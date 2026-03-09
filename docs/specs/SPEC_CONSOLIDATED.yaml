@@ -8,7 +8,7 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-09"
-  total_features: 67
+  total_features: 68
   total_business_rules: 49
   total_design_decisions: 66
 
@@ -1615,6 +1615,50 @@ features:
         when: "Maestro queries for testID 'swipeable-edit-button'"
         then: "The edit button is found and can be tapped"
 
+  - id: F020_E2E
+    name: "E2E Testing — Phase 4 (Settings + Invite + Cleanup)"
+    area: e2e_testing
+    description: |
+      Extends F019_E2E with two new Maestro flows (07-invite.yaml and
+      08-settings.yaml), testID props on users.tsx (invite modal) and
+      invite/[token].tsx (for future tests), a Deno cleanup script for
+      test data, and an updated README. Flow 07-invite: Login as bishopric
+      -> Settings > Users -> create invitation for secretary -> verify
+      success message and deep link URL displayed -> close modal -> logout.
+      NOTE: Does NOT test invite registration (browser-based, outside
+      Maestro scope). Flow 08-settings: Login -> Settings -> theme toggle
+      (Claro/Escuro/Automatico) -> app language round-trip (pt-BR -> en-US
+      -> verify 'Settings'/'Light/Dark Theme'/'App Language', en-US -> pt-BR
+      -> verify 'Configuracoes'/'Tema Claro/Escuro'/'Idioma do App') ->
+      logout. testIDs: users.tsx (~10: users-invite-button, users-invite-
+      email-input, users-invite-role-{role}-radio x3, users-invite-submit-
+      button, users-invite-success-text, users-invite-link-text,
+      users-invite-copy-button, users-invite-close-button),
+      invite/[token].tsx (5 for future: invite-fullname-input, invite-
+      password-input, invite-confirm-password-input, invite-submit-button,
+      invite-error-text). Cleanup: e2e/scripts/cleanup.ts Deno script
+      using Supabase admin SDK to delete e2e-*@test.com users and their
+      wards. [CR-284]
+    acceptance_criteria:
+      - given: "Bishopric user is logged in on Users screen"
+        when: "Maestro flow 07-invite creates invitation for secretary role"
+        then: "Invitation created, success message and deep link URL displayed"
+      - given: "Invitation success visible"
+        when: "Maestro closes modal and logs out"
+        then: "App returns to login screen"
+      - given: "User is on Settings screen with pt-BR"
+        when: "Maestro flow 08-settings taps 'Tema Claro/Escuro' and selects 'Escuro'"
+        then: "Dark theme applied, Escuro option shows checkmark"
+      - given: "User is on Settings screen with pt-BR"
+        when: "Maestro taps 'Idioma do App' and selects 'English'"
+        then: "UI changes to English, 'Settings' title visible"
+      - given: "App language is en-US"
+        when: "Maestro taps 'App Language' and selects 'Portugues (Brasil)'"
+        then: "UI returns to Portuguese, 'Configuracoes' title visible"
+      - given: "e2e/scripts/cleanup.ts exists with SUPABASE_URL and SERVICE_ROLE_KEY"
+        when: "Script is executed via Deno"
+        then: "Auth users matching e2e-*@test.com and their wards are deleted"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -2187,3 +2231,24 @@ edge_cases:
 
   - id: EC052
     description: "SearchInput already passes testID to inner TextInput via ...rest spread. No code change needed for SearchInput.tsx; callers just pass testID prop. [CR-284]"
+
+  - id: EC053
+    description: "Flow 07-invite tests ONLY invitation creation (modal open, fill email, select role, submit, verify success). Does NOT test invite registration — browser-based flow is outside Maestro scope. testIDs still added to invite/[token].tsx for future tests. [CR-284]"
+
+  - id: EC054
+    description: "Invite modal submit with empty email -> submit Pressable has opacity 0.5 and disabled={true}, no API call. [CR-284]"
+
+  - id: EC055
+    description: "Language change round-trip in 08-settings: LANGUAGE_LABELS are 'Portugues (Brasil)', 'English', 'Espanol' (not locale codes). en-US strings: 'Settings', 'Light/Dark Theme', 'App Language'. [CR-284]"
+
+  - id: EC056
+    description: "Theme screen options use i18n keys theme.automatic/light/dark -> pt-BR: 'Automatico', 'Claro', 'Escuro'. No testIDs needed, text targeting is reliable. [CR-284]"
+
+  - id: EC057
+    description: "Cleanup script handles partial state: user exists but ward already deleted -> try/catch per user, continues to next. No e2e users found -> outputs message and exits cleanly. [CR-284]"
+
+  - id: EC058
+    description: "Flow 07 depends on 01-register output vars (TEST_EMAIL/TEST_PASSWORD). Running 07 standalone fails at login step. [CR-284]"
+
+  - id: EC059
+    description: "Users screen loads via list-users Edge Function (network call). Maestro uses extendedWaitUntil for users-invite-button with 15s timeout. [CR-284]"

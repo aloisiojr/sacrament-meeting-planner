@@ -1,0 +1,747 @@
+# =============================================================================
+# QA_PLAN_020.yaml
+# PRE validation: E2E Testing with Maestro - Phase 4
+# Settings flows + Invite flow + Cleanup + README update
+# =============================================================================
+
+metadata:
+  artifact_id: "020"
+  mode: PRE
+  date: "2026-03-09"
+  scope: "Phase 4 - testIDs on settings/users/invite screens + flows 07-invite, 08-settings + cleanup script + README update"
+  cr: [284]
+  validated: true
+
+user_request: |
+  Testes E2E com Maestro para publicação nas lojas. Usar banco de produção com ward isolada.
+  Adicionar testIDs nos componentes e criar fluxos Maestro.
+  Fase 4: Settings (language, theme changes), invite (criar convite + registrar convidado na
+  mesma ward), cleanup script, instruções de execução no README.
+
+# =============================================================================
+# PRE-VALIDATION EVIDENCE
+# =============================================================================
+
+evidence:
+
+  - id: EV01
+    category: codebase_state
+    description: "Phases 1-3 complete — 6 Maestro flows exist (01 through 06)"
+    search: "Glob e2e/maestro/*.yaml returns 6 files: 01-register, 02-login-logout, 03-home-presentation, 04-agenda, 05-speeches, 06-members"
+    conclusion: |
+      All 6 flows from phases 1-3 are in place. Phase 4 will add flows 07 and 08.
+      Existing README at e2e/README.md has basic run instructions but no cleanup or full-suite info.
+
+  - id: EV02
+    category: target_files
+    description: "Settings index.tsx — has 2 testIDs, needs more for E2E"
+    file: "src/app/(tabs)/settings/index.tsx"
+    findings: |
+      - Existing testIDs: settings-members-button (line 224), settings-sign-out-button (line 329)
+      - SettingsItem component accepts testID prop (line 28, 37) — already wired
+      - Missing testIDs: settings-users-button (Users item at line 298), settings-theme-button (Theme item at line 319),
+        settings-app-language-button (App Language item at line 313), settings-about-button (About item at line 323)
+      - App Language Modal: has language options but NO testIDs on option Pressables
+      - Ward Language section: inline Pressable (line 259-279) — no testID
+
+  - id: EV03
+    category: target_files
+    description: "Users management screen — ZERO testIDs"
+    file: "src/app/(tabs)/settings/users.tsx"
+    findings: |
+      - Invite button: Pressable at line 295-302 with accessibilityLabel but no testID
+      - Invite modal: Modal at line 514-650 with email input, role selector, submit button — zero testIDs
+      - User list: users.map() at line 335-510 — user cards have no testID
+      - Invite result: deep link text (selectable), Copy/Share buttons — no testIDs
+      - Key testIDs needed:
+        * users-invite-button (invite header button)
+        * users-invite-email-input (email TextInput in modal)
+        * users-invite-role-{role}-radio (role selector in modal)
+        * users-invite-submit-button (submit in modal)
+        * users-invite-link-text (deep link display)
+        * users-invite-copy-button (copy link button)
+        * users-invite-close-button (close modal after success)
+        * users-back-button (back navigation)
+
+  - id: EV04
+    category: target_files
+    description: "Invite registration screen — ZERO testIDs"
+    file: "src/app/(auth)/invite/[token].tsx"
+    findings: |
+      - Read-only fields: stake, ward, role, email — TextInput with editable={false}, no testIDs
+      - Full Name input: TextInput at line 285-303 — no testID
+      - Password input: TextInput at line 311-328 — no testID
+      - Confirm Password input: TextInput at line 335-353 — no testID
+      - Submit button: TouchableOpacity at line 357-376 — no testID
+      - Error container: View at line 190-200 — no testID
+      - Key testIDs needed:
+        * invite-fullname-input
+        * invite-password-input
+        * invite-confirm-password-input
+        * invite-submit-button
+        * invite-error-text
+        * invite-stake-text (read-only field)
+        * invite-ward-text (read-only field)
+
+  - id: EV05
+    category: target_files
+    description: "Theme screen — ZERO testIDs"
+    file: "src/app/(tabs)/settings/theme.tsx"
+    findings: |
+      - Theme options: 3 Pressable items (automatic, light, dark) at lines 47-64
+      - Each option has accessibilityRole="radio" but no testID
+      - Back button: Pressable at line 32-35 — no testID
+      - Key testIDs needed:
+        * theme-back-button
+        * theme-option-{mode}-radio (automatic, light, dark)
+
+  - id: EV06
+    category: architecture
+    description: "Invite flow architecture analysis — deep link chain"
+    findings: |
+      - create-invitation Edge Function generates deep link:
+        ${SUPABASE_URL}/functions/v1/invite-redirect?token=${token}
+      - invite-redirect returns HTTP 302 to external page:
+        ${EXTERNAL_PAGES_URL}/accept-invite.html?token=${token}
+      - External page (GitHub Pages) opens app via scheme:
+        sacrmeetplan://invite/${token}
+      - App scheme: "sacrmeetplan" (app.json line 10)
+      - Expo Router: (auth)/invite/[token].tsx handles the route
+      - NavigationGuard: unauthenticated users stay in (auth) group
+      - register-invited-user Edge Function: dual-purpose
+        * token-only request: validates token, returns invitation data
+        * full request (token + password + fullName): creates user + returns session
+
+  - id: EV07
+    category: flow_design
+    description: "Invite flow E2E interaction plan"
+    findings: |
+      - CHALLENGE: Flow requires 2 user sessions — bishopric (creates invite) and invited user (registers)
+      - Maestro can use `openLink` to navigate via deep link scheme
+      - Maestro can use `copyTextFrom` to extract the invite link from the screen
+      - FLOW DESIGN:
+        1. Login as bishopric (existing test user from 01-register)
+        2. Navigate: Configurações tab -> Usuários do App
+        3. Tap "Convidar Usuário" button
+        4. Fill email (e2e-invite-{timestamp}@test.com), select role (observer)
+        5. Tap submit -> wait for invite success
+        6. Extract invite link text (copyTextFrom or directly use evalScript)
+        7. Close modal, logout
+        8. Open invite link via openLink (sacrmeetplan://invite/{token})
+        9. Fill form: full name, password, confirm password
+        10. Submit -> wait for home screen
+        11. Verify user is in the same ward (sees same ward name)
+      - CRITICAL ISSUE: Extracting the token from the deep link text displayed on screen
+        is complex. The link is displayed as a Supabase URL (not the app scheme).
+        Maestro cannot easily parse text content and extract a UUID from it.
+      - ALTERNATIVE: Use evalScript with Maestro's JavaScript to:
+        a) Skip extracting the link from UI
+        b) Instead, call the create-invitation API directly via fetch() in evalScript
+        c) Parse the response to get the token
+        d) Build the app deep link: sacrmeetplan://invite/{token}
+        e) Use openLink to navigate
+      - PROBLEM with alternative: evalScript fetch() may not have auth credentials
+      - SIMPLEST VIABLE APPROACH:
+        a) After invite success, the deep link text is displayed in a selectable Text
+        b) The link format: https://...supabase.co/functions/v1/invite-redirect?token=UUID
+        c) We can extract just the token UUID by reading the text and parsing
+        d) BUT: Maestro's copyTextFrom only copies text, doesn't provide it to evalScript easily
+      - RECOMMENDED APPROACH (most reliable):
+        a) Create invite via UI (steps 1-5 above)
+        b) After invite success, the token is in the displayed URL
+        c) Use a testID on the link text element to grab it
+        d) Use Maestro's `copyTextFrom` with id: users-invite-link-text
+        e) Use clipboard/evalScript to parse token from URL
+        f) OR: The invite screen shows the full Supabase URL, but the invite-redirect
+           would need browser. Instead, construct sacrmeetplan://invite/{token}
+        g) SIMPLEST: Add testID to the link text. In the flow, use `openLink` with
+           the sacrmeetplan:// scheme directly. But we need the token value.
+      - DECISION: The invite E2E test will use a hybrid approach:
+        Step 1-6: Create invite via UI, extract token using Maestro clipboard
+        Step 7: Logout
+        Step 8-11: Use openLink with extracted token to register
+        NOTE: If clipboard extraction is unreliable, the test can use the Supabase
+        API directly via a helper script to create the invitation.
+
+  - id: EV08
+    category: flow_design
+    description: "Settings flow E2E interaction plan (language + theme)"
+    findings: |
+      - FLOW DESIGN for 08-settings.yaml:
+        1. Login as bishopric
+        2. Navigate to Configurações tab (already on it after login? — verify)
+        3. Tap "Tema Claro/Escuro" item
+        4. Tap "Claro" option -> verify selected (checkmark)
+        5. Tap "Escuro" option -> verify selected
+        6. Tap "Automático" option -> verify selected (restore default)
+        7. Tap back button
+        8. Tap app language item -> modal opens
+        9. Tap "English" option -> verify language changes (settings labels change to English)
+        10. Reopen language modal -> tap "Portugues (Brasil)" to restore
+        11. Verify labels back in Portuguese
+      - FEASIBILITY: Straightforward UI interaction, no external dependencies
+      - RISK: Language change affects ALL UI strings — need to use English strings for assertions
+        after changing to English, then switch back to Portuguese
+      - NOTE: Ward language change is more destructive (resets templates, changes collections)
+        so it should NOT be tested in E2E — skip ward language change
+
+  - id: EV09
+    category: cleanup
+    description: "Cleanup approach analysis — no existing cleanup script"
+    findings: |
+      - Currently: README says "Delete test wards manually from the Supabase dashboard"
+      - No cleanup script exists (Glob e2e/**/cleanup* returns empty)
+      - Supabase has delete-user Edge Function but it requires JWT + same ward + bishopric role
+      - Ward cleanup options:
+        a) Supabase SQL query (requires service_role_key — NOT safe for script)
+        b) Use delete-user Edge Function from within the test flow itself (delete the ward's users)
+        c) Create a dedicated cleanup Edge Function (overkill)
+        d) Create a local cleanup script using Supabase JS client with service_role_key
+      - DECISION: Create a standalone cleanup script (e2e/cleanup.ts) that:
+        1. Uses Supabase admin client (service_role_key from env)
+        2. Finds test users by email pattern: e2e-*@test.com
+        3. Finds their ward_ids from app_metadata
+        4. Deletes: users (auth), ward data (speeches, agendas, members, etc.), ward itself
+        5. Runs via: npx tsx e2e/cleanup.ts
+      - ALTERNATIVE (simpler): Add cleanup as part of the E2E flow itself
+        * Flow 01 registers user, all other flows use that user
+        * Last flow (or a separate 99-cleanup.yaml) logs in and uses delete-user API
+        * Problem: Can't delete self via delete-user, and can't delete ward
+      - FINAL DECISION: Standalone TypeScript cleanup script is the best approach.
+        It runs outside Maestro, uses service_role_key to clean up test data.
+        Add to e2e/cleanup.ts with instructions in README.
+
+  - id: EV10
+    category: i18n_strings
+    description: "Key pt-BR and en-US strings needed for Maestro assertions"
+    findings: |
+      PT-BR strings:
+      - settings.users: "Usuários do App"
+      - settings.theme: "Tema Claro/Escuro"
+      - settings.appLanguage: "Idioma do App"
+      - settings.signOut: "Sair"
+      - settings.signOutTitle: "Sair"
+      - users.title: "Usuários do App"
+      - users.inviteUser: "Convidar Usuário"
+      - users.inviteSuccess: "Convite criado com sucesso"
+      - users.copyLink: "Copiar Link"
+      - users.shareLink: "Compartilhar Link"
+      - theme.automatic: "Automático"
+      - theme.light: "Claro"
+      - theme.dark: "Escuro"
+      - roles.bishopric: "Bispado"
+      - roles.secretary: "Secretário"
+      - roles.observer: "Observador"
+      - auth.inviteTitle: "Criar Conta"
+      - auth.inviteSubtitle: "Registro por convite"
+      - auth.createAccountButton: "Criar Conta"
+      - common.close: "Fechar"
+      - common.confirm: "Confirmar"
+
+      EN-US strings (for language-change verification):
+      - settings.title: "Settings" (need to verify)
+      - settings.theme: need to check en-US.json
+
+  - id: EV11
+    category: conventions
+    description: "testID naming convention — {screen}-{element}-{type} kebab-case"
+    source: "e2e/README.md"
+    findings: |
+      - Existing convention from README: -input, -button, -text, -radio
+      - New screen prefixes for Phase 4: users, invite, theme, settings (existing)
+      - Dynamic testIDs use template literals for roles: users-invite-role-${r}-radio
+
+  - id: EV12
+    category: codebase_state
+    description: "Existing unit test count and E2E test files"
+    findings: |
+      - 3 E2E test files exist: f017-e2e-testing.test.ts, f018-e2e-phase2.test.ts, f019-e2e-phase3.test.ts
+      - These validate testID presence in source files
+      - Phase 4 will need f020-e2e-phase4.test.ts for new testIDs
+      - 1707+ unit tests passing per project memory
+
+# =============================================================================
+# FEASIBILITY ASSESSMENT
+# =============================================================================
+
+feasibility:
+  verdict: FEASIBLE
+  risks:
+    - id: R01
+      severity: high
+      description: "Invite flow requires extracting token from displayed deep link text"
+      mitigation: |
+        Add testID to the invite link Text element (users-invite-link-text).
+        Use Maestro's copyTextFrom to grab the URL, then parse the token UUID
+        from the query parameter with evalScript. Construct the app deep link:
+        sacrmeetplan://invite/{token} and use openLink to navigate.
+        If clipboard extraction is unreliable, fall back to a simpler approach:
+        the flow can use the Supabase API directly in evalScript to create an
+        invitation and get the token programmatically.
+
+    - id: R02
+      severity: high
+      description: "Invite flow requires logout + re-login with different user — session management"
+      mitigation: |
+        After creating the invite, the bishopric user must logout.
+        Use existing logout pattern from 02-login-logout: tap settings sign-out,
+        confirm alert. Wait for login screen. Then use openLink to navigate to
+        invite screen (which is in auth group, accessible when unauthenticated).
+        After invited user registers, auth state changes and navigation guard
+        redirects to tabs — verify by waiting for "Inicio" / home screen.
+
+    - id: R03
+      severity: medium
+      description: "Language change test — UI strings change mid-flow"
+      mitigation: |
+        After changing app language to English, all assertions must use English
+        strings (e.g., "Settings" instead of "Configurações"). Change back to
+        Portuguese before the flow ends to not affect subsequent flows.
+        Keep language-change test isolated within 08-settings.yaml.
+
+    - id: R04
+      severity: medium
+      description: "Cleanup script needs service_role_key — security concern"
+      mitigation: |
+        Script reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from environment
+        variables (not hardcoded). Add clear documentation that the script should
+        only be run in development/testing context. The .gitignore already excludes
+        .env files. Script confirms before deleting.
+
+    - id: R05
+      severity: low
+      description: "Theme change visual verification limited in Maestro"
+      mitigation: |
+        Maestro can verify theme radio selection state via assertVisible on
+        checkmark icons. Cannot easily verify actual color changes, but can
+        verify the selected option changes when tapped. This is sufficient.
+
+    - id: R06
+      severity: medium
+      description: "Invite flow depends on create-invitation Edge Function and register-invited-user — network latency"
+      mitigation: |
+        Add generous timeouts (15000ms) for Edge Function calls.
+        Use extendedWaitUntil for network-dependent transitions.
+
+    - id: R07
+      severity: low
+      description: "Invite flow creates a second user — must clean up after test"
+      mitigation: |
+        The cleanup script handles this. Test wards and users are identifiable
+        by email pattern (e2e-*@test.com) and ward name ("E2E Test Ward").
+
+# =============================================================================
+# VALIDATION CHECKS (for POST validation)
+# =============================================================================
+
+validation_checks:
+
+  must_pass:
+
+    # --- testID additions: Settings index ---
+    - id: MP01
+      description: "testID added to Users SettingsItem"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx SettingsItem for users has testID='settings-users-button'"
+
+    - id: MP02
+      description: "testID added to Theme SettingsItem"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx SettingsItem for theme has testID='settings-theme-button'"
+
+    - id: MP03
+      description: "testID added to App Language SettingsItem"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx SettingsItem for app language has testID='settings-app-language-button'"
+
+    # --- testID additions: Users screen ---
+    - id: MP04
+      description: "testID added to Users invite button"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx invite Pressable has testID='users-invite-button'"
+
+    - id: MP05
+      description: "testID added to Users invite email input"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx invite modal TextInput for email has testID='users-invite-email-input'"
+
+    - id: MP06
+      description: "testID added to Users invite submit button"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx invite modal submit Pressable has testID='users-invite-submit-button'"
+
+    - id: MP07
+      description: "testID added to Users invite link text"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx invite result Text has testID='users-invite-link-text'"
+
+    - id: MP08
+      description: "testID added to Users invite copy link button"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx copy link Pressable has testID='users-invite-copy-button'"
+
+    - id: MP09
+      description: "testID added to Users invite close modal button"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx close Pressable (after success) has testID='users-invite-close-button'"
+
+    - id: MP10
+      description: "testID added to Users invite role radio buttons"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx role selector Pressable has testID={`users-invite-role-${role}-radio`}"
+
+    - id: MP11
+      description: "testID added to Users back button"
+      how_to_verify: "src/app/(tabs)/settings/users.tsx back Pressable has testID='users-back-button'"
+
+    # --- testID additions: Invite screen ---
+    - id: MP12
+      description: "testID added to Invite full name input"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx full name TextInput has testID='invite-fullname-input'"
+
+    - id: MP13
+      description: "testID added to Invite password input"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx password TextInput has testID='invite-password-input'"
+
+    - id: MP14
+      description: "testID added to Invite confirm password input"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx confirm password TextInput has testID='invite-confirm-password-input'"
+
+    - id: MP15
+      description: "testID added to Invite submit button"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx submit TouchableOpacity has testID='invite-submit-button'"
+
+    # --- testID additions: Theme screen ---
+    - id: MP16
+      description: "testID added to Theme option radio buttons (dynamic per mode)"
+      how_to_verify: "src/app/(tabs)/settings/theme.tsx Pressable for each option has testID={`theme-option-${mode}-radio`}"
+
+    - id: MP17
+      description: "testID added to Theme back button"
+      how_to_verify: "src/app/(tabs)/settings/theme.tsx back Pressable has testID='theme-back-button'"
+
+    # --- Maestro flows ---
+    - id: MP18
+      description: "07-invite.yaml flow exists and tests invitation creation + invited user registration"
+      how_to_verify: |
+        e2e/maestro/07-invite.yaml:
+        - Logs in with existing credentials (from 01-register)
+        - Navigates to Settings -> Users (Usuários do App)
+        - Taps "Convidar Usuário" button
+        - Fills email and selects role (observer or secretary)
+        - Submits invitation
+        - Waits for success message
+        - Extracts token from displayed deep link
+        - Closes invite modal
+        - Logs out (sign out flow)
+        - Opens app deep link: sacrmeetplan://invite/{token}
+        - Fills form: full name, password, confirm password
+        - Submits registration
+        - Waits for home screen (verifies user entered same ward)
+
+    - id: MP19
+      description: "08-settings.yaml flow exists and tests theme + app language changes"
+      how_to_verify: |
+        e2e/maestro/08-settings.yaml:
+        - Logs in with existing credentials
+        - Navigates to Configurações tab
+        - Taps Theme item -> theme screen
+        - Selects Light theme -> verifies selected
+        - Selects Dark theme -> verifies selected
+        - Selects Automatic -> back to settings
+        - Taps App Language item -> language modal
+        - Selects English -> verifies UI strings changed
+        - Reopens language -> selects Portuguese -> verifies restored
+        - Flow ends on Settings screen in Portuguese
+
+    - id: MP20
+      description: "Cleanup script exists at e2e/cleanup.ts"
+      how_to_verify: |
+        e2e/cleanup.ts exists and:
+        - Uses Supabase admin client (service_role_key from env)
+        - Finds test users by email pattern (e2e-*@test.com)
+        - Deletes test users and their ward data
+        - Can be run via: npx tsx e2e/cleanup.ts
+
+    - id: MP21
+      description: "e2e/README.md updated with Phase 4 content"
+      how_to_verify: |
+        README.md includes:
+        - Flow 07-invite description
+        - Flow 08-settings description
+        - Cleanup script usage instructions (npx tsx e2e/cleanup.ts)
+        - Full sequential run instructions
+        - Environment variables needed for cleanup (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    - id: MP22
+      description: "Existing unit tests still pass (no regressions from testID additions)"
+      how_to_verify: "Run vitest run — all 1707+ tests pass"
+
+    - id: MP23
+      description: "All new testIDs follow {screen}-{element}-{type} kebab-case convention"
+      how_to_verify: "All testIDs added in Phase 4 match kebab-case pattern with screen prefix"
+
+  should_pass:
+
+    - id: SP01
+      description: "testID added to Settings about item"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx SettingsItem for about has testID='settings-about-button'"
+
+    - id: SP02
+      description: "testID added to Settings history item"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx SettingsItem for history has testID='settings-history-button'"
+
+    - id: SP03
+      description: "testID added to Invite error text"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx error View has testID='invite-error-text'"
+
+    - id: SP04
+      description: "testID added to Invite stake/ward/role read-only fields"
+      how_to_verify: "src/app/(auth)/invite/[token].tsx read-only TextInputs have testID props"
+
+    - id: SP05
+      description: "App language modal options have testIDs"
+      how_to_verify: "src/app/(tabs)/settings/index.tsx Pressable for each language has testID={`settings-app-language-${lang}-radio`}"
+
+    - id: SP06
+      description: "Maestro flows use testID selectors where testIDs are available"
+      how_to_verify: "Flow YAML files reference elements by id: (testID) for elements that have testIDs"
+
+    - id: SP07
+      description: "Flows include appropriate wait commands for network operations"
+      how_to_verify: "After invite creation and registration, flows use extendedWaitUntil with generous timeouts"
+
+    - id: SP08
+      description: "New E2E tests added for Phase 4 testID validation"
+      how_to_verify: "src/__tests__/f020-e2e-phase4.test.ts exists with testID cross-validation tests"
+
+    - id: SP09
+      description: "Cleanup script has confirmation prompt before deleting"
+      how_to_verify: "e2e/cleanup.ts prompts user or has --force flag for CI"
+
+    - id: SP10
+      description: "08-settings.yaml restores Portuguese language before ending"
+      how_to_verify: "Flow ends with pt-BR language to not affect subsequent flows"
+
+# =============================================================================
+# TESTID PLAN — NEW IDS FOR PHASE 4
+# =============================================================================
+
+testid_plan:
+
+  settings_screen:
+    - testID: "settings-users-button"
+      element: "SettingsItem — Users navigation"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "297-300"
+
+    - testID: "settings-theme-button"
+      element: "SettingsItem — Theme navigation"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "317-320"
+
+    - testID: "settings-app-language-button"
+      element: "SettingsItem — App Language"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "310-315"
+
+    - testID: "settings-about-button"
+      element: "SettingsItem — About"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "321-324"
+
+    - testID: "settings-history-button"
+      element: "SettingsItem — History"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "303-306"
+
+    - testID: "settings-app-language-${lang}-radio"
+      element: "Pressable — App language option"
+      file: "src/app/(tabs)/settings/index.tsx"
+      line_area: "356-374"
+      dynamic: true
+      note: "lang values: pt-BR, en-US, es-LA"
+
+  users_screen:
+    - testID: "users-invite-button"
+      element: "Pressable — Invite User button (header)"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "295-302"
+
+    - testID: "users-back-button"
+      element: "Pressable — Back button"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "287-291"
+
+    - testID: "users-invite-email-input"
+      element: "TextInput — Email in invite modal"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "532-548"
+
+    - testID: "users-invite-role-${role}-radio"
+      element: "Pressable — Role option in invite modal"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "552-577"
+      dynamic: true
+      note: "role values: bishopric, secretary, observer"
+
+    - testID: "users-invite-submit-button"
+      element: "Pressable — Submit invite button"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "581-600"
+
+    - testID: "users-invite-link-text"
+      element: "Text — Displayed deep link after invite success"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "608-616"
+
+    - testID: "users-invite-copy-button"
+      element: "Pressable — Copy link button"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "618-622"
+
+    - testID: "users-invite-close-button"
+      element: "Pressable — Close modal after success"
+      file: "src/app/(tabs)/settings/users.tsx"
+      line_area: "637-645"
+
+  invite_screen:
+    - testID: "invite-fullname-input"
+      element: "TextInput — Full name field"
+      file: "src/app/(auth)/invite/[token].tsx"
+      line_area: "285-303"
+
+    - testID: "invite-password-input"
+      element: "TextInput — Password field"
+      file: "src/app/(auth)/invite/[token].tsx"
+      line_area: "311-328"
+
+    - testID: "invite-confirm-password-input"
+      element: "TextInput — Confirm password field"
+      file: "src/app/(auth)/invite/[token].tsx"
+      line_area: "335-353"
+
+    - testID: "invite-submit-button"
+      element: "TouchableOpacity — Submit registration button"
+      file: "src/app/(auth)/invite/[token].tsx"
+      line_area: "357-376"
+
+    - testID: "invite-error-text"
+      element: "View — Error container"
+      file: "src/app/(auth)/invite/[token].tsx"
+      line_area: "190-200"
+
+  theme_screen:
+    - testID: "theme-option-${mode}-radio"
+      element: "Pressable — Theme option"
+      file: "src/app/(tabs)/settings/theme.tsx"
+      line_area: "47-64"
+      dynamic: true
+      note: "mode values: automatic, light, dark"
+
+    - testID: "theme-back-button"
+      element: "Pressable — Back button"
+      file: "src/app/(tabs)/settings/theme.tsx"
+      line_area: "32-35"
+
+# =============================================================================
+# IMPLEMENTATION GUIDANCE
+# =============================================================================
+
+implementation_notes:
+
+  files_to_modify:
+    - path: "src/app/(tabs)/settings/index.tsx"
+      changes: |
+        Add testID to existing SettingsItem usages:
+        - Users: testID="settings-users-button" (line ~298)
+        - Theme: testID="settings-theme-button" (line ~319)
+        - App Language: testID="settings-app-language-button" (line ~313)
+        - About: testID="settings-about-button" (line ~323)
+        - History: testID="settings-history-button" (line ~305)
+        Add testID to app language modal options:
+        - Pressable for each lang: testID={`settings-app-language-${lang}-radio`}
+
+    - path: "src/app/(tabs)/settings/users.tsx"
+      changes: |
+        Add testID to:
+        - Invite button: testID="users-invite-button"
+        - Back button: testID="users-back-button"
+        - Email input (modal): testID="users-invite-email-input"
+        - Role selector (modal): testID={`users-invite-role-${role}-radio`}
+        - Submit button (modal): testID="users-invite-submit-button"
+        - Link text (result): testID="users-invite-link-text"
+        - Copy button (result): testID="users-invite-copy-button"
+        - Close button (result): testID="users-invite-close-button"
+
+    - path: "src/app/(auth)/invite/[token].tsx"
+      changes: |
+        Add testID to:
+        - Full name TextInput: testID="invite-fullname-input"
+        - Password TextInput: testID="invite-password-input"
+        - Confirm password TextInput: testID="invite-confirm-password-input"
+        - Submit TouchableOpacity: testID="invite-submit-button"
+        - Error container: testID="invite-error-text"
+
+    - path: "src/app/(tabs)/settings/theme.tsx"
+      changes: |
+        Add testID to:
+        - Back button Pressable: testID="theme-back-button"
+        - Theme option Pressable: testID={`theme-option-${mode}-radio`}
+
+  files_to_create:
+    - path: "e2e/maestro/07-invite.yaml"
+      description: |
+        Flow: Login -> Settings -> Users -> Create invite (email + observer role) ->
+        Wait for success -> Extract token from link -> Close modal -> Logout ->
+        Open sacrmeetplan://invite/{token} -> Fill name + password + confirm ->
+        Submit -> Wait for home screen (verify successful registration)
+
+    - path: "e2e/maestro/08-settings.yaml"
+      description: |
+        Flow: Login -> Settings tab ->
+        Tap Theme -> Select Light -> verify -> Select Dark -> verify ->
+        Select Automatic -> back ->
+        Tap App Language -> Select English -> verify English UI strings ->
+        Reopen language -> Select Portuguese -> verify Portuguese restored
+
+    - path: "e2e/cleanup.ts"
+      description: |
+        Standalone cleanup script:
+        - Import @supabase/supabase-js
+        - Read SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from env
+        - List all auth users matching e2e-*@test.com email pattern
+        - For each user: get ward_id from app_metadata
+        - Delete users from auth
+        - Delete ward data (speeches, agendas, members, etc.) via cascade or manual
+        - Delete ward from wards table
+        - Log actions taken
+        - Run via: npx tsx e2e/cleanup.ts
+
+    - path: "src/__tests__/f020-e2e-phase4.test.ts"
+      description: |
+        Unit tests validating testID presence in Phase 4 source files:
+        - settings/index.tsx has settings-users-button, settings-theme-button, etc.
+        - settings/users.tsx has users-invite-button, users-invite-email-input, etc.
+        - invite/[token].tsx has invite-fullname-input, invite-password-input, etc.
+        - settings/theme.tsx has theme-option-{mode}-radio, theme-back-button
+
+  files_to_update:
+    - path: "e2e/README.md"
+      description: |
+        Add sections:
+        - Flow 07-invite description
+        - Flow 08-settings description
+        - Cleanup script usage (with environment variable setup)
+        - Full sequential run instructions
+        - Note about running cleanup after test suite
+
+  maestro_flow_notes: |
+    - CRITICAL: Both flows login with existing credentials from 01-register
+    - Flow 07 (invite) is the most complex flow in the suite:
+      * Creates a second user via invite mechanism
+      * Requires logout + re-entry via deep link
+      * Uses evalScript to parse token from URL
+      * Invited user email: e2e-invite-{timestamp}@test.com (different from test user)
+    - Flow 08 (settings) is straightforward but language change affects assertion strings
+    - Flow order: 07 creates an extra user in the ward, 08 tests settings
+    - Cleanup: e2e/cleanup.ts should be run after the full suite to delete test data
+    - managePrayers=false by default: ward language item may not be visible to observer
+    - Theme changes are visual — verify via radio selection state only
+
+  testid_count_estimate: |
+    Phase 4 adds approximately 22-26 new testID props:
+    - settings/index.tsx: ~8 (users, theme, appLanguage, about, history + language modal options)
+    - settings/users.tsx: ~8 (invite button, back, email, roles, submit, link, copy, close)
+    - invite/[token].tsx: ~5 (fullname, password, confirm, submit, error)
+    - settings/theme.tsx: ~4 (back + 3 theme options)

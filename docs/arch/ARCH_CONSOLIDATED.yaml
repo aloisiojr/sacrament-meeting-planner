@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-09 (CR-284: E2E Testing with Maestro — Phase 3)
+# Last updated: 2026-03-09 (CR-284: E2E Testing with Maestro — Phase 4)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-09"
   total_modules: 14
-  total_adrs: 57
+  total_adrs: 58
 
 # =============================================================================
 # TECH STACK
@@ -476,8 +476,10 @@ modules:
       (home-presentation, agenda). Phase 3: testID props on SpeechSlot,
       MemberSelectorModal, StatusChangeModal, TopicSelectorModal, SundayCard,
       Members screen, SwipeableCard, SettingsItem; 2 flow files (speeches,
-      members). Tests run against production Supabase with RLS isolation.
-    features: [F017_E2E, F018_E2E, F019_E2E]
+      members). Phase 4: testID props on users.tsx (invite modal) and
+      invite/[token].tsx; 2 flow files (invite, settings); cleanup script
+      (Deno). Tests run against production Supabase with RLS isolation.
+    features: [F017_E2E, F018_E2E, F019_E2E, F020_E2E]
     components:
       # Phase 1 flows
       - path: e2e/maestro/01-register.yaml
@@ -494,6 +496,14 @@ modules:
         responsibility: E2E flow for Settings -> add member -> Speeches tab -> assign speaker -> change status -> topic modal -> collapse
       - path: e2e/maestro/06-members.yaml
         responsibility: E2E flow for Settings -> Members -> add member -> edit (swipe) -> delete (swipe + confirm) -> verify
+      # Phase 4 flows
+      - path: e2e/maestro/07-invite.yaml
+        responsibility: E2E flow for login -> Users -> create invitation -> verify success -> close modal -> logout (creation only, no registration)
+      - path: e2e/maestro/08-settings.yaml
+        responsibility: E2E flow for login -> Settings -> theme changes -> language round-trip (pt-BR -> en-US -> pt-BR) -> logout
+      # Cleanup script
+      - path: e2e/scripts/cleanup.ts
+        responsibility: Deno script for deleting e2e-*@test.com test users and their associated wards via Supabase admin SDK
       - path: e2e/README.md
         responsibility: E2E testing documentation
     testid_targets:
@@ -540,6 +550,13 @@ modules:
         count: 8
       - path: src/components/SwipeableCard.tsx
         count: 2
+      # Phase 4
+      - path: src/app/(tabs)/settings/users.tsx
+        count: 10
+        note: "Invite-related testIDs: button, email, role radios x3, submit, success, link, copy, close"
+      - path: src/app/(auth)/invite/[token].tsx
+        count: 5
+        note: "Registration testIDs: fullname, password, confirm, submit, error (2 locations same ID)"
     dependencies:
       - "Maestro CLI"
       - "Java 17"
@@ -1468,3 +1485,14 @@ adrs:
       A fresh test ward has zero members. Creating the member within flow 05 makes
       it independent of flow 06 execution order. Each flow can run individually
       after 01-register.
+
+  - id: ADR-058
+    title: "Deno cleanup script with Supabase admin SDK for test data cleanup"
+    decision: |
+      Create e2e/scripts/cleanup.ts as a Deno script that uses Supabase admin SDK
+      to list auth users matching e2e-*@test.com, delete their wards (cascade), and
+      delete the auth users. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars.
+    rationale: |
+      E2E test runs accumulate test users and wards. Deno is consistent with the
+      project Edge Functions runtime. Per-user try/catch handles partial state
+      gracefully. Service role key is passed via env, not committed to repo.

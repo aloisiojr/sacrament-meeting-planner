@@ -1,0 +1,401 @@
+# =============================================================================
+# SPEC_F020.yaml
+# E2E Testing with Maestro — Phase 4: Settings + Invite + Cleanup
+# Artifact ID: 020
+# CR: 284
+# Created: 2026-03-09
+# Updated: 2026-03-09 (user OQ answers applied)
+# Status: COMPLETE
+# =============================================================================
+
+metadata:
+  artifact_id: "020"
+  cr: 284
+  phase: 4
+  title: "E2E Testing with Maestro — Phase 4: Settings + Invite + Cleanup"
+  status: complete
+  created: "2026-03-09"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  type: spec_summary
+  feature_id: F020_E2E
+  status: complete
+  ac_count: 24
+  edge_cases_count: 9
+
+  pending:
+    open_questions: 0
+    assumptions: 2
+    inconsistencies: 0
+
+# =============================================================================
+# OPEN QUESTIONS (all resolved by user)
+# =============================================================================
+
+open_questions:
+
+  - id: OQ-1
+    status: resolved
+    resolution: "Option B — invite creation only, no registration via deep link"
+    question: |
+      The invite flow requires the invited user to open a link in a BROWSER
+      (invite-redirect Edge Function redirects to external GitHub Pages HTML).
+      Maestro operates within the app context (iOS Simulator). How should the
+      E2E test handle the browser-based invite registration step?
+    context: |
+      create-invitation returns a deepLink URL in format:
+      {SUPABASE_URL}/functions/v1/invite-redirect?token={UUID}
+      This is an HTTPS URL, NOT a sacrmeetplan:// deep link.
+      invite-redirect does a 302 redirect to an external GitHub Pages HTML
+      page (accept-invite.html?token={UUID}).
+    options:
+      - "Option A: Extract token from HTTPS URL, use deep link to in-app screen."
+      - "Option B: Skip invite registration, only test invitation creation. [CHOSEN]"
+      - "Option C: Use Maestro to interact with Safari. [fragile, rejected]"
+
+  - id: OQ-2
+    status: resolved
+    resolution: "Confirmed — 5 testIDs for invite/[token].tsx (for future tests)"
+    question: |
+      The invite/[token].tsx screen has NO testID props on any elements.
+      Should the spec require adding testIDs to this screen?
+    context: |
+      Even though flow 07 does not test invite registration, testIDs are
+      added for future test coverage.
+    options:
+      - "Add testIDs to interactive + error elements (5 total) [CHOSEN]"
+      - "Add testIDs only to interactive elements (3 inputs + 1 button)"
+
+  - id: OQ-3
+    status: resolved
+    resolution: "Confirmed — ~10 testIDs for users.tsx invite modal"
+    question: |
+      The users.tsx screen has NO testIDs on invite-related elements.
+      Should testIDs be added?
+    options:
+      - "Add testIDs to all invite-related elements (~10) [CHOSEN]"
+      - "Target by visible text (fragile, i18n-dependent)"
+
+  - id: OQ-4
+    status: resolved
+    resolution: "Option A — full round-trip language change test"
+    question: |
+      Should the settings flow change language and verify, or only open/close modal?
+    context: |
+      LANGUAGE_LABELS: 'Portugues (Brasil)', 'English', 'Espanol'.
+      en-US strings: title='Settings', theme='Light/Dark Theme', appLanguage='App Language'.
+      pt-BR strings: title='Configuracoes', theme='Tema Claro/Escuro', appLanguage='Idioma do App'.
+    options:
+      - "Option A: Full round-trip (pt-BR -> en-US -> verify -> pt-BR -> verify) [CHOSEN]"
+      - "Option B: Only verify modal opens/closes"
+
+  - id: OQ-5
+    status: resolved
+    resolution: "Option A — Deno script using Supabase admin SDK"
+    question: |
+      What format should the cleanup script use?
+    options:
+      - "Option A: Deno script (e2e/scripts/cleanup.ts) with Supabase admin SDK [CHOSEN]"
+      - "Option B: Shell script using Supabase CLI"
+      - "Option C: No automated cleanup"
+
+# =============================================================================
+# ASSUMPTIONS
+# =============================================================================
+
+assumptions:
+
+  - id: A-1
+    status: irrelevant
+    assumption: |
+      The in-app invite/[token].tsx screen can be reached via deep link
+      (sacrmeetplan://invite/{token}).
+    reason: "No longer relevant — flow 07 does not test invite registration."
+    needs_confirmation: false
+
+  - id: A-2
+    status: irrelevant
+    assumption: |
+      After the invited user registers, the app navigates to Home tab automatically.
+    reason: "No longer relevant — flow 07 does not test invite registration."
+    needs_confirmation: false
+
+  - id: A-3
+    status: confirmed
+    assumption: |
+      Flow 07-invite.yaml reuses the ward/credentials created by 01-register
+      (bishopric user). The flow logs in with TEST_EMAIL/TEST_PASSWORD to
+      create the invitation.
+    reason: |
+      All flows (02-08) reuse the ward created by 01-register. The invite
+      creation requires a logged-in bishopric. Credentials are available via
+      ${output.TEST_EMAIL} and ${output.TEST_PASSWORD}.
+    needs_confirmation: false
+
+  - id: A-4
+    status: confirmed
+    assumption: |
+      The theme settings screen (theme.tsx) does NOT need new testIDs.
+      Theme options can be targeted by visible text: "Automatico", "Claro",
+      "Escuro" (pt-BR). Pressable items with accessibilityRole="radio".
+    reason: |
+      Theme options are static, always visible, and have stable pt-BR text
+      labels. Text targeting is acceptable following the same pattern as
+      tab bar items.
+    needs_confirmation: false
+
+# =============================================================================
+# INCONSISTENCIES
+# =============================================================================
+
+inconsistencies: []
+
+# =============================================================================
+# FEATURE SPEC
+# =============================================================================
+
+feature:
+  id: F020_E2E
+  name: "E2E Testing — Phase 4 (Settings + Invite + Cleanup)"
+  area: e2e_testing
+  description: |
+    Extends F019_E2E with two new Maestro flows (07-invite.yaml and
+    08-settings.yaml), testID props on users.tsx (invite modal) and
+    invite/[token].tsx, a cleanup script for test data, and an updated
+    README with complete run instructions.
+
+    Flow 07-invite.yaml: Login as bishopric -> navigate to Settings >
+    Users -> create invitation for a new user (secretary role) -> verify
+    success message and deep link URL displayed -> close modal -> logout.
+    NOTE: Does NOT test invite registration (browser-based flow is
+    outside Maestro scope).
+
+    Flow 08-settings.yaml: Login -> navigate to Settings -> test theme
+    change (Claro -> Escuro -> verify, then restore Automatico) ->
+    test app language round-trip (pt-BR -> en-US -> verify English strings,
+    en-US -> pt-BR -> verify Portuguese strings) -> logout.
+
+    Cleanup script: Deno script to delete E2E test users and wards.
+
+    README update: add instructions for running cleanup, all flows, and
+    troubleshooting tips for Phase 4 flows.
+
+# =============================================================================
+# ACCEPTANCE CRITERIA
+# =============================================================================
+
+acceptance_criteria:
+
+  # --- Flow 07: Invite (creation only) ---
+
+  - id: AC-001
+    description: "07-invite: Login as bishopric"
+    given: "App is on login screen with test credentials from 01-register"
+    when: "Maestro flow 07-invite logs in with TEST_EMAIL/TEST_PASSWORD"
+    then: "User is authenticated and Home tab visible"
+
+  - id: AC-002
+    description: "07-invite: Navigate to Users screen"
+    given: "User is logged in on Home tab"
+    when: "Maestro navigates to Configuracoes tab, then taps 'Usuarios do App'"
+    then: "Users screen is visible with the current user listed"
+
+  - id: AC-003
+    description: "07-invite: Open invite modal"
+    given: "User is on Users screen"
+    when: "Maestro taps the invite button (testID: users-invite-button)"
+    then: "Invite modal opens with email input, role selector, and submit button"
+
+  - id: AC-004
+    description: "07-invite: Fill invite form and submit"
+    given: "Invite modal is open"
+    when: "Maestro enters email (e2e-invited-{timestamp}@test.com), selects secretary role (testID: users-invite-role-secretary-radio), taps submit (testID: users-invite-submit-button)"
+    then: "Invitation is created, success message visible (testID: users-invite-success-text), deep link URL displayed (testID: users-invite-link-text)"
+
+  - id: AC-005
+    description: "07-invite: Close invite modal"
+    given: "Invitation created successfully with success message visible"
+    when: "Maestro taps close button (testID: users-invite-close-button)"
+    then: "Modal closes, Users screen is visible"
+
+  - id: AC-006
+    description: "07-invite: Logout"
+    given: "User is on Users screen after successful invite creation"
+    when: "Maestro taps back, scrolls to sign out, taps sign out, confirms"
+    then: "App returns to login screen"
+
+  # --- Flow 08: Settings ---
+
+  - id: AC-007
+    description: "08-settings: Login"
+    given: "App is on login screen with test credentials from 01-register"
+    when: "Maestro flow 08-settings logs in"
+    then: "User is authenticated and Home tab visible"
+
+  - id: AC-008
+    description: "08-settings: Navigate to Settings"
+    given: "User is logged in on Home tab"
+    when: "Maestro taps Configuracoes tab"
+    then: "Settings screen visible with Ward Settings and App Settings groups"
+
+  - id: AC-009
+    description: "08-settings: Open theme screen"
+    given: "User is on Settings screen"
+    when: "Maestro taps 'Tema Claro/Escuro'"
+    then: "Theme screen opens showing 3 options: Automatico, Claro, Escuro"
+
+  - id: AC-010
+    description: "08-settings: Change theme to light"
+    given: "Theme screen is open"
+    when: "Maestro taps 'Claro'"
+    then: "Claro option shows checkmark (selected)"
+
+  - id: AC-011
+    description: "08-settings: Change theme to dark"
+    given: "Theme screen is open with Claro selected"
+    when: "Maestro taps 'Escuro'"
+    then: "Escuro option shows checkmark (selected)"
+
+  - id: AC-012
+    description: "08-settings: Return to settings from theme"
+    given: "Theme is set to Escuro"
+    when: "Maestro taps back button"
+    then: "Settings screen visible"
+
+  - id: AC-013
+    description: "08-settings: Open app language modal"
+    given: "User is on Settings screen"
+    when: "Maestro taps 'Idioma do App'"
+    then: "Language modal opens showing 3 options with current language checked"
+
+  - id: AC-014
+    description: "08-settings: Change app language to en-US"
+    given: "App language modal is open"
+    when: "Maestro taps 'English'"
+    then: "Modal closes, Settings screen text changes to English ('Settings' title visible)"
+
+  - id: AC-015
+    description: "08-settings: Verify en-US UI strings"
+    given: "App language is en-US"
+    when: "Maestro checks settings screen"
+    then: "'Settings' text visible, 'Light/Dark Theme' visible, 'App Language' visible"
+
+  - id: AC-016
+    description: "08-settings: Change app language back to pt-BR"
+    given: "App language is en-US"
+    when: "Maestro taps 'App Language', selects 'Portugues (Brasil)'"
+    then: "Modal closes, Settings screen text returns to Portuguese ('Configuracoes' title visible)"
+
+  - id: AC-017
+    description: "08-settings: Verify pt-BR restored"
+    given: "App language is back to pt-BR"
+    when: "Maestro checks settings screen"
+    then: "'Tema Claro/Escuro' visible, 'Idioma do App' visible"
+
+  - id: AC-018
+    description: "08-settings: Restore theme to automatic"
+    given: "User is on Settings screen (pt-BR)"
+    when: "Maestro taps 'Tema Claro/Escuro', taps 'Automatico', taps back"
+    then: "Theme restored to automatic, settings screen visible"
+
+  - id: AC-019
+    description: "08-settings: Logout"
+    given: "User is on Settings screen"
+    when: "Maestro taps sign out and confirms"
+    then: "App returns to login screen"
+
+  # --- testID additions ---
+
+  - id: AC-020
+    description: "testIDs added to users.tsx invite modal"
+    given: "users.tsx source code"
+    when: "Checking testID props on invite-related elements"
+    then: "users-invite-button, users-invite-email-input, users-invite-role-{role}-radio (x3), users-invite-submit-button, users-invite-success-text, users-invite-link-text, users-invite-copy-button, users-invite-close-button are present (~10 total)"
+
+  - id: AC-021
+    description: "testIDs added to invite/[token].tsx (for future tests)"
+    given: "invite/[token].tsx source code"
+    when: "Checking testID props on interactive and assertion elements"
+    then: "invite-fullname-input, invite-password-input, invite-confirm-password-input, invite-submit-button, invite-error-text are present (5 total)"
+
+  # --- Cleanup script ---
+
+  - id: AC-022
+    description: "Cleanup script exists and runs"
+    given: "e2e/scripts/cleanup.ts file exists"
+    when: "Script is executed with valid SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars"
+    then: "Script lists and deletes auth users matching e2e-*@test.com and their associated wards"
+
+  # --- README update ---
+
+  - id: AC-023
+    description: "README updated with Phase 4 flows and cleanup instructions"
+    given: "e2e/README.md file"
+    when: "README is read"
+    then: "Contains instructions for running 07-invite, 08-settings, cleanup script, and all-flows sequential run"
+
+  # --- Final verification ---
+
+  - id: AC-024
+    description: "All 8 Maestro flows run sequentially without failure"
+    given: "All flows (01 through 08) exist in e2e/maestro/"
+    when: "maestro test e2e/maestro/ is executed"
+    then: "All 8 flows pass in sequence"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+
+edge_cases:
+
+  - id: EC-001
+    case: "Invite modal submit with empty email"
+    expected: "Submit button is disabled (opacity 0.5), no API call made"
+
+  - id: EC-002
+    case: "Invitation creation fails due to network error"
+    expected: "Error alert shown via inviteMutation.onError; modal stays open for retry"
+
+  - id: EC-003
+    case: "Theme change does not persist across app restart"
+    expected: "ThemeContext.setPreference saves to AsyncStorage; persisted on next launch"
+
+  - id: EC-004
+    case: "Language change while language modal animation is still running"
+    expected: "Modal closes first (setAppLanguageModalVisible(false)), then language change runs"
+
+  - id: EC-005
+    case: "Cleanup script finds no e2e test users"
+    expected: "Script outputs 'No test users found' and exits cleanly"
+
+  - id: EC-006
+    case: "Cleanup script encounters partially deleted ward (user exists, ward already deleted)"
+    expected: "Script handles gracefully with try/catch per user, continues to next"
+
+  - id: EC-007
+    case: "Flow 07 runs before flow 01 (no TEST_EMAIL/TEST_PASSWORD)"
+    expected: "Flow 07 fails at login step; requires 01-register to run first"
+
+  - id: EC-008
+    case: "Users screen loads slowly (list-users Edge Function)"
+    expected: "Maestro uses extendedWaitUntil for users-invite-button with appropriate timeout"
+
+  - id: EC-009
+    case: "Language round-trip: en-US strings for settings items differ from pt-BR"
+    expected: "After changing to en-US: 'Settings' title, 'Light/Dark Theme', 'App Language'. After back to pt-BR: 'Configuracoes', 'Tema Claro/Escuro', 'Idioma do App'."
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-01: true  # Read SPEC_CONSOLIDATED before starting
+  GATE-02: true  # Identified all ambiguities (5 OQs)
+  GATE-03: true  # Listed ALL open questions with IDs
+  GATE-04: true  # Listed ALL assumptions with IDs
+  GATE-05: true  # Checked for inconsistencies with SPEC_CONSOLIDATED (none found)
+  GATE-06: true  # Status is complete (all OQs resolved by user)

@@ -1,0 +1,412 @@
+# =============================================================================
+# ARCH_M020.yaml
+# Architecture: E2E Testing with Maestro — Phase 4 (Settings + Invite + Cleanup)
+# CR: 284
+# SPEC: SPEC_F020.yaml
+# Created: 2026-03-09
+# =============================================================================
+
+type: arch
+version: 1
+status: complete
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: "Extend Maestro E2E testing with testID props on users.tsx (invite modal) and invite/[token].tsx, add two new flow files (07-invite, 08-settings), create a Deno cleanup script for test data, and update e2e/README.md"
+  principles:
+    - "Zero functional impact: testID props do not affect rendering, accessibility, or behavior (same as Phases 1-3)"
+    - "Reuse established conventions: {screen}-{element}-{type} kebab-case naming (ADR-052)"
+    - "Reuse flow ordering: numbered prefix YAML files (ADR-053)"
+    - "Flow 07 tests invite creation only (SPEC OQ-1 Option B): no deep link registration"
+    - "Text-based targeting acceptable for theme options per Assumption A-4 (no testIDs needed on theme.tsx)"
+    - "Settings flow verifies full round-trip language change (pt-BR -> en-US -> pt-BR) to ensure assertion language consistency"
+    - "Cleanup script uses Deno + Supabase admin SDK, consistent with Edge Functions runtime (ADR-058)"
+
+# =============================================================================
+# DIAGRAM
+# =============================================================================
+
+diagram: |
+  Maestro CLI
+      |
+      v
+  [07-invite.yaml]
+      |
+      +--> Login as bishopric (01-register creds)
+      |         |
+      |         v
+      +--> [settings/index.tsx] --> Usuarios do App
+      |         |
+      |         v
+      +--> [settings/users.tsx] --> Create invitation
+      |         |
+      |         +--> testIDs: invite button, email input, role radios,
+      |         |    submit, success text, link text, copy, close
+      |         |
+      |         v
+      +--> Assert success message + deep link URL visible
+      |         |
+      |         v
+      +--> Close modal -> Navigate back -> Logout
+      |
+      v
+  [08-settings.yaml]
+      |
+      +--> Login
+      |         |
+      |         v
+      +--> [settings/index.tsx] --> Theme + Language tests
+      |         |
+      |         +--> [settings/theme.tsx] --> Light -> Dark -> Automatic
+      |         |    (text targeting: Claro, Escuro, Automatico)
+      |         |
+      |         +--> App Language modal --> en-US -> verify -> pt-BR -> verify
+      |         |
+      |         v
+      +--> Logout
+      |
+      v
+  [e2e/scripts/cleanup.ts]
+      |
+      +--> Deno script (Supabase admin SDK)
+      +--> Delete e2e-*@test.com users + wards
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+
+  - name: "TestID Layer (users.tsx — invite modal)"
+    responsibility: "Add ~10 testID props to invite-related elements in users.tsx: header invite button, email input, role radio buttons (3), submit button, success text, link text, copy button, close button"
+    dependencies: []
+
+  - name: "TestID Layer (invite/[token].tsx)"
+    responsibility: "Add 5 testID props to invite registration screen: fullname input, password input, confirm password input, submit button, error container"
+    dependencies: []
+
+  - name: "Maestro Flow: 07-invite"
+    responsibility: "E2E flow: login as bishopric -> Settings > Users > create invitation (secretary role) -> verify success message and deep link URL displayed -> close modal -> logout. Does NOT test invite registration (SPEC OQ-1 Option B)."
+    dependencies:
+      - "TestID Layer (users.tsx — invite modal)"
+      - "Maestro Flow: 01-register"
+
+  - name: "Maestro Flow: 08-settings"
+    responsibility: "E2E flow: login -> Settings -> theme screen (light/dark/automatic) -> app language modal (pt-BR -> en-US -> verify -> pt-BR -> verify) -> logout"
+    dependencies:
+      - "Maestro Flow: 01-register"
+
+  - name: "Cleanup Script (cleanup.ts)"
+    responsibility: "Deno script that deletes E2E test users (e2e-*@test.com) and their associated wards via Supabase admin SDK"
+    dependencies:
+      - "@supabase/supabase-js (Deno import)"
+
+  - name: "README Update (e2e/README.md)"
+    responsibility: "Add Phase 4 documentation: 07-invite and 08-settings flow descriptions, cleanup script usage, troubleshooting tips"
+    dependencies: []
+
+# =============================================================================
+# CONTRACTS
+# =============================================================================
+
+contracts:
+
+  - name: "testID_users_invite"
+    component: "TestID Layer (users.tsx — invite modal)"
+    description: "testID props on invite-related elements in users.tsx"
+    elements:
+      - testID: "users-invite-button"
+        component: Pressable
+        target_line: "inviteButton in header (line ~296)"
+        purpose: "Header invite button targeting to open invite modal"
+      - testID: "users-invite-email-input"
+        component: TextInput
+        target_line: "email TextInput in invite modal (line ~532)"
+        purpose: "Email input in invite modal"
+      - testID: "users-invite-role-bishopric-radio"
+        component: Pressable
+        target_line: "role radio Pressable in invite modal, key=bishopric (line ~553)"
+        purpose: "Bishopric role radio button"
+      - testID: "users-invite-role-secretary-radio"
+        component: Pressable
+        target_line: "role radio Pressable in invite modal, key=secretary"
+        purpose: "Secretary role radio button"
+      - testID: "users-invite-role-observer-radio"
+        component: Pressable
+        target_line: "role radio Pressable in invite modal, key=observer"
+        purpose: "Observer role radio button"
+      - testID: "users-invite-submit-button"
+        component: Pressable
+        target_line: "submit Pressable in invite modal (line ~581)"
+        purpose: "Submit/invite button in modal"
+      - testID: "users-invite-success-text"
+        component: Text
+        target_line: "success Text after invite creation (line ~605)"
+        purpose: "Success message text for assertion"
+      - testID: "users-invite-link-text"
+        component: Text
+        target_line: "deepLink selectable Text (line ~608)"
+        purpose: "Deep link URL text for visibility assertion"
+      - testID: "users-invite-copy-button"
+        component: Pressable
+        target_line: "copy link Pressable (line ~618)"
+        purpose: "Copy link button"
+      - testID: "users-invite-close-button"
+        component: Pressable
+        target_line: "close modal Pressable (line ~637)"
+        purpose: "Close modal button after invite success"
+    notes: |
+      Role radio testIDs use dynamic template: `users-invite-role-${role}-radio`
+      inside the ROLES.map() in the invite modal section. The 3 values
+      (bishopric, secretary, observer) are from the ROLES constant.
+
+  - name: "testID_invite_registration"
+    component: "TestID Layer (invite/[token].tsx)"
+    description: "testID props on invite registration screen interactive and assertion elements (for future tests)"
+    elements:
+      - testID: "invite-fullname-input"
+        component: TextInput
+        target_line: "fullName TextInput (line ~285)"
+        purpose: "Full name input for registration"
+      - testID: "invite-password-input"
+        component: TextInput
+        target_line: "password TextInput (line ~311)"
+        purpose: "Password input for registration"
+      - testID: "invite-confirm-password-input"
+        component: TextInput
+        target_line: "confirmPassword TextInput (line ~335)"
+        purpose: "Confirm password input for registration"
+      - testID: "invite-submit-button"
+        component: TouchableOpacity
+        target_line: "submit TouchableOpacity (line ~357)"
+        purpose: "Submit/register button"
+      - testID: "invite-error-text"
+        component: View
+        target_line: "error container View (line ~192, also line ~157 for pre-form errors)"
+        purpose: "Error message container for assertion (appears in both form and pre-form error states)"
+    notes: |
+      The error container appears in two locations:
+      1. Pre-form error state (line ~157): when token is invalid/expired before showing form
+      2. In-form error state (line ~192): validation errors during registration
+      Both should have the same testID since only one is visible at a time.
+      These testIDs are added for future test coverage (flow 07 does NOT navigate
+      to this screen per SPEC OQ-1 Option B).
+
+  - name: "maestro_flow_invite"
+    component: "Maestro Flow: 07-invite"
+    description: "Maestro YAML flow file for invitation creation (creation only, no registration)"
+    input: "Credentials from 01-register (TEST_EMAIL, TEST_PASSWORD)"
+    output: "Verified invitation creation with success message and deep link URL"
+    flow_parts:
+      - name: "Part A - Login as bishopric"
+        steps:
+          - "Assert login screen visible"
+          - "Enter TEST_EMAIL and TEST_PASSWORD"
+          - "Tap login"
+          - "Wait Home tab"
+      - name: "Part B - Navigate to Users"
+        steps:
+          - "Tap Configuracoes tab"
+          - "Wait Settings screen"
+          - "Tap 'Usuarios do App' text (settings:users item)"
+          - "extendedWaitUntil users-invite-button visible"
+      - name: "Part C - Create invitation"
+        steps:
+          - "Tap users-invite-button"
+          - "Wait invite modal (users-invite-email-input visible)"
+          - "Input e2e-invited-{timestamp}@test.com in users-invite-email-input"
+          - "Tap users-invite-role-secretary-radio"
+          - "Tap users-invite-submit-button"
+          - "extendedWaitUntil users-invite-success-text visible"
+      - name: "Part D - Verify success and close modal"
+        steps:
+          - "Assert users-invite-link-text visible (deep link URL displayed)"
+          - "Tap users-invite-close-button"
+          - "Wait modal close"
+      - name: "Part E - Navigate back and logout"
+        steps:
+          - "Tap back button (return to Settings)"
+          - "scrollUntilVisible settings-sign-out-button"
+          - "Tap settings-sign-out-button"
+          - "Confirm sign-out alert (tap 'Confirmar')"
+          - "Wait login screen"
+
+  - name: "maestro_flow_settings"
+    component: "Maestro Flow: 08-settings"
+    description: "Maestro YAML flow file for theme and language settings round-trip"
+    input: "Credentials from 01-register (TEST_EMAIL, TEST_PASSWORD)"
+    output: "Verified theme change, language change round-trip"
+    flow_parts:
+      - name: "Part A - Login"
+        steps:
+          - "Assert login screen visible"
+          - "Enter TEST_EMAIL and TEST_PASSWORD"
+          - "Tap login"
+          - "Wait Home tab"
+      - name: "Part B - Navigate to Settings"
+        steps:
+          - "Tap Configuracoes tab"
+          - "Assert Settings screen visible"
+      - name: "Part C - Theme changes"
+        steps:
+          - "Tap 'Tema Claro/Escuro' text (theme settings item)"
+          - "Wait theme screen"
+          - "Tap 'Claro' text"
+          - "Assert Claro checkmark visible (selected)"
+          - "Tap 'Escuro' text"
+          - "Assert Escuro checkmark visible (selected)"
+          - "Tap back button"
+          - "Wait Settings screen"
+      - name: "Part D - Language change to en-US"
+        steps:
+          - "Tap 'Idioma do App' text"
+          - "Wait language modal visible"
+          - "Tap 'English' text"
+          - "Wait modal close"
+          - "Assert 'Settings' title text visible (en-US)"
+          - "Assert 'Light/Dark Theme' text visible (en-US)"
+          - "Assert 'App Language' text visible (en-US)"
+      - name: "Part E - Language change back to pt-BR"
+        steps:
+          - "Tap 'App Language' text (en-US label)"
+          - "Wait language modal visible"
+          - "Tap 'Portugues (Brasil)' text"
+          - "Wait modal close"
+          - "Assert 'Configuracoes' title text visible (pt-BR restored)"
+          - "Assert 'Tema Claro/Escuro' text visible"
+          - "Assert 'Idioma do App' text visible"
+      - name: "Part F - Restore theme to automatic"
+        steps:
+          - "Tap 'Tema Claro/Escuro'"
+          - "Tap 'Automatico'"
+          - "Tap back button"
+      - name: "Part G - Logout"
+        steps:
+          - "scrollUntilVisible settings-sign-out-button"
+          - "Tap settings-sign-out-button"
+          - "Confirm sign-out alert (tap 'Confirmar')"
+          - "Wait login screen"
+
+  - name: "cleanup_script"
+    component: "Cleanup Script (cleanup.ts)"
+    description: "Deno script for deleting E2E test users and wards"
+    interface:
+      env_vars:
+        - "SUPABASE_URL: Supabase project URL"
+        - "SUPABASE_SERVICE_ROLE_KEY: Service role key for admin API access"
+      run_command: "deno run --allow-net --allow-env e2e/scripts/cleanup.ts"
+    algorithm:
+      - "Import createClient from @supabase/supabase-js via CDN/deno.land"
+      - "Read SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from env"
+      - "Create Supabase client with service role key (admin access)"
+      - "Call admin.auth.admin.listUsers() to get all auth users"
+      - "Filter users where email matches pattern e2e-*@test.com"
+      - "If no matching users found, print 'No test users found' and exit"
+      - "For each matching user:"
+      - "  - Extract ward_id from user.app_metadata"
+      - "  - If ward_id exists, delete ward (CASCADE deletes speeches, agendas, etc.)"
+      - "  - Delete auth user via admin.auth.admin.deleteUser(user.id)"
+      - "  - Print deleted user email and ward_id"
+      - "  - try/catch per user for graceful handling of partial state"
+      - "Print summary: N users deleted, M wards deleted"
+
+# =============================================================================
+# DATA MODEL
+# =============================================================================
+
+data_model:
+  entities: []
+  notes: |
+    No database schema changes. Phase 4 E2E tests interact with existing
+    tables via the same RLS-isolated test ward created by 01-register.
+    Flow 07 creates an invitation in the invitations table via the
+    create-invitation Edge Function. Flow 08 modifies only client-side
+    state (theme in AsyncStorage, app language in i18n).
+    The cleanup script directly deletes auth users and wards via admin API.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+security:
+  notes: |
+    Same as Phases 1-3:
+    - Tests run against production Supabase with full RLS isolation
+    - Test accounts use pattern e2e-{timestamp}@test.com
+    - No secrets in Maestro flow files; credentials from 01-register output
+    - Flow 07 creates an invitation but does NOT register the invited user
+      (the invitation record remains in the invitations table; cleanup
+      script handles deletion via ward CASCADE)
+    - Cleanup script requires SUPABASE_SERVICE_ROLE_KEY (admin access):
+      - MUST NOT be committed to repository
+      - Passed via environment variables at runtime
+      - Script file documents required env vars in comments
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+observability:
+  notes: |
+    Same as Phases 1-3:
+    - Maestro provides built-in test execution reporting (pass/fail per step)
+    - Failed flows produce screenshots automatically
+    - Cleanup script outputs per-user deletion log for debugging
+    - No additional app-side instrumentation needed
+
+# =============================================================================
+# FILE CHANGES SUMMARY
+# =============================================================================
+
+file_changes:
+
+  modify:
+    - path: src/app/(tabs)/settings/users.tsx
+      description: "Add testID to ~10 invite-related elements (invite button, email input, role radios x3, submit, success text, link text, copy button, close button)"
+      impact: zero_functional_impact
+
+    - path: src/app/(auth)/invite/[token].tsx
+      description: "Add testID to 5 elements (fullname input, password input, confirm password input, submit button, error container x2 locations)"
+      impact: zero_functional_impact
+
+    - path: e2e/README.md
+      description: "Update with Phase 4 flow descriptions (07-invite, 08-settings), cleanup script instructions, troubleshooting tips, and complete sequential run instructions"
+      impact: documentation_only
+
+  create:
+    - path: e2e/maestro/07-invite.yaml
+      description: "Maestro E2E flow: Login as bishopric -> Users -> create invitation -> verify success -> close modal -> logout (creation only, no registration)"
+
+    - path: e2e/maestro/08-settings.yaml
+      description: "Maestro E2E flow: Login -> Settings -> theme changes (Claro/Escuro/Automatico) -> language round-trip (pt-BR -> en-US -> pt-BR) -> logout"
+
+    - path: e2e/scripts/cleanup.ts
+      description: "Deno script: delete e2e-*@test.com users and associated wards via Supabase admin SDK"
+
+# =============================================================================
+# ARCHITECTURE DECISION RECORDS
+# =============================================================================
+
+adrs:
+
+  - id: ADR-058
+    title: "Deno cleanup script with Supabase admin SDK for test data cleanup"
+    context: |
+      E2E test runs accumulate test users (e2e-*@test.com) and their
+      associated wards in the production Supabase database. Manual cleanup
+      via the Supabase dashboard is tedious. The project uses Deno for Edge
+      Functions, making a Deno script consistent with the existing runtime.
+    decision: |
+      Create e2e/scripts/cleanup.ts as a Deno script that uses the Supabase
+      admin SDK (@supabase/supabase-js) to list all auth users, filter by
+      e2e-*@test.com email pattern, delete their wards (cascade), and delete
+      the auth users. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env
+      vars. Per-user try/catch for graceful partial-state handling.
+    consequences:
+      - "pro: Automated cleanup reduces manual effort"
+      - "pro: Consistent with project Deno runtime"
+      - "pro: Per-user error handling prevents cascade failures"
+      - "contra: Requires service role key (sensitive credential, env-only)"

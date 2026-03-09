@@ -156,6 +156,7 @@ export function SwipeableCard({
             onPress={handleEdit}
             accessibilityRole="button"
             accessibilityLabel={editLabel ?? 'Edit'}
+            testID="swipeable-edit-button"
           >
             <PencilIcon size={20} color={colors.onPrimary} />
           </Pressable>
@@ -166,6 +167,7 @@ export function SwipeableCard({
             onPress={handleDelete}
             accessibilityRole="button"
             accessibilityLabel={deleteLabel ?? 'Delete'}
+            testID="swipeable-delete-button"
           >
             <TrashIcon size={20} color="#FFFFFF" />
           </Pressable>

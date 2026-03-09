@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 22
-last_updated: "2026-03-08"
+version: 23
+last_updated: "2026-03-09"
 
 summary:
-  total_test_files: 66
-  total_tests: 1789
+  total_test_files: 67
+  total_tests: 1884
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -20,6 +20,7 @@ summary:
   # Note: F071 added 39 tests (coder): CR-281 multiline fix, CR-282 activationDistance, CR-283 recognized_names rework
   # Note: F071 added 96 tests (tester): CR-281/282/283 behavioral tests + flaky useSpeechCounts fix
   # Note: F017_E2E added 82 tests (tester): CR-284 E2E testing infrastructure validation + 2 pre-existing test fixes
+  # Note: F018_E2E added 95 tests (tester): CR-284 Phase 2 E2E testID validation + Maestro flow structure
   framework: vitest
   categories:
     module_named: 58
@@ -925,6 +926,26 @@ module_tests:
       - "KeyboardAvoidingView (2 tests): login screen uses KAV, register screen uses KAV"
       - "Flow file naming ADR-053 (3 tests): 01-register exists, 02-login-logout exists, zero-padded prefix"
       - "Pre-existing test fixes (2 tests): autoFocus removed, activationDistance replaced by dragHitSlop"
+
+  - file: src/__tests__/f018-e2e-phase2.test.ts
+    tests: 95
+    module: "src/app/(tabs)/index.tsx, src/app/(tabs)/agenda.tsx, src/components/AgendaForm.tsx, src/components/ActorSelector.tsx, src/app/presentation.tsx, e2e/maestro/03-home-presentation.yaml, e2e/maestro/04-agenda.yaml"
+    covers:
+      - "Home tab testIDs (4 tests): home-start-meeting-button, home-preview-pencil-button, count=2, naming convention"
+      - "Agenda tab dynamic testIDs (3 tests): agenda-card-${date}, agenda-play-${date}, count=2"
+      - "AgendaForm SelectorField testIDs (8 tests): 7 selector testIDs (presiding, conducting, pianist, conductor, opening-hymn, sacrament-hymn, closing-hymn), count=7"
+      - "SelectorField testID interface ADR-054 (3 tests): parameter, type declaration, Pressable forwarding"
+      - "HymnSelectorModal testIDs (2 tests): hymn-selector-search-input, hymn-selector-close-button"
+      - "ActorSelector testIDs (6 tests): search-input, close-button, add-button, add-input, add-confirm, count=5"
+      - "Presentation Mode testIDs (6 tests): presentation-screen, edit-button, font-toggle-button, font-toggle-text, close-button, count=5"
+      - "03-home-presentation flow (17 tests): file exists, appId, credentials, login testIDs, Home wait, start meeting testID, presentation wait, title assertion, font toggle text, Presidindo label, font toggle 2x, Ultimo Discurso tap, close button, Home return, no populated values, timeouts, 6 parts"
+      - "04-agenda flow (22 tests): file exists, appId, credentials, login testIDs, Agendas tab, evalScript date, dynamic card testID, section header wait, 15s timeout, scrollUntilVisible, presiding selector, ActorSelector wait, actor creation flow, actor name input, actor name visible, opening hymn selector, hymn search wait, hymn search input, animation wait, modal close, scroll UP, card collapse, assertNotVisible, 6 parts, timeouts"
+      - "Cross-validation (3 tests): all 03-home-presentation testIDs in source, all 04-agenda static testIDs in source, dynamic template patterns exist"
+      - "testID naming convention ADR-052 (4 tests): kebab-case 2+ segments, screen prefixes, type suffixes, dynamic ISO date"
+      - "Flow file naming ADR-053 (4 tests): 03-home-presentation exists, 04-agenda exists, zero-padded prefix, sequential order"
+      - "pt-BR assertion strings (7 tests): presentation title, presiding label, sectionWelcome, lastSpeech, home tab, agenda tab, startMeeting"
+      - "SearchInput passthrough EC_E2E_P2_011 (2 tests): HymnSelectorModal, ActorSelector"
+      - "Total testID count (1 test): verifies counts across 5 source files"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4250,8 +4271,19 @@ gaps:
   #   + 2 pre-existing test fixes in f071.
   # No gaps.
 
+  # F018_E2E gaps
+  # All ACs covered: AC-SF1-01/02, AC-SF2-01/02, AC-SF3-01/02, AC-SF4-01/02,
+  #   AC-SF5-01/02, AC-SF6-01/02/03, AC-SF7-01/02/03, AC-SF8-01/02/03. 18 ACs total.
+  # All edge cases covered: EC_E2E_P2_001 through EC_E2E_P2_011. 11 ECs total.
+  # 95 tester tests: 4 Home testIDs, 3 Agenda dynamic testIDs, 8 AgendaForm SelectorField,
+  #   3 SelectorField interface, 2 HymnSelectorModal, 6 ActorSelector, 6 Presentation Mode,
+  #   17 03-home-presentation flow, 22 04-agenda flow, 3 cross-validation, 4 naming convention,
+  #   4 flow file naming, 7 pt-BR strings, 2 SearchInput passthrough, 1 total count,
+  #   + 3 additional within flow tests covering EC_E2E_P2_001-011.
+  # No gaps.
+
 stats:
-  total_tests: 1789
-  passing: 1789
+  total_tests: 1884
+  passing: 1884
   failing: 0
   skipped: 0

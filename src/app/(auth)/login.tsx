@@ -74,6 +74,7 @@ export default function LoginScreen() {
         <View style={styles.formContainer}>
           {error && (
             <View
+              testID="login-error-text"
               style={[
                 styles.errorContainer,
                 { backgroundColor: colors.errorContainer },
@@ -108,6 +109,7 @@ export default function LoginScreen() {
               textContentType="emailAddress"
               autoComplete="email"
               editable={!loading}
+              testID="login-email-input"
             />
           </View>
 
@@ -133,6 +135,7 @@ export default function LoginScreen() {
               autoComplete="password"
               editable={!loading}
               onSubmitEditing={handleLogin}
+              testID="login-password-input"
             />
           </View>
 
@@ -145,6 +148,7 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={loading}
             activeOpacity={0.8}
+            testID="login-submit-button"
           >
             {loading ? (
               <ActivityIndicator color={colors.onPrimary} />
@@ -159,6 +163,7 @@ export default function LoginScreen() {
             style={styles.forgotPasswordLink}
             onPress={() => router.push('/(auth)/forgot-password')}
             disabled={loading}
+            testID="login-forgot-password-button"
           >
             <Text
               style={[styles.forgotPasswordText, { color: colors.primary }]}
@@ -171,6 +176,7 @@ export default function LoginScreen() {
             style={styles.createAccountLink}
             onPress={handleCreateAccount}
             disabled={loading}
+            testID="login-create-account-button"
           >
             <Text
               style={[styles.createAccountText, { color: colors.primary }]}

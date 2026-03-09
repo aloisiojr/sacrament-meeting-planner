@@ -86,6 +86,7 @@ export function StatusChangeModal({
                 styles.indicator,
                 { backgroundColor: STATUS_INDICATOR_COLORS[currentStatus] },
               ]}
+              testID="status-modal-current"
             />
             <Text style={[styles.currentLabel, { color: colors.textSecondary }]}>
               {getStatusLabel(currentStatus)}
@@ -99,6 +100,7 @@ export function StatusChangeModal({
               <Pressable
                 style={styles.optionRow}
                 onPress={() => onSelect(item)}
+                testID={`status-modal-option-${item}`}
               >
                 <View
                   style={[
@@ -117,6 +119,7 @@ export function StatusChangeModal({
           <Pressable
             style={[styles.closeButton, { borderTopColor: colors.divider }]}
             onPress={onClose}
+            testID="status-modal-close-button"
           >
             <Text style={[styles.closeText, { color: colors.primary }]}>
               {t('common.close')}

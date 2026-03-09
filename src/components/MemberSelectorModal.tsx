@@ -69,8 +69,9 @@ export function MemberSelectorModal({
             placeholder={t('speeches.selectSpeaker')}
             autoFocus
             autoCapitalize="words"
+            testID="member-selector-search-input"
           />
-          <Pressable style={styles.closeButton} onPress={handleClose}>
+          <Pressable style={styles.closeButton} onPress={handleClose} testID="member-selector-close-button">
             <Text style={[styles.closeText, { color: colors.primary }]}>
               {t('common.close')}
             </Text>
@@ -88,6 +89,7 @@ export function MemberSelectorModal({
                 item.id === selectedId && { backgroundColor: colors.primaryContainer },
               ]}
               onPress={() => handleSelect(item)}
+              testID={`member-selector-item-${item.id}`}
             >
               <Text
                 style={[

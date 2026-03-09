@@ -95,6 +95,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
         autoCapitalize="words"
         textContentType="name"
         autoComplete="name"
+        testID="members-editor-fullname-input"
       />
       <TextInput
         style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
@@ -104,6 +105,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
         placeholderTextColor={colors.placeholder}
         returnKeyType="next"
         autoCapitalize="words"
+        testID="members-editor-informal-input"
       />
       <View style={styles.phoneRow}>
         <Pressable
@@ -123,6 +125,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           autoComplete="tel"
+          testID="members-editor-phone-input"
         />
       </View>
 
@@ -132,6 +135,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           style={styles.cancelButton}
           onPress={onCancel}
           accessibilityRole="button"
+          testID="members-editor-cancel-button"
         >
           <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
             {t('common.cancel')}
@@ -141,6 +145,7 @@ function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
           style={[styles.saveButton, { backgroundColor: colors.primary }]}
           onPress={handleSave}
           accessibilityRole="button"
+          testID="members-editor-save-button"
         >
           <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
             {t('common.save')}
@@ -563,7 +568,7 @@ export default function MembersScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="members-back-button">
             <Text style={[styles.backButton, { color: colors.primary }]}>
               {t('common.back')}
             </Text>
@@ -575,6 +580,7 @@ export default function MembersScreen() {
               onPress={handleAdd}
               accessibilityRole="button"
               accessibilityLabel={t('members.addMember')}
+              testID="members-add-button"
             >
               <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
             </Pressable>
@@ -594,6 +600,7 @@ export default function MembersScreen() {
             value={search}
             onChangeText={setSearch}
             placeholder={t('common.search')}
+            testID="members-search-input"
           />
           <Pressable onPress={() => setSearch('')} accessibilityRole="button">
             <Text style={[styles.closeButtonText, { color: colors.primary }]}>

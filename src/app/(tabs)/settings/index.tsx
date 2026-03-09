@@ -25,14 +25,16 @@ interface SettingsItemProps {
   value?: string;
   onPress: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
+  testID?: string;
 }
 
-const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, colors }: SettingsItemProps) {
+const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, colors, testID }: SettingsItemProps) {
   return (
     <Pressable
       style={[styles.item, { borderBottomColor: colors.divider }]}
       onPress={onPress}
       accessibilityRole="button"
+      testID={testID}
     >
       <Text style={[styles.itemText, { color: colors.text }]}>{label}</Text>
       <View style={styles.itemRight}>
@@ -219,6 +221,7 @@ export default function SettingsScreen() {
                   label={t('settings.members')}
                   onPress={() => router.push('/(tabs)/settings/members')}
                   colors={colors}
+                  testID="settings-members-button"
                 />
               )}
               {!isObserver && (

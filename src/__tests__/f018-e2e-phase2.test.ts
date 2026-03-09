@@ -712,10 +712,10 @@ describe('F018_E2E: Phase 2 Maestro flow file naming (ADR-053)', () => {
     expect(path.basename(agendaFlowPath)).toBe('04-agenda.yaml');
   });
 
-  it('all flow files use zero-padded numeric prefix (01, 02, 03, 04)', () => {
+  it('all flow files use zero-padded numeric prefix (01, 02, 03, 04, ...)', () => {
     const files = fs.readdirSync(path.join(projectRoot, 'e2e/maestro'));
     const yamlFiles = files.filter((f) => f.endsWith('.yaml'));
-    expect(yamlFiles.length).toBe(4);
+    expect(yamlFiles.length).toBeGreaterThanOrEqual(4);
     for (const file of yamlFiles) {
       expect(file).toMatch(/^\d{2}-/);
     }

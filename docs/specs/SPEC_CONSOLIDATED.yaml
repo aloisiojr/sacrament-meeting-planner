@@ -8,7 +8,7 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  total_features: 65
+  total_features: 66
   total_business_rules: 49
   total_design_decisions: 66
 
@@ -1541,6 +1541,40 @@ features:
         when: "Maestro queries for testID 'settings-sign-out-button'"
         then: "The sign-out button is found and can be tapped"
 
+  - id: F018_E2E
+    name: "E2E Testing — Phase 2 (Agenda + Presentation Flows)"
+    area: e2e_testing
+    description: |
+      Extends F017_E2E with testID props on Agenda tab (AgendaForm selectors,
+      HymnSelectorModal, AgendaSundayCard), Presentation Mode (header buttons,
+      accordion cards), and Home tab (Start Meeting button, preview pencil).
+      Two new Maestro flows: 03-home-presentation.yaml (Home -> Presentation
+      Mode -> verify accordion cards -> font toggle -> close) and
+      04-agenda.yaml (Agenda tab -> expand Sunday -> assign presiding actor
+      via ActorSelector "+ Add" flow -> assign opening hymn via search "2" ->
+      collapse). Phase 2 flows reuse credentials from 01-register. testID
+      convention: {screen}-{element}-{type} kebab-case. Dynamic testIDs for
+      agenda cards: agenda-card-{YYYY-MM-DD}. [CR-284]
+    acceptance_criteria:
+      - given: "User is logged in on Home tab"
+        when: "Maestro flow 03-home-presentation taps Start Meeting button"
+        then: "Presentation Mode opens showing meeting title and Welcome card expanded"
+      - given: "Presentation Mode is open"
+        when: "Maestro flow 03-home-presentation taps font toggle"
+        then: "Font toggle label switches between 'Aa' and 'AA'"
+      - given: "Presentation Mode is open"
+        when: "Maestro flow 03-home-presentation taps Last Speech collapsed card"
+        then: "Last Speech card expands showing field labels"
+      - given: "User navigates to Agenda tab"
+        when: "Maestro flow 04-agenda expands next Sunday card"
+        then: "AgendaForm appears with section headers (lazy creation)"
+      - given: "AgendaForm is expanded"
+        when: "Maestro flow 04-agenda assigns presiding via ActorSelector + Add"
+        then: "New actor created, presiding field shows 'E2E Presidente'"
+      - given: "AgendaForm is expanded"
+        when: "Maestro flow 04-agenda assigns opening hymn via search '2'"
+        then: "Hymn selected, opening hymn field shows hymn number and title"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -2086,3 +2120,30 @@ edge_cases:
 
   - id: EC043
     description: "manage_prayers defaults to false for new ward -> tab shows 'Discursos' not 'Discursos e Orações'. E2E flows assert 'Discursos' accordingly. [CR-284]"
+
+  - id: EC044
+    description: "Next Sunday date varies between E2E runs. Maestro 04-agenda computes next Sunday via evalScript. Dynamic testID agenda-card-{YYYY-MM-DD} used for targeting. [CR-284]"
+
+  - id: EC045
+    description: "Next Sunday might be general_conference/stake_conference (non-expandable). Flow should scroll to following Sunday if needed. [CR-284]"
+
+  - id: EC046
+    description: "Lazy agenda creation takes network time after card expand. Maestro uses extendedWaitUntil for section header text before proceeding. [CR-284]"
+
+  - id: EC047
+    description: "ActorSelector bottom-sheet animation delay. Maestro uses waitForAnimationToEnd or explicit wait after selector opens. [CR-284]"
+
+  - id: EC048
+    description: "HymnSelectorModal results load async. Maestro waits for results to appear after typing hymn number before tapping. [CR-284]"
+
+  - id: EC049
+    description: "Presentation Mode accordion card tap target is header bar (48px). Maestro taps card title text (e.g. 'Ultimo Discurso') for reliability. [CR-284]"
+
+  - id: EC050
+    description: "Presentation Mode shows '---' for empty fields after 01-register. Flow 03-home-presentation asserts field labels, not populated values. [CR-284]"
+
+  - id: EC051
+    description: "Flow execution order matters: 03-home-presentation before 04-agenda sees empty fields; after sees populated. Both orders valid. [CR-284]"
+
+  - id: EC052
+    description: "SearchInput already passes testID to inner TextInput via ...rest spread. No code change needed for SearchInput.tsx; callers just pass testID prop. [CR-284]"

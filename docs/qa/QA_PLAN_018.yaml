@@ -1,0 +1,652 @@
+# =============================================================================
+# QA_PLAN_018.yaml
+# PRE validation: E2E Testing with Maestro - Phase 2
+# Agenda flows + Presentation mode testIDs + Maestro flows 03/04
+# =============================================================================
+
+metadata:
+  artifact_id: "018"
+  mode: PRE
+  date: "2026-03-09"
+  scope: "Phase 2 - testIDs on agenda/presentation components + flows 03-home-presentation, 04-agenda"
+  cr: [284]
+  validated: true
+
+user_request: |
+  Testes E2E com Maestro para publicação nas lojas. Usar banco de produção com ward isolada.
+  Adicionar testIDs nos componentes e criar fluxos Maestro.
+  Fase 2: Adicionar testID aos componentes de agenda (AgendaForm, agenda.tsx, HymnSelectorModal, ActorSelector) e
+  presentation.tsx. Criar flows 03-home-presentation.yaml e 04-agenda.yaml.
+
+# =============================================================================
+# PRE-VALIDATION EVIDENCE
+# =============================================================================
+
+evidence:
+
+  - id: EV01
+    category: codebase_state
+    description: "Phase 1 testIDs already in place — no testIDs yet in Phase 2 target files"
+    search: "Grep for 'testID' in src/ — matches only in login.tsx (6), register.tsx (12), settings/index.tsx (1)"
+    conclusion: |
+      Phase 1 testIDs are confirmed working. Phase 2 target files (agenda.tsx, index.tsx,
+      presentation.tsx, AgendaForm.tsx, ActorSelector.tsx, SundayCard.tsx, HymnSelectorModal,
+      AccordionCard.tsx) have zero testIDs. All must be added from scratch.
+
+  - id: EV02
+    category: target_files
+    description: "Home tab (index.tsx) verified — Start Meeting button and preview card"
+    file: "src/app/(tabs)/index.tsx"
+    findings: |
+      - "Iniciar Reunião Sacramental" button: Pressable at line 133-146, navigates to /presentation
+      - Preview card with dateBlock, status lines, pencil edit button
+      - Pencil button navigates to /(tabs)/agenda?expandDate=sundayDate
+      - Uses i18n: home.startMeeting, home.meetingAgendaTitle
+      - No testID on any element (confirmed by grep)
+      - Sections: NextSundaysSection, NextAssignmentsSection, InviteManagementSection
+      - Start Meeting button has accessibilityRole="button" (no testID)
+
+  - id: EV03
+    category: target_files
+    description: "Agenda tab (agenda.tsx) verified — Sunday cards with expand/collapse"
+    file: "src/app/(tabs)/agenda.tsx"
+    findings: |
+      - FlatList of AgendaSundayCard components — inline component (not separate file)
+      - Each card: dateBlock + status lines (collapsed) / full AgendaForm (expanded)
+      - Card header Pressable: onPress=handleToggle (expand/collapse), lines 399-403
+      - Play button (Pressable): visible when expanded, navigates to /presentation?date=date, lines 538-557
+      - Chevron icons for expand/collapse, lines 558-562
+      - SundayTypeDropdown + AgendaForm rendered when expanded, lines 566-584
+      - No testID on any element
+      - Important: AgendaSundayCard is an INLINE component in agenda.tsx (not exported SundayCard)
+
+  - id: EV04
+    category: target_files
+    description: "AgendaForm component verified — full form with selector fields"
+    file: "src/components/AgendaForm.tsx"
+    findings: |
+      - 4 sections: Welcome, Sacrament, First Speeches, Last Speech (normal meeting)
+      - SelectorField sub-component: Pressable that opens modals (lines 692-731)
+      - Fields: presiding, conducting, recognized_names, welcome_new_families, announcements,
+        pianist, conductor, openingHymn, openingPrayer, sacramentHymn, wardBusiness,
+        babyBlessing, baptismConfirmation, stakeAnnouncements, intermediateHymn, closingHymn, closingPrayer
+      - Toggle fields: babyBlessing, baptismConfirmation, stakeAnnouncements, musicalNumber, intermediateHymn
+      - Speakers 1-3: ReadOnlySpeakerRow sub-component with pencil icon to navigate to speeches tab
+      - Prayer handling: depends on managePrayers flag (SelectorField or ReadOnlySpeakerRow)
+      - HymnSelectorModal: inline sub-component at lines 799-873, bottom-sheet with search + FlatList
+      - ActorSelector: imported from ./ActorSelector, opened via setSelectorModal
+      - No testID on any element
+
+  - id: EV05
+    category: target_files
+    description: "ActorSelector component verified — bottom-sheet modal with search, add, edit"
+    file: "src/components/ActorSelector.tsx"
+    findings: |
+      - Modal with bottom-sheet (2/3 screen height), lines 227-319
+      - SearchInput for filtering actors by name
+      - Add button/input for creating new actors
+      - FlatList of actors with edit/delete actions
+      - Pressable for each actor row (select), lines 187-203
+      - Close button (Pressable), lines 254-256
+      - No testID on any element
+
+  - id: EV06
+    category: target_files
+    description: "Presentation screen verified — full-screen read-only meeting view"
+    file: "src/app/presentation.tsx"
+    findings: |
+      - SafeAreaView with header (title, pencil, font toggle, close buttons)
+      - Uses AccordionCard for collapsible sections
+      - buildPresentationCards generates card config from agenda/speeches data
+      - Header elements: title "Reunião Sacramental" (t('presentation.title')), date label
+      - Pencil button (edit agenda), Font toggle (Aa/AA), Close button (X icon)
+      - PresentationFieldRow sub-component renders field labels and values
+      - No testID on any element
+
+  - id: EV07
+    category: target_files
+    description: "AccordionCard component verified — used by presentation screen"
+    file: "src/components/AccordionCard.tsx"
+    findings: |
+      - Pressable card headers with expand/collapse on tap
+      - ScrollView for expanded card content
+      - accessibilityRole="button" and accessibilityState={{ expanded }} on headers
+      - No testID on any element
+
+  - id: EV08
+    category: target_files
+    description: "SundayCard component verified (SundayTypeDropdown used in agenda.tsx)"
+    file: "src/components/SundayCard.tsx"
+    findings: |
+      - SundayTypeDropdown is EXPORTED and used directly in agenda.tsx line 567-575
+      - Dropdown opens a Modal with FlatList of sunday type options
+      - Also has "Other" custom reason Modal
+      - No testID on any element
+
+  - id: EV09
+    category: phase1_state
+    description: "Phase 1 Maestro flows confirmed working pattern"
+    files:
+      - "e2e/maestro/01-register.yaml"
+      - "e2e/maestro/02-login-logout.yaml"
+    findings: |
+      - Both flows start with appId: com.alouisio.sacramentmeetingplanner
+      - Use evalScript for dynamic test data (email, password)
+      - Use id: "xxx" for testID selectors
+      - Use assertVisible for text-based assertions (tab names: "Início", "Agendas")
+      - Use extendedWaitUntil with timeouts for network operations
+      - Use tapOn with text for native Alert buttons ("Confirmar")
+      - 01-register generates unique ward; 02-login-logout reuses output.TEST_EMAIL/TEST_PASSWORD
+
+  - id: EV10
+    category: conventions
+    description: "testID naming convention from Phase 1"
+    source: "e2e/README.md"
+    findings: |
+      - Pattern: {screen}-{element}-{type} in kebab-case
+      - Types: -input, -button, -text, -radio
+      - Dynamic: template literals for .map() rendered elements
+      - Screen prefixes used so far: login, register, settings
+      - New prefixes needed: home, agenda, presentation
+
+  - id: EV11
+    category: i18n_strings
+    description: "Key pt-BR strings needed for Maestro assertions"
+    findings: |
+      - tabs.home: "Início"
+      - tabs.agenda: "Agendas"
+      - home.startMeeting: "Iniciar Reunião Sacramental"
+      - home.meetingAgendaTitle: "Agenda da Reunião Sacramental"
+      - presentation.title: "Reunião Sacramental"
+      - agenda.presiding: "Presidindo"
+      - agenda.conducting: "Dirigindo"
+      - agenda.pianist: "Pianista"
+      - agenda.conductor: "Regente"
+      - agenda.openingHymn: "Hino de Abertura"
+      - agenda.sacramentHymn: "Hino Sacramental"
+      - agenda.closingHymn: "Hino de Encerramento"
+      - agenda.openingPrayer: "Oração de Abertura"
+      - agenda.closingPrayer: "Oração de Encerramento"
+      - agenda.sectionWelcome: "Boas-Vindas, Anúncios e Reconhecimentos"
+      - agenda.sectionSacrament: "Designações e Sacramento"
+      - agenda.sectionFirstSpeeches: "Primeiros Discursos"
+      - agenda.sectionLastSpeech: "Último Discurso"
+      - common.close: depends on locale — used in modals
+      - common.search: search placeholder
+      - common.add: add button text
+
+  - id: EV12
+    category: flow_design
+    description: "Flow dependency analysis — each flow must register its own ward"
+    findings: |
+      - CRITICAL RULE: Each E2E test creates its own ward via register-first-user
+      - Flow 03 and 04 MUST start with full registration (same as 01-register pattern)
+      - After registration: user lands on Home tab with auto-created agenda for next Sunday
+      - New ward has NO actors, NO hymn selections, NO speeches assigned
+      - agenda is lazy-created on first expand (lazyCreate.mutate in handleToggle)
+      - managePrayers=false by default (new ward) — so prayers use SelectorField not ReadOnlySpeakerRow
+
+  - id: EV13
+    category: flow_design
+    description: "Agenda flow interaction analysis — what can be tested in empty ward"
+    findings: |
+      - After register, Home tab shows "Iniciar Reunião Sacramental" button and preview card
+      - Tapping "Agendas" tab shows list of Sunday cards, next Sunday highlighted with blue border
+      - Tapping next Sunday card expands it (handleToggle) — lazy-creates agenda if needed
+      - Expanded card shows: SundayTypeDropdown + AgendaForm
+      - AgendaForm shows: SectionHeaders + SelectorFields (empty by default)
+      - Presiding field: tapping opens ActorSelector bottom-sheet with empty list (no actors in new ward)
+      - Opening Hymn: tapping opens HymnSelectorModal with full hymn list (seeded data)
+      - Can select a hymn and verify it appears in the field
+      - Play button visible when expanded — navigates to presentation screen
+      - FEASIBLE: can test expand/collapse, hymn selection, actor creation, presentation navigation
+
+# =============================================================================
+# FEASIBILITY ASSESSMENT
+# =============================================================================
+
+feasibility:
+  verdict: FEASIBLE
+  risks:
+    - id: R01
+      severity: medium
+      description: "Agenda lazy-creation requires network call after expanding card"
+      mitigation: "Use extendedWaitUntil with timeout after tapping card to wait for AgendaForm to render"
+
+    - id: R02
+      severity: low
+      description: "HymnSelectorModal uses RN Modal with FlatList — scroll position and selection might need care"
+      mitigation: "Maestro supports tapping items in scrollable lists. Use scrollUntilVisible if hymn is off-screen."
+
+    - id: R03
+      severity: medium
+      description: "ActorSelector in new ward starts empty — need to create actor via add button before selecting"
+      mitigation: "Flow will test add actor workflow: tap + button, enter name, submit, then select. This tests more functionality."
+
+    - id: R04
+      severity: low
+      description: "Presentation screen uses AccordionCard with dynamic content — hard to assert specific field values"
+      mitigation: "Assert section headers and overall structure visible. Field values will be empty or hymn numbers from the agenda test."
+
+    - id: R05
+      severity: low
+      description: "AgendaSundayCard is inline in agenda.tsx (not exported SundayCard) — testIDs must go on inline component"
+      mitigation: "testIDs are added as JSX props regardless of component structure. Can add testID to the card View and header Pressable."
+
+    - id: R06
+      severity: low
+      description: "Bottom-sheet modal overlay click stopPropagation (web-only pattern per ADR-022)"
+      mitigation: "E2E tests run on iOS simulator — web-only code path not relevant for Maestro testing"
+
+    - id: R07
+      severity: medium
+      description: "Identifying which Sunday card to tap — multiple cards visible in FlatList"
+      mitigation: "Next Sunday card is highlighted (blue border). Add dynamic testID like agenda-card-{date} to each card for precise targeting."
+
+# =============================================================================
+# VALIDATION CHECKS (for POST validation)
+# =============================================================================
+
+validation_checks:
+
+  must_pass:
+
+    # --- testID additions: Home screen ---
+    - id: MP01
+      description: "testID added to Home 'Start Meeting' button"
+      how_to_verify: "src/app/(tabs)/index.tsx Pressable for startMeeting has testID='home-start-meeting-button'"
+
+    - id: MP02
+      description: "testID added to Home preview card pencil button"
+      how_to_verify: "src/app/(tabs)/index.tsx Pressable for pencil edit has testID='home-edit-agenda-button'"
+
+    # --- testID additions: Agenda screen ---
+    - id: MP03
+      description: "testID added to Agenda sunday cards (dynamic per date)"
+      how_to_verify: "src/app/(tabs)/agenda.tsx AgendaSundayCard root View has testID={`agenda-card-${date}`}"
+
+    - id: MP04
+      description: "testID added to Agenda card header (expand/collapse)"
+      how_to_verify: "src/app/(tabs)/agenda.tsx Pressable card header has testID={`agenda-card-header-${date}`}"
+
+    - id: MP05
+      description: "testID added to Agenda card play button (presentation)"
+      how_to_verify: "src/app/(tabs)/agenda.tsx Pressable play button has testID={`agenda-play-button`} or testID={`agenda-play-${date}-button`}"
+
+    # --- testID additions: AgendaForm ---
+    - id: MP06
+      description: "testID added to AgendaForm presiding SelectorField"
+      how_to_verify: "src/components/AgendaForm.tsx SelectorField for presiding has testID='agenda-presiding-button'"
+
+    - id: MP07
+      description: "testID added to AgendaForm opening hymn SelectorField"
+      how_to_verify: "src/components/AgendaForm.tsx SelectorField for openingHymn has testID='agenda-opening-hymn-button'"
+
+    - id: MP08
+      description: "testID added to AgendaForm sacrament hymn SelectorField"
+      how_to_verify: "src/components/AgendaForm.tsx SelectorField for sacramentHymn has testID='agenda-sacrament-hymn-button'"
+
+    - id: MP09
+      description: "testID added to AgendaForm closing hymn SelectorField"
+      how_to_verify: "src/components/AgendaForm.tsx SelectorField for closingHymn has testID='agenda-closing-hymn-button'"
+
+    # --- testID additions: ActorSelector ---
+    - id: MP10
+      description: "testID added to ActorSelector add button"
+      how_to_verify: "src/components/ActorSelector.tsx Pressable '+ Add' has testID='actor-add-button'"
+
+    - id: MP11
+      description: "testID added to ActorSelector add name input"
+      how_to_verify: "src/components/ActorSelector.tsx TextInput for adding name has testID='actor-add-name-input'"
+
+    - id: MP12
+      description: "testID added to ActorSelector add confirm button"
+      how_to_verify: "src/components/ActorSelector.tsx Pressable confirm add has testID='actor-add-confirm-button'"
+
+    - id: MP13
+      description: "testID added to ActorSelector close button"
+      how_to_verify: "src/components/ActorSelector.tsx Pressable close has testID='actor-close-button'"
+
+    # --- testID additions: HymnSelectorModal ---
+    - id: MP14
+      description: "testID added to HymnSelectorModal search input"
+      how_to_verify: "src/components/AgendaForm.tsx HymnSelectorModal SearchInput has testID='hymn-search-input'"
+
+    - id: MP15
+      description: "testID added to HymnSelectorModal close button"
+      how_to_verify: "src/components/AgendaForm.tsx HymnSelectorModal close Pressable has testID='hymn-close-button'"
+
+    # --- testID additions: Presentation screen ---
+    - id: MP16
+      description: "testID added to Presentation close button"
+      how_to_verify: "src/app/presentation.tsx Pressable close has testID='presentation-close-button'"
+
+    - id: MP17
+      description: "testID added to Presentation pencil (edit) button"
+      how_to_verify: "src/app/presentation.tsx Pressable pencil has testID='presentation-edit-button'"
+
+    - id: MP18
+      description: "testID added to Presentation font toggle button"
+      how_to_verify: "src/app/presentation.tsx Pressable font toggle has testID='presentation-font-toggle-button'"
+
+    # --- Maestro flows ---
+    - id: MP19
+      description: "03-home-presentation.yaml flow exists and tests home -> presentation -> close"
+      how_to_verify: |
+        e2e/maestro/03-home-presentation.yaml:
+        - Registers new ward
+        - Asserts Home tab visible with "Iniciar Reunião Sacramental" button
+        - Taps start meeting button (by testID)
+        - Asserts presentation screen visible ("Reunião Sacramental")
+        - Asserts close button visible (by testID)
+        - Closes presentation (taps close button)
+        - Asserts back on Home tab
+
+    - id: MP20
+      description: "04-agenda.yaml flow exists and tests agenda expand, hymn selection, actor creation"
+      how_to_verify: |
+        e2e/maestro/04-agenda.yaml:
+        - Registers new ward
+        - Navigates to Agendas tab
+        - Taps next Sunday card to expand
+        - Waits for AgendaForm to load
+        - Taps presiding field to open ActorSelector
+        - Creates a new actor via add button/input
+        - Selects the created actor
+        - Verifies actor name appears in presiding field
+        - Taps opening hymn field to open HymnSelectorModal
+        - Selects a hymn
+        - Verifies hymn appears in the field
+        - Taps play button to open presentation
+        - Verifies presentation screen visible
+        - Closes presentation
+
+    - id: MP21
+      description: "Existing unit tests still pass (no regressions from testID additions)"
+      how_to_verify: "Run vitest run — all 1707+ tests pass"
+
+    - id: MP22
+      description: "All new testIDs follow {screen}-{element}-{type} kebab-case convention"
+      how_to_verify: "All testIDs added in Phase 2 match pattern /^(home|agenda|actor|hymn|presentation)-[a-z0-9-]+-[a-z]+$/"
+
+  should_pass:
+
+    - id: SP01
+      description: "testID added to AgendaForm conducting SelectorField"
+      how_to_verify: "SelectorField for conducting has testID='agenda-conducting-button'"
+
+    - id: SP02
+      description: "testID added to AgendaForm pianist SelectorField"
+      how_to_verify: "SelectorField for pianist has testID='agenda-pianist-button'"
+
+    - id: SP03
+      description: "testID added to AgendaForm conductor SelectorField"
+      how_to_verify: "SelectorField for conductor has testID='agenda-conductor-button'"
+
+    - id: SP04
+      description: "testID added to AgendaForm opening prayer SelectorField"
+      how_to_verify: "SelectorField for openingPrayer has testID='agenda-opening-prayer-button'"
+
+    - id: SP05
+      description: "testID added to AgendaForm closing prayer SelectorField"
+      how_to_verify: "SelectorField for closingPrayer has testID='agenda-closing-prayer-button'"
+
+    - id: SP06
+      description: "testID added to AccordionCard section headers in presentation"
+      how_to_verify: "AccordionCard Pressable headers have testID={`presentation-section-${index}-header`}"
+
+    - id: SP07
+      description: "Maestro flows use testID selectors (not text) where testIDs are available"
+      how_to_verify: "Flow YAML files reference elements by id: (testID) rather than by visible text for elements that have testIDs"
+
+    - id: SP08
+      description: "Flows include appropriate wait commands for network operations"
+      how_to_verify: "After expanding agenda card, flows use extendedWaitUntil for AgendaForm fields to appear"
+
+    - id: SP09
+      description: "ActorSelector search input has testID"
+      how_to_verify: "src/components/ActorSelector.tsx SearchInput has testID='actor-search-input'"
+
+    - id: SP10
+      description: "Home preview card has testID"
+      how_to_verify: "src/app/(tabs)/index.tsx preview card View has testID='home-preview-card'"
+
+    - id: SP11
+      description: "e2e/README.md updated with Phase 2 flow descriptions"
+      how_to_verify: "README.md mentions 03-home-presentation.yaml and 04-agenda.yaml"
+
+    - id: SP12
+      description: "New E2E tests added for Phase 2 testID validation"
+      how_to_verify: "src/__tests__/f017-e2e-testing.test.ts updated with Phase 2 testID cross-validation"
+
+# =============================================================================
+# TESTID PLAN — NEW IDS FOR PHASE 2
+# =============================================================================
+
+testid_plan:
+
+  home_screen:
+    - testID: "home-start-meeting-button"
+      element: "Pressable — Start Meeting"
+      file: "src/app/(tabs)/index.tsx"
+      line_area: "133-146"
+
+    - testID: "home-edit-agenda-button"
+      element: "Pressable — Pencil edit"
+      file: "src/app/(tabs)/index.tsx"
+      line_area: "233-241"
+
+    - testID: "home-preview-card"
+      element: "View — Preview card container"
+      file: "src/app/(tabs)/index.tsx"
+      line_area: "149-243"
+
+  agenda_screen:
+    - testID: "agenda-card-{date}"
+      element: "View — AgendaSundayCard root"
+      file: "src/app/(tabs)/agenda.tsx"
+      line_area: "390-397"
+      dynamic: true
+
+    - testID: "agenda-card-header-{date}"
+      element: "Pressable — Card header (expand/collapse)"
+      file: "src/app/(tabs)/agenda.tsx"
+      line_area: "399-403"
+      dynamic: true
+
+    - testID: "agenda-play-{date}-button"
+      element: "Pressable — Play button (presentation)"
+      file: "src/app/(tabs)/agenda.tsx"
+      line_area: "538-557"
+      dynamic: true
+
+  agenda_form:
+    - testID: "agenda-presiding-button"
+      element: "SelectorField — Presiding"
+      file: "src/components/AgendaForm.tsx"
+      context: "FieldRow label=presiding"
+
+    - testID: "agenda-conducting-button"
+      element: "SelectorField — Conducting"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-pianist-button"
+      element: "SelectorField — Pianist"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-conductor-button"
+      element: "SelectorField — Conductor"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-opening-hymn-button"
+      element: "SelectorField — Opening Hymn"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-sacrament-hymn-button"
+      element: "SelectorField — Sacrament Hymn"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-closing-hymn-button"
+      element: "SelectorField — Closing Hymn"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-opening-prayer-button"
+      element: "SelectorField — Opening Prayer (when managePrayers=false)"
+      file: "src/components/AgendaForm.tsx"
+
+    - testID: "agenda-closing-prayer-button"
+      element: "SelectorField — Closing Prayer (when managePrayers=false)"
+      file: "src/components/AgendaForm.tsx"
+
+  actor_selector:
+    - testID: "actor-add-button"
+      element: "Pressable — '+ Add' button"
+      file: "src/components/ActorSelector.tsx"
+      line_area: "261-268"
+
+    - testID: "actor-add-name-input"
+      element: "TextInput — New actor name"
+      file: "src/components/ActorSelector.tsx"
+      line_area: "271-280"
+
+    - testID: "actor-add-confirm-button"
+      element: "Pressable — Confirm add"
+      file: "src/components/ActorSelector.tsx"
+      line_area: "282-289"
+
+    - testID: "actor-close-button"
+      element: "Pressable — Close modal"
+      file: "src/components/ActorSelector.tsx"
+      line_area: "254-256"
+
+    - testID: "actor-search-input"
+      element: "SearchInput — Filter actors"
+      file: "src/components/ActorSelector.tsx"
+      line_area: "247-253"
+
+  hymn_selector:
+    - testID: "hymn-search-input"
+      element: "SearchInput — Filter hymns"
+      file: "src/components/AgendaForm.tsx"
+      line_area: "833-839"
+
+    - testID: "hymn-close-button"
+      element: "Pressable — Close modal"
+      file: "src/components/AgendaForm.tsx"
+      line_area: "840-842"
+
+  presentation_screen:
+    - testID: "presentation-edit-button"
+      element: "Pressable — Pencil edit"
+      file: "src/app/presentation.tsx"
+      line_area: "100-107"
+
+    - testID: "presentation-font-toggle-button"
+      element: "Pressable — Font size toggle"
+      file: "src/app/presentation.tsx"
+      line_area: "108-117"
+
+    - testID: "presentation-close-button"
+      element: "Pressable — Close/back"
+      file: "src/app/presentation.tsx"
+      line_area: "118-125"
+
+    - testID: "presentation-section-{index}-header"
+      element: "AccordionCard Pressable header"
+      file: "src/components/AccordionCard.tsx"
+      line_area: "73-98"
+      dynamic: true
+
+# =============================================================================
+# IMPLEMENTATION GUIDANCE
+# =============================================================================
+
+implementation_notes:
+
+  files_to_modify:
+    - path: "src/app/(tabs)/index.tsx"
+      changes: |
+        Add testID to:
+        - Start Meeting Pressable: testID="home-start-meeting-button"
+        - Pencil edit Pressable: testID="home-edit-agenda-button"
+        - Preview card View: testID="home-preview-card"
+
+    - path: "src/app/(tabs)/agenda.tsx"
+      changes: |
+        Add testID to AgendaSundayCard (inline component):
+        - Root View: testID={`agenda-card-${date}`}
+        - Card header Pressable: testID={`agenda-card-header-${date}`}
+        - Play button Pressable: testID={`agenda-play-${date}-button`}
+
+    - path: "src/components/AgendaForm.tsx"
+      changes: |
+        Add testID to SelectorField calls (via new prop on SelectorField component):
+        - Presiding: testID="agenda-presiding-button"
+        - Conducting: testID="agenda-conducting-button"
+        - Pianist: testID="agenda-pianist-button"
+        - Conductor: testID="agenda-conductor-button"
+        - Opening Hymn: testID="agenda-opening-hymn-button"
+        - Sacrament Hymn: testID="agenda-sacrament-hymn-button"
+        - Closing Hymn: testID="agenda-closing-hymn-button"
+        - Opening Prayer: testID="agenda-opening-prayer-button"
+        - Closing Prayer: testID="agenda-closing-prayer-button"
+        HymnSelectorModal:
+        - SearchInput: testID="hymn-search-input"
+        - Close Pressable: testID="hymn-close-button"
+        SelectorField sub-component: add testID prop and forward to Pressable
+
+    - path: "src/components/ActorSelector.tsx"
+      changes: |
+        Add testID to:
+        - Add button: testID="actor-add-button"
+        - Add name TextInput: testID="actor-add-name-input"
+        - Add confirm Pressable: testID="actor-add-confirm-button"
+        - Close Pressable: testID="actor-close-button"
+        - SearchInput: testID="actor-search-input"
+
+    - path: "src/app/presentation.tsx"
+      changes: |
+        Add testID to:
+        - Pencil Pressable: testID="presentation-edit-button"
+        - Font toggle Pressable: testID="presentation-font-toggle-button"
+        - Close Pressable: testID="presentation-close-button"
+
+    - path: "src/components/AccordionCard.tsx"
+      changes: |
+        Add testID to card header Pressable: testID={`presentation-section-${index}-header`}
+        Note: AccordionCard is also potentially used elsewhere, so consider
+        using a generic testID like `accordion-section-${index}-header` or
+        accept the presentation- prefix since it's only used in presentation currently.
+
+  files_to_create:
+    - path: "e2e/maestro/03-home-presentation.yaml"
+      description: |
+        Flow: Register ward -> Home tab -> tap Start Meeting button ->
+        assert presentation screen -> close presentation -> assert back on Home
+        Key interactions: register-first-user, home-start-meeting-button,
+        presentation-close-button
+
+    - path: "e2e/maestro/04-agenda.yaml"
+      description: |
+        Flow: Register ward -> Agendas tab -> expand next Sunday card ->
+        open presiding ActorSelector -> create actor -> select actor ->
+        open hymn selector -> select hymn -> verify -> open presentation ->
+        close presentation
+        Key interactions: agenda-card-header, actor-add-button, actor-add-name-input,
+        agenda-presiding-button, agenda-opening-hymn-button, hymn items
+
+  maestro_flow_notes: |
+    - CRITICAL: Each flow registers its own ward (independent, no shared state)
+    - New ward: managePrayers=false, no actors, no hymn selections
+    - After register, user lands on Home tab (auto-navigate)
+    - Hymn list is seeded data — always available in all wards
+    - Actor list starts empty — must create actor before selecting
+    - Agenda is lazy-created when expanding a Sunday card (network call, needs wait)
+    - Tab navigation: tapOn text label ("Agendas", "Início")
+    - Bottom-sheet modals: use testID for buttons inside, text for item selection
+
+  selectorfield_testid_approach: |
+    SelectorField is a sub-component of AgendaForm. Two approaches:
+    1. Add testID prop to SelectorField and pass through to the Pressable root
+    2. Wrap SelectorField calls in a View with testID
+    Recommended: Approach 1 (cleaner, testID directly on interactive element)

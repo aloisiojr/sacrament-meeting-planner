@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-08 (CR-284: E2E Testing with Maestro — Phase 1)
+# Last updated: 2026-03-08 (CR-284: E2E Testing with Maestro — Phase 2)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
   total_modules: 14
-  total_adrs: 53
+  total_adrs: 55
 
 # =============================================================================
 # TECH STACK
@@ -469,25 +469,47 @@ modules:
   - id: M014
     name: E2E Testing (Maestro)
     description: |
-      Maestro E2E testing infrastructure. testID props on auth screens and
-      settings sign-out button enable reliable element targeting. YAML flow
-      files test register, login, logout, and invalid login flows. Tests
-      run against production Supabase with RLS isolation.
-    features: [F017_E2E]
+      Maestro E2E testing infrastructure. Phase 1: testID props on auth screens
+      and settings sign-out button; 2 flow files (register, login-logout).
+      Phase 2: testID props on Home tab, Agenda tab, AgendaForm (SelectorField
+      + HymnSelectorModal), ActorSelector, Presentation Mode; 2 flow files
+      (home-presentation, agenda). Tests run against production Supabase with
+      RLS isolation.
+    features: [F017_E2E, F018_E2E]
     components:
+      # Phase 1 flows
       - path: e2e/maestro/01-register.yaml
         responsibility: E2E flow for first user registration (creates new ward)
       - path: e2e/maestro/02-login-logout.yaml
         responsibility: E2E flow for login, logout, and invalid login
+      # Phase 2 flows
+      - path: e2e/maestro/03-home-presentation.yaml
+        responsibility: E2E flow for Home tab -> Presentation Mode -> verify + font toggle -> close
+      - path: e2e/maestro/04-agenda.yaml
+        responsibility: E2E flow for Agenda tab -> expand Sunday -> assign actor + hymn -> collapse
       - path: e2e/README.md
         responsibility: E2E testing documentation
     testid_targets:
+      # Phase 1
       - path: src/app/(auth)/login.tsx
         count: 6
       - path: src/app/(auth)/register.tsx
         count: 15
       - path: src/app/(tabs)/settings/index.tsx
         count: 1
+      # Phase 2
+      - path: src/app/(tabs)/index.tsx
+        count: 2
+      - path: src/app/(tabs)/agenda.tsx
+        count: 2
+        note: "Dynamic testIDs: agenda-card-{date}, agenda-play-{date}"
+      - path: src/components/AgendaForm.tsx
+        count: 9
+        note: "7 SelectorField testIDs + 2 HymnSelectorModal testIDs"
+      - path: src/components/ActorSelector.tsx
+        count: 5
+      - path: src/app/presentation.tsx
+        count: 5
     dependencies:
       - "Maestro CLI"
       - "Java 17"
@@ -1375,3 +1397,23 @@ adrs:
       Flows have data dependencies (register creates credentials for login-logout).
       Numeric prefix enforces order without configuration. Each flow can also run
       individually for debugging.
+
+  - id: ADR-054
+    title: "SelectorField testID via prop passthrough pattern"
+    decision: |
+      Add optional testID prop to SelectorField and forward it to the outer Pressable.
+      Each caller passes a semantic testID (e.g., "agenda-presiding-selector").
+    rationale: |
+      Caller controls the testID value — semantic, readable, stable. SelectorField
+      stays generic with no hardcoded IDs. Consistent with SearchInput's testID
+      handling via rest spread.
+
+  - id: ADR-055
+    title: "Dynamic testID with ISO date suffix for agenda cards"
+    decision: |
+      Use template literal agenda-card-${date} where date is YYYY-MM-DD ISO string.
+      Maestro flows compute target date via evalScript. Same pattern for play button.
+    rationale: |
+      Each Sunday card needs a unique, deterministic testID. The ISO date is already
+      available as the card's date prop. evalScript in Maestro handles the dynamic
+      computation at test runtime.

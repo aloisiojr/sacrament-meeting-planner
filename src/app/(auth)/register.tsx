@@ -151,6 +151,7 @@ export default function RegisterScreen() {
         <View style={styles.formContainer}>
           {error && (
             <View
+              testID="register-error-text"
               style={[
                 styles.errorContainer,
                 { backgroundColor: colors.errorContainer },
@@ -182,6 +183,7 @@ export default function RegisterScreen() {
               textContentType="name"
               autoComplete="name"
               editable={!loading}
+              testID="register-fullname-input"
             />
           </View>
 
@@ -206,6 +208,7 @@ export default function RegisterScreen() {
               textContentType="emailAddress"
               autoComplete="email"
               editable={!loading}
+              testID="register-email-input"
             />
           </View>
 
@@ -228,6 +231,7 @@ export default function RegisterScreen() {
               textContentType="newPassword"
               autoComplete="new-password"
               editable={!loading}
+              testID="register-password-input"
             />
           </View>
 
@@ -250,6 +254,7 @@ export default function RegisterScreen() {
               textContentType="newPassword"
               autoComplete="new-password"
               editable={!loading}
+              testID="register-confirm-password-input"
             />
           </View>
 
@@ -270,6 +275,7 @@ export default function RegisterScreen() {
               placeholderTextColor={colors.placeholder}
               autoCapitalize="words"
               editable={!loading}
+              testID="register-stake-input"
             />
           </View>
 
@@ -290,6 +296,7 @@ export default function RegisterScreen() {
               placeholderTextColor={colors.placeholder}
               autoCapitalize="words"
               editable={!loading}
+              testID="register-ward-input"
             />
           </View>
 
@@ -311,6 +318,7 @@ export default function RegisterScreen() {
                   ]}
                   onPress={() => setRole(r)}
                   disabled={loading}
+                  testID={`register-role-${r}-radio`}
                 >
                   <Text
                     style={[
@@ -343,6 +351,7 @@ export default function RegisterScreen() {
                   ]}
                   onPress={() => setLanguage(lang)}
                   disabled={loading}
+                  testID={`register-language-${lang}-radio`}
                 >
                   <Text
                     style={[
@@ -375,6 +384,7 @@ export default function RegisterScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}
+              testID="register-timezone-input"
             />
           </View>
 
@@ -388,6 +398,7 @@ export default function RegisterScreen() {
             onPress={handleRegister}
             disabled={loading}
             activeOpacity={0.8}
+            testID="register-submit-button"
           >
             {loading ? (
               <ActivityIndicator color={colors.onPrimary} />
@@ -402,6 +413,7 @@ export default function RegisterScreen() {
             style={styles.backLink}
             onPress={handleBack}
             disabled={loading}
+            testID="register-back-button"
           >
             <Text style={[styles.backLinkText, { color: colors.primary }]}>
               {t('common.back')}

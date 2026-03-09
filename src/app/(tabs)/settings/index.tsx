@@ -323,6 +323,7 @@ export default function SettingsScreen() {
         </View>
 
         <Pressable
+          testID="settings-sign-out-button"
           style={[styles.signOutButton, { borderColor: colors.error }]}
           onPress={handleSignOut}
           accessibilityRole="button"

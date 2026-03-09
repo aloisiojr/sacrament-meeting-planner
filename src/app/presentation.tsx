@@ -86,7 +86,7 @@ export default function PresentationScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView testID="presentation-screen" style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
         <View style={styles.headerTitleContainer}>
@@ -98,6 +98,7 @@ export default function PresentationScreen() {
           </Text>
         </View>
         <Pressable
+          testID="presentation-edit-button"
           style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
           accessibilityRole="button"
@@ -106,16 +107,18 @@ export default function PresentationScreen() {
           <PencilIcon size={16} color={colors.text} />
         </Pressable>
         <Pressable
+          testID="presentation-font-toggle-button"
           style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')}
           accessibilityRole="button"
           accessibilityLabel="Toggle font size"
         >
-          <Text style={[styles.fontToggleText, { color: colors.text }]}>
+          <Text testID="presentation-font-toggle-text" style={[styles.fontToggleText, { color: colors.text }]}>
             {fontSizeMode === 'normal' ? 'Aa' : 'AA'}
           </Text>
         </Pressable>
         <Pressable
+          testID="presentation-close-button"
           style={[styles.closeButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.back()}
           accessibilityRole="button"

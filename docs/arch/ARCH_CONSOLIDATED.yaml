@@ -1,14 +1,14 @@
 # =============================================================================
 # ARCH_CONSOLIDATED.yaml
 # Architecture documentation for Sacrament Meeting Planner
-# Last updated: 2026-03-08 (CR-281/282/283: EditableListField bugfixes, recognized_names rework)
+# Last updated: 2026-03-08 (CR-284: E2E Testing with Maestro — Phase 1)
 # =============================================================================
 
 metadata:
   project: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  total_modules: 13
-  total_adrs: 51
+  total_modules: 14
+  total_adrs: 53
 
 # =============================================================================
 # TECH STACK
@@ -57,6 +57,7 @@ tech_stack:
   testing:
     runner: Vitest 4
     utilities: "@testing-library/react-native 13"
+    e2e: Maestro (YAML flow files, iOS simulator)
 
   build:
     bundler: Metro (via Expo)
@@ -461,6 +462,36 @@ modules:
       - "react-native-reanimated"
       - "react-native-safe-area-context"
       - "react-native-screens"
+
+  # ---------------------------------------------------------------------------
+  # M014 - E2E Testing (Maestro)
+  # ---------------------------------------------------------------------------
+  - id: M014
+    name: E2E Testing (Maestro)
+    description: |
+      Maestro E2E testing infrastructure. testID props on auth screens and
+      settings sign-out button enable reliable element targeting. YAML flow
+      files test register, login, logout, and invalid login flows. Tests
+      run against production Supabase with RLS isolation.
+    features: [F017_E2E]
+    components:
+      - path: e2e/maestro/01-register.yaml
+        responsibility: E2E flow for first user registration (creates new ward)
+      - path: e2e/maestro/02-login-logout.yaml
+        responsibility: E2E flow for login, logout, and invalid login
+      - path: e2e/README.md
+        responsibility: E2E testing documentation
+    testid_targets:
+      - path: src/app/(auth)/login.tsx
+        count: 6
+      - path: src/app/(auth)/register.tsx
+        count: 15
+      - path: src/app/(tabs)/settings/index.tsx
+        count: 1
+    dependencies:
+      - "Maestro CLI"
+      - "Java 17"
+      - "iOS Simulator (Xcode)"
 
 # =============================================================================
 # SHARED LIBRARIES
@@ -1324,3 +1355,23 @@ adrs:
       between array and scalar types. The temp column approach is safer and
       explicit. The \n separator is consistent with the other three list
       fields (announcements, welcome_new_families, sustaining_releasing).
+
+  - id: ADR-052
+    title: "testID naming convention: {screen}-{element}-{type} in kebab-case"
+    decision: |
+      Use testID with convention {screen}-{element}-{type} in kebab-case for
+      E2E testing. Dynamic IDs use template literals for .map() elements.
+    rationale: |
+      testID is stable across language and text changes, unlike text matching.
+      The convention is self-documenting and supports dynamic IDs for rendered
+      lists (role/language radio buttons). Text matching reserved for assertions only.
+
+  - id: ADR-053
+    title: "Maestro flow files with numbered prefix for execution order"
+    decision: |
+      Use zero-padded numeric prefix (01-, 02-, etc.) for Maestro YAML flow files.
+      Alphabetical order = execution order when running `maestro test e2e/maestro/`.
+    rationale: |
+      Flows have data dependencies (register creates credentials for login-logout).
+      Numeric prefix enforces order without configuration. Each flow can also run
+      individually for debugging.

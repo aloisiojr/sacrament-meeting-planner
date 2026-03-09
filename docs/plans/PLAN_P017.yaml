@@ -1,0 +1,657 @@
+# =============================================================================
+# PLAN_P017.yaml
+# Artifact ID: 017
+# Phase: 1 of 4
+# Features: F017_E2E (CR-284)
+# Status: pending
+# =============================================================================
+
+metadata:
+  artifact_id: "017"
+  phase: 1
+  total_phases: 4
+  feature_ids: [F017_E2E]
+  crs: [284]
+  status: pending
+  created: "2026-03-08"
+  author: planner
+
+# =============================================================================
+# OVERVIEW
+# =============================================================================
+
+overview:
+  goal: |
+    Set up Maestro E2E testing infrastructure with testID props on auth screens
+    (login.tsx, register.tsx) and settings sign-out button (settings/index.tsx),
+    then create two Maestro flow YAML files (01-register, 02-login-logout) and
+    an e2e/README.md documentation file. Zero functional impact on the app.
+
+  principles:
+    - "Zero functional impact: testID props do not affect rendering or behavior"
+    - "testID over text matching for element targeting (text for assertions only)"
+    - "Self-contained flows: each flow creates its own isolated test data"
+    - "Convention-driven: {screen}-{element}-{type} kebab-case naming (ADR-052)"
+    - "Numbered prefix for execution order (ADR-053)"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ---------------------------------------------------------------------------
+  # STEP 1: Add testID props to login.tsx (6 elements)
+  # ---------------------------------------------------------------------------
+  - id: S017-01
+    title: "Add testID to 6 login screen elements"
+    feature: F017_E2E
+    sub_feature: SF1
+    depends_on: []
+    files:
+      - path: src/app/(auth)/login.tsx
+        action: edit
+        description: |
+          Add testID prop to 6 existing elements. No new imports, no logic changes.
+
+          1. Error container View (line 76):
+             Add testID="login-error-text" to <View> at line 76
+             Current: <View style={[styles.errorContainer, ...
+             After:   <View testID="login-error-text" style={[styles.errorContainer, ...
+
+          2. Email TextInput (line 92):
+             Add testID="login-email-input" to <TextInput> at line 92
+             Insert after autoComplete="email" (line 109):
+               testID="login-email-input"
+
+          3. Password TextInput (line 118):
+             Add testID="login-password-input" to <TextInput> at line 118
+             Insert after onSubmitEditing={handleLogin} (line 135):
+               testID="login-password-input"
+
+          4. Login button TouchableOpacity (line 139):
+             Add testID="login-submit-button" to <TouchableOpacity> at line 139
+             Insert after activeOpacity={0.8} (line 147):
+               testID="login-submit-button"
+
+          5. Forgot password TouchableOpacity (line 158):
+             Add testID="login-forgot-password-button" to <TouchableOpacity> at line 158
+             Insert after disabled={loading} (line 161):
+               testID="login-forgot-password-button"
+
+          6. Create account TouchableOpacity (line 170):
+             Add testID="login-create-account-button" to <TouchableOpacity> at line 170
+             Insert after disabled={loading} (line 173):
+               testID="login-create-account-button"
+
+    done_when: |
+      - login.tsx has 6 testID props: login-email-input, login-password-input,
+        login-submit-button, login-forgot-password-button, login-create-account-button,
+        login-error-text
+      - npx tsc --noEmit passes (no type errors)
+      - Existing tests pass (no regression)
+      - App renders correctly on simulator (visual check)
+
+    acceptance_criteria:
+      - AC-SF1-01  # login-email-input found by Maestro
+      - AC-SF1-02  # login-submit-button found by Maestro
+      - AC-SF1-03  # login-error-text visible on error
+
+    edge_cases: []
+
+    tests: []
+    # testID props are verified by E2E flows (steps S017-04 and S017-05),
+    # not by unit tests. testID has no functional impact.
+
+  # ---------------------------------------------------------------------------
+  # STEP 2: Add testID props to register.tsx (15 elements)
+  # ---------------------------------------------------------------------------
+  - id: S017-02
+    title: "Add testID to 15 register screen elements"
+    feature: F017_E2E
+    sub_feature: SF2
+    depends_on: []
+    files:
+      - path: src/app/(auth)/register.tsx
+        action: edit
+        description: |
+          Add testID prop to 15 existing elements. No new imports, no logic changes.
+
+          1. Error container View (line 153):
+             Add testID="register-error-text" to <View> at line 153
+             Current: <View style={[styles.errorContainer, ...
+             After:   <View testID="register-error-text" style={[styles.errorContainer, ...
+
+          2. Full Name TextInput (line 170):
+             Add testID="register-fullname-input"
+             Insert after editable={!loading} (line 184):
+               testID="register-fullname-input"
+
+          3. Email TextInput (line 193):
+             Add testID="register-email-input"
+             Insert after editable={!loading} (line 208):
+               testID="register-email-input"
+
+          4. Password TextInput (line 217):
+             Add testID="register-password-input"
+             Insert after editable={!loading} (line 230):
+               testID="register-password-input"
+
+          5. Confirm Password TextInput (line 239):
+             Add testID="register-confirm-password-input"
+             Insert after editable={!loading} (line 252):
+               testID="register-confirm-password-input"
+
+          6. Stake TextInput (line 261):
+             Add testID="register-stake-input"
+             Insert after editable={!loading} (line 272):
+               testID="register-stake-input"
+
+          7. Ward TextInput (line 281):
+             Add testID="register-ward-input"
+             Insert after editable={!loading} (line 292):
+               testID="register-ward-input"
+
+          8-9. Role radio buttons (dynamic, line 303):
+             Add testID={`register-role-${r}-radio`} to the TouchableOpacity
+             inside the .map() callback.
+             Insert after disabled={loading} (line 313):
+               testID={`register-role-${r}-radio`}
+             This generates: register-role-bishopric-radio, register-role-secretary-radio
+
+          10-12. Language radio buttons (dynamic, line 335):
+             Add testID={`register-language-${lang}-radio`} to the TouchableOpacity
+             inside the .map() callback.
+             Insert after disabled={loading} (line 345):
+               testID={`register-language-${lang}-radio`}
+             This generates: register-language-pt-BR-radio, register-language-en-US-radio,
+             register-language-es-LA-radio
+
+          13. Timezone TextInput (line 365):
+             Add testID="register-timezone-input"
+             Insert after editable={!loading} (line 377):
+               testID="register-timezone-input"
+
+          14. Submit button TouchableOpacity (line 382):
+             Add testID="register-submit-button"
+             Insert after activeOpacity={0.8} (line 390):
+               testID="register-submit-button"
+
+          15. Back link TouchableOpacity (line 401):
+             Add testID="register-back-button"
+             Insert after disabled={loading} (line 404):
+               testID="register-back-button"
+
+    done_when: |
+      - register.tsx has 15 testID props (7 static inputs, 2 dynamic role radios,
+        3 dynamic language radios, 2 static buttons, 1 error view)
+      - npx tsc --noEmit passes (no type errors)
+      - Existing tests pass (no regression)
+      - Dynamic testIDs use template literals: `register-role-${r}-radio`,
+        `register-language-${lang}-radio`
+
+    acceptance_criteria:
+      - AC-SF2-01  # register-fullname-input found by Maestro
+      - AC-SF2-02  # register-role-bishopric-radio found by Maestro
+      - AC-SF2-03  # register-submit-button found by Maestro
+      - AC-SF2-04  # register-error-text visible on validation error
+
+    edge_cases:
+      - EC_E2E_004  # Keyboard covering elements (KeyboardAvoidingView + Maestro auto-scroll)
+
+    tests: []
+    # testID props verified by E2E flow 01-register (step S017-04)
+
+  # ---------------------------------------------------------------------------
+  # STEP 3: Add testID to settings sign-out button
+  # ---------------------------------------------------------------------------
+  - id: S017-03
+    title: "Add testID to settings sign-out Pressable"
+    feature: F017_E2E
+    sub_feature: SF3
+    depends_on: []
+    files:
+      - path: src/app/(tabs)/settings/index.tsx
+        action: edit
+        description: |
+          Add testID prop to the sign-out Pressable button.
+
+          Sign-out Pressable (line 325):
+            Add testID="settings-sign-out-button"
+            Current: <Pressable style={[styles.signOutButton, ...
+            After:   <Pressable testID="settings-sign-out-button" style={[styles.signOutButton, ...
+
+    done_when: |
+      - settings/index.tsx has testID="settings-sign-out-button" on the sign-out Pressable
+      - npx tsc --noEmit passes
+      - Existing tests pass (no regression)
+
+    acceptance_criteria:
+      - AC-SF3-01  # settings-sign-out-button found by Maestro
+
+    edge_cases: []
+
+    tests: []
+    # testID verified by E2E flow 02-login-logout (step S017-05)
+
+  # ---------------------------------------------------------------------------
+  # STEP 4: Create Maestro flow 01-register.yaml
+  # ---------------------------------------------------------------------------
+  - id: S017-04
+    title: "Create Maestro E2E flow: 01-register.yaml"
+    feature: F017_E2E
+    sub_feature: SF4
+    depends_on: [S017-01, S017-02]
+    files:
+      - path: e2e/maestro/01-register.yaml
+        action: create
+        description: |
+          Maestro flow YAML that registers a new first user for a new ward.
+
+          Flow structure:
+          ```yaml
+          appId: com.alouisio.sacramentmeetingplanner
+          ---
+          # 01-register: Register new ward first user
+
+          # Generate unique email
+          - evalScript: ${output.TEST_EMAIL = 'e2e-' + Date.now() + '@test.com'}
+          - evalScript: ${output.TEST_PASSWORD = 'Test123456'}
+
+          # Assert login screen visible
+          - assertVisible: "Entrar"
+
+          # Navigate to register screen
+          - tapOn:
+              id: "login-create-account-button"
+
+          # Assert register screen visible
+          - assertVisible: "Criar Conta"
+
+          # Fill registration form
+          - tapOn:
+              id: "register-fullname-input"
+          - inputText: "E2E Test User"
+
+          - tapOn:
+              id: "register-email-input"
+          - inputText: ${output.TEST_EMAIL}
+
+          - tapOn:
+              id: "register-password-input"
+          - inputText: ${output.TEST_PASSWORD}
+
+          - tapOn:
+              id: "register-confirm-password-input"
+          - inputText: ${output.TEST_PASSWORD}
+
+          - tapOn:
+              id: "register-stake-input"
+          - inputText: "E2E Test Stake"
+
+          - tapOn:
+              id: "register-ward-input"
+          - inputText: "E2E Test Ward"
+
+          # Role: bishopric is default — no tap needed
+          # Language: pt-BR is default — no tap needed
+          # Timezone: auto-detected — no change needed
+
+          # Submit registration
+          - tapOn:
+              id: "register-submit-button"
+
+          # Wait for registration to complete and navigate to Home
+          - extendedWaitUntil:
+              visible: "Início"
+              timeout: 15000
+
+          # Assert tab bar visible with expected tabs
+          - assertVisible: "Início"
+          - assertVisible: "Agendas"
+          - assertVisible: "Discursos"
+          - assertVisible: "Configurações"
+          ```
+
+          Notes:
+          - Uses testID for element targeting, text for assertions
+          - Unique email via JavaScript Date.now()
+          - extendedWaitUntil with 15s timeout for network latency (EC_E2E_001)
+          - Default role/language = no tap needed
+          - Tab label "Discursos" (not "Discursos e Orações") for new ward (EC_E2E_005)
+
+    done_when: |
+      - File e2e/maestro/01-register.yaml exists
+      - Flow starts with appId config section
+      - Uses evalScript for unique email generation
+      - Targets elements by testID (tapOn id:)
+      - Assertions use pt-BR text strings
+      - Has extendedWaitUntil with timeout for registration completion
+      - Asserts all 4 tab labels after successful registration
+
+    acceptance_criteria:
+      - AC-SF4-01  # New ward created, user logged in, Home tab visible
+      - AC-SF4-02  # Unique email prevents email_exists error
+      - AC-SF4-03  # App navigates to tabs and shows 4-tab bar
+
+    edge_cases:
+      - EC_E2E_001  # Slow network: extendedWaitUntil 15s timeout
+      - EC_E2E_003  # Partial failure: re-run safe with new timestamp
+      - EC_E2E_004  # Keyboard covering: Maestro auto-scroll + KeyboardAvoidingView
+      - EC_E2E_005  # Tab label "Discursos" for new ward (manage_prayers=false)
+
+    tests: []
+    # This IS the E2E test. Verified by running: maestro test e2e/maestro/01-register.yaml
+
+  # ---------------------------------------------------------------------------
+  # STEP 5: Create Maestro flow 02-login-logout.yaml
+  # ---------------------------------------------------------------------------
+  - id: S017-05
+    title: "Create Maestro E2E flow: 02-login-logout.yaml"
+    feature: F017_E2E
+    sub_feature: SF5
+    depends_on: [S017-01, S017-03]
+    files:
+      - path: e2e/maestro/02-login-logout.yaml
+        action: create
+        description: |
+          Maestro flow YAML that tests login, logout, and invalid login.
+          Runs AFTER 01-register.yaml (uses credentials from output).
+
+          Flow structure:
+          ```yaml
+          appId: com.alouisio.sacramentmeetingplanner
+          ---
+          # 02-login-logout: Login, logout, and invalid login test
+
+          # ---- Part A: Login with valid credentials ----
+
+          # Assert login screen visible
+          - assertVisible:
+              id: "login-submit-button"
+
+          # Enter email from 01-register output
+          - tapOn:
+              id: "login-email-input"
+          - inputText: ${output.TEST_EMAIL}
+
+          # Enter password
+          - tapOn:
+              id: "login-password-input"
+          - inputText: ${output.TEST_PASSWORD}
+
+          # Tap login
+          - tapOn:
+              id: "login-submit-button"
+
+          # Wait for Home tab
+          - extendedWaitUntil:
+              visible: "Início"
+              timeout: 10000
+
+          # Assert Home tab visible
+          - assertVisible: "Início"
+
+          # ---- Part B: Logout ----
+
+          # Navigate to Settings tab
+          - tapOn: "Configurações"
+
+          # Assert settings screen visible
+          - assertVisible:
+              id: "settings-sign-out-button"
+
+          # Scroll to and tap sign-out button
+          - scrollUntilVisible:
+              element:
+                id: "settings-sign-out-button"
+              direction: DOWN
+          - tapOn:
+              id: "settings-sign-out-button"
+
+          # Confirm sign-out in native Alert
+          - tapOn: "Confirmar"
+
+          # Wait for login screen
+          - extendedWaitUntil:
+              visible:
+                id: "login-submit-button"
+              timeout: 10000
+
+          # Assert login screen visible
+          - assertVisible:
+              id: "login-submit-button"
+
+          # ---- Part C: Invalid login ----
+
+          # Enter invalid credentials
+          - tapOn:
+              id: "login-email-input"
+          - inputText: "invalid@test.com"
+
+          - tapOn:
+              id: "login-password-input"
+          - inputText: "wrongpassword"
+
+          # Tap login
+          - tapOn:
+              id: "login-submit-button"
+
+          # Wait for error to appear
+          - extendedWaitUntil:
+              visible:
+                id: "login-error-text"
+              timeout: 10000
+
+          # Assert error message
+          - assertVisible: "E-mail ou senha incorretos"
+          ```
+
+          Notes:
+          - Part A uses credentials from 01-register output
+          - Part B handles native iOS Alert via text matching (EC_E2E_002)
+          - Part C validates error display on invalid credentials
+          - scrollUntilVisible for sign-out button (may be below fold)
+
+    done_when: |
+      - File e2e/maestro/02-login-logout.yaml exists
+      - Flow has 3 parts: login (Part A), logout (Part B), invalid login (Part C)
+      - Part A uses output.TEST_EMAIL and output.TEST_PASSWORD from 01-register
+      - Part B taps native Alert "Confirmar" button
+      - Part C asserts "E-mail ou senha incorretos" error text
+      - All element targeting uses testID
+      - All text assertions use pt-BR strings
+
+    acceptance_criteria:
+      - AC-SF5-01  # Login with valid credentials succeeds, Home tab visible
+      - AC-SF5-02  # Logout via confirmation alert returns to login screen
+      - AC-SF5-03  # Invalid login shows error message
+
+    edge_cases:
+      - EC_E2E_001  # Slow network: extendedWaitUntil timeouts
+      - EC_E2E_002  # Native iOS Alert handled via text matching
+
+    tests: []
+    # This IS the E2E test. Verified by running: maestro test e2e/maestro/02-login-logout.yaml
+
+  # ---------------------------------------------------------------------------
+  # STEP 6: Create e2e/README.md documentation
+  # ---------------------------------------------------------------------------
+  - id: S017-06
+    title: "Create e2e/README.md documentation"
+    feature: F017_E2E
+    sub_feature: SF6
+    depends_on: []
+    files:
+      - path: e2e/README.md
+        action: create
+        description: |
+          Documentation file with the following sections:
+
+          1. **E2E Testing with Maestro** (title)
+
+          2. **Prerequisites**
+             - Maestro CLI installed (brew install maestro)
+             - Java 17 (brew install openjdk@17)
+             - Xcode with iOS simulator (iPhone 17, iOS 26.3)
+             - App built for simulator
+
+          3. **Building the app**
+             - npx expo run:ios
+
+          4. **Running tests**
+             - Individual flow: maestro test e2e/maestro/01-register.yaml
+             - All flows sequentially: maestro test e2e/maestro/
+             - Note: 01-register must run before 02-login-logout
+
+          5. **Test data management**
+             - Tests use PRODUCTION Supabase
+             - Each test creates isolated ward via register-first-user
+             - Unique email: e2e-{timestamp}@test.com
+             - RLS ensures data isolation
+             - Cleanup: delete test wards from Supabase dashboard
+
+          6. **testID convention**
+             - Format: {screen}-{element}-{type}
+             - Types: -input, -button, -text, -radio
+             - Examples: login-email-input, register-submit-button
+
+          7. **Troubleshooting**
+             - Simulator not found: verify iOS simulator running
+             - Timeout errors: increase extendedWaitUntil timeout
+             - Registration fails: check Supabase Edge Function logs
+             - Tab assertion fails: check manage_prayers default
+
+    done_when: |
+      - File e2e/README.md exists
+      - All 7 sections present
+      - Prerequisites list complete
+      - Run commands accurate
+      - testID convention documented
+
+    acceptance_criteria:
+      - AC-SF6-01  # Developer can run E2E tests following README instructions
+
+    edge_cases: []
+
+    tests: []
+
+  # ---------------------------------------------------------------------------
+  # STEP 7: Final verification
+  # ---------------------------------------------------------------------------
+  - id: S017-07
+    title: "Final verification: type check, existing tests, Maestro dry run"
+    feature: F017_E2E
+    depends_on: [S017-01, S017-02, S017-03, S017-04, S017-05, S017-06]
+    files: []
+    done_when: |
+      - npx tsc --noEmit passes with no errors
+      - npx vitest run passes (all existing tests green, no regressions)
+      - e2e/maestro/01-register.yaml is valid YAML (parseable)
+      - e2e/maestro/02-login-logout.yaml is valid YAML (parseable)
+      - e2e/README.md exists and is well-formatted markdown
+      - Total testID count: 22 (6 login + 15 register + 1 settings)
+      - File count: 3 modified (login.tsx, register.tsx, settings/index.tsx),
+                    3 created (01-register.yaml, 02-login-logout.yaml, README.md)
+      - docs/plans/PLAN_CONSOLIDATED.yaml updated with P017 entry
+
+    acceptance_criteria:
+      - AC-SF1-01 through AC-SF1-03  # login testIDs verified
+      - AC-SF2-01 through AC-SF2-04  # register testIDs verified
+      - AC-SF3-01                     # settings testID verified
+      - AC-SF4-01 through AC-SF4-03  # 01-register flow verified
+      - AC-SF5-01 through AC-SF5-03  # 02-login-logout flow verified
+      - AC-SF6-01                     # README verified
+
+    edge_cases:
+      - EC_E2E_001  # Slow network handling in flows
+      - EC_E2E_002  # Native Alert handling in 02-login-logout
+      - EC_E2E_003  # Partial failure recovery
+      - EC_E2E_004  # Keyboard covering elements
+      - EC_E2E_005  # Tab label for new ward
+
+    tests: []
+
+# =============================================================================
+# DEPENDENCY GRAPH
+# =============================================================================
+
+dependency_graph: |
+  S017-01 (login testIDs) ──────────┬──────────────────────────────┐
+  S017-02 (register testIDs) ───────┤                              │
+  S017-03 (settings testID) ────────┤                              │
+  S017-06 (README) ─────────────────┤                              │
+                                     │                              │
+  S017-04 (01-register flow) ◄─── S017-01, S017-02                │
+  S017-05 (02-login-logout) ◄──── S017-01, S017-03                │
+                                                                    │
+  S017-07 (final verification) ◄──────────────────────────── ALL ──┘
+
+  Parallelizable:
+    Group A (independent): S017-01, S017-02, S017-03, S017-06
+    Group B (after S017-01+S017-02): S017-04
+    Group C (after S017-01+S017-03): S017-05
+    Group D (after all): S017-07
+
+# =============================================================================
+# COVERAGE MATRIX
+# =============================================================================
+
+coverage_matrix:
+  SF1:
+    acceptance_criteria:
+      AC-SF1-01: S017-01  # login-email-input found by Maestro
+      AC-SF1-02: S017-01  # login-submit-button found by Maestro
+      AC-SF1-03: S017-01  # login-error-text visible on error
+    edge_cases: []
+
+  SF2:
+    acceptance_criteria:
+      AC-SF2-01: S017-02  # register-fullname-input found by Maestro
+      AC-SF2-02: S017-02  # register-role-bishopric-radio found by Maestro
+      AC-SF2-03: S017-02  # register-submit-button found by Maestro
+      AC-SF2-04: S017-02  # register-error-text visible on validation error
+    edge_cases:
+      EC_E2E_004: S017-02  # Keyboard covering elements
+
+  SF3:
+    acceptance_criteria:
+      AC-SF3-01: S017-03  # settings-sign-out-button found by Maestro
+    edge_cases: []
+
+  SF4:
+    acceptance_criteria:
+      AC-SF4-01: S017-04  # Ward created, user logged in, Home visible
+      AC-SF4-02: S017-04  # Unique email prevents collision
+      AC-SF4-03: S017-04  # App shows 4-tab bar
+    edge_cases:
+      EC_E2E_001: S017-04  # Slow network timeout
+      EC_E2E_003: S017-04  # Partial failure recovery
+      EC_E2E_004: S017-04  # Keyboard covering
+      EC_E2E_005: S017-04  # Tab label for new ward
+
+  SF5:
+    acceptance_criteria:
+      AC-SF5-01: S017-05  # Login succeeds, Home visible
+      AC-SF5-02: S017-05  # Logout via alert returns to login
+      AC-SF5-03: S017-05  # Invalid login shows error
+    edge_cases:
+      EC_E2E_001: S017-05  # Slow network timeout
+      EC_E2E_002: S017-05  # Native Alert handling
+
+  SF6:
+    acceptance_criteria:
+      AC-SF6-01: S017-06  # README instructions work
+    edge_cases: []
+
+# =============================================================================
+# VALIDATION GATE
+# =============================================================================
+
+validation_gate:
+  GATE-PLAN-01: true  # Every AC covered by at least 1 step + 1 test (E2E flows ARE the tests)
+  GATE-PLAN-02: true  # Every step has verifiable done_when
+  GATE-PLAN-03: true  # Dependencies between steps are correct
+  GATE-PLAN-04: true  # No circular dependencies
+  GATE-PLAN-05: true  # All edge cases covered
+  GATE-PLAN-06: true  # File paths match ARCH_M017 components

@@ -8,9 +8,9 @@
 metadata:
   product: Sacrament Meeting Planner
   last_updated: "2026-03-08"
-  total_features: 64
-  total_business_rules: 44
-  total_design_decisions: 59
+  total_features: 65
+  total_business_rules: 49
+  total_design_decisions: 66
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -1501,6 +1501,46 @@ features:
         when: "Migration 032 runs"
         then: "Column type changed to TEXT, data converted via array_to_string()"
 
+  # ---------------------------------------------------------------------------
+  # F017_E2E: E2E Testing with Maestro — Phase 1 [CR-284]
+  # ---------------------------------------------------------------------------
+
+  - id: F017_E2E
+    name: "E2E Testing Infrastructure — Phase 1 (Auth Flows)"
+    area: e2e_testing
+    description: |
+      Adds Maestro E2E testing infrastructure. Phase 1: directory structure
+      (e2e/maestro/), testID props on auth screens (login.tsx: 6 elements,
+      register.tsx: 15 elements) and settings sign-out button (1 element),
+      two Maestro flow files (01-register.yaml, 02-login-logout.yaml),
+      and e2e/README.md. Tests run against production Supabase with RLS
+      isolation. Each flow creates its own ward via register-first-user
+      with unique email (e2e-{timestamp}@test.com). testID convention:
+      {screen}-{element}-{type} in kebab-case. Tab bar elements targeted
+      by visible pt-BR text labels. [CR-284]
+    acceptance_criteria:
+      - given: "App is launched in a clean state (no session)"
+        when: "Maestro flow 01-register executes"
+        then: "New ward created via register-first-user, user logged in, Home tab visible with 4 tabs"
+      - given: "User credentials created by 01-register exist"
+        when: "Maestro flow 02-login-logout executes login"
+        then: "User is authenticated and Home tab is visible"
+      - given: "User is on Settings tab"
+        when: "Maestro flow 02-login-logout executes logout"
+        then: "Confirmation alert appears, user confirms, app returns to login screen"
+      - given: "Invalid credentials are entered"
+        when: "Maestro flow 02-login-logout executes invalid login test"
+        then: "Error message 'E-mail ou senha incorretos' is displayed"
+      - given: "Login screen renders"
+        when: "Maestro queries for testID 'login-email-input'"
+        then: "The email TextInput is found and can receive text input"
+      - given: "Register screen renders"
+        when: "Maestro queries for testID 'register-submit-button'"
+        then: "The submit button is found and can be tapped"
+      - given: "Settings screen renders"
+        when: "Maestro queries for testID 'settings-sign-out-button'"
+        then: "The sign-out button is found and can be tapped"
+
 # =============================================================================
 # BUSINESS RULES
 # =============================================================================
@@ -1661,6 +1701,26 @@ business_rules:
   - id: BR037
     rule: "Fresh JWT for edge function invocation"
     description: "callEdgeFunction() refreshes the session before invoking to ensure a valid JWT. Uses refreshSession() instead of getSession()."
+
+  - id: BR038
+    rule: "E2E test ward isolation"
+    description: "Each E2E test flow creates its own ward via register-first-user with a unique email (e2e-{timestamp}@test.com). RLS ensures complete data isolation. Tests NEVER interact with existing production wards. [CR-284]"
+
+  - id: BR039
+    rule: "testID naming convention"
+    description: "All testID props follow {screen}-{element}-{type} kebab-case convention. Screens: login, register, settings. Types: input, button, text, radio. Dynamic testIDs for mapped elements use template literals. [CR-284]"
+
+  - id: BR040
+    rule: "E2E assertions use pt-BR strings"
+    description: "All Maestro text assertions use pt-BR i18n strings since the app defaults to pt-BR. Key strings: 'Entrar', 'Criar Conta', 'Início', 'Configurações', 'Sair', 'Confirmar', 'E-mail ou senha incorretos'. [CR-284]"
+
+  - id: BR041
+    rule: "Tab bar elements targeted by text, not testID"
+    description: "Tab bar items are targeted by visible text label ('Início', 'Configurações', etc.) since Expo Router Tabs.Screen doesn't natively expose testID without custom tabBarLabel wrapper. [CR-284]"
+
+  - id: BR042
+    rule: "Maestro flows numbered for execution order"
+    description: "Flow files use zero-padded prefix (01-, 02-, etc.) to enforce execution order in alphabetical directory listing. 01-register must run before 02-login-logout. [CR-284]"
 
 # =============================================================================
 # DESIGN DECISIONS
@@ -1864,6 +1924,34 @@ design_decisions:
     decision: "New disabledNames prop on ActorSelector"
     rationale: "Separate from selectedNames (which shows checkmarks in multi-select). disabledNames grays out and prevents selection. When editing a name, other selected names are disabled but the current name remains selectable (user can re-select to keep). [CR-283]"
 
+  - id: DD050
+    decision: "testID preferred over text matching for element targeting in Maestro"
+    rationale: "Text matching is fragile across i18n changes. testID is stable across language changes and refactors. Text matching reserved for assertions only. [CR-284]"
+
+  - id: DD051
+    decision: "Separate YAML files per Maestro flow"
+    rationale: "Individual flow files (01-register.yaml, 02-login-logout.yaml) can run independently or sequentially. Easier to debug failures, add new flows, and maintain. [CR-284]"
+
+  - id: DD052
+    decision: "No testID on tab bar items (Tabs.Screen)"
+    rationale: "Expo Router renders tab labels as visible Text. Maestro can tap on text 'Início', 'Configurações', etc. Adding testID to Tabs.Screen requires wrapping tabBarLabel. Tab labels are stable. [CR-284]"
+
+  - id: DD053
+    decision: "Error testID on View container, not inner Text"
+    rationale: "Error container View wraps the error Text. testID on View allows assertVisible check while inner text content is verified via text assertion. Matches conditional rendering pattern. [CR-284]"
+
+  - id: DD054
+    decision: "Register flow creates credentials consumed by login flow"
+    rationale: "01-register generates unique email and stores in output. 02-login-logout reads from output or env. Avoids hardcoding credentials and ensures test isolation. [CR-284]"
+
+  - id: DD055
+    decision: "Production database for E2E, no separate test environment"
+    rationale: "User explicitly requested production Supabase. RLS ensures data isolation per ward. Test wards don't affect real data. Manual cleanup from dashboard is acceptable. [CR-284]"
+
+  - id: DD056
+    decision: "Dynamic testID for mapped radio buttons via template literals"
+    rationale: "Role and language radio buttons are rendered via .map(). testID uses template literals (e.g. register-role-${r}-radio) to generate unique testIDs per option. [CR-284]"
+
 # =============================================================================
 # EDGE CASES
 # =============================================================================
@@ -1983,3 +2071,18 @@ edge_cases:
 
   - id: EC038
     description: "Migration 032: existing agendas with NULL recognized_names -> column stays NULL after migration (no data to convert). [CR-283]"
+
+  - id: EC039
+    description: "Slow network during E2E register -> Maestro waitForAnimationToEnd and explicit wait (5-10s) after submit. ActivityIndicator replaces button text during loading. [CR-284]"
+
+  - id: EC040
+    description: "Sign-out Alert is native iOS Alert.alert, not React component -> Maestro handles via tapOn text matching ('Confirmar'). [CR-284]"
+
+  - id: EC041
+    description: "01-register fails mid-flow (network error) -> ward may be partially created. Re-run with new timestamp email is safe. Orphaned test wards cleaned from Supabase dashboard. [CR-284]"
+
+  - id: EC042
+    description: "Keyboard covers register screen elements -> Maestro auto-scrolls when tapping testID. KeyboardAvoidingView in screen also helps. [CR-284]"
+
+  - id: EC043
+    description: "manage_prayers defaults to false for new ward -> tab shows 'Discursos' not 'Discursos e Orações'. E2E flows assert 'Discursos' accordingly. [CR-284]"

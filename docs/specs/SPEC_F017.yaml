@@ -1,0 +1,569 @@
+# =============================================================================
+# SPEC_F017.yaml
+# E2E Testing with Maestro — Phase 1: Setup + Auth Flows
+# Artifact ID: 017
+# CR: 284
+# Created: 2026-03-08
+# Status: DRAFT → COMPLETE
+# =============================================================================
+
+metadata:
+  artifact_id: "017"
+  cr: 284
+  phase: 1
+  title: "E2E Testing with Maestro — Phase 1: Setup + Auth Flows"
+  status: complete
+  created: "2026-03-08"
+
+# =============================================================================
+# SPEC SUMMARY
+# =============================================================================
+
+spec_summary:
+  open_questions: []
+  assumptions:
+    - id: A001
+      description: |
+        Maestro CLI, Java 17, Xcode and iOS simulator (iPhone 17, iOS 26.3)
+        are already installed and configured. App builds and runs on simulator
+        via `npx expo run:ios`.
+      validated: true
+      source: "project-status.yaml prerequisites"
+
+    - id: A002
+      description: |
+        Tests run against PRODUCTION Supabase. Each test creates its own ward
+        via register-first-user Edge Function with a unique email
+        (e2e-{timestamp}@test.com). Ward data is isolated by RLS. No cleanup
+        is needed within the test — test wards can be deleted manually from
+        Supabase dashboard after testing.
+      validated: true
+      source: "project-status.yaml resume_notes"
+
+    - id: A003
+      description: |
+        The app default language is pt-BR. All Maestro assertions use pt-BR
+        strings from the i18n files (e.g. "Entrar", "Criar Conta", "Início",
+        "Configurações", "Sair", "Confirmar").
+      validated: true
+      source: "src/i18n/locales/pt-BR.json verified"
+
+    - id: A004
+      description: |
+        testID naming convention: {screen}-{element}-{type} in kebab-case.
+        Examples: login-email-input, register-submit-button, settings-sign-out-button.
+        Type suffixes: -input (TextInput), -button (TouchableOpacity/Pressable),
+        -text (Text for assertions), -radio (role/language selectors).
+      validated: true
+      source: "user request"
+
+    - id: A005
+      description: |
+        Tab bar elements in Expo Router use the Tabs.Screen `name` prop as
+        testID source. Maestro can locate tab items by their visible label text
+        (e.g. "Início", "Agendas", "Discursos", "Configurações").
+        No explicit testID is needed on Tabs.Screen; Maestro uses tapOn text.
+      validated: true
+      source: "Expo Router Tabs — labels rendered as Text with title prop"
+
+    - id: A006
+      description: |
+        The forgot-password screen does NOT get testIDs in Phase 1.
+        Only login.tsx and register.tsx are in scope.
+      validated: true
+      source: "user request scope"
+
+  inconsistencies: []
+
+# =============================================================================
+# FEATURES
+# =============================================================================
+
+features:
+
+  - id: F017_E2E
+    name: "E2E Testing Infrastructure — Phase 1 (Auth Flows)"
+    area: e2e_testing
+    description: |
+      Adds Maestro E2E testing infrastructure to the project. Phase 1 covers:
+      1. Directory structure: e2e/maestro/ for Maestro flow YAML files
+      2. testID props on auth screen components (login.tsx, register.tsx)
+         and settings sign-out button (settings/index.tsx) to enable
+         reliable element targeting in Maestro flows
+      3. Two Maestro flow files:
+         - 01-register.yaml: registers a new ward user end-to-end
+         - 02-login-logout.yaml: logs in with existing credentials and logs out
+      4. e2e/README.md with setup instructions and run commands
+
+      Each test flow is self-contained: 01-register creates a new ward with a
+      unique email, and 02-login-logout reuses those credentials. Tests run
+      against production Supabase with RLS isolation.
+
+      testID convention: {screen}-{element}-{type} (kebab-case).
+
+    sub_features:
+
+      # ----- SF1: testID on login.tsx -----
+      - id: SF1
+        name: "Add testID to login screen elements"
+        file: "src/app/(auth)/login.tsx"
+        description: |
+          Add testID prop to 6 interactive elements on the login screen to
+          enable Maestro to target them reliably without depending on text
+          matching (which is fragile across language changes).
+        changes:
+          - element: "Email TextInput"
+            line: 92
+            testID: "login-email-input"
+            component: TextInput
+          - element: "Password TextInput"
+            line: 118
+            testID: "login-password-input"
+            component: TextInput
+          - element: "Login button (TouchableOpacity)"
+            line: 139
+            testID: "login-submit-button"
+            component: TouchableOpacity
+          - element: "Forgot password link (TouchableOpacity)"
+            line: 158
+            testID: "login-forgot-password-button"
+            component: TouchableOpacity
+          - element: "Create account link (TouchableOpacity)"
+            line: 170
+            testID: "login-create-account-button"
+            component: TouchableOpacity
+          - element: "Error container (View)"
+            line: 76
+            testID: "login-error-text"
+            component: View
+        acceptance_criteria:
+          - given: "Login screen renders"
+            when: "Maestro queries for testID 'login-email-input'"
+            then: "The email TextInput is found and can receive text input"
+          - given: "Login screen renders"
+            when: "Maestro queries for testID 'login-submit-button'"
+            then: "The login button is found and can be tapped"
+          - given: "Login fails with invalid credentials"
+            when: "Maestro queries for testID 'login-error-text'"
+            then: "The error container is visible with error message"
+
+      # ----- SF2: testID on register.tsx -----
+      - id: SF2
+        name: "Add testID to register screen elements"
+        file: "src/app/(auth)/register.tsx"
+        description: |
+          Add testID prop to 15 interactive elements on the register screen.
+          Includes all text inputs, role radio buttons, language radio buttons,
+          submit button, back button, and error container.
+        changes:
+          - element: "Full Name TextInput"
+            line: 170
+            testID: "register-fullname-input"
+            component: TextInput
+          - element: "Email TextInput"
+            line: 193
+            testID: "register-email-input"
+            component: TextInput
+          - element: "Password TextInput"
+            line: 217
+            testID: "register-password-input"
+            component: TextInput
+          - element: "Confirm Password TextInput"
+            line: 239
+            testID: "register-confirm-password-input"
+            component: TextInput
+          - element: "Stake TextInput"
+            line: 261
+            testID: "register-stake-input"
+            component: TextInput
+          - element: "Ward TextInput"
+            line: 281
+            testID: "register-ward-input"
+            component: TextInput
+          - element: "Timezone TextInput"
+            line: 365
+            testID: "register-timezone-input"
+            component: TextInput
+          - element: "Role radio - bishopric"
+            line: 303
+            testID: "register-role-bishopric-radio"
+            component: TouchableOpacity
+            note: "Dynamic via template literal: `register-role-${r}-radio`"
+          - element: "Role radio - secretary"
+            line: 303
+            testID: "register-role-secretary-radio"
+            component: TouchableOpacity
+            note: "Same TouchableOpacity in .map(); testID set dynamically"
+          - element: "Language radio - pt-BR"
+            line: 335
+            testID: "register-language-pt-BR-radio"
+            component: TouchableOpacity
+            note: "Dynamic via template literal: `register-language-${lang}-radio`"
+          - element: "Language radio - en-US"
+            line: 335
+            testID: "register-language-en-US-radio"
+            component: TouchableOpacity
+          - element: "Language radio - es-LA"
+            line: 335
+            testID: "register-language-es-LA-radio"
+            component: TouchableOpacity
+          - element: "Submit button (Create Account)"
+            line: 382
+            testID: "register-submit-button"
+            component: TouchableOpacity
+          - element: "Back link"
+            line: 401
+            testID: "register-back-button"
+            component: TouchableOpacity
+          - element: "Error container (View)"
+            line: 152
+            testID: "register-error-text"
+            component: View
+        acceptance_criteria:
+          - given: "Register screen renders"
+            when: "Maestro queries for testID 'register-fullname-input'"
+            then: "The full name TextInput is found and can receive text input"
+          - given: "Register screen renders"
+            when: "Maestro queries for testID 'register-role-bishopric-radio'"
+            then: "The bishopric role radio button is found and can be tapped"
+          - given: "Register screen renders"
+            when: "Maestro queries for testID 'register-submit-button'"
+            then: "The submit button is found and can be tapped"
+          - given: "Registration fails with validation error"
+            when: "Maestro queries for testID 'register-error-text'"
+            then: "The error container is visible with the validation message"
+
+      # ----- SF3: testID on settings sign-out -----
+      - id: SF3
+        name: "Add testID to settings sign-out button"
+        file: "src/app/(tabs)/settings/index.tsx"
+        description: |
+          Add testID to the sign-out Pressable button at the bottom of the
+          Settings screen. This enables the logout flow in Maestro.
+        changes:
+          - element: "Sign Out button (Pressable)"
+            line: 325
+            testID: "settings-sign-out-button"
+            component: Pressable
+        acceptance_criteria:
+          - given: "Settings screen renders for any authenticated role"
+            when: "Maestro queries for testID 'settings-sign-out-button'"
+            then: "The sign-out button is found and can be tapped"
+
+      # ----- SF4: Maestro flow 01-register.yaml -----
+      - id: SF4
+        name: "Maestro flow: 01-register.yaml"
+        file: "e2e/maestro/01-register.yaml"
+        description: |
+          End-to-end flow that registers a new first user for a new ward.
+          This is the foundational flow — it creates the ward that subsequent
+          flows can use for login.
+
+          Flow steps:
+          1. App opens on login screen (NavigationGuard redirects unauthenticated)
+          2. Assert login screen visible (check for "Entrar" button text)
+          3. Tap "Criar conta para primeiro usuário de uma Ala" link
+             (testID: login-create-account-button)
+          4. Assert register screen visible (check for "Criar Conta" title)
+          5. Fill Full Name: "E2E Test User"
+          6. Fill Email: unique email using JavaScript ${Date.now()}
+             (e.g. e2e-1709931234567@test.com)
+          7. Fill Password: "Test123456"
+          8. Fill Confirm Password: "Test123456"
+          9. Fill Stake: "E2E Test Stake"
+          10. Fill Ward: "E2E Test Ward"
+          11. Role: bishopric is already selected by default — no tap needed
+          12. Language: pt-BR is already selected by default — no tap needed
+          13. Timezone: auto-detected — no change needed
+          14. Tap "Criar Conta" submit button (testID: register-submit-button)
+          15. Wait for navigation to Home tab (NavigationGuard auto-redirect)
+          16. Assert Home tab is visible: check for "Início" tab label
+          17. Assert tab bar visible with 4 tabs: "Início", "Agendas",
+              "Discursos" or "Discursos e Orações", "Configurações"
+
+          Environment variables:
+          - TEST_EMAIL: generated at runtime via JavaScript
+          - TEST_PASSWORD: "Test123456"
+
+          Note: Maestro stores output variables for use by subsequent flows.
+          The generated email and password are written to e2e/maestro/.env
+          or passed via Maestro's output mechanism for 02-login-logout.
+
+        acceptance_criteria:
+          - given: "App is launched in a clean state (no session)"
+            when: "Flow 01-register executes"
+            then: "A new ward is created via register-first-user, user is logged in, and Home tab is visible"
+          - given: "Flow uses a unique email based on timestamp"
+            when: "Register form is submitted"
+            then: "No email_exists error occurs; registration succeeds"
+          - given: "Registration succeeds"
+            when: "NavigationGuard detects session"
+            then: "App navigates to (tabs) group and shows 4-tab bar"
+
+      # ----- SF5: Maestro flow 02-login-logout.yaml -----
+      - id: SF5
+        name: "Maestro flow: 02-login-logout.yaml"
+        file: "e2e/maestro/02-login-logout.yaml"
+        description: |
+          End-to-end flow that tests login with existing credentials and
+          then performs logout. This flow runs AFTER 01-register.yaml.
+
+          Flow steps:
+          Part A — Login:
+          1. App opens on login screen (or launched fresh)
+          2. Assert login screen visible (testID: login-submit-button visible)
+          3. Tap email input (testID: login-email-input)
+          4. Type email (from 01-register output or hardcoded test account)
+          5. Tap password input (testID: login-password-input)
+          6. Type password "Test123456"
+          7. Tap login button (testID: login-submit-button)
+          8. Wait for navigation to Home tab
+          9. Assert Home tab visible: "Início" tab label
+
+          Part B — Logout:
+          10. Tap "Configurações" tab
+          11. Assert Settings screen visible (check for "Configurações" title or
+              testID: settings-sign-out-button visible)
+          12. Scroll down to sign-out button
+          13. Tap sign-out button (testID: settings-sign-out-button)
+          14. Assert confirmation Alert appears with "Sair" title and
+              "Deseja realmente sair?" message
+          15. Tap "Confirmar" button in Alert
+          16. Wait for navigation to login screen
+          17. Assert login screen visible (testID: login-submit-button visible)
+
+          Part C — Invalid Login (negative test):
+          18. Tap email input, type "invalid@test.com"
+          19. Tap password input, type "wrongpassword"
+          20. Tap login button
+          21. Assert error message visible (testID: login-error-text)
+          22. Assert error text contains "E-mail ou senha incorretos"
+
+          Environment variables:
+          - TEST_EMAIL: from 01-register or env file
+          - TEST_PASSWORD: "Test123456"
+
+        acceptance_criteria:
+          - given: "User credentials created by 01-register exist in production"
+            when: "Flow 02-login-logout executes Part A (login)"
+            then: "User is authenticated and Home tab is visible"
+          - given: "User is on Settings tab"
+            when: "Flow executes Part B (logout)"
+            then: "Confirmation alert appears, user confirms, app returns to login screen"
+          - given: "Invalid credentials are entered"
+            when: "Flow executes Part C (invalid login)"
+            then: "Error message 'E-mail ou senha incorretos' is displayed"
+
+      # ----- SF6: e2e/README.md -----
+      - id: SF6
+        name: "E2E testing README"
+        file: "e2e/README.md"
+        description: |
+          Documentation file with setup instructions and run commands for
+          Maestro E2E tests.
+
+          Sections:
+          1. Prerequisites (Maestro CLI, Java 17, Xcode, iOS simulator)
+          2. Building the app (`npx expo run:ios`)
+          3. Running individual flows (`maestro test e2e/maestro/01-register.yaml`)
+          4. Running all flows sequentially (`maestro test e2e/maestro/`)
+          5. Test data management (production Supabase, RLS isolation, cleanup)
+          6. testID convention reference
+          7. Troubleshooting common issues
+
+        acceptance_criteria:
+          - given: "Developer reads e2e/README.md"
+            when: "Following the setup and run instructions"
+            then: "Can successfully run Maestro flows on iOS simulator"
+
+# =============================================================================
+# BUSINESS RULES (E2E-specific)
+# =============================================================================
+
+business_rules:
+
+  - id: BR_E2E_001
+    rule: "Each E2E test flow creates its own isolated ward"
+    description: |
+      Every test flow that needs an authenticated session MUST start by
+      registering a new user via register-first-user Edge Function. This
+      creates a new ward with RLS isolation. Tests NEVER interact with
+      existing production wards.
+
+  - id: BR_E2E_002
+    rule: "Unique email per test run"
+    description: |
+      Each test run generates a unique email using timestamp:
+      e2e-{Date.now()}@test.com. This prevents email_exists errors
+      on repeated test runs.
+
+  - id: BR_E2E_003
+    rule: "testID convention: {screen}-{element}-{type}"
+    description: |
+      All testID props follow kebab-case convention:
+      - {screen}: screen name (login, register, settings)
+      - {element}: element purpose (email, password, submit, sign-out)
+      - {type}: component type (input, button, text, radio)
+      Examples: login-email-input, register-submit-button, settings-sign-out-button
+
+  - id: BR_E2E_004
+    rule: "Maestro assertions use pt-BR strings"
+    description: |
+      All text assertions in Maestro flows use pt-BR i18n strings since
+      the app defaults to pt-BR and the test user registers with pt-BR
+      language. Key strings: "Entrar", "Criar Conta", "Início",
+      "Configurações", "Sair", "Confirmar", "E-mail ou senha incorretos".
+
+  - id: BR_E2E_005
+    rule: "Dynamic role/language radio testIDs"
+    description: |
+      Role radio buttons use dynamic testID: `register-role-${r}-radio`
+      where r is 'bishopric' or 'secretary'.
+      Language radio buttons use: `register-language-${lang}-radio`
+      where lang is 'pt-BR', 'en-US', or 'es-LA'.
+
+# =============================================================================
+# DESIGN DECISIONS (E2E-specific)
+# =============================================================================
+
+design_decisions:
+
+  - id: DD_E2E_001
+    decision: "testID preferred over text matching for element targeting"
+    rationale: |
+      Text matching is fragile — i18n key changes or language switches break
+      tests. testID is stable across language changes and refactors. Maestro
+      supports both but testID is more reliable. Text matching is only used
+      for assertions (verifying visible content).
+
+  - id: DD_E2E_002
+    decision: "Separate YAML files per flow (not monolithic)"
+    rationale: |
+      Individual flow files (01-register.yaml, 02-login-logout.yaml) can be
+      run independently or sequentially via `maestro test e2e/maestro/`.
+      Easier to debug failures, add new flows, and maintain.
+
+  - id: DD_E2E_003
+    decision: "Flow numbering with zero-padded prefix"
+    rationale: |
+      Files named 01-, 02-, etc. to enforce execution order when running
+      `maestro test` on the directory (alphabetical order = execution order).
+      01-register must run before 02-login-logout since it creates the test
+      credentials.
+
+  - id: DD_E2E_004
+    decision: "No testID on tab bar items (Tabs.Screen)"
+    rationale: |
+      Expo Router Tabs.Screen renders tab labels as visible Text. Maestro can
+      tap on text "Início", "Agendas", etc. Adding testID to Tabs.Screen
+      requires wrapping options.tabBarLabel which is more complex than needed.
+      Tab navigation is reliably tested via text matching since tab labels
+      are stable.
+
+  - id: DD_E2E_005
+    decision: "Login error testID on the View container, not the Text"
+    rationale: |
+      The error container View wraps the error Text. Placing testID on the
+      View allows Maestro to check visibility (assertVisible) while the
+      inner Text content is checked via text assertion. This matches the
+      conditional rendering pattern ({error && <View>}).
+
+  - id: DD_E2E_006
+    decision: "01-register creates credentials, 02-login-logout consumes them"
+    rationale: |
+      The register flow generates a unique email and writes it to Maestro
+      output. The login-logout flow reads from output or from a shared env
+      file. This avoids hardcoding credentials and ensures test isolation.
+      If running 02 standalone, a pre-existing test account can be provided
+      via environment variables.
+
+  - id: DD_E2E_007
+    decision: "Production database, no separate test environment"
+    rationale: |
+      User explicitly requested using production Supabase. RLS ensures
+      complete data isolation per ward. Test wards created by E2E flows
+      don't affect real ward data. Manual cleanup from Supabase dashboard
+      is acceptable for Phase 1.
+
+# =============================================================================
+# EDGE CASES (E2E-specific)
+# =============================================================================
+
+edge_cases:
+
+  - id: EC_E2E_001
+    description: |
+      Slow network during register — Maestro waitForAnimationToEnd and
+      explicit wait (5-10s) after submit button tap before asserting
+      Home screen visibility. The ActivityIndicator replaces button text
+      during loading.
+
+  - id: EC_E2E_002
+    description: |
+      Sign-out confirmation Alert is a native iOS Alert.alert, not a
+      React component. Maestro handles native alerts via tapOn text
+      matching ("Confirmar").
+
+  - id: EC_E2E_003
+    description: |
+      If 01-register fails mid-flow (e.g. network error), the ward may
+      have been partially created. Re-running with a new timestamp email
+      is safe. Orphaned test wards can be cleaned from Supabase dashboard.
+
+  - id: EC_E2E_004
+    description: |
+      Keyboard may cover elements on register screen. Maestro auto-scrolls
+      when tapping testID elements. The KeyboardAvoidingView in the screen
+      also helps. If needed, explicit scroll commands in the flow.
+
+  - id: EC_E2E_005
+    description: |
+      manage_prayers toggle state affects tab label ("Discursos" vs
+      "Discursos e Orações"). For a newly registered ward, manage_prayers
+      defaults to false, so the tab shows "Discursos". Flows assert
+      "Discursos" accordingly.
+
+# =============================================================================
+# FILES TO MODIFY
+# =============================================================================
+
+files_to_modify:
+  - path: "src/app/(auth)/login.tsx"
+    changes: "Add testID to 6 elements (2 TextInput, 3 TouchableOpacity, 1 View)"
+
+  - path: "src/app/(auth)/register.tsx"
+    changes: "Add testID to 15 elements (7 TextInput, 5 TouchableOpacity via .map, 2 TouchableOpacity static, 1 View)"
+
+  - path: "src/app/(tabs)/settings/index.tsx"
+    changes: "Add testID to 1 element (sign-out Pressable)"
+
+# =============================================================================
+# FILES TO CREATE
+# =============================================================================
+
+files_to_create:
+  - path: "e2e/maestro/01-register.yaml"
+    description: "Maestro flow: register new first user for a new ward"
+
+  - path: "e2e/maestro/02-login-logout.yaml"
+    description: "Maestro flow: login with existing credentials, logout, invalid login test"
+
+  - path: "e2e/README.md"
+    description: "E2E testing documentation with setup, run commands, and conventions"
+
+# =============================================================================
+# IMPACT ANALYSIS
+# =============================================================================
+
+impact_analysis:
+  existing_features_affected: []
+  existing_tests_affected: []
+  notes: |
+    Adding testID props has ZERO functional impact on the app. testID is a
+    React Native prop used only for testing frameworks (Maestro, Detox,
+    Appium). It does not affect rendering, accessibility, or behavior.
+    No existing unit tests are affected since testID is not tested in
+    component unit tests.
+
+    The 3 new files (2 YAML flows + 1 README) are outside the src/ tree
+    and have no impact on the app bundle.

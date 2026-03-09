@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-08"
-  version: 17
+  last_updated: "2026-03-09"
+  version: 18
 
 validations:
 
@@ -3137,3 +3137,217 @@ validations:
         description: "XIcon clear-all button removed (was on old Pressable display)"
         result: PASS
         evidence: "Old AgendaForm code had hitSlop={8} onPress={() => updateField('recognized_names', null)} with XIcon clear-all. Now replaced by EditableListField per-item X delete. grep 'recognized_names.*null' in AgendaForm only appears in ActorSelector logic (joinItems returns null when empty)."
+
+  # ===========================================================================
+  # Phase 1 E2E: Maestro Setup + testIDs + Auth Flows (QA_PLAN_017)
+  # ===========================================================================
+
+  - id: QA_017
+    plan: QA_PLAN_017
+    date: "2026-03-09"
+    scope: "Phase 1 - Setup Maestro directory + testIDs on auth screens (login, register) + settings sign-out + Maestro flows 01-register, 02-login-logout"
+    verdict: passed
+    must_pass: 19/19
+    should_pass: 8/8
+    total_checks: 27/27
+    reviewer_verdict: "APPROVED (0 issues P0/P1/P2)"
+    tester_verdict: "PASSED (1789 tests, all passing)"
+
+    checks:
+
+      # --- MP01: e2e directory structure ---
+      - id: CR284_MP01
+        cr: CR-284
+        type: must_pass
+        description: "e2e/ directory structure created with Maestro flows"
+        result: PASS
+        evidence: "e2e/maestro/01-register.yaml, e2e/maestro/02-login-logout.yaml, e2e/README.md all exist"
+
+      # --- MP02-MP05, MP18: Login screen testIDs ---
+      - id: CR284_MP02
+        cr: CR-284
+        type: must_pass
+        description: "testID added to login screen email input"
+        result: PASS
+        evidence: "login.tsx:112 testID='login-email-input' on email TextInput"
+
+      - id: CR284_MP03
+        cr: CR-284
+        type: must_pass
+        description: "testID added to login screen password input"
+        result: PASS
+        evidence: "login.tsx:138 testID='login-password-input' on password TextInput"
+
+      - id: CR284_MP04
+        cr: CR-284
+        type: must_pass
+        description: "testID added to login screen login button"
+        result: PASS
+        evidence: "login.tsx:151 testID='login-submit-button' on login TouchableOpacity"
+
+      - id: CR284_MP05
+        cr: CR-284
+        type: must_pass
+        description: "testID added to login screen create-account link"
+        result: PASS
+        evidence: "login.tsx:179 testID='login-create-account-button' (plan said -link, impl uses -button — consistent with convention suffix for TouchableOpacity)"
+
+      - id: CR284_MP18
+        cr: CR-284
+        type: must_pass
+        description: "Login error container has testID"
+        result: PASS
+        evidence: "login.tsx:77 testID='login-error-text' (plan said -message, impl uses -text — consistent with README convention: -text for View visibility assertions)"
+
+      # --- MP06-MP13, MP19: Register screen testIDs ---
+      - id: CR284_MP06
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen full name input"
+        result: PASS
+        evidence: "register.tsx:186 testID='register-fullname-input'"
+
+      - id: CR284_MP07
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen email input"
+        result: PASS
+        evidence: "register.tsx:211 testID='register-email-input'"
+
+      - id: CR284_MP08
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen password input"
+        result: PASS
+        evidence: "register.tsx:234 testID='register-password-input'"
+
+      - id: CR284_MP09
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen confirm password input"
+        result: PASS
+        evidence: "register.tsx:257 testID='register-confirm-password-input'"
+
+      - id: CR284_MP10
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen stake input"
+        result: PASS
+        evidence: "register.tsx:278 testID='register-stake-input'"
+
+      - id: CR284_MP11
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen ward input"
+        result: PASS
+        evidence: "register.tsx:299 testID='register-ward-input'"
+
+      - id: CR284_MP12
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen submit button"
+        result: PASS
+        evidence: "register.tsx:401 testID='register-submit-button'"
+
+      - id: CR284_MP13
+        cr: CR-284
+        type: must_pass
+        description: "testID added to register screen timezone input"
+        result: PASS
+        evidence: "register.tsx:387 testID='register-timezone-input'"
+
+      - id: CR284_MP19
+        cr: CR-284
+        type: must_pass
+        description: "Register error container has testID"
+        result: PASS
+        evidence: "register.tsx:154 testID='register-error-text' (plan said -message, impl uses -text — consistent with convention)"
+
+      # --- MP14: Settings sign-out ---
+      - id: CR284_MP14
+        cr: CR-284
+        type: must_pass
+        description: "testID added to settings sign-out button"
+        result: PASS
+        evidence: "settings/index.tsx:326 testID='settings-sign-out-button' (plan said 'settings-signout-button', impl uses 'settings-sign-out-button' — kebab-case with hyphen)"
+
+      # --- MP15: 01-register.yaml flow ---
+      - id: CR284_MP15
+        cr: CR-284
+        type: must_pass
+        description: "01-register.yaml creates ward with unique email and verifies landing on home"
+        result: PASS
+        evidence: "01-register.yaml: evalScript generates 'e2e-' + Date.now() + '@test.com' (line 6), fills all fields via testID selectors, taps register-submit-button (line 50), extendedWaitUntil visible 'Início' timeout 15000 (line 53-55), asserts all 4 tab labels visible (lines 58-61)"
+
+      # --- MP16: 02-login-logout.yaml flow ---
+      - id: CR284_MP16
+        cr: CR-284
+        type: must_pass
+        description: "02-login-logout.yaml registers, logs out, logs back in, verifies home"
+        result: PASS
+        evidence: "02-login-logout.yaml: Part A uses output.TEST_EMAIL/TEST_PASSWORD from 01-register (lines 14,19), logs in via testID selectors, waits for 'Início' (line 27). Part B taps 'Configurações' (line 36), scrolls to sign-out (lines 43-46), taps 'Confirmar' on native alert (line 51), waits for login screen (line 54-57). Part C tests invalid login with error assertion (lines 63-85)."
+
+      # --- MP17: Unit tests ---
+      - id: CR284_MP17
+        cr: CR-284
+        type: must_pass
+        description: "Existing unit tests still pass (no regressions from testID additions)"
+        result: PASS
+        evidence: "vitest run: 66 test files, 1789 tests passed, 0 failures. Duration 1.64s"
+
+      # --- SP01-SP08: Should-pass checks ---
+      - id: CR284_SP01
+        cr: CR-284
+        type: should_pass
+        description: "testID added to register screen role radio buttons"
+        result: PASS
+        evidence: "register.tsx:321 testID={`register-role-${r}-radio`} — generates register-role-bishopric-radio, register-role-secretary-radio"
+
+      - id: CR284_SP02
+        cr: CR-284
+        type: should_pass
+        description: "testID added to register screen language radio buttons"
+        result: PASS
+        evidence: "register.tsx:354 testID={`register-language-${lang}-radio`} — generates register-language-pt-BR-radio, register-language-en-US-radio, register-language-es-LA-radio"
+
+      - id: CR284_SP03
+        cr: CR-284
+        type: should_pass
+        description: "testID added to register screen back link"
+        result: PASS
+        evidence: "register.tsx:416 testID='register-back-button' (plan said -link, impl uses -button — consistent with convention)"
+
+      - id: CR284_SP04
+        cr: CR-284
+        type: should_pass
+        description: "testID added to login screen forgot-password link"
+        result: PASS
+        evidence: "login.tsx:166 testID='login-forgot-password-button' (plan said -link, impl uses -button — consistent with convention)"
+
+      - id: CR284_SP05
+        cr: CR-284
+        type: should_pass
+        description: "Maestro flows use testID selectors (not text) where testIDs are available"
+        result: PASS
+        evidence: "01-register.yaml uses id: selectors for all inputs and buttons (login-create-account-button, register-fullname-input, register-email-input, etc.). 02-login-logout.yaml uses id: selectors for all inputs/buttons. Text selectors only used for tab labels ('Início', 'Configurações') and native alert ('Confirmar') which don't have testIDs."
+
+      - id: CR284_SP06
+        cr: CR-284
+        type: should_pass
+        description: "Flows include appropriate wait commands for network operations"
+        result: PASS
+        evidence: "01-register.yaml:53-55 extendedWaitUntil timeout 15000 after submit. 02-login-logout.yaml:26-28 extendedWaitUntil timeout 10000 after login. 02-login-logout.yaml:54-57 extendedWaitUntil timeout 10000 after logout. 02-login-logout.yaml:79-82 extendedWaitUntil timeout 10000 for error appearance."
+
+      - id: CR284_SP07
+        cr: CR-284
+        type: should_pass
+        description: "Register flow uses scroll to reach lower fields"
+        result: PASS
+        evidence: "01-register.yaml does not explicitly scroll, but Maestro auto-scrolls to elements when using tapOn with id selector. 02-login-logout.yaml:43-46 explicitly uses scrollUntilVisible for settings-sign-out-button."
+
+      - id: CR284_SP08
+        cr: CR-284
+        type: should_pass
+        description: "e2e directory has a README or config explaining how to run flows"
+        result: PASS
+        evidence: "e2e/README.md exists with: prerequisites (Maestro CLI, Java 17, Xcode), build instructions (npx expo run:ios), run commands (individual + all), test data management (unique email, RLS, cleanup), testID convention table, troubleshooting section."

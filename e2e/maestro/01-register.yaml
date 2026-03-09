@@ -1,0 +1,61 @@
+appId: com.alouisio.sacramentmeetingplanner
+---
+# 01-register: Register new ward first user
+
+# Generate unique email and password
+- evalScript: ${output.TEST_EMAIL = 'e2e-' + Date.now() + '@test.com'}
+- evalScript: ${output.TEST_PASSWORD = 'Test123456'}
+
+# Assert login screen visible
+- assertVisible: "Entrar"
+
+# Navigate to register screen
+- tapOn:
+    id: "login-create-account-button"
+
+# Assert register screen visible
+- assertVisible: "Criar Conta"
+
+# Fill registration form
+- tapOn:
+    id: "register-fullname-input"
+- inputText: "E2E Test User"
+
+- tapOn:
+    id: "register-email-input"
+- inputText: ${output.TEST_EMAIL}
+
+- tapOn:
+    id: "register-password-input"
+- inputText: ${output.TEST_PASSWORD}
+
+- tapOn:
+    id: "register-confirm-password-input"
+- inputText: ${output.TEST_PASSWORD}
+
+- tapOn:
+    id: "register-stake-input"
+- inputText: "E2E Test Stake"
+
+- tapOn:
+    id: "register-ward-input"
+- inputText: "E2E Test Ward"
+
+# Role: bishopric is default — no tap needed
+# Language: pt-BR is default — no tap needed
+# Timezone: auto-detected — no change needed
+
+# Submit registration
+- tapOn:
+    id: "register-submit-button"
+
+# Wait for registration to complete and navigate to Home
+- extendedWaitUntil:
+    visible: "Início"
+    timeout: 15000
+
+# Assert tab bar visible with expected tabs
+- assertVisible: "Início"
+- assertVisible: "Agendas"
+- assertVisible: "Discursos"
+- assertVisible: "Configurações"

@@ -102,11 +102,12 @@ describe('CR-281 S016-01: Inline edit TextInput props', () => {
     expect(src).toContain('paddingVertical: 0');
   });
 
-  it('Inline edit TextInput preserves autoFocus', () => {
+  it('Inline edit TextInput does not use autoFocus (removed for drag stability)', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
     );
-    expect(src).toContain('autoFocus');
+    // autoFocus was removed to prevent drag reorder revert issues
+    expect(src).not.toContain('autoFocus');
   });
 });
 
@@ -114,12 +115,13 @@ describe('CR-281 S016-01: Inline edit TextInput props', () => {
 // CR-282: S016-02 - DraggableFlatList activationDistance
 // =============================================================================
 
-describe('CR-282 S016-02: DraggableFlatList activationDistance', () => {
-  it('DraggableFlatList has activationDistance={9999}', () => {
+describe('CR-282 S016-02: DraggableFlatList drag control', () => {
+  it('DraggableFlatList uses dragHitSlop (replaced activationDistance)', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
     );
-    expect(src).toContain('activationDistance={9999}');
+    // activationDistance={9999} was replaced by dragHitSlop for better drag control
+    expect(src).toContain('dragHitSlop');
   });
 
   it('DraggableFlatList preserves scrollEnabled={false}', () => {

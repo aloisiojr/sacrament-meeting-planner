@@ -64,6 +64,8 @@ export interface SundayCardProps {
   renderHeaderRight?: () => React.ReactNode;
   /** Children to render when expanded (speech slots, etc.). */
   children?: React.ReactNode;
+  /** Optional testID for E2E targeting. */
+  testID?: string;
 }
 
 // --- DateBlock Component ---
@@ -405,6 +407,7 @@ export const SundayCard = React.memo(function SundayCard({
   showChevron = true,
   renderHeaderRight,
   children,
+  testID,
 }: SundayCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -441,6 +444,8 @@ export const SundayCard = React.memo(function SundayCard({
   const maxLines = managePrayers ? 5 : 3;
   const collapsedMinHeight = maxLines * LINE_HEIGHT + (maxLines - 1) * MARGIN_BOTTOM;
 
+  const headerTestID = testID ? testID.replace('card', 'card-header') : undefined;
+
   return (
     <View
       style={[
@@ -449,6 +454,7 @@ export const SundayCard = React.memo(function SundayCard({
         isNext && { borderColor: colors.primary, borderWidth: 2 },
         isPast && !expanded && { opacity: 0.6 },
       ]}
+      testID={testID}
     >
       {/* Header */}
       <Pressable
@@ -457,6 +463,7 @@ export const SundayCard = React.memo(function SundayCard({
         accessibilityRole="button"
         accessibilityLabel={`Sunday ${formatDate(date, locale)}`}
         accessibilityState={{ expanded }}
+        testID={headerTestID}
       >
         <DateBlock date={date} locale={locale} />
 

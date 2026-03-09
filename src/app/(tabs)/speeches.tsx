@@ -444,6 +444,7 @@ function SpeechesTabContent() {
           managePrayers={managePrayers}
           onToggle={isExpandable ? () => handleToggle(item.date) : undefined}
           showChevron={isExpandable}
+          testID={`speeches-card-${item.date}`}
           onStatusPress={(speech) => {
             // Status press handled within SpeechSlot
           }}

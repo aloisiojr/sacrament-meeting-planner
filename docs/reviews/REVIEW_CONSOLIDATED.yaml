@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-08"
-  version: 19
-  last_updated_by: "phase-017"
+  last_updated: "2026-03-09"
+  version: 20
+  last_updated_by: "phase-018"
 
 reviews:
   - id: REV-001
@@ -5032,3 +5032,309 @@ reviews:
       p2_count: 0
       files_reviewed: 6
       total_commits: 10
+
+  - id: REV-020
+    scope: "CR-284 — E2E Testing with Maestro Phase 2: Agenda + Presentation Flows"
+    date: "2026-03-09"
+    reviewer: reviewer-agent
+    phase: 18
+    feature: F018_E2E
+    iteration: 1
+
+    commits:
+      - sha: 12ec5f2
+        message: "feat(home): add testID props to 2 Home tab elements (CR-284)"
+      - sha: 79ba4f3
+        message: "feat(agenda): add dynamic testID props to 2 AgendaSundayCard elements (CR-284)"
+      - sha: cc8551b
+        message: "feat(AgendaForm): add testID to SelectorField + 7 callers + HymnSelectorModal (CR-284)"
+      - sha: 201c992
+        message: "feat(ActorSelector): add testID to 5 interactive elements (CR-284)"
+      - sha: 8381858
+        message: "feat(presentation): add testID to 5 Presentation Mode elements (CR-284)"
+      - sha: 2674d81
+        message: "feat(e2e): create Maestro flow 03-home-presentation for Presentation Mode (CR-284)"
+      - sha: d981798
+        message: "feat(e2e): create Maestro flow 04-agenda for Agenda tab assign flow (CR-284)"
+      - sha: 0dc7019
+        message: "chore(plans): mark P018 E2E testing phase 2 as implemented (CR-284)"
+      - sha: 22950cf
+        message: "chore(code-ledger): add CR-284 E2E Phase 2 commits to CODE_LEDGER v18"
+      - sha: ad56beb
+        message: "test(e2e): add tests for Phase 2 E2E testing infrastructure CR-284"
+      - sha: 9147855
+        message: "docs(tests): update TEST_CONSOLIDATED v23 for CR-284 Phase 2 E2E testing"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_vs_request:
+        status: pass
+        notes: |
+          SPEC_F018 fully covers the user request for E2E testing Phase 2:
+          - testID props on index.tsx (2 elements), agenda.tsx (2 dynamic),
+            AgendaForm.tsx (9 elements: 7 SelectorField + 2 HymnSelectorModal),
+            ActorSelector.tsx (5 elements), presentation.tsx (5 elements)
+          - Two new Maestro flow files: 03-home-presentation and 04-agenda
+          - 8 sub-features (SF1-SF8) with 18 acceptance criteria and 11 edge cases
+          - All 5 open questions resolved with user-confirmed defaults
+          - All 6 assumptions confirmed
+          - Zero inconsistencies with SPEC_CONSOLIDATED
+
+      arch_vs_spec:
+        status: pass
+        notes: |
+          ARCH_M018 correctly maps all SPEC components:
+          - 5 TestID Layer components for the 5 modified source files
+          - 2 Maestro Flow components with correct dependencies
+          - Contracts define all testIDs with correct component types
+          - ADR-054 (SelectorField testID passthrough) correctly specifies
+            the prop interface change and Pressable forwarding
+          - ADR-055 (dynamic testID with ISO date suffix) aligns with SPEC
+            BR_E2E_P2_002 and DD_E2E_P2_001
+          - File changes summary matches SPEC files_to_modify exactly
+
+      plan_vs_arch:
+        status: pass
+        notes: |
+          PLAN_P018 has 8 steps (S018-01 through S018-08) that follow ARCH:
+          - Steps 1-5: testID additions (parallel, no dependencies)
+          - Step 6: 03-home-presentation flow (depends on S018-01, S018-05)
+          - Step 7: 04-agenda flow (depends on S018-02, S018-03, S018-04)
+          - Step 8: Final verification (depends on all)
+          Dependencies match ARCH component dependencies exactly.
+          Coverage matrix maps all ACs and edge cases to steps.
+
+      code_vs_plan:
+        status: pass
+        notes: |
+          Code implements exactly what PLAN specifies:
+          - index.tsx: 2 testID props (home-start-meeting-button at line 134,
+            home-preview-pencil-button at line 235) — matches S018-01
+          - agenda.tsx: 2 dynamic testIDs using template literals
+            (`agenda-card-${date}` at line 400, `agenda-play-${date}` at
+            line 540) — matches S018-02
+          - AgendaForm.tsx: SelectorField interface extended with testID?: string,
+            forwarded to Pressable via testID={testID}. 7 caller sites correctly
+            pass semantic testIDs. HymnSelectorModal has hymn-selector-search-input
+            on SearchInput and hymn-selector-close-button on Pressable — matches S018-03
+          - ActorSelector.tsx: 5 testIDs (search-input, close-button, add-button,
+            add-input, add-confirm) — matches S018-04
+          - presentation.tsx: 5 testIDs (screen on SafeAreaView, edit-button,
+            font-toggle-button, font-toggle-text, close-button) — matches S018-05
+          - 03-home-presentation.yaml: 6 parts (Login, Start Presentation, Verify,
+            Font Toggle, Accordion, Close) — matches S018-06
+          - 04-agenda.yaml: 6 parts (Login, Navigate, Expand, Assign Actor,
+            Assign Hymn, Collapse) with evalScript for dynamic date — matches S018-07
+          - CODE_LEDGER updated with 8 commits for Phase 2
+
+      chain_intact: true
+
+    # =========================================================================
+    # CODE REVIEW FINDINGS
+    # =========================================================================
+
+    issues: []
+    # No P0, P1, or P2 issues found.
+
+    code_review_details:
+      index_tsx:
+        testIDs_verified:
+          - "home-start-meeting-button on Pressable (Start Meeting CTA)"
+          - "home-preview-pencil-button on Pressable (agenda preview pencil)"
+        count: 2
+        naming_convention: pass
+        zero_functional_impact: true
+
+      agenda_tsx:
+        testIDs_verified:
+          - "`agenda-card-${date}` on Pressable (card header, dynamic)"
+          - "`agenda-play-${date}` on Pressable (play button, dynamic)"
+        count: 2
+        type: dynamic_template_literals
+        naming_convention: pass
+        zero_functional_impact: true
+
+      AgendaForm_tsx:
+        SelectorField_interface:
+          added_prop: "testID?: string"
+          forwarded_to: "outer Pressable via testID={testID}"
+          pattern: "ADR-054 prop passthrough"
+        testIDs_verified:
+          - "agenda-presiding-selector on SelectorField caller"
+          - "agenda-conducting-selector on SelectorField caller"
+          - "agenda-pianist-selector on SelectorField caller"
+          - "agenda-conductor-selector on SelectorField caller"
+          - "agenda-opening-hymn-selector on SelectorField caller"
+          - "agenda-sacrament-hymn-selector on SelectorField caller"
+          - "agenda-closing-hymn-selector on SelectorField caller"
+          - "hymn-selector-search-input on SearchInput (HymnSelectorModal)"
+          - "hymn-selector-close-button on Pressable (HymnSelectorModal)"
+        count: 9
+        naming_convention: pass
+        zero_functional_impact: true
+
+      ActorSelector_tsx:
+        testIDs_verified:
+          - "actor-selector-search-input on SearchInput"
+          - "actor-selector-close-button on Pressable"
+          - "actor-selector-add-button on Pressable (dashed-border add)"
+          - "actor-selector-add-input on TextInput (name input)"
+          - "actor-selector-add-confirm on Pressable (confirm creation)"
+        count: 5
+        naming_convention: pass
+        zero_functional_impact: true
+
+      presentation_tsx:
+        testIDs_verified:
+          - "presentation-screen on SafeAreaView (container)"
+          - "presentation-edit-button on Pressable (pencil)"
+          - "presentation-font-toggle-button on Pressable (font toggle)"
+          - "presentation-font-toggle-text on Text (Aa/AA label)"
+          - "presentation-close-button on Pressable (close X)"
+        count: 5
+        naming_convention: pass
+        zero_functional_impact: true
+
+      maestro_03_home_presentation:
+        structure: valid_yaml
+        appId: "com.alouisio.sacramentmeetingplanner"
+        parts:
+          - "Part A: Login with output.TEST_EMAIL/TEST_PASSWORD"
+          - "Part B: Tap home-start-meeting-button, wait for presentation-screen"
+          - "Part C: Assert 'Reuniao Sacramental' title, 'Presidindo' label, font toggle"
+          - "Part D: Tap presentation-font-toggle-button twice (toggle and back)"
+          - "Part E: Tap 'Ultimo Discurso' collapsed card by text (EC_E2E_P2_006)"
+          - "Part F: Tap presentation-close-button, assert Home tab visible"
+        element_targeting: "testID for interactive elements, text for assertions"
+        i18n_verification: |
+          All pt-BR strings match src/i18n/locales/pt-BR.json:
+          - "Inicio" = tabs.home
+          - "Reuniao Sacramental" = presentation.title
+          - "Presidindo" = agenda.presiding
+          - "Ultimo Discurso" = speeches.lastSpeech
+        edge_case_handling:
+          EC_E2E_P2_006: "Accordion tap by text 'Ultimo Discurso'"
+          EC_E2E_P2_008: "Flow uses field labels, not populated values"
+          EC_E2E_P2_009: "Flow order independent (labels not values)"
+
+      maestro_04_agenda:
+        structure: valid_yaml
+        appId: "com.alouisio.sacramentmeetingplanner"
+        parts:
+          - "Part A: Login with output.TEST_EMAIL/TEST_PASSWORD"
+          - "Part B: Navigate to Agendas tab by text"
+          - "Part C: evalScript computes NEXT_SUNDAY, tap agenda-card-{date}, wait 15s for lazy creation"
+          - "Part D: scrollUntilVisible, tap agenda-presiding-selector, ActorSelector inline create 'E2E Presidente'"
+          - "Part E: scrollUntilVisible, tap agenda-opening-hymn-selector, search '2', tap first result"
+          - "Part F: scrollUntilVisible UP, tap card header to collapse, assertNotVisible"
+        element_targeting: "testID for interactive elements, text for assertions"
+        dynamic_date: "evalScript computes NEXT_SUNDAY via getDay() + toISOString()"
+        i18n_verification: |
+          All pt-BR strings match src/i18n/locales/pt-BR.json:
+          - "Inicio" = tabs.home
+          - "Agendas" = tabs.agenda
+          - "Boas-Vindas, Anuncios e Reconhecimentos" = agenda.sectionWelcome
+        edge_case_handling:
+          EC_E2E_P2_001: "Dynamic date via evalScript"
+          EC_E2E_P2_003: "15s timeout for lazy agenda creation"
+          EC_E2E_P2_004: "extendedWaitUntil 5s for ActorSelector"
+          EC_E2E_P2_005: "waitForAnimationToEnd for hymn search"
+          EC_E2E_P2_007: "scrollUntilVisible before tapping fields"
+          EC_E2E_P2_010: "scrollUntilVisible for FlatList card"
+
+    # =========================================================================
+    # TESTS
+    # =========================================================================
+
+    tests:
+      file: src/__tests__/f018-e2e-phase2.test.ts
+      total: 95
+      status: all_passing
+      coverage:
+        - "AC-SF1-01, AC-SF1-02: Home tab testIDs (3 tests)"
+        - "AC-SF2-01, AC-SF2-02: Agenda dynamic testIDs (3 tests)"
+        - "AC-SF3-01, AC-SF3-02: AgendaForm SelectorField testIDs (7 tests)"
+        - "ADR-054: SelectorField testID interface (3 tests)"
+        - "AC-SF4-01, AC-SF4-02: HymnSelectorModal testIDs (2 tests)"
+        - "AC-SF5-01, AC-SF5-02: ActorSelector testIDs (6 tests)"
+        - "AC-SF6-01, AC-SF6-02, AC-SF6-03: Presentation testIDs (6 tests)"
+        - "AC-SF7-01, AC-SF7-02, AC-SF7-03: 03-home-presentation flow (16 tests)"
+        - "AC-SF8-01, AC-SF8-02, AC-SF8-03: 04-agenda flow (21 tests)"
+        - "Cross-validation: flow testIDs exist in source (3 tests)"
+        - "ADR-052: naming convention (4 tests)"
+        - "ADR-053: flow file naming (4 tests)"
+        - "pt-BR i18n strings (7 tests)"
+        - "EC_E2E_P2_011: SearchInput passthrough (2 tests)"
+        - "Total testID count verification (1 test)"
+
+    # =========================================================================
+    # SECURITY REVIEW
+    # =========================================================================
+
+    security:
+      notes: |
+        Same as Phase 1:
+        - No secrets stored in Maestro flow files. Credentials from 01-register output.
+        - Actor data ("E2E Presidente") scoped to test ward via RLS isolation.
+        - Hymn assignment updates existing agendas table with RLS protection.
+        - Test accounts identifiable by e2e-* email pattern for cleanup.
+
+    # =========================================================================
+    # DEPLOY IDENTIFICATION
+    # =========================================================================
+
+    pending_deploys: []
+    deploy_notes: |
+      No deploys required. Changes are:
+      - testID props on 5 source files (zero functional impact, client-side only)
+      - 2 Maestro YAML flow files (outside app bundle, in e2e/ directory)
+      testID props will be included in the next regular EAS Build. No database
+      migrations, Edge Function changes, or infrastructure updates needed.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - "docs/specs/SPEC_F018.yaml"
+        - "docs/arch/ARCH_M018.yaml"
+        - "docs/plans/PLAN_P018.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+      notes: |
+        All code changes for CR-284 Phase 2 are committed across 11 commits
+        (12ec5f2..9147855). The 4 pending documentation files are project
+        artifacts that are committed by the Orchestrator at the end of the
+        phase, not by the Coder.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-284 (E2E Testing with Maestro Phase 2) implementation is correct and
+      complete. Chain validation passes at all 4 levels (SPEC->ARCH->PLAN->CODE).
+      21 testID props added across 5 source files (2 Home, 2 Agenda dynamic,
+      9 AgendaForm with SelectorField interface change, 5 ActorSelector,
+      5 Presentation) following the {screen}-{element}-{type} kebab-case
+      convention (ADR-052). SelectorField testID prop passthrough implemented
+      per ADR-054. Dynamic testIDs for agenda cards use ISO date suffix per
+      ADR-055. Two Maestro flows created: 03-home-presentation (Home tab ->
+      Presentation Mode round-trip with font toggle and accordion verification)
+      and 04-agenda (Agenda tab -> expand Sunday -> assign actor inline ->
+      assign hymn via search -> collapse). All pt-BR strings verified against
+      i18n. 95 tests passing. Zero functional impact. No deploys required.
+      No P0, P1, or P2 issues found.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 9
+      total_commits: 11

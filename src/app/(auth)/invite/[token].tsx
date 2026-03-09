@@ -159,6 +159,7 @@ export default function InviteRegistrationScreen() {
             styles.errorContainer,
             { backgroundColor: colors.errorContainer },
           ]}
+          testID="invite-error-text"
         >
           <Text style={[styles.errorText, { color: colors.error }]}>
             {error}
@@ -193,6 +194,7 @@ export default function InviteRegistrationScreen() {
                 styles.errorContainer,
                 { backgroundColor: colors.errorContainer },
               ]}
+              testID="invite-error-text"
             >
               <Text style={[styles.errorText, { color: colors.error }]}>
                 {error}
@@ -300,6 +302,7 @@ export default function InviteRegistrationScreen() {
               textContentType="name"
               autoComplete="name"
               editable={!submitting}
+              testID="invite-fullname-input"
             />
           </View>
 
@@ -325,6 +328,7 @@ export default function InviteRegistrationScreen() {
               textContentType="newPassword"
               autoComplete="new-password"
               editable={!submitting}
+              testID="invite-password-input"
             />
           </View>
 
@@ -350,6 +354,7 @@ export default function InviteRegistrationScreen() {
               autoComplete="new-password"
               editable={!submitting}
               onSubmitEditing={handleRegister}
+              testID="invite-confirm-password-input"
             />
           </View>
 
@@ -363,6 +368,7 @@ export default function InviteRegistrationScreen() {
             onPress={handleRegister}
             disabled={submitting}
             activeOpacity={0.8}
+            testID="invite-submit-button"
           >
             {submitting ? (
               <ActivityIndicator color={colors.onPrimary} />

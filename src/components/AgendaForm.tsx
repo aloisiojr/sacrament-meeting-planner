@@ -159,6 +159,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.presiding')} colors={colors}>
         <SelectorField
+          testID="agenda-presiding-selector"
           value={agenda.presiding_name ?? ''}
           placeholder={t('agenda.presiding')}
           onPress={() => {
@@ -180,6 +181,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.conducting')} colors={colors}>
         <SelectorField
+          testID="agenda-conducting-selector"
           value={agenda.conducting_name ?? ''}
           placeholder={t('agenda.conducting')}
           onPress={() => {
@@ -234,6 +236,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.pianist')} colors={colors}>
         <SelectorField
+          testID="agenda-pianist-selector"
           value={agenda.pianist_name ?? ''}
           placeholder={t('agenda.pianist')}
           onPress={() => {
@@ -255,6 +258,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.conductor')} colors={colors}>
         <SelectorField
+          testID="agenda-conductor-selector"
           value={agenda.conductor_name ?? ''}
           placeholder={t('agenda.conductor')}
           onPress={() => {
@@ -276,6 +280,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.openingHymn')} colors={colors}>
         <SelectorField
+          testID="agenda-opening-hymn-selector"
           value={getHymnDisplay(agenda.opening_hymn_id, allHymns)}
           placeholder={t('agenda.openingHymn')}
           onPress={() => {
@@ -389,6 +394,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
       <FieldRow label={t('agenda.sacramentHymn')} colors={colors}>
         <SelectorField
+          testID="agenda-sacrament-hymn-selector"
           value={getHymnDisplay(agenda.sacrament_hymn_id, sacramentalHymns)}
           placeholder={t('agenda.sacramentHymn')}
           onPress={() => {
@@ -509,6 +515,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       {/* Closing (both normal and special) */}
       <FieldRow label={t('agenda.closingHymn')} colors={colors}>
         <SelectorField
+          testID="agenda-closing-hymn-selector"
           value={getHymnDisplay(agenda.closing_hymn_id, allHymns)}
           placeholder={t('agenda.closingHymn')}
           onPress={() => {
@@ -697,6 +704,7 @@ function SelectorField({
   colors,
   onClear,
   hasValue,
+  testID,
 }: {
   value: string;
   placeholder: string;
@@ -705,9 +713,11 @@ function SelectorField({
   colors: ThemeColors;
   onClear?: () => void;
   hasValue?: boolean;
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       style={[styles.selectorField, { borderColor: colors.border }]}
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
@@ -832,12 +842,13 @@ function HymnSelectorModal({
           {/* Search */}
           <View style={styles.sheetSearchRow}>
             <SearchInput
+              testID="hymn-selector-search-input"
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
               placeholder={t('common.search')}
             />
-            <Pressable onPress={onClose} style={styles.sheetCloseBtn}>
+            <Pressable testID="hymn-selector-close-button" onPress={onClose} style={styles.sheetCloseBtn}>
               <Text style={[styles.sheetCloseText, { color: colors.primary }]}>{t('common.close')}</Text>
             </Pressable>
           </View>

@@ -297,6 +297,7 @@ export default function UserManagementScreen() {
             onPress={openInviteModal}
             accessibilityRole="button"
             accessibilityLabel={t('users.inviteUser')}
+            testID="users-invite-button"
           >
             <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
           </Pressable>
@@ -545,6 +546,7 @@ export default function UserManagementScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  testID="users-invite-email-input"
                 />
 
                 {/* Role selector */}
@@ -562,6 +564,7 @@ export default function UserManagementScreen() {
                       onPress={() => setInviteRole(role)}
                       accessibilityRole="radio"
                       accessibilityState={{ selected: inviteRole === role }}
+                      testID={`users-invite-role-${role}-radio`}
                     >
                       <Text
                         style={[
@@ -589,6 +592,7 @@ export default function UserManagementScreen() {
                   onPress={handleInvite}
                   disabled={!inviteEmail.trim() || inviteMutation.isPending}
                   accessibilityRole="button"
+                  testID="users-invite-submit-button"
                 >
                   {inviteMutation.isPending ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
@@ -602,7 +606,7 @@ export default function UserManagementScreen() {
             ) : (
               <>
                 {/* Success: show deep link */}
-                <Text style={[styles.successText, { color: colors.text }]}>
+                <Text style={[styles.successText, { color: colors.text }]} testID="users-invite-success-text">
                   {t('users.inviteSuccess')}
                 </Text>
                 <Text
@@ -611,6 +615,7 @@ export default function UserManagementScreen() {
                     { color: colors.primary, backgroundColor: colors.surfaceVariant },
                   ]}
                   selectable
+                  testID="users-invite-link-text"
                 >
                   {inviteResult.deepLink}
                 </Text>
@@ -619,6 +624,7 @@ export default function UserManagementScreen() {
                     style={[styles.linkButton, { backgroundColor: colors.primary }]}
                     onPress={() => handleCopyLink(inviteResult.deepLink)}
                     accessibilityRole="button"
+                    testID="users-invite-copy-button"
                   >
                     <Text style={styles.linkButtonText}>{t('users.copyLink')}</Text>
                   </Pressable>
@@ -638,6 +644,7 @@ export default function UserManagementScreen() {
                   style={[styles.closeButton, { borderColor: colors.divider }]}
                   onPress={closeInviteModal}
                   accessibilityRole="button"
+                  testID="users-invite-close-button"
                 >
                   <Text style={[styles.closeButtonText, { color: colors.text }]}>
                     {t('common.close')}

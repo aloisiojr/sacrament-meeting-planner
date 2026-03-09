@@ -183,6 +183,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
               onBlur={finishEdit}
               multiline
               blurOnSubmit
+              scrollEnabled={false}
               returnKeyType="done"
             />
           )}
@@ -227,6 +228,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
           returnKeyType="done"
           multiline
           blurOnSubmit
+          scrollEnabled={false}
         />
       )}
     </View>

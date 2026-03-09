@@ -83,8 +83,9 @@ export function TopicSelectorModal({
             onChangeText={setSearch}
             placeholder={t('speeches.selectTopic')}
             autoFocus
+            testID="topic-selector-search-input"
           />
-          <Pressable style={styles.closeButton} onPress={handleClose}>
+          <Pressable style={styles.closeButton} onPress={handleClose} testID="topic-selector-close-button">
             <Text style={[styles.closeText, { color: colors.primary }]}>
               {t('common.close')}
             </Text>

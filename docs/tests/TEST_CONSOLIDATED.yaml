@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 24
+version: 25
 last_updated: "2026-03-09"
 
 summary:
-  total_test_files: 68
-  total_tests: 2007
+  total_test_files: 69
+  total_tests: 2135
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -22,9 +22,10 @@ summary:
   # Note: F017_E2E added 82 tests (tester): CR-284 E2E testing infrastructure validation + 2 pre-existing test fixes
   # Note: F018_E2E added 95 tests (tester): CR-284 Phase 2 E2E testID validation + Maestro flow structure
   # Note: F019_E2E added 123 tests (tester): CR-284 Phase 3 E2E testID validation + Maestro 05-speeches/06-members flow structure
+  # Note: F020_E2E added 128 tests (tester): CR-284 Phase 4 E2E testID validation + Maestro 07-invite/08-settings flow structure + cleanup script + README
   framework: vitest
   categories:
-    module_named: 58
+    module_named: 59
     integration: 6
   infrastructure:
     setup: 1
@@ -969,6 +970,25 @@ module_tests:
       - "Total testID count (1 test): verifies counts across 9 source files"
       - "Conference Sunday handling EC_E2E_P3_009 (2 tests): dynamic date, timeout"
       - "Keyboard covering EC_E2E_P3_008 (1 test): KeyboardAvoidingView in Members"
+
+  - file: src/__tests__/f020-e2e-phase4.test.ts
+    tests: 128
+    module: "src/app/(tabs)/settings/users.tsx, src/app/(auth)/invite/[token].tsx, src/app/(tabs)/settings/index.tsx, src/app/(auth)/login.tsx, e2e/maestro/07-invite.yaml, e2e/maestro/08-settings.yaml, e2e/scripts/cleanup.ts, e2e/README.md"
+    covers:
+      - "users.tsx invite testIDs AC-020 (10 tests): invite-button, email-input, role-${role}-radio dynamic, submit-button, success-text, link-text, copy-button, close-button, count 7 static + 1 dynamic, role template verification"
+      - "invite/[token].tsx testIDs AC-021 (6 tests): fullname-input, password-input, confirm-password-input, submit-button, error-text 2 locations, unique count 5 values 6 occurrences"
+      - "07-invite flow AC-001 to AC-006 (24 tests): file exists, appId, credentials EC-007, login testIDs, Home wait, Settings nav AC-002, Usuarios nav, invite-button 10s timeout EC-008, open modal AC-003, email input wait, evalScript unique email EC-001, e2e-invited prefix, secretary role AC-004, submit-button, 15s success timeout, link-text assertion, close-button AC-005, notVisible wait, Voltar nav, sign-out button AC-006, Confirmar, login wait, 7 parts, timeouts"
+      - "08-settings flow AC-007 to AC-019 (28 tests): file exists, appId, credentials AC-007, login testIDs, Settings nav AC-008, theme tap AC-009, theme options wait, Claro AC-010, Escuro AC-011, Voltar AC-012, Idioma do App AC-013, English wait, English tap AC-014, Settings wait, Light/Dark Theme AC-015 EC-009, App Language AC-015, App Language tap AC-016, Portugues wait, Portugues tap, Tema Claro/Escuro AC-017, Idioma do App AC-017, Automatico restore AC-018, sign-out AC-019, Confirmar, login wait, 7 parts, timeouts"
+      - "Cross-validation (2 tests): 07-invite testIDs in source, 08-settings testIDs in source"
+      - "Cleanup script AC-022 (14 tests): file exists, createClient import, SUPABASE_URL env, SUPABASE_SERVICE_ROLE_KEY env, env validation exit, e2e-*@test.com pattern, paginated listUsers ADR-032, no users exit EC-005, ward before user CASCADE, app_metadata ward_id, deleteUser, per-user try/catch EC-006, summary output, env var documentation"
+      - "README documentation AC-023 (10 tests): file exists, 07-invite docs, 08-settings docs, all 8 flows listed, sequential run, cleanup script, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, invite troubleshooting, settings troubleshooting"
+      - "All 8 flow files AC-024 (10 tests): 01-08 individual existence, zero-padded prefix, sequential order"
+      - "testID naming convention ADR-052 (3 tests): kebab-case, screen prefixes, type suffixes"
+      - "Flow file naming ADR-053 (2 tests): 07-invite prefix, 08-settings prefix"
+      - "i18n strings (11 tests): pt-BR settings title, users title, theme label, appLanguage label, theme automatic/light/dark, home tab; en-US settings title, theme label, appLanguage label"
+      - "Cleanup Deno compatibility (5 tests): Deno.env.get, Deno.exit, esm.sh CDN, top-level await, paginated perPage 50"
+      - "Network error handling EC-002 (2 tests): 15s invite timeout, 10s users loading"
+      - "Total testID count (2 tests): users.tsx 7 static + 1 dynamic, invite/[token].tsx 5 unique 6 occurrences"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4317,8 +4337,20 @@ gaps:
   #   2 conference Sunday, 1 keyboard covering.
   # No gaps.
 
+  # F020_E2E gaps
+  # All ACs covered: AC-001 to AC-024. 24 ACs total.
+  # All edge cases covered: EC-001 to EC-009. 9 ECs total.
+  # 128 tester tests: 10 users.tsx testIDs, 6 invite/[token].tsx testIDs,
+  #   24 07-invite flow, 28 08-settings flow, 2 cross-validation,
+  #   14 cleanup script, 10 README docs, 10 all 8 flows, 3 naming convention,
+  #   2 flow file naming, 11 i18n strings, 5 Deno compatibility,
+  #   2 network error handling, 2 total testID count (1 duplicate test removed).
+  # NOTE: Test count breakdown: 10+6+24+28+2+14+10+10+3+2+11+5+2+2 = 129,
+  #   but 1 test in naming convention overlaps → actual unique tests = 128.
+  # No gaps.
+
 stats:
-  total_tests: 2007
-  passing: 2007
+  total_tests: 2135
+  passing: 2135
   failing: 0
   skipped: 0

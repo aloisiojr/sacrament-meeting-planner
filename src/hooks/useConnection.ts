@@ -33,26 +33,40 @@ export function useConnection(): ConnectionState {
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlineDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
       const online = isNetInfoOnline(state);
-      setIsOnline(online);
-      onlineManager.setOnline(online);
 
-      if (!online) {
-        // Show banner immediately when going offline
-        setShowOfflineBanner(true);
-        if (bannerTimeoutRef.current) {
-          clearTimeout(bannerTimeoutRef.current);
-          bannerTimeoutRef.current = null;
+      if (online) {
+        // Cancel any pending offline transition
+        if (offlineDebounceRef.current) {
+          clearTimeout(offlineDebounceRef.current);
+          offlineDebounceRef.current = null;
         }
-      } else {
+        // Go online immediately
+        setIsOnline(true);
+        onlineManager.setOnline(true);
         // Delay hiding banner slightly so user sees the transition
         bannerTimeoutRef.current = setTimeout(() => {
           setShowOfflineBanner(false);
           bannerTimeoutRef.current = null;
         }, 1500);
+      } else {
+        // Debounce offline transition to avoid false positives on app resume
+        if (!offlineDebounceRef.current) {
+          offlineDebounceRef.current = setTimeout(() => {
+            offlineDebounceRef.current = null;
+            setIsOnline(false);
+            onlineManager.setOnline(false);
+            setShowOfflineBanner(true);
+            if (bannerTimeoutRef.current) {
+              clearTimeout(bannerTimeoutRef.current);
+              bannerTimeoutRef.current = null;
+            }
+          }, 3000);
+        }
       }
     });
 
@@ -60,6 +74,9 @@ export function useConnection(): ConnectionState {
       unsubscribe();
       if (bannerTimeoutRef.current) {
         clearTimeout(bannerTimeoutRef.current);
+      }
+      if (offlineDebounceRef.current) {
+        clearTimeout(offlineDebounceRef.current);
       }
     };
   }, []);

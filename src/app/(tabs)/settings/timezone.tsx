@@ -17,74 +17,7 @@ import { SearchInput } from '../../../components/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import { CheckIcon } from '../../../components/icons';
-
-/**
- * Common IANA timezone list covering major regions.
- * Sorted alphabetically for easy scanning.
- */
-const TIMEZONES: string[] = [
-  'Africa/Cairo',
-  'Africa/Johannesburg',
-  'Africa/Lagos',
-  'Africa/Nairobi',
-  'America/Anchorage',
-  'America/Argentina/Buenos_Aires',
-  'America/Bogota',
-  'America/Chicago',
-  'America/Denver',
-  'America/Edmonton',
-  'America/Halifax',
-  'America/Lima',
-  'America/Los_Angeles',
-  'America/Manaus',
-  'America/Mexico_City',
-  'America/Montevideo',
-  'America/New_York',
-  'America/Phoenix',
-  'America/Recife',
-  'America/Santiago',
-  'America/Sao_Paulo',
-  'America/St_Johns',
-  'America/Toronto',
-  'America/Vancouver',
-  'Asia/Almaty',
-  'Asia/Bangkok',
-  'Asia/Colombo',
-  'Asia/Dhaka',
-  'Asia/Dubai',
-  'Asia/Hong_Kong',
-  'Asia/Jakarta',
-  'Asia/Karachi',
-  'Asia/Kolkata',
-  'Asia/Manila',
-  'Asia/Seoul',
-  'Asia/Shanghai',
-  'Asia/Singapore',
-  'Asia/Taipei',
-  'Asia/Tokyo',
-  'Atlantic/Reykjavik',
-  'Australia/Adelaide',
-  'Australia/Brisbane',
-  'Australia/Melbourne',
-  'Australia/Perth',
-  'Australia/Sydney',
-  'Europe/Amsterdam',
-  'Europe/Berlin',
-  'Europe/Brussels',
-  'Europe/Istanbul',
-  'Europe/Lisbon',
-  'Europe/London',
-  'Europe/Madrid',
-  'Europe/Moscow',
-  'Europe/Paris',
-  'Europe/Rome',
-  'Europe/Stockholm',
-  'Europe/Warsaw',
-  'Europe/Zurich',
-  'Pacific/Auckland',
-  'Pacific/Fiji',
-  'Pacific/Honolulu',
-];
+import { TIMEZONES } from '../../../lib/timezones';
 
 export default function TimezoneScreen() {
   const { t } = useTranslation();

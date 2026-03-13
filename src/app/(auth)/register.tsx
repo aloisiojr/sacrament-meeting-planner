@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +19,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_TIMEZONES, LANGUAGE_LABELS, SUPPORTED_LANGUAGES, changeLanguage } from '../../i18n';
 import type { SupportedLanguage } from '../../i18n';
+import { TIMEZONES } from '../../lib/timezones';
+import { SearchInput } from '../../components/SearchInput';
+import { CheckIcon } from '../../components/icons';
 
 export default function RegisterScreen() {
   const { t } = useTranslation();
@@ -33,6 +39,8 @@ export default function RegisterScreen() {
   const [timezone, setTimezone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTimezonePicker, setShowTimezonePicker] = useState(false);
+  const [timezoneSearch, setTimezoneSearch] = useState('');
 
   // Auto-detect timezone
   useEffect(() => {
@@ -42,6 +50,18 @@ export default function RegisterScreen() {
     } catch {
       setTimezone(DEFAULT_TIMEZONES['pt-BR']);
     }
+  }, []);
+
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneSearch.trim()) return TIMEZONES;
+    const query = timezoneSearch.toLowerCase();
+    return TIMEZONES.filter((tz) => tz.toLowerCase().includes(query));
+  }, [timezoneSearch]);
+
+  const handleTimezoneSelect = useCallback((tz: string) => {
+    setTimezone(tz);
+    setShowTimezonePicker(false);
+    setTimezoneSearch('');
   }, []);
 
   const validate = (): string | null => {
@@ -371,22 +391,71 @@ export default function RegisterScreen() {
             <Text style={[styles.label, { color: colors.textSecondary }]}>
               {t('auth.timezone')}
             </Text>
-            <TextInput
-              style={[styles.input, {
+            <Pressable
+              style={[styles.input, styles.pickerButton, {
                 backgroundColor: colors.inputBackground,
                 borderColor: colors.inputBorder,
-                color: colors.text,
               }]}
-              value={timezone}
-              onChangeText={setTimezone}
-              placeholder="America/Sao_Paulo"
-              placeholderTextColor={colors.placeholder}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
+              onPress={() => setShowTimezonePicker(true)}
+              disabled={loading}
               testID="register-timezone-input"
-            />
+            >
+              <Text style={[styles.pickerButtonText, { color: colors.text }]}>
+                {timezone || 'America/Sao_Paulo'}
+              </Text>
+            </Pressable>
           </View>
+
+          {/* Timezone Picker Modal */}
+          <Modal
+            visible={showTimezonePicker}
+            animationType="slide"
+            presentationStyle="pageSheet"
+            onRequestClose={() => setShowTimezonePicker(false)}
+          >
+            <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={() => { setShowTimezonePicker(false); setTimezoneSearch(''); }} hitSlop={12}>
+                  <Text style={[styles.modalCloseText, { color: colors.primary }]}>
+                    {t('common.close')}
+                  </Text>
+                </Pressable>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {t('timezoneSelector.title')}
+                </Text>
+                <View style={styles.modalHeaderSpacer} />
+              </View>
+              <View style={[styles.modalSearchContainer, { backgroundColor: colors.card }]}>
+                <SearchInput
+                  value={timezoneSearch}
+                  onChangeText={setTimezoneSearch}
+                  placeholder={t('timezoneSelector.search')}
+                />
+              </View>
+              <FlatList
+                data={filteredTimezones}
+                keyExtractor={(item) => item}
+                keyboardShouldPersistTaps="handled"
+                style={[styles.modalList, { backgroundColor: colors.card }]}
+                renderItem={({ item }) => {
+                  const isSelected = item === timezone;
+                  return (
+                    <Pressable
+                      style={[
+                        styles.modalItem,
+                        { borderBottomColor: colors.divider },
+                        isSelected && { backgroundColor: colors.surfaceVariant },
+                      ]}
+                      onPress={() => handleTimezoneSelect(item)}
+                    >
+                      <Text style={[styles.modalItemText, { color: colors.text }]}>{item}</Text>
+                      {isSelected && <CheckIcon size={18} color={colors.primary} />}
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+          </Modal>
 
           {/* Submit */}
           <TouchableOpacity
@@ -505,11 +574,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  pickerButton: {
+    justifyContent: 'center',
+  },
+  pickerButtonText: {
+    fontSize: 16,
+  },
   backLink: {
     marginTop: 24,
     alignItems: 'center',
   },
   backLinkText: {
     fontSize: 14,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalHeaderSpacer: {
+    width: 50,
+  },
+  modalSearchContainer: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 8,
+  },
+  modalList: {
+    marginHorizontal: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalItemText: {
+    fontSize: 15,
+    flex: 1,
   },
 });

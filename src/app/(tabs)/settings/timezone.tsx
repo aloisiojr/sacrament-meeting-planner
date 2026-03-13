@@ -141,11 +141,6 @@ export default function TimezoneScreen() {
           onChangeText={setSearch}
           placeholder={t('timezoneSelector.search')}
         />
-        <Pressable onPress={() => setSearch('')} accessibilityRole="button">
-          <Text style={[styles.closeButtonText, { color: colors.primary }]}>
-            {t('common.close')}
-          </Text>
-        </Pressable>
       </View>
 
       <FlatList
@@ -198,17 +193,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
     overflow: 'hidden',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
   list: {
     marginHorizontal: 16,

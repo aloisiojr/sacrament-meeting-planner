@@ -5,7 +5,7 @@
  * Special: Welcome, Designations/Sacrament, Special Meeting.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,8 @@ export interface AgendaFormProps {
   customReason?: string | null;
   /** When true, all form fields are disabled (offline read-only mode). */
   disabled?: boolean;
+  /** Called with touch Y coordinate to scroll field into view. */
+  onFieldFocus?: (touchY: number) => void;
 }
 
 type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer';
@@ -60,7 +62,7 @@ interface SelectorState {
 
 // --- Component ---
 
-export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exceptionReason, customReason, disabled = false }: AgendaFormProps) {
+export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exceptionReason, customReason, disabled = false, onFieldFocus }: AgendaFormProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { hasPermission } = useAuth();
@@ -84,6 +86,19 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
     mode: 'add' | 'edit';
     editIndex?: number;
   } | null>(null);
+
+  // Refs for text inputs that need keyboard scroll
+  const textInputRef1 = useRef<View>(null);
+  const textInputRef2 = useRef<View>(null);
+  const textInputRef3 = useRef<View>(null);
+
+  const handleTextFocus = useCallback((ref: React.RefObject<View | null>) => {
+    if (onFieldFocus && ref.current) {
+      ref.current.measureInWindow((_x: number, y: number) => {
+        onFieldFocus(y);
+      });
+    }
+  }, [onFieldFocus]);
 
   const isSpecial = isSpecialMeeting(exceptionReason);
 
@@ -176,6 +191,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             });
           } : undefined}
           hasValue={!!agenda.presiding_name}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -198,6 +214,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             });
           } : undefined}
           hasValue={!!agenda.conducting_name}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -207,6 +224,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           onSave={(text) => updateField('recognized_names', text)}
           disabled={isObserver}
           placeholder={t('agenda.addPresence')}
+          onFieldFocus={onFieldFocus}
           onItemPress={(index, _item) => {
             setRecognizeSelector({ mode: 'edit', editIndex: index });
           }}
@@ -222,6 +240,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           onSave={(text) => updateField('welcome_new_families', text)}
           disabled={isObserver}
           placeholder={t('agenda.addWelcome')}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -231,6 +250,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           onSave={(text) => updateField('announcements', text)}
           disabled={isObserver}
           placeholder={t('agenda.addAnnouncement')}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -253,6 +273,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             });
           } : undefined}
           hasValue={!!agenda.pianist_name}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -275,6 +296,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             });
           } : undefined}
           hasValue={!!agenda.conductor_name}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -292,6 +314,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           colors={colors}
           onClear={!isObserver ? () => updateField('opening_hymn_id', null) : undefined}
           hasValue={!!agenda.opening_hymn_id}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -332,6 +355,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               }
             } : undefined}
             hasValue={!!getSpeech(0)?.speaker_name}
+            onFieldFocus={onFieldFocus}
           />
         )}
       </FieldRow>
@@ -345,6 +369,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           onSave={(text) => updateField('sustaining_releasing', text)}
           disabled={isObserver}
           placeholder={t('agenda.addWardBusiness')}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -356,14 +381,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         colors={colors}
       />
       {agenda.has_baby_blessing && (
-        <DebouncedTextInput
-          style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
-          value={agenda.baby_blessing_names ?? ''}
-          onSave={(text) => updateField('baby_blessing_names', text)}
-          placeholder={t('agenda.names', 'Names')}
-          placeholderTextColor={colors.textTertiary}
-          editable={!isObserver}
-        />
+        <View ref={textInputRef1}>
+          <DebouncedTextInput
+            style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
+            value={agenda.baby_blessing_names ?? ''}
+            onSave={(text) => updateField('baby_blessing_names', text)}
+            placeholder={t('agenda.names', 'Names')}
+            placeholderTextColor={colors.textTertiary}
+            editable={!isObserver}
+            onFocus={() => handleTextFocus(textInputRef1)}
+          />
+        </View>
       )}
 
       <ToggleField
@@ -374,14 +402,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         colors={colors}
       />
       {agenda.has_baptism_confirmation && (
-        <DebouncedTextInput
-          style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
-          value={agenda.baptism_confirmation_names ?? ''}
-          onSave={(text) => updateField('baptism_confirmation_names', text)}
-          placeholder={t('agenda.names', 'Names')}
-          placeholderTextColor={colors.textTertiary}
-          editable={!isObserver}
-        />
+        <View ref={textInputRef2}>
+          <DebouncedTextInput
+            style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
+            value={agenda.baptism_confirmation_names ?? ''}
+            onSave={(text) => updateField('baptism_confirmation_names', text)}
+            placeholder={t('agenda.names', 'Names')}
+            placeholderTextColor={colors.textTertiary}
+            editable={!isObserver}
+            onFocus={() => handleTextFocus(textInputRef2)}
+          />
+        </View>
       )}
 
       <ToggleField
@@ -406,6 +437,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           colors={colors}
           onClear={!isObserver ? () => updateField('sacrament_hymn_id', null) : undefined}
           hasValue={!!agenda.sacrament_hymn_id}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -441,14 +473,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             colors={colors}
           />
           {agenda.has_special_presentation ? (
-            <DebouncedTextInput
-              style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
-              value={agenda.special_presentation_description ?? ''}
-              onSave={(text) => updateField('special_presentation_description', text)}
-              placeholder={t('agenda.musicalNumber')}
-              placeholderTextColor={colors.textTertiary}
-              editable={!isObserver}
-            />
+            <View ref={textInputRef3}>
+              <DebouncedTextInput
+                style={[styles.textInput, styles.indented, { color: colors.text, borderColor: colors.border }]}
+                value={agenda.special_presentation_description ?? ''}
+                onSave={(text) => updateField('special_presentation_description', text)}
+                placeholder={t('agenda.musicalNumber')}
+                placeholderTextColor={colors.textTertiary}
+                editable={!isObserver}
+                onFocus={() => handleTextFocus(textInputRef3)}
+              />
+            </View>
           ) : (
             <>
               <ToggleField
@@ -472,6 +507,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
                     colors={colors}
                     onClear={!isObserver ? () => updateField('intermediate_hymn_id', null) : undefined}
                     hasValue={!!agenda.intermediate_hymn_id}
+                    onFieldFocus={onFieldFocus}
                   />
                 </FieldRow>
               )}
@@ -527,6 +563,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           colors={colors}
           onClear={!isObserver ? () => updateField('closing_hymn_id', null) : undefined}
           hasValue={!!agenda.closing_hymn_id}
+          onFieldFocus={onFieldFocus}
         />
       </FieldRow>
 
@@ -567,6 +604,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               }
             } : undefined}
             hasValue={!!getSpeech(4)?.speaker_name}
+            onFieldFocus={onFieldFocus}
           />
         )}
       </FieldRow>
@@ -705,6 +743,7 @@ function SelectorField({
   onClear,
   hasValue,
   testID,
+  onFieldFocus,
 }: {
   value: string;
   placeholder: string;
@@ -714,12 +753,25 @@ function SelectorField({
   onClear?: () => void;
   hasValue?: boolean;
   testID?: string;
+  onFieldFocus?: (touchY: number) => void;
 }) {
+  const viewRef = useRef<View>(null);
+
+  const handlePress = useCallback(() => {
+    onPress();
+    if (onFieldFocus && viewRef.current) {
+      viewRef.current.measureInWindow((_x: number, y: number) => {
+        onFieldFocus(y);
+      });
+    }
+  }, [onPress, onFieldFocus]);
+
   return (
     <Pressable
+      ref={viewRef}
       testID={testID}
       style={[styles.selectorField, { borderColor: colors.border }]}
-      onPress={disabled ? undefined : onPress}
+      onPress={disabled ? undefined : handlePress}
       disabled={disabled}
     >
       <Text

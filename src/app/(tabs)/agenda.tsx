@@ -13,6 +13,7 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -143,6 +144,7 @@ function AgendaTabContent() {
 
   const flatListRef = useRef<FlatList>(null);
   const hasScrolled = useRef(false);
+  const scrollOffset = useRef(0);
 
   useEffect(() => {
     if (!hasScrolled.current && initialIndex > 0 && listItems.length > 0) {
@@ -214,6 +216,18 @@ function AgendaTabContent() {
     [expandedDate, isOnline, lazyCreate, listItems]
   );
 
+  const handleFieldFocus = useCallback((touchY: number) => {
+    const screenHeight = Dimensions.get('window').height;
+    const targetY = screenHeight / 5;
+    const delta = touchY - targetY;
+    if (delta > 30) {
+      flatListRef.current?.scrollToOffset({
+        offset: Math.max(0, scrollOffset.current + delta),
+        animated: true,
+      });
+    }
+  }, []);
+
   const getItemKey = useCallback((item: ListItem, index: number): string => {
     if (item.type === 'year') return `year-${item.year}`;
     return `sun-${item.data.date}`;
@@ -258,6 +272,7 @@ function AgendaTabContent() {
           onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
           onRemoveException={(d) => removeSundayException.mutate(d)}
           onDeleteSpeeches={(d) => deleteSpeechesByDate.mutate({ sundayDate: d })}
+          onFieldFocus={handleFieldFocus}
         />
       );
     },
@@ -312,6 +327,8 @@ function AgendaTabContent() {
           ) : null
         }
         onScrollToIndexFailed={onScrollToIndexFailed}
+        onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         contentContainerStyle={styles.listContent}
       />
     </SafeAreaView>
@@ -336,6 +353,7 @@ interface AgendaSundayCardProps {
   onTypeChange: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   onRemoveException: (date: string) => void;
   onDeleteSpeeches: (date: string) => void;
+  onFieldFocus: (touchY: number) => void;
 }
 
 function AgendaSundayCard({
@@ -354,6 +372,7 @@ function AgendaSundayCard({
   onTypeChange,
   onRemoveException,
   onDeleteSpeeches,
+  onFieldFocus,
 }: AgendaSundayCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -581,6 +600,7 @@ function AgendaSundayCard({
               exceptionReason={exception?.reason ?? null}
               customReason={exception?.custom_reason ?? null}
               disabled={isOffline}
+              onFieldFocus={onFieldFocus}
             />
           </ThemedErrorBoundary>
         </View>

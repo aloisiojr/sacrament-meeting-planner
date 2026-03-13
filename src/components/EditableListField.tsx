@@ -37,11 +37,12 @@ interface EditableListFieldProps {
   placeholder: string;
   onItemPress?: (index: number, item: string) => void;
   onAddPress?: () => void;
+  onFieldFocus?: (touchY: number) => void;
 }
 
 // --- Component ---
 
-export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress }: EditableListFieldProps) {
+export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress, onFieldFocus }: EditableListFieldProps) {
   const { colors } = useTheme();
   const [items, setItems] = useState<string[]>(() => parseItems(value));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -49,6 +50,15 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
   const [addText, setAddText] = useState('');
   const isEditingRef = useRef(false);
   const addInputRef = useRef<TextInput>(null);
+  const rootRef = useRef<View>(null);
+
+  const handleInputFocus = useCallback(() => {
+    if (onFieldFocus && rootRef.current) {
+      rootRef.current.measureInWindow((_x: number, y: number) => {
+        onFieldFocus(y);
+      });
+    }
+  }, [onFieldFocus]);
 
   // External value sync
   useEffect(() => {
@@ -165,7 +175,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
             <GripIcon size={16} color={colors.textTertiary} />
           </Pressable>
           {onItemPress ? (
-            <Pressable style={styles.itemTextPressable} onPress={() => onItemPress(idx, item)}>
+            <Pressable style={styles.itemTextPressable} onPress={() => { handleInputFocus(); onItemPress(idx, item); }}>
               <Text style={[styles.itemText, { color: colors.text }]}>
                 {item}
               </Text>
@@ -178,7 +188,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
                 if (editingIndex !== idx) startEdit(idx);
                 setEditText(text);
               }}
-              onFocus={() => { if (editingIndex !== idx) startEdit(idx); }}
+              onFocus={() => { if (editingIndex !== idx) startEdit(idx); handleInputFocus(); }}
               onSubmitEditing={finishEdit}
               onBlur={finishEdit}
               multiline
@@ -197,7 +207,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
 
   // --- Active state ---
   return (
-    <View>
+    <View ref={rootRef}>
       <DraggableFlatList
         data={items}
         keyExtractor={(_, index) => `${index}`}
@@ -209,7 +219,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
       {onAddPress ? (
         <Pressable
           style={[styles.addInput, { borderColor: colors.border }]}
-          onPress={onAddPress}
+          onPress={() => { handleInputFocus(); onAddPress!(); }}
         >
           <Text style={{ color: colors.textTertiary, fontSize: 15 }}>
             {placeholder}
@@ -223,6 +233,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
           onChangeText={setAddText}
           onSubmitEditing={handleAdd}
           onBlur={handleAdd}
+          onFocus={handleInputFocus}
           placeholder={placeholder}
           placeholderTextColor={colors.textTertiary}
           returnKeyType="done"

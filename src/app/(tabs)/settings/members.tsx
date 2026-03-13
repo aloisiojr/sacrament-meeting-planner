@@ -713,8 +713,9 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   searchContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    marginBottom: 12,
   },
   csvActions: {
     flexDirection: 'row',

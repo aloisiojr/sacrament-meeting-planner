@@ -193,6 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   searchContainer: {
+    flexDirection: 'row',
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,

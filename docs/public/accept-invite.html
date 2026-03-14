@@ -175,11 +175,9 @@
     var inviteToken = params.get('token');
 
     // --- i18n ---
-    var lang = navigator.language || 'pt-BR';
-    var t;
-    var roleLabels;
-    if (lang.startsWith('en')) {
-      t = {
+    var translations = {
+      en: {
+        title: 'Sacrament Meeting Planner',
         subtitle: 'Accept Invitation',
         loading: 'Validating invitation...',
         labelStake: 'Stake',
@@ -200,11 +198,11 @@
         errorShortPassword: 'Password must be at least 6 characters.',
         errorMismatch: 'Passwords do not match.',
         errorGeneric: 'An error occurred. Please try again.',
-        errorMissingToken: 'Invalid link. Missing invitation token.'
-      };
-      roleLabels = { bishopric: 'Bishopric', secretary: 'Secretary', observer: 'Observer' };
-    } else if (lang.startsWith('es')) {
-      t = {
+        errorMissingToken: 'Invalid link. Missing invitation token.',
+        roles: { bishopric: 'Bishopric', secretary: 'Secretary', observer: 'Observer' }
+      },
+      es: {
+        title: 'Planificador de Reunion Sacramental',
         subtitle: 'Aceptar invitacion',
         loading: 'Validando invitacion...',
         labelStake: 'Estaca',
@@ -225,11 +223,11 @@
         errorShortPassword: 'La contrasena debe tener al menos 6 caracteres.',
         errorMismatch: 'Las contrasenas no coinciden.',
         errorGeneric: 'Ocurrio un error. Intentelo de nuevo.',
-        errorMissingToken: 'Enlace invalido. Falta el token de invitacion.'
-      };
-      roleLabels = { bishopric: 'Obispado', secretary: 'Secretario', observer: 'Observador' };
-    } else {
-      t = {
+        errorMissingToken: 'Enlace invalido. Falta el token de invitacion.',
+        roles: { bishopric: 'Obispado', secretary: 'Secretario', observer: 'Observador' }
+      },
+      pt: {
+        title: 'Planejador de Reuniao Sacramental',
         subtitle: 'Aceitar Convite',
         loading: 'Validando convite...',
         labelStake: 'Estaca',
@@ -250,22 +248,37 @@
         errorShortPassword: 'A senha deve ter pelo menos 6 caracteres.',
         errorMismatch: 'As senhas nao coincidem.',
         errorGeneric: 'Ocorreu um erro. Tente novamente.',
-        errorMissingToken: 'Link invalido. Token de convite ausente.'
-      };
-      roleLabels = { bishopric: 'Bispado', secretary: 'Secretario', observer: 'Observador' };
+        errorMissingToken: 'Link invalido. Token de convite ausente.',
+        roles: { bishopric: 'Bispado', secretary: 'Secretario', observer: 'Observador' }
+      }
+    };
+
+    function getLangKey(code) {
+      if (!code) return 'pt';
+      if (code.startsWith('en')) return 'en';
+      if (code.startsWith('es')) return 'es';
+      return 'pt';
     }
 
-    // --- Apply i18n ---
-    document.getElementById('subtitle').textContent = t.subtitle;
-    document.getElementById('loading-text').textContent = t.loading;
-    document.getElementById('label-stake').textContent = t.labelStake;
-    document.getElementById('label-ward').textContent = t.labelWard;
-    document.getElementById('label-role').textContent = t.labelRole;
-    document.getElementById('label-email').textContent = t.labelEmail;
-    document.getElementById('label-fullname').textContent = t.labelFullName;
-    document.getElementById('label-password').textContent = t.labelPassword;
-    document.getElementById('label-confirm').textContent = t.labelConfirm;
-    document.getElementById('submit-btn').textContent = t.submit;
+    // Start with device language for loading text, switch to ward language after token validation
+    var t = translations[getLangKey(navigator.language)];
+    var roleLabels = t.roles;
+
+    function applyTexts() {
+      document.querySelector('h1').textContent = t.title;
+      document.getElementById('subtitle').textContent = t.subtitle;
+      document.getElementById('loading-text').textContent = t.loading;
+      document.getElementById('label-stake').textContent = t.labelStake;
+      document.getElementById('label-ward').textContent = t.labelWard;
+      document.getElementById('label-role').textContent = t.labelRole;
+      document.getElementById('label-email').textContent = t.labelEmail;
+      document.getElementById('label-fullname').textContent = t.labelFullName;
+      document.getElementById('label-password').textContent = t.labelPassword;
+      document.getElementById('label-confirm').textContent = t.labelConfirm;
+      document.getElementById('submit-btn').textContent = t.submit;
+    }
+
+    applyTexts();
 
     // --- State helpers ---
     function showError(msg) {
@@ -324,8 +337,16 @@
           return;
         }
 
-        // Populate read-only fields
+        // Switch to ward language
         var inv = data.invitation;
+        if (inv.language) {
+          var wardLangKey = getLangKey(inv.language);
+          t = translations[wardLangKey];
+          roleLabels = t.roles;
+          applyTexts();
+        }
+
+        // Populate read-only fields
         document.getElementById('stake').value = inv.stakeName || '';
         document.getElementById('ward').value = inv.wardName || '';
         document.getElementById('role').value = translateRole(inv.role);

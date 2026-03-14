@@ -149,9 +149,11 @@ export function ActorSelector({
 
   const handleDelete = useCallback(
     (actor: MeetingActor) => {
+      const roleKey = `actors.deleteConfirm_${roleFilter}`;
+      const message = t(roleKey, { defaultValue: '' }) || t('actors.deleteConfirm');
       Alert.alert(
         t('common.delete'),
-        t('actors.deleteConfirm'),
+        message,
         [
           { text: t('common.cancel'), style: 'cancel' },
           {
@@ -162,7 +164,7 @@ export function ActorSelector({
         ]
       );
     },
-    [t, deleteActor]
+    [t, deleteActor, roleFilter]
   );
 
   const renderItem = useCallback(

@@ -14,12 +14,14 @@ import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { supabase } from '../../../lib/supabase';
+import { changeLanguage, type SupportedLanguage } from '../../../i18n';
 
 interface InvitationData {
   email: string;
   role: string;
   stakeName: string;
   wardName: string;
+  language?: string;
 }
 
 export default function InviteRegistrationScreen() {
@@ -61,6 +63,9 @@ export default function InviteRegistrationScreen() {
       } else if (data?.error === 'token_expired') {
         setError(t('auth.inviteExpired'));
       } else if (data?.invitation) {
+        if (data.invitation.language) {
+          changeLanguage(data.invitation.language as SupportedLanguage);
+        }
         setInvitation(data.invitation);
       } else {
         setError(t('auth.inviteInvalid'));

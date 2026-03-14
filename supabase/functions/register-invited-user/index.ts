@@ -63,7 +63,7 @@ async function handleValidateToken(supabaseAdmin: any, input: ValidateTokenInput
   // Look up invitation
   const { data: invitation, error: lookupError } = await supabaseAdmin
     .from('invitations')
-    .select('*, wards(name, stake_name)')
+    .select('*, wards(name, stake_name, language)')
     .eq('token', token)
     .maybeSingle();
 
@@ -97,6 +97,7 @@ async function handleValidateToken(supabaseAdmin: any, input: ValidateTokenInput
         role: invitation.role,
         stakeName: invitation.wards?.stake_name,
         wardName: invitation.wards?.name,
+        language: invitation.wards?.language || 'pt-BR',
       },
     }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

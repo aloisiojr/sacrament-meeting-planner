@@ -97,26 +97,26 @@ Deno.serve(async (req) => {
 
     switch (wardLanguage) {
       case 'en-US':
-        defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
-        defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
-        defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about a topic from {colecao} titled "{titulo}" {link}. Can we confirm your speech?';
-        defaultOpeningPrayerTemplate = 'Hi {nome}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}. To help with reverence, we ask that you arrive 15 minutes before the meeting starts and sit with the bishopric on the stand. Can we count on you?';
-        defaultClosingPrayerTemplate = 'Hi {nome}, how are you? You have been assigned to give the closing prayer at Sacrament Meeting on {data}. We would like to ask you to join the bishopric on the stand during the intermediate hymn. Can we count on you?';
+        defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultOpeningPrayerTemplate = 'Hi {nome}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
+        defaultClosingPrayerTemplate = 'Hi {nome}, you have been assigned to give the closing prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
         break;
       case 'es-LA':
-        defaultSpeech1Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
-        defaultSpeech2Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
-        defaultSpeech3Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre un tema de {colecao} con el título "{titulo}" {link}. ¿Podemos confirmar tu discurso?';
-        defaultOpeningPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de apertura en la Reunión Sacramental del día {data}. Para ayudar con la reverencia, te pedimos que llegues 15 minutos antes del inicio de la reunión y te sientes junto con el obispado en el púlpito. ¿Podemos contar contigo?';
-        defaultClosingPrayerTemplate = 'Hola {nome}, ¿cómo estás? Has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}. Nos gustaría pedirte que te unas al obispado en el púlpito durante el himno intermedio. ¿Podemos contar contigo?';
+        defaultSpeech1Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultSpeech2Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultSpeech3Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultOpeningPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de apertura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
+        defaultClosingPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
         break;
       case 'pt-BR':
       default:
-        defaultSpeech1Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
-        defaultSpeech2Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
-        defaultSpeech3Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre um tema do(a) {colecao} com o título "{titulo}" {link}. Podemos confirmar o seu discurso?';
-        defaultOpeningPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de abertura na Reunião Sacramental do dia {data}. Para ajudar na reverência, pedimos que você chegue 15min antes do início da reunião e se sente junto com o bispado ao púlpito. Podemos contar com você?';
-        defaultClosingPrayerTemplate = 'Oi {nome}, tudo bom? Você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}. Gostaríamos de pedir para que se junte ao bispado no púlpito durante o hino intermediário. Podemos contar com você?';
+        defaultSpeech1Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultSpeech2Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultSpeech3Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultOpeningPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+        defaultClosingPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
         break;
     }
 
@@ -179,18 +179,38 @@ Deno.serve(async (req) => {
     }
 
     // Create ward_collection_config entries for all general collections
-    // matching the ward's language (inactive by default).
-    // This makes them visible in the Topics screen for the user to activate.
+    // matching the ward's language.
+    // "For the Strength of Youth", "Gospel Principles", and the latest
+    // general conference collection are active by default.
     const { data: generalCollections } = await supabaseAdmin
       .from('general_collections')
-      .select('id')
+      .select('id, name')
       .eq('language', input.language || 'pt-BR');
 
     if (generalCollections && generalCollections.length > 0) {
-      const configEntries = generalCollections.map((col: { id: string }) => ({
+      // Collections that should be active by default (per language)
+      const defaultActiveNames: Record<string, Set<string>> = {
+        'pt-BR': new Set(['Para a Forca da Juventude', 'Principios do Evangelho']),
+        'en-US': new Set(['For the Strength of Youth', 'Gospel Principles']),
+        'es-LA': new Set(['Para la Fortaleza de la Juventud', 'Principios del Evangelio']),
+      };
+      const knownNames = new Set([
+        'Temas Especiais', 'Para a Forca da Juventude', 'Principios do Evangelho',
+        'Special Topics', 'For the Strength of Youth', 'Gospel Principles',
+        'Temas Especiales', 'Para la Fortaleza de la Juventud', 'Principios del Evangelio',
+      ]);
+      const activeNames = defaultActiveNames[wardLanguage] ?? defaultActiveNames['pt-BR'];
+
+      // Find the latest conference collection (not in knownNames, highest name = newest)
+      const conferenceCollections = generalCollections
+        .filter((col: { id: string; name: string }) => !knownNames.has(col.name))
+        .sort((a: { name: string }, b: { name: string }) => b.name.localeCompare(a.name));
+      const latestConferenceId = conferenceCollections.length > 0 ? conferenceCollections[0].id : null;
+
+      const configEntries = generalCollections.map((col: { id: string; name: string }) => ({
         ward_id: ward.id,
         collection_id: col.id,
-        active: false,
+        active: activeNames.has(col.name) || col.id === latestConferenceId,
       }));
 
       const { error: configError } = await supabaseAdmin

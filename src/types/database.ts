@@ -106,6 +106,7 @@ export interface WardTopic {
   ward_id: string;
   title: string;
   link: string | null;
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 }

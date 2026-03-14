@@ -46,7 +46,7 @@ function normalizeForSearch(text: string): string {
 /**
  * Fetch ward-specific topics, sorted alphabetically.
  */
-export function useWardTopics(search?: string) {
+export function useWardTopics() {
   const { wardId } = useAuth();
 
   return useQuery({
@@ -56,17 +56,13 @@ export function useWardTopics(search?: string) {
         .from('ward_topics')
         .select('*')
         .eq('ward_id', wardId)
+        .order('is_default', { ascending: false })
         .order('title', { ascending: true });
 
       if (error) throw error;
       return data ?? [];
     },
     enabled: !!wardId,
-    select: (data: WardTopic[]) => {
-      if (!search?.trim()) return data;
-      const normalized = normalizeForSearch(search);
-      return data.filter((t) => normalizeForSearch(t.title).includes(normalized));
-    },
   });
 }
 
@@ -186,17 +182,14 @@ interface CollectionWithConfig extends GeneralCollection {
  */
 export const FIXED_COLLECTION_ORDER: Record<string, number> = {
   // pt-BR
-  'Temas Especiais': 0,
-  'Para a Forca da Juventude': 1,
-  'Principios do Evangelho': 2,
+  'Para a Forca da Juventude': 0,
+  'Principios do Evangelho': 1,
   // en-US
-  'Special Topics': 0,
-  'For the Strength of Youth': 1,
-  'Gospel Principles': 2,
+  'For the Strength of Youth': 0,
+  'Gospel Principles': 1,
   // es-LA
-  'Temas Especiales': 0,
-  'Para la Fortaleza de la Juventud': 1,
-  'Principios del Evangelio': 2,
+  'Para la Fortaleza de la Juventud': 0,
+  'Principios del Evangelio': 1,
 };
 
 /**
@@ -361,7 +354,7 @@ export function useActiveTopics() {
       if (wardTopicsResult.error) throw wardTopicsResult.error;
       if (activeConfigsResult.error) throw activeConfigsResult.error;
 
-      const wardTopicLabel = t('topics.wardTopics');
+      const wardTopicLabel = t('topics.customTopics');
       (wardTopicsResult.data ?? []).forEach((t) => {
         results.push({
           id: t.id,

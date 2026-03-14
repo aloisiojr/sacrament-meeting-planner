@@ -6,9 +6,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-09"
+  last_updated: "2026-03-14"
   total_modules: 14
-  total_adrs: 58
+  total_adrs: 60
 
 # =============================================================================
 # TECH STACK
@@ -163,18 +163,23 @@ modules:
     description: |
       Ward-specific topics and general topic collections. Collections are
       language-specific and can be activated/deactivated per ward. Active
-      topics combine ward topics + active collection topics.
+      topics combine ward topics + active collection topics. Ward topics
+      include 2 is_default=true defaults per ward (language-specific),
+      sorted first, non-editable/non-deletable. 'Temas Especiais' collection
+      removed (CR-285). Section renamed to 'Custom Topics' (CR-286).
+      Search removed, inline add replaces floating '+' button (CR-288).
     features: [F008, F056]
     components:
       - path: src/hooks/useTopics.ts
-        responsibility: TanStack Query hooks for topic CRUD, collection toggle, active topics aggregation
+        responsibility: TanStack Query hooks for topic CRUD, collection toggle, active topics aggregation. Sorts defaults first (is_default DESC, title ASC).
       - path: src/app/(tabs)/settings/topics.tsx
-        responsibility: Topics settings screen with ward topics and collection management
+        responsibility: Topics settings screen with ward topics (inline add area) and collection management. No search field.
       - path: src/components/TopicSelectorModal.tsx
         responsibility: Topic selection modal showing ward + collection topics
     dependencies:
       - "general_collections, general_topics tables (global, read-only)"
       - "ward_collection_config table (ward-level activation)"
+      - "ward_topics.is_default column (migration 034)"
 
   # ---------------------------------------------------------------------------
   # M004 - Meeting Actors
@@ -1496,3 +1501,30 @@ adrs:
       E2E test runs accumulate test users and wards. Deno is consistent with the
       project Edge Functions runtime. Per-user try/catch handles partial state
       gracefully. Service role key is passed via env, not committed to repo.
+
+  - id: ADR-059
+    title: "Default ward topics with is_default boolean guard"
+    decision: |
+      Use an is_default BOOLEAN column on ward_topics to mark pre-populated
+      default topics. Default topics are inserted at ward creation time
+      (migration for existing wards, register-first-user for new wards)
+      with language-appropriate titles. The UI disables swipe actions for
+      is_default=true topics.
+    rationale: |
+      A boolean column is simpler than a separate table or hardcoded IDs.
+      It keeps the schema flat while allowing the UI to distinguish default
+      from user-created topics. The NOT EXISTS guard in migration 034
+      prevents duplicates. Language-specific titles are determined at
+      insertion time, not dynamically translated.
+
+  - id: ADR-060
+    title: "Inline add replaces search + floating button on topics screen"
+    decision: |
+      Remove SearchInput, Close button, and floating "+" button from Topics
+      screen. Replace with inline add area at bottom of topic list that
+      expands to existing TopicEditor (title + link). Custom pattern, NOT
+      EditableListField, because topics have title+link (not single text).
+    rationale: |
+      Search adds complexity for a typically small list (under 20 items).
+      Inline add at bottom is more discoverable and contextual than a
+      floating button. Reuses TopicEditor for consistency with edit flow.

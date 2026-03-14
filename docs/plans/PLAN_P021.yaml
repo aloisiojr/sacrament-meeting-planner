@@ -1,0 +1,469 @@
+# =============================================================================
+# PLAN_P021.yaml
+# Artifact ID: 021
+# Feature: F021 - Topic Library Overhaul (CR-285, CR-286, CR-287, CR-288)
+# Phase: 1 of 1
+# Status: pending
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+artifact_id: "021"
+feature: "F021"
+phase: 1
+total_phases: 1
+cr_range: "CR-285 to CR-288"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ===========================================================================
+  # S021-01: Migration 033 - Delete special topics (CR-285)
+  # ===========================================================================
+
+  - id: S021-01
+    title: "Migration 033: Delete special topics collections"
+    cr: CR-285
+    depends_on: []
+    files:
+      - path: supabase/migrations/033_delete_special_topics.sql
+        action: create
+    description: |
+      Create migration 033 that deletes the 'Temas Especiais', 'Special Topics',
+      and 'Temas Especiales' rows from general_collections. CASCADE foreign keys
+      will automatically clean up general_topics and ward_collection_config.
+
+      SQL:
+        DELETE FROM general_collections
+        WHERE name IN ('Temas Especiais', 'Special Topics', 'Temas Especiales');
+    done_when: |
+      - File supabase/migrations/033_delete_special_topics.sql exists
+      - Contains DELETE FROM general_collections WHERE name IN (3 names)
+      - No other tables are explicitly modified (CASCADE handles cleanup)
+    acs_covered: [AC-285-1, AC-285-2, AC-285-3, AC-285-4]
+    tests:
+      - "Verify migration file exists and contains correct DELETE statement"
+      - "Verify no explicit DELETE from general_topics or ward_collection_config (CASCADE handles it)"
+
+  # ===========================================================================
+  # S021-02: Migration 034 - Add is_default column + seed defaults (CR-286)
+  # ===========================================================================
+
+  - id: S021-02
+    title: "Migration 034: Add is_default column and seed default ward topics"
+    cr: CR-286
+    depends_on: [S021-01]
+    files:
+      - path: supabase/migrations/034_add_default_ward_topics.sql
+        action: create
+    description: |
+      Create migration 034 that:
+      1. ALTER TABLE ward_topics ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT false
+      2. INSERT 2 default topics per existing ward based on ward language:
+         - pt-BR: 'Tema livre', 'Seu testemunho'
+         - en-US: 'Open Topic', 'Your Testimony'
+         - es-LA: 'Tema libre', 'Tu testimonio'
+      3. Use NOT EXISTS guard to prevent duplicates
+      4. Set is_default=true for all inserted defaults
+    done_when: |
+      - File supabase/migrations/034_add_default_ward_topics.sql exists
+      - Contains ALTER TABLE ward_topics ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT false
+      - Contains 3 INSERT blocks (one per language) with CROSS JOIN and NOT EXISTS guard
+      - All inserted rows have is_default=true
+    acs_covered: [AC-286-2, AC-286-7]
+    tests:
+      - "Verify migration file exists with ALTER TABLE and 3 INSERT blocks"
+      - "Verify NOT EXISTS guard prevents duplicate insertion"
+      - "Verify existing rows retain is_default=false (column DEFAULT)"
+
+  # ===========================================================================
+  # S021-03: Type + hook updates (CR-285 + CR-286)
+  # ===========================================================================
+
+  - id: S021-03
+    title: "Update WardTopic type, FIXED_COLLECTION_ORDER, useWardTopics sort, useActiveTopics label"
+    cr: "CR-285 + CR-286"
+    depends_on: [S021-01, S021-02]
+    files:
+      - path: src/types/database.ts
+        action: modify
+      - path: src/hooks/useTopics.ts
+        action: modify
+    description: |
+      1. database.ts: Add is_default: boolean to WardTopic interface (after link field)
+
+      2. useTopics.ts FIXED_COLLECTION_ORDER:
+         - Remove 'Temas Especiais', 'Special Topics', 'Temas Especiales' entries
+         - Shift FSY collections from priority 1 to 0
+         - Shift Gospel Principles collections from priority 2 to 1
+         Result: 6 entries (2 per language) instead of 9
+
+      3. useTopics.ts useWardTopics:
+         - Remove search parameter
+         - Add .order('is_default', { ascending: false }) as first sort key
+         - Keep .order('title', { ascending: true }) as second sort key
+         - Remove select callback (was for search filtering)
+         NOTE: Do NOT remove normalizeForSearch function (kept for potential future use
+         per team-lead instruction, even though its only caller in this file is removed)
+
+      4. useTopics.ts useActiveTopics:
+         - Change wardTopicLabel from t('topics.wardTopics') to t('topics.customTopics')
+    done_when: |
+      - WardTopic interface includes is_default: boolean
+      - FIXED_COLLECTION_ORDER has 6 entries (no special topics, FSY=0, GP=1)
+      - useWardTopics() has no search param, sorts by is_default DESC then title ASC, no select callback
+      - normalizeForSearch function is still present in useTopics.ts
+      - useActiveTopics uses t('topics.customTopics') for ward topic label
+    acs_covered: [AC-285-5, AC-286-4, AC-286-6]
+    tests:
+      - "FIXED_COLLECTION_ORDER has no 'Temas Especiais'/'Special Topics'/'Temas Especiales' entries"
+      - "FIXED_COLLECTION_ORDER: FSY collections have priority 0, GP collections have priority 1"
+      - "Unknown collection names get default priority 3"
+      - "WardTopic type has is_default: boolean field"
+      - "useWardTopics sorts is_default DESC, title ASC"
+
+  # ===========================================================================
+  # S021-04: register-first-user updates (CR-285 + CR-286)
+  # ===========================================================================
+
+  - id: S021-04
+    title: "Update register-first-user: remove special topics from knownNames, add default topics insertion"
+    cr: "CR-285 + CR-286"
+    depends_on: [S021-02]
+    files:
+      - path: supabase/functions/register-first-user/index.ts
+        action: modify
+    description: |
+      1. CR-285: Remove 'Temas Especiais', 'Special Topics', 'Temas Especiales'
+         from knownNames set (reduce from 9 to 6 entries)
+
+      2. CR-286: After ward creation block, insert 2 default ward_topics:
+         const defaultTopicTitles: Record<string, string[]> = {
+           'pt-BR': ['Tema livre', 'Seu testemunho'],
+           'en-US': ['Open Topic', 'Your Testimony'],
+           'es-LA': ['Tema libre', 'Tu testimonio'],
+         };
+         const topicTitles = defaultTopicTitles[wardLanguage] ?? defaultTopicTitles['en-US'];
+         await supabaseAdmin
+           .from('ward_topics')
+           .insert(topicTitles.map(title => ({
+             ward_id: ward.id,
+             title,
+             is_default: true,
+           })));
+    done_when: |
+      - knownNames set has 6 entries (no special topics names)
+      - Default topic insertion block exists after ward creation
+      - Uses wardLanguage with en-US fallback
+      - Inserts with is_default: true
+    acs_covered: [AC-286-1]
+    tests:
+      - "knownNames set does not contain 'Temas Especiais', 'Special Topics', or 'Temas Especiales'"
+      - "Default topic insertion uses correct titles per language"
+      - "Fallback to en-US for unknown ward language"
+
+  # ===========================================================================
+  # S021-05: i18n updates (CR-286 + CR-287)
+  # ===========================================================================
+
+  - id: S021-05
+    title: "Update i18n: add customTopics key, update description text"
+    cr: "CR-286 + CR-287"
+    depends_on: []
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en-US.json
+        action: modify
+      - path: src/i18n/locales/es-LA.json
+        action: modify
+    description: |
+      In all 3 locale files, within the "topics" section:
+
+      1. CR-286: Add new key topics.customTopics:
+         - pt-BR: "Temas Personalizados"
+         - en-US: "Custom Topics"
+         - es-LA: "Temas Personalizados"
+
+      2. CR-287: Update topics.description:
+         - pt-BR: "Crie temas personalizados ou ative coleções de temas pré-definidos. Ativar uma coleção torna seus temas disponíveis para serem designados a discursantes. Deslize temas personalizados para editar ou remover."
+         - en-US: "Create custom topics or activate predefined topic collections. Activating a collection makes its topics available for assigning to speakers. Swipe custom topics to edit or remove."
+         - es-LA: "Cree temas personalizados o active colecciones de temas predefinidos. Activar una colección hace que sus temas estén disponibles para asignar a oradores. Deslice temas personalizados para editar o eliminar."
+    done_when: |
+      - topics.customTopics key exists in all 3 locale files with correct values
+      - topics.description updated in all 3 locale files with new text
+    acs_covered: [AC-286-3, AC-287-1, AC-287-2, AC-287-3]
+    tests:
+      - "topics.customTopics exists in pt-BR.json with value 'Temas Personalizados'"
+      - "topics.customTopics exists in en-US.json with value 'Custom Topics'"
+      - "topics.customTopics exists in es-LA.json with value 'Temas Personalizados'"
+      - "topics.description updated in pt-BR.json"
+      - "topics.description updated in en-US.json"
+      - "topics.description updated in es-LA.json"
+
+  # ===========================================================================
+  # S021-06: topics.tsx overhaul (CR-286 + CR-288)
+  # ===========================================================================
+
+  - id: S021-06
+    title: "Overhaul topics.tsx: rename section, disable default swipe, remove search, inline add"
+    cr: "CR-286 + CR-288"
+    depends_on: [S021-03, S021-05]
+    files:
+      - path: src/app/(tabs)/settings/topics.tsx
+        action: modify
+    description: |
+      CR-286 changes:
+      1. Section title: topics.wardTopics -> topics.customTopics
+      2. TopicRow: SwipeableCard disabled={!canWrite || item.is_default}
+
+      CR-288 changes:
+      1. Remove SearchInput import
+      2. Remove search state (const [search, setSearch] = useState(''))
+      3. Remove filteredTopics useMemo
+      4. Remove searchContainer View (SearchInput + Close button)
+      5. Remove '+' button from sectionHeader
+      6. Remove handleAdd callback
+      7. Remove TopicEditor at TOP of list (isAdding && block before map)
+      8. Replace filteredTopics with wardTopics in rendering
+      9. Remove useWardTopics search argument (now takes no args)
+      10. Add inline add area BELOW topic list:
+          - isAdding=false: Pressable with italic placeholder t('topics.addTopic')
+          - isAdding=true: TopicEditor with onSave/onCancel
+          - Only visible when canWrite is true
+      11. Remove unused styles: searchContainer, closeButtonText, addButton, addButtonText
+      12. Add new styles: addTopicRow, addTopicPlaceholder
+    done_when: |
+      - Section title uses t('topics.customTopics')
+      - SwipeableCard disabled includes item.is_default check
+      - No SearchInput import or usage
+      - No search state or filteredTopics useMemo
+      - No '+' button in section header
+      - No TopicEditor at top of list
+      - Inline add area below topic list with Pressable placeholder and TopicEditor expansion
+      - Inline add area only visible when canWrite is true
+      - wardTopics used directly (not filteredTopics)
+      - useWardTopics() called with no arguments
+      - Old styles removed, new styles added
+    acs_covered: [AC-286-5, AC-288-1, AC-288-2, AC-288-3, AC-288-4, AC-288-5, AC-288-6, AC-288-7, AC-288-8]
+    tests:
+      - "No SearchInput rendered in TopicsScreen"
+      - "No '+' button in section header"
+      - "Inline add placeholder visible when canWrite=true"
+      - "Inline add placeholder hidden when canWrite=false"
+      - "TopicEditor expands on tap of inline placeholder"
+      - "TopicEditor collapses on cancel"
+      - "SwipeableCard disabled when topic.is_default=true"
+      - "SwipeableCard enabled when topic.is_default=false and canWrite=true"
+      - "All topics shown without filtering"
+
+  # ===========================================================================
+  # S021-07: Tests (all CRs)
+  # ===========================================================================
+
+  - id: S021-07
+    title: "Create test file and update existing tests"
+    cr: "CR-285 + CR-286 + CR-287 + CR-288"
+    depends_on: [S021-03, S021-04, S021-05, S021-06]
+    files:
+      - path: src/__tests__/f021-topic-library-overhaul.test.ts
+        action: create
+    description: |
+      Create new test file with test suites:
+      1. FIXED_COLLECTION_ORDER (CR-285):
+         - No special topics entries
+         - FSY collections have priority 0
+         - Gospel Principles collections have priority 1
+         - Unknown names default to priority 3
+      2. WardTopic type (CR-286):
+         - is_default field exists
+      3. i18n keys (CR-286 + CR-287):
+         - topics.customTopics exists in all 3 locales
+         - topics.description updated in all 3 locales
+      4. register-first-user knownNames (CR-285):
+         - No special topics in knownNames
+
+      Update any existing tests that reference:
+      - useWardTopics with search argument (remove argument)
+      - 'Temas Especiais' in FIXED_COLLECTION_ORDER (remove/update)
+    done_when: |
+      - Test file src/__tests__/f021-topic-library-overhaul.test.ts exists
+      - All test suites pass
+      - Existing tests updated for new useWardTopics signature
+      - npx jest runs with 0 failures
+    acs_covered: [AC-285-1, AC-285-5, AC-286-3, AC-286-4, AC-287-1, AC-287-2, AC-287-3]
+    tests:
+      - "All new tests in f021-topic-library-overhaul.test.ts pass"
+      - "No existing test failures from signature changes"
+
+  # ===========================================================================
+  # S021-08: ADR documentation
+  # ===========================================================================
+
+  - id: S021-08
+    title: "Document ADR-059 and ADR-060"
+    cr: "CR-286 + CR-288"
+    depends_on: [S021-06]
+    files:
+      - path: docs/arch/ARCH_M021.yaml
+        action: no_change
+    description: |
+      ADRs are already documented in ARCH_M021.yaml:
+      - ADR-059: Default ward topics with is_default boolean guard
+      - ADR-060: Inline add replaces search + floating button on topics screen
+
+      Add ADR references to CHANGE_REQUESTS.yaml for CR-286 and CR-288.
+      Update docs/plans/PLAN_CONSOLIDATED.yaml with P021 entry.
+    done_when: |
+      - ADR-059 and ADR-060 referenced in appropriate CR entries
+      - PLAN_CONSOLIDATED.yaml updated with P021
+
+  # ===========================================================================
+  # S021-09: Final verification
+  # ===========================================================================
+
+  - id: S021-09
+    title: "Final verification: all tests pass, no regressions"
+    cr: "CR-285 + CR-286 + CR-287 + CR-288"
+    depends_on: [S021-07, S021-08]
+    files: []
+    description: |
+      Run full test suite to verify:
+      1. All new tests pass
+      2. No existing test regressions
+      3. TypeScript compiles without errors
+      4. No lint errors
+    done_when: |
+      - npx jest passes with 0 failures
+      - npx tsc --noEmit passes
+      - No new lint warnings/errors
+    acs_covered: []
+    tests:
+      - "Full test suite passes"
+      - "TypeScript compilation succeeds"
+
+# =============================================================================
+# AC COVERAGE MATRIX
+# =============================================================================
+
+ac_coverage:
+  AC-285-1:
+    step: [S021-01, S021-07]
+    description: "No special topics rows in general_collections after migration 033"
+  AC-285-2:
+    step: [S021-01]
+    description: "No orphan general_topics rows (CASCADE deleted)"
+  AC-285-3:
+    step: [S021-01]
+    description: "No orphan ward_collection_config rows (CASCADE deleted)"
+  AC-285-4:
+    step: [S021-01]
+    description: "Previously assigned speech topics preserved (no FK)"
+  AC-285-5:
+    step: [S021-03, S021-07]
+    description: "Special topics not shown in Topics settings screen"
+  AC-286-1:
+    step: [S021-04]
+    description: "New ward gets 2 default topics via register-first-user"
+  AC-286-2:
+    step: [S021-02]
+    description: "Existing wards get 2 default topics via migration 034"
+  AC-286-3:
+    step: [S021-05, S021-07]
+    description: "Section title shows 'Custom Topics' (or locale equivalent)"
+  AC-286-4:
+    step: [S021-03, S021-07]
+    description: "Default topics appear first in list"
+  AC-286-5:
+    step: [S021-06]
+    description: "SwipeableCard disabled for default topics"
+  AC-286-6:
+    step: [S021-03]
+    description: "TopicSelectorModal uses 'Custom Topics' label"
+  AC-286-7:
+    step: [S021-02]
+    description: "NOT EXISTS guard prevents duplicate defaults"
+  AC-287-1:
+    step: [S021-05, S021-07]
+    description: "pt-BR description text updated"
+  AC-287-2:
+    step: [S021-05, S021-07]
+    description: "en-US description text updated"
+  AC-287-3:
+    step: [S021-05, S021-07]
+    description: "es-LA description text updated"
+  AC-288-1:
+    step: [S021-06]
+    description: "No search field or Close button visible"
+  AC-288-2:
+    step: [S021-06]
+    description: "No floating '+' button visible"
+  AC-288-3:
+    step: [S021-06]
+    description: "Inline 'Add topic' placeholder below last topic"
+  AC-288-4:
+    step: [S021-06]
+    description: "TopicEditor expands inline on tap"
+  AC-288-5:
+    step: [S021-06]
+    description: "New topic created on save, editor collapses"
+  AC-288-6:
+    step: [S021-06]
+    description: "Editor collapses on cancel without creating topic"
+  AC-288-7:
+    step: [S021-06]
+    description: "Inline add hidden for observer role"
+  AC-288-8:
+    step: [S021-06]
+    description: "All topics shown without filtering"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+
+edge_cases:
+  - id: EC-021-01
+    description: "Ward already has topic titled 'Tema livre' when migration 034 runs"
+    covered_by: S021-02
+    handling: "NOT EXISTS guard prevents duplicate insertion"
+  - id: EC-021-02
+    description: "Ward with unknown language (not pt-BR/en-US/es-LA) during register-first-user"
+    covered_by: S021-04
+    handling: "Fallback to en-US default topic titles via ?? operator"
+  - id: EC-021-03
+    description: "Speech previously assigned topic from deleted 'Temas Especiais' collection"
+    covered_by: S021-01
+    handling: "Speeches table has no FK to collections; snapshot fields preserved"
+  - id: EC-021-04
+    description: "Observer tries to add topic (no topic:write permission)"
+    covered_by: S021-06
+    handling: "canWrite guard hides inline add area entirely"
+  - id: EC-021-05
+    description: "User swipes on default topic trying to edit/delete"
+    covered_by: S021-06
+    handling: "SwipeableCard disabled={!canWrite || item.is_default} blocks swipe"
+  - id: EC-021-06
+    description: "Empty ward topics list (no custom topics, only defaults)"
+    covered_by: S021-06
+    handling: "Defaults always appear; inline add placeholder still shows below"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_steps: 9
+  migrations: 2
+  edge_functions_modified: 1
+  new_files: 3
+  modified_files: 7
+  adrs: [ADR-059, ADR-060]
+  key_decisions:
+    - "normalizeForSearch kept in useTopics.ts per team-lead instruction (not removed even though dead code)"
+    - "Migration 033 before 034 (order matters: delete collections before adding defaults)"
+    - "Inline add is custom pattern, NOT EditableListField (topics have title+link)"
+    - "Default topics protection is UI-only (SwipeableCard disabled), not RLS-enforced"

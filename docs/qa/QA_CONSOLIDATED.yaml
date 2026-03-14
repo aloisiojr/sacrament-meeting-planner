@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-09"
-  version: 21
+  last_updated: "2026-03-14"
+  version: 22
 
 validations:
 
@@ -4361,3 +4361,189 @@ validations:
         description: "08-settings.yaml restores Portuguese language before ending"
         result: PASS
         evidence: "Flow Part E explicitly switches back to pt-BR: tapOn 'Portugues (Brasil)', waits for 'Configuracoes', asserts 'Tema Claro/Escuro' + 'Idioma do App' visible. Part F restores theme to Automatico. Flow ends in pt-BR with automatic theme. Matches SPEC AC-016, AC-017, AC-018."
+
+  # ===========================================================================
+  # F021: Topic Library Overhaul (QA_PLAN_021)
+  # CR-285 + CR-286 + CR-287 + CR-288
+  # ===========================================================================
+
+  - id: QA_021
+    plan: QA_PLAN_021
+    date: "2026-03-14"
+    scope: "Topic Library Overhaul - CR-285 (delete Temas Especiais), CR-286 (rename + default topics), CR-287 (update description), CR-288 (inline add)"
+    verdict: passed
+    must_pass: 15/15
+    should_pass: 7/7
+    total_checks: 22/22
+    tester_verdict: "PASSED (1784 tests, 77 new in f021-topic-library-overhaul.test.ts)"
+    reviewer_verdict: "APPROVED (0 issues)"
+
+    checks:
+
+      # --- CR-285: Delete Temas Especiais ---
+
+      - id: CR285_MP1
+        cr: CR-285
+        type: must_pass
+        description: "Migration deletes 'Temas Especiais'/'Special Topics'/'Temas Especiales' from general_collections"
+        result: PASS
+        evidence: "supabase/migrations/033_delete_special_topics.sql contains: DELETE FROM general_collections WHERE name IN ('Temas Especiais', 'Special Topics', 'Temas Especiales')"
+
+      - id: CR285_MP2
+        cr: CR-285
+        type: must_pass
+        description: "FIXED_COLLECTION_ORDER no longer references Temas Especiais/Special Topics/Temas Especiales"
+        result: PASS
+        evidence: "src/hooks/useTopics.ts:183-193 FIXED_COLLECTION_ORDER now has only 6 entries (2 per language) at priorities 0-1. No 'Temas Especiais', 'Special Topics', or 'Temas Especiales' entries."
+
+      - id: CR285_MP3
+        cr: CR-285
+        type: must_pass
+        description: "register-first-user knownNames no longer includes Temas Especiais variants"
+        result: PASS
+        evidence: "supabase/functions/register-first-user/index.ts:212-216 knownNames set contains only 6 entries (FSY + Gospel Principles in 3 languages). No Temas Especiais/Special Topics/Temas Especiales."
+
+      - id: CR285_MP4
+        cr: CR-285
+        type: must_pass
+        description: "speeches table snapshot columns are NOT modified by the migration"
+        result: PASS
+        evidence: "033_delete_special_topics.sql only contains DELETE FROM general_collections. No ALTER TABLE speeches statement. topic_title/topic_link/topic_collection columns remain untouched."
+
+      # --- CR-286: Rename + Default Topics ---
+
+      - id: CR286_MP1
+        cr: CR-286
+        type: must_pass
+        description: "i18n 'customTopics' key added with correct translations"
+        result: PASS
+        evidence: "pt-BR.json:211 'customTopics': 'Temas Personalizados'. en-US.json:211 'customTopics': 'Custom Topics'. es-LA.json:211 'customTopics': 'Temas Personalizados'. topics.tsx:375 uses t('topics.customTopics'). useTopics.ts:357 uses t('topics.customTopics') for active topics label."
+
+      - id: CR286_MP2
+        cr: CR-286
+        type: must_pass
+        description: "ward_topics table has is_default BOOLEAN column"
+        result: PASS
+        evidence: "supabase/migrations/034_add_default_ward_topics.sql:5 ALTER TABLE ward_topics ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT false"
+
+      - id: CR286_MP3
+        cr: CR-286
+        type: must_pass
+        description: "Migration inserts default topics for ALL existing wards"
+        result: PASS
+        evidence: "034_add_default_ward_topics.sql:8-38 contains 3 INSERT statements (one per language: pt-BR, en-US, es-LA) using CROSS JOIN with VALUES and NOT EXISTS guard to prevent duplicates. All set is_default=true."
+
+      - id: CR286_MP4
+        cr: CR-286
+        type: must_pass
+        description: "register-first-user inserts 2 default topics on ward creation"
+        result: PASS
+        evidence: "register-first-user/index.ts:147-160 inserts default ward_topics with is_default=true after ward creation. defaultTopicTitles maps 3 languages to correct titles. Falls back to en-US."
+
+      - id: CR286_MP5
+        cr: CR-286
+        type: must_pass
+        description: "Default topics cannot be edited or deleted in the UI"
+        result: PASS
+        evidence: "topics.tsx:399 passes disabled={!canWrite || item.is_default} to TopicRow/SwipeableCard. When is_default=true, swipe is disabled regardless of permissions."
+
+      - id: CR286_MP6
+        cr: CR-286
+        type: must_pass
+        description: "WardTopic TypeScript interface includes is_default"
+        result: PASS
+        evidence: "src/types/database.ts:109 has 'is_default: boolean' in WardTopic interface."
+
+      # --- CR-287: Update description text ---
+
+      - id: CR287_MP1
+        cr: CR-287
+        type: must_pass
+        description: "topics.description updated in all 3 locale files"
+        result: PASS
+        evidence: |
+          pt-BR.json:218 "Crie temas personalizados ou ative coleções de temas pré-definidos. Ativar uma coleção torna seus temas disponíveis para serem designados a discursantes. Deslize temas personalizados para editar ou remover."
+          en-US.json:218 "Create custom topics or activate predefined topic collections. Activating a collection makes its topics available for assigning to speakers. Swipe custom topics to edit or remove."
+          es-LA.json:218 "Cree temas personalizados o active colecciones de temas predefinidos. Activar una colección hace que sus temas estén disponibles para asignar a oradores. Deslice temas personalizados para editar o eliminar."
+          All match SPEC CR-287 exactly.
+
+      # --- CR-288: Remove search/close, replace + with inline ---
+
+      - id: CR288_MP1
+        cr: CR-288
+        type: must_pass
+        description: "Search field removed from topics screen"
+        result: PASS
+        evidence: "topics.tsx has no SearchInput import, no 'search' state variable, no filteredTopics useMemo. Grep for 'SearchInput' in topics.tsx returns no matches."
+
+      - id: CR288_MP2
+        cr: CR-288
+        type: must_pass
+        description: "Close button removed from topics screen"
+        result: PASS
+        evidence: "topics.tsx has no t('common.close') reference. No closeButtonText style. No searchContainer view."
+
+      - id: CR288_MP3
+        cr: CR-288
+        type: must_pass
+        description: "Add button (+) removed from topics screen"
+        result: PASS
+        evidence: "topics.tsx:372-377 sectionHeader only contains section title text (t('topics.customTopics')). No addButton Pressable or '+' text."
+
+      - id: CR288_MP4
+        cr: CR-288
+        type: must_pass
+        description: "Inline add field exists below the topic list"
+        result: PASS
+        evidence: "topics.tsx:411-433 renders inline add area AFTER wardTopics.map: when isAdding=false shows addTopicRow Pressable with t('topics.addTopic') placeholder; when isAdding=true shows TopicEditor. Guarded by canWrite. Styles addTopicRow (line 627) and addTopicPlaceholder (line 635) defined."
+
+      # --- should_pass checks ---
+
+      - id: CR285_SP1
+        cr: CR-285
+        type: should_pass
+        description: "CASCADE deletes related general_topics and ward_collection_config rows"
+        result: PASS
+        evidence: "001_initial_schema.sql:66 general_topics.collection_id REFERENCES general_collections(id) ON DELETE CASCADE. Line 79 ward_collection_config.collection_id REFERENCES general_collections(id) ON DELETE CASCADE."
+
+      - id: CR286_SP1
+        cr: CR-286
+        type: should_pass
+        description: "Default topic titles match ward language correctly"
+        result: PASS
+        evidence: "Migration 034: pt-BR 'Tema livre'/'Seu testemunho', en-US 'Open Topic'/'Your Testimony', es-LA 'Tema libre'/'Tu testimonio'. register-first-user defaultTopicTitles at line 148-152 matches exactly."
+
+      - id: CR286_SP2
+        cr: CR-286
+        type: should_pass
+        description: "useCreateWardTopic does not set is_default (user-created topics are always non-default)"
+        result: PASS
+        evidence: "useTopics.ts:80-84 useCreateWardTopic insert sends ward_id, title, link only. No is_default field. DB default is false."
+
+      - id: CR286_SP3
+        cr: CR-286
+        type: should_pass
+        description: "useActiveTopics still includes default ward topics in the selector"
+        result: PASS
+        evidence: "useTopics.ts:343-346 useActiveTopics queries ward_topics with .select('*').eq('ward_id', wardId) -- no is_default filter, so all topics (including defaults) are included."
+
+      - id: CR288_SP1
+        cr: CR-288
+        type: should_pass
+        description: "Inline add field supports title and optional link"
+        result: PASS
+        evidence: "topics.tsx:413-417 inline add shows TopicEditor which has title input (line 67-76) and link input (line 77-87) with Save/Cancel buttons."
+
+      - id: CR288_SP2
+        cr: CR-288
+        type: should_pass
+        description: "SearchInput import removed"
+        result: PASS
+        evidence: "topics.tsx imports (lines 6-36): no SearchInput import. Grep for SearchInput in file returns 0 matches."
+
+      - id: CR288_SP3
+        cr: CR-288
+        type: should_pass
+        description: "Existing tests updated or removed to reflect search removal"
+        result: PASS
+        evidence: "All 1784 tests pass (npx vitest run). f021-topic-library-overhaul.test.ts has 77 tests covering all 4 CRs. No test references search functionality in topics screen."

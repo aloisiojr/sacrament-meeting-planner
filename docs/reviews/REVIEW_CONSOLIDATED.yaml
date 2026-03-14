@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-09"
-  version: 22
-  last_updated_by: "phase-020"
+  last_updated: "2026-03-14"
+  version: 23
+  last_updated_by: "phase-021"
 
 reviews:
   - id: REV-001
@@ -5979,3 +5979,344 @@ reviews:
       tests_total: 2135
       tests_passing: 2135
       test_files: 69
+
+  # ===========================================================================
+  # REV-023: CR-285 + CR-286 + CR-287 + CR-288 (Phase 021)
+  # Topic Library Overhaul
+  # ===========================================================================
+
+  - id: REV-023
+    scope: "CR-285 + CR-286 + CR-287 + CR-288 - Topic Library Overhaul (Phase 021)"
+    date: "2026-03-14"
+    reviewer: reviewer-agent
+    commits:
+      - hash: 357323e
+        message: "feat(migration): delete special topics collections (CR-285)"
+      - hash: 07c4d58
+        message: "feat(migration): add is_default column and seed default ward topics (CR-286)"
+      - hash: 734c149
+        message: "feat(topics): update WardTopic type, collection order, and hooks (CR-285, CR-286)"
+      - hash: f633fdb
+        message: "feat(register): remove special topics from knownNames, add default topics (CR-285, CR-286)"
+      - hash: 0f9b7c5
+        message: "feat(i18n): add customTopics key and update description text (CR-286, CR-287)"
+      - hash: 3028b7d
+        message: "feat(topics): overhaul topics screen with inline add and default topic protection (CR-286, CR-288)"
+      - hash: 23a5801
+        message: "test: update existing tests for topic library overhaul (CR-285, CR-286)"
+      - hash: 130083b
+        message: "test(F021): add 77 behavioral tests for Topic Library Overhaul"
+
+    # =========================================================================
+    # CHAIN VALIDATION: SPEC -> ARCH -> PLAN -> CODE
+    # =========================================================================
+
+    chain_validation:
+      spec_to_arch:
+        status: pass
+        notes: |
+          ARCH_M021 faithfully translates all 4 CRs from SPEC_F021:
+          - CR-285: Migration 033 DELETE with CASCADE, FIXED_COLLECTION_ORDER cleanup, knownNames cleanup
+          - CR-286: Migration 034 ALTER+INSERT, WardTopic.is_default, useWardTopics sort, section rename, register-first-user default topics
+          - CR-287: topics.description i18n update in 3 locales
+          - CR-288: Remove SearchInput/search state/filteredTopics/'+' button, add inline add area below list
+          All acceptance criteria mapped. ADR-059 and ADR-060 documented.
+
+      arch_to_plan:
+        status: pass
+        notes: |
+          PLAN_P021 breaks ARCH into 9 steps with correct dependencies:
+          S021-01 (migration 033) -> S021-02 (migration 034) -> S021-03 (types+hooks) -> S021-04 (register-first-user)
+          S021-05 (i18n, independent) -> S021-06 (topics.tsx, depends on S021-03+05)
+          S021-07 (tests) -> S021-08 (ADR docs) -> S021-09 (final verification)
+          AC coverage matrix is complete (18 ACs across 4 CRs). Edge cases documented.
+          Key decision to keep normalizeForSearch per team-lead instruction documented.
+
+      plan_to_code:
+        status: pass
+        notes: |
+          All 9 plan steps implemented across 8 commits. Each commit maps to its plan step.
+          Files changed match plan file list exactly. All ACs verifiable in code.
+
+    # =========================================================================
+    # CODE REVIEW - PER FILE
+    # =========================================================================
+
+    file_reviews:
+
+      - file: supabase/migrations/033_delete_special_topics.sql
+        cr: CR-285
+        status: pass
+        notes: |
+          Simple, correct DELETE statement. Targets all 3 language variants.
+          CASCADE verified: 001_initial_schema.sql:66 has
+          "collection_id UUID NOT NULL REFERENCES general_collections(id) ON DELETE CASCADE"
+          for general_topics, and line 79 has the same for ward_collection_config.
+          No explicit cleanup of child tables needed. Speeches table has no FK
+          to general_collections (topic_title/topic_link/topic_collection are
+          snapshot fields) so they are preserved. Correct.
+
+      - file: supabase/migrations/034_add_default_ward_topics.sql
+        cr: CR-286
+        status: pass
+        notes: |
+          ALTER TABLE adds is_default BOOLEAN NOT NULL DEFAULT false. Correct.
+          3 INSERT blocks (pt-BR, en-US, es-LA) use CROSS JOIN with VALUES
+          for topic titles. NOT EXISTS guard prevents duplicates per ward.
+          Language filter (w.language = 'pt-BR' etc.) uses correct DB locale codes.
+          All inserted rows set is_default=true. Idempotent-safe.
+
+      - file: src/types/database.ts
+        cr: CR-286
+        status: pass
+        notes: |
+          WardTopic interface at line 104 correctly includes is_default: boolean
+          between link and created_at fields. Matches migration schema.
+
+      - file: src/hooks/useTopics.ts
+        cr: "CR-285, CR-286"
+        status: pass
+        notes: |
+          FIXED_COLLECTION_ORDER: 6 entries (2 per language), FSY=0, GP=1.
+          Special topics entries removed. Unknown collections get default 3
+          via ?? operator in useCollections select callback. Correct.
+
+          useWardTopics(): No search parameter. Sort by is_default DESC then
+          title ASC. No select callback. Matches ARCH exactly.
+
+          useActiveTopics: wardTopicLabel uses t('topics.customTopics'). Correct.
+
+          normalizeForSearch: Function kept at line 37 per team-lead instruction.
+          It is dead code in this file (no callers after search removal) but
+          TopicSelectorModal.tsx has its own copy. Keeping it is harmless.
+
+      - file: supabase/functions/register-first-user/index.ts
+        cr: "CR-285, CR-286"
+        status: pass
+        notes: |
+          knownNames: 6 entries, no special topics. Correct.
+
+          Default topic insertion (lines 147-160): Placed AFTER ward creation
+          (line 137) and BEFORE user creation (line 163). Uses wardLanguage
+          with ?? fallback to en-US. Inserts with is_default: true. Correct.
+
+          If user creation fails (line 177), ward is deleted (line 179) which
+          will CASCADE delete the ward_topics too (ward_topics has FK to wards).
+          No error handling on the topic insert itself - acceptable since
+          ward_topics are non-critical and the Supabase insert will throw
+          which gets caught by the outer try/catch.
+
+      - file: src/app/(tabs)/settings/topics.tsx
+        cr: "CR-286, CR-288"
+        status: pass
+        notes: |
+          CR-286:
+          - Section title uses t('topics.customTopics') at line 375. Correct.
+          - SwipeableCard disabled={!canWrite || item.is_default} at line 399. Correct.
+
+          CR-288:
+          - No SearchInput import. No search state. No filteredTopics. No '+' button.
+          - All old styles removed (searchContainer, closeButtonText, addButton, addButtonText).
+          - Inline add area at lines 411-433, BELOW topic list (after wardTopics.map).
+          - canWrite guard wraps entire inline add area. Correct.
+          - isAdding toggles between Pressable placeholder and TopicEditor. Correct.
+          - Pressable onPress resets activeSwipeId and editingId before setIsAdding(true).
+          - TopicEditor onSave calls handleSaveNew, onCancel sets isAdding false. Correct.
+          - addTopicRow and addTopicPlaceholder styles match ARCH spec. Correct.
+          - wardTopics used directly (not filteredTopics). useWardTopics() no args. Correct.
+
+      - file: src/i18n/locales/pt-BR.json
+        cr: "CR-286, CR-287"
+        status: pass
+        notes: |
+          topics.customTopics = "Temas Personalizados". Correct.
+          topics.description updated with new text matching SPEC exactly. Correct.
+          topics.wardTopics key retained for backward compatibility. OK.
+
+      - file: src/i18n/locales/en-US.json
+        cr: "CR-286, CR-287"
+        status: pass
+        notes: |
+          topics.customTopics = "Custom Topics". Correct.
+          topics.description updated. Matches SPEC exactly. Correct.
+
+      - file: src/i18n/locales/es-LA.json
+        cr: "CR-286, CR-287"
+        status: pass
+        notes: |
+          topics.customTopics = "Temas Personalizados". Correct.
+          topics.description updated. Matches SPEC exactly. Correct.
+
+      - file: src/__tests__/f021-topic-library-overhaul.test.ts
+        cr: "CR-285, CR-286, CR-287, CR-288"
+        status: pass
+        notes: |
+          77 behavioral tests covering all 18 ACs and 6 edge cases.
+          Tests verify migrations, types, hooks, i18n, UI structure,
+          inline add pattern, and cross-cutting concerns (no regressions).
+          File-based assertions (fs.readFileSync + regex/contain) for
+          structural checks. Import-based assertions for i18n values
+          and FIXED_COLLECTION_ORDER. Comprehensive and correct.
+
+    # =========================================================================
+    # SPECIFIC AREAS CHECKED (per review instructions)
+    # =========================================================================
+
+    specific_checks:
+      - area: "Migration 033 CASCADE"
+        result: pass
+        detail: |
+          001_initial_schema.sql:66 - general_topics.collection_id REFERENCES general_collections(id) ON DELETE CASCADE
+          001_initial_schema.sql:79 - ward_collection_config.collection_id REFERENCES general_collections(id) ON DELETE CASCADE
+          Both FKs have CASCADE. Migration 033 DELETE will cascade correctly.
+
+      - area: "Migration 034 language mapping and NOT EXISTS"
+        result: pass
+        detail: |
+          Uses w.language = 'pt-BR'/'en-US'/'es-LA' which match the wards.language column values.
+          NOT EXISTS guard prevents duplicates. CROSS JOIN with VALUES generates rows correctly.
+
+      - area: "register-first-user default topics placement"
+        result: pass
+        detail: |
+          Lines 147-160: After ward creation (line 137), before user creation (line 163).
+          Uses correct wardLanguage variable. Falls back to en-US. is_default: true.
+
+      - area: "topics.tsx inline add BELOW topic list"
+        result: pass
+        detail: |
+          Lines 411-433: Inline add area appears after wardTopics.map() block (lines 387-409).
+          TopicEditor at TOP of list (old isAdding && block) is removed.
+
+      - area: "topics.tsx SwipeableCard disabled for defaults"
+        result: pass
+        detail: |
+          Line 399: disabled={!canWrite || item.is_default}. Both conditions checked.
+
+      - area: "FIXED_COLLECTION_ORDER priorities after special topics removal"
+        result: pass
+        detail: |
+          6 entries: FSY collections = 0, Gospel Principles = 1.
+          Unknown collections get 3 via ?? in useCollections select callback.
+
+      - area: "i18n customTopics and description in all 3 locales"
+        result: pass
+        detail: |
+          All 3 locales have topics.customTopics with correct values.
+          All 3 locales have topics.description with updated text matching SPEC.
+
+      - area: "normalizeForSearch NOT removed"
+        result: pass
+        detail: |
+          Function still exists at useTopics.ts:37. Kept per team-lead instruction.
+          TopicSelectorModal has its own copy at line 30.
+
+      - area: "ward_collection_config FK CASCADE check"
+        result: pass
+        detail: |
+          001_initial_schema.sql:79 confirms ON DELETE CASCADE on collection_id FK.
+          Migration 033 does not need explicit DELETE from ward_collection_config.
+
+    # =========================================================================
+    # SECURITY REVIEW
+    # =========================================================================
+
+    security:
+      notes: |
+        - No new RLS policies added (uses existing ward_topics and general_collections RLS)
+        - Default topic protection is UI-only (SwipeableCard disabled). No RLS enforcement
+          prevents a direct API call from deleting a default topic. This is acceptable for
+          the current threat model since all authenticated users with topic:write already
+          have full CRUD on ward_topics via existing RLS.
+        - register-first-user uses supabaseAdmin (service role) for default topic insertion.
+          This is the existing pattern for ward setup operations.
+        - Migration 033 CASCADE is safe: only deletes data owned by the deleted collection.
+        - No new API endpoints, no new auth flows, no secrets exposed.
+
+    # =========================================================================
+    # DEPLOY IDENTIFICATION
+    # =========================================================================
+
+    pending_deploys:
+      - type: migration
+        file: supabase/migrations/033_delete_special_topics.sql
+        target: Supabase (production)
+        instructions: |
+          Run migration 033 BEFORE migration 034. This deletes the special topics
+          collections. CASCADE handles general_topics and ward_collection_config cleanup.
+          Speeches with snapshot topics from these collections are preserved (no FK).
+          One-time, irreversible data deletion. Verify with:
+            SELECT count(*) FROM general_collections WHERE name IN ('Temas Especiais', 'Special Topics', 'Temas Especiales');
+          Should return 0 after migration.
+
+      - type: migration
+        file: supabase/migrations/034_add_default_ward_topics.sql
+        target: Supabase (production)
+        instructions: |
+          Run migration 034 AFTER migration 033. Adds is_default column to ward_topics
+          and seeds 2 default topics per existing ward. Verify with:
+            SELECT count(*) FROM ward_topics WHERE is_default = true;
+          Should return 2 * (number of wards). Check per-language:
+            SELECT w.language, wt.title FROM ward_topics wt JOIN wards w ON w.id = wt.ward_id WHERE wt.is_default = true ORDER BY w.language, wt.title;
+
+      - type: edge_function
+        file: supabase/functions/register-first-user/index.ts
+        target: Supabase Edge Functions (production)
+        instructions: |
+          Deploy register-first-user after migrations 033+034 are applied.
+          Changes: knownNames reduced to 6 entries, default ward topics inserted
+          after ward creation. Test by registering a new ward and verifying
+          2 default topics appear with is_default=true.
+
+    deploy_notes: |
+      Deploy order: migration 033 -> migration 034 -> register-first-user edge function.
+      Frontend changes (topics.tsx, useTopics.ts, i18n, database.ts) will be included
+      in the next EAS Build.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - "docs/specs/SPEC_F021.yaml"
+        - "docs/arch/ARCH_M021.yaml"
+        - "docs/plans/PLAN_P021.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+      notes: |
+        All code changes for F021 are committed across 8 commits
+        (357323e..130083b). Documentation files are pending Orchestrator commit.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-285 through CR-288 (Topic Library Overhaul) implementation is correct
+      and complete. Chain validation passes at all 4 levels (SPEC->ARCH->PLAN->CODE).
+
+      Migration 033 correctly deletes special topics with CASCADE (verified FK
+      definitions in 001_initial_schema.sql:66,79). Migration 034 correctly adds
+      is_default column and seeds defaults with NOT EXISTS guard and language
+      filtering. register-first-user correctly inserts default topics after ward
+      creation with language fallback to en-US. topics.tsx correctly removes search
+      infrastructure, floating '+' button, and adds inline add area BELOW topic
+      list with canWrite guard and TopicEditor expansion. SwipeableCard disabled
+      for is_default topics. FIXED_COLLECTION_ORDER updated to 6 entries with
+      correct priorities. All 3 i18n locales updated with customTopics key and
+      new description text matching SPEC exactly. normalizeForSearch kept per
+      team-lead instruction. 77 new tests, 2212 total passing. Zero P0/P1/P2
+      issues found.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 0
+      files_reviewed: 10
+      total_commits: 8
+      tests_total: 2212
+      tests_passing: 2212
+      test_files: 70

@@ -1,44 +1,31 @@
 project:
-  name: "E2E Testing with Maestro (CR-284)"
+  name: "Topic Library Overhaul (CR-285 to CR-288)"
   type: feature_request
-  created_at: "2026-03-08"
+  created_at: "2026-03-14"
   user_request: |
-    Testes E2E com Maestro para publicação nas lojas.
-    Usar banco de produção com ward isolada.
-    Adicionar testIDs nos componentes e criar fluxos Maestro.
+    Revisão da Biblioteca de Temas:
+    5.1. Deletar "Temas Especiais" do banco (manter em discursos já designados).
+    5.2. Renomear "Temas da Ala" para "Temas Personalizados". Pré-popular com "Tema livre" e "Seu testemunho" (não editáveis/deletáveis).
+    5.3. Atualizar texto da tela com nova descrição.
+    5.4. Remover busca, trocar + por campo inline abaixo da lista com suporte a título e link.
 
 phases:
-  total: 4
-  current: 4
+  total: 1
+  current: 1
   summary:
     - phase: 1
-      artifact_id: "017"
-      description: "Setup Maestro + testIDs + fluxos auth (registro, login, logout)"
+      artifact_id: "021"
+      description: "Topic Library overhaul: delete special topics, rename ward topics, add defaults, update UI"
       status: completed
-      crs: [284]
-    - phase: 2
-      artifact_id: "018"
-      description: "Fluxos agenda (expandir domingo, atribuir atores, hinos, orações) + presentation mode"
-      status: completed
-      crs: [284]
-    - phase: 3
-      artifact_id: "019"
-      description: "Fluxos speeches (atribuir orador, tópico, mudar status) + member CRUD"
-      status: completed
-      crs: [284]
-    - phase: 4
-      artifact_id: "020"
-      description: "Fluxos settings + invite (criar convite + registrar convidado) + cleanup"
-      status: completed
-      crs: [284]
+      crs: [285, 286, 287, 288]
 
 current_phase:
-  id: 4
-  started_at: "2026-03-09"
-  features: [F020]
-  change_requests: [284]
+  id: 1
+  started_at: "2026-03-14"
+  features: [F021]
+  change_requests: [285, 286, 287, 288]
   current_agent: "orchestrator"
-  current_step: "Phase 4 completed, documentation committed"
+  current_step: "Phase 1 completed, documentation committed"
 
 artifacts:
   spec_consolidated: "docs/specs/SPEC_CONSOLIDATED.yaml"
@@ -49,74 +36,21 @@ artifacts:
   review_consolidated: "docs/reviews/REVIEW_CONSOLIDATED.yaml"
   qa_consolidated: "docs/qa/QA_CONSOLIDATED.yaml"
 
-pending_deploys: []
-last_updated: "2026-03-09T15:00:00"
+pending_deploys:
+  - type: migration
+    file: supabase/migrations/033_delete_special_topics.sql
+    reason: "Delete special topics collections (CASCADE)"
+    order: 1
+  - type: migration
+    file: supabase/migrations/034_add_default_ward_topics.sql
+    reason: "Add is_default column, seed 2 default topics per ward"
+    order: 2
+  - type: edge_function
+    file: supabase/functions/register-first-user/index.ts
+    reason: "knownNames cleanup + default topics insertion"
+    order: 3
+
+last_updated: "2026-03-14T23:37:00"
 
 artifact_counter:
-  current: 20
-
-resume_notes: |
-  PROJECT: E2E Testing with Maestro (CR-284)
-  STATUS: Created, Phase 1 not started
-
-  CRITICAL RULE:
-  - Every E2E test MUST create its own ward via register-first-user at the start
-  - Tests run against PRODUCTION Supabase — NEVER touch existing wards/data
-  - Each flow is self-contained: creates ward, runs tests, data stays isolated by RLS
-  - Use unique email per test run (e.g. e2e-{timestamp}@test.com)
-  - Cleanup: test ward/user can be deleted via Supabase dashboard after testing
-
-  PREREQUISITES (already done by user):
-  - Maestro CLI installed
-  - Java 17 installed
-  - Xcode + iOS simulator (iPhone 17, iOS 26.3) configured
-  - App builds and runs on simulator (npx expo run:ios)
-  - CocoaPods installed
-  - Using PRODUCTION Supabase (not separate E2E project)
-
-  CONTEXT FROM PLANNING SESSION:
-  - Zero testID in codebase - all components need testID added
-  - Has accessibilityLabel on some components but not enough
-  - App language: pt-BR default
-  - Auth: Supabase email/password, 3 roles (bishopric, secretary, observer)
-  - Navigation: Expo Router 6 with (auth) and (tabs) groups
-  - 4 tabs: Home (index), Agenda, Speeches, Settings
-  - Key i18n strings (pt-BR):
-    - Login: "Gerenciador da Reunião Sacramental", "Entrar"
-    - Register: "Criar Conta", "Primeiro usuário da Ala"
-    - Tabs: "Início", "Agendas", "Discursos", "Configurações"
-    - Home: "Iniciar Reunião Sacramental"
-    - Settings: "Sair" (sign out)
-
-  PHASE DETAILS:
-
-  Phase 1: Setup + Auth Flows (artifact_id: 017)
-  - Create e2e/maestro/ directory structure
-  - Add testID to auth screens (login, register) and tab bar
-  - Create flows: 01-register.yaml, 02-login-logout.yaml
-  - Test on simulator
-  - Key files: src/app/(auth)/login.tsx, register.tsx, (tabs)/_layout.tsx
-
-  Phase 2: Agenda + Presentation (artifact_id: 018)
-  - Add testID to agenda components (AgendaForm, SundayCard, ActorSelector, HymnSelector)
-  - Create flows: 03-home-presentation.yaml, 04-agenda.yaml
-  - Key files: src/app/(tabs)/agenda.tsx, index.tsx, presentation.tsx
-  - Components: SundayCard, AgendaForm, HymnSelectorModal, ActorSelector
-
-  Phase 3: Speeches + Members (artifact_id: 019)
-  - Add testID to speech components (SpeechSlot, MemberSelectorModal, StatusChangeModal)
-  - Add testID to member management (members.tsx)
-  - Create flows: 05-speeches.yaml, 06-members.yaml
-  - Key files: src/app/(tabs)/speeches.tsx, settings/members.tsx
-  - Components: SpeechSlot, StatusLED, SwipeableCard
-
-  Phase 4: Settings + Invite + Cleanup (artifact_id: 020)
-  - Create flow: 07-invite.yaml (criar convite + registrar convidado na mesma ward)
-    - Bishopric cria convite via Settings > Users
-    - Novo usuário abre link/token e registra como secretary/observer
-    - Verificar que convidado entra na mesma ward
-  - Create flow: 08-settings.yaml (language, theme changes)
-  - Create cleanup script to delete test ward/user
-  - Add e2e run instructions to README or e2e/README.md
-  - Final verification: run all flows sequentially
-  - Key files: src/app/(tabs)/settings/users.tsx, src/app/(auth)/invite/[token].tsx
+  current: 21

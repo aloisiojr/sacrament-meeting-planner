@@ -7,10 +7,10 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-09"
+  last_updated: "2026-03-14"
   total_features: 68
   total_business_rules: 49
-  total_design_decisions: 66
+  total_design_decisions: 68
 
 # =============================================================================
 # PRODUCT DESCRIPTION
@@ -56,9 +56,11 @@ features:
     area: auth
     description: |
       Email/password authentication via Supabase Auth. Supports login, logout,
-      first user registration (creates ward), and invited user registration.
-      Session persisted across app restarts. Navigation guard redirects
-      unauthenticated users to login and authenticated users to home.
+      first user registration (creates ward + default topics), and invited user
+      registration. Session persisted across app restarts. Navigation guard
+      redirects unauthenticated users to login and authenticated users to home.
+      register-first-user also inserts 2 default ward_topics (is_default=true)
+      with language-appropriate titles. [Modified by CR-286]
     acceptance_criteria:
       - given: "User opens the app without a session"
         when: "App loads"
@@ -230,27 +232,42 @@ features:
     name: Topic Management
     area: ward_data
     description: |
-      Ward-specific topics CRUD. Topics have title and optional link. Sorted
-      alphabetically. Accent-insensitive search. General topic collections can
-      be activated/deactivated per ward. Collections are language-specific
-      (using locale codes: pt-BR, en-US, es-LA). When ward language changes,
-      old language collections are deactivated and new language collections
-      activated. Collection topics can be expanded inline with accordion pattern.
-      Active topics aggregation combines ward topics + active general collection
-      topics, sorted by "Collection : Title".
+      Custom topics CRUD (renamed from "Ward Topics" to "Custom Topics").
+      Topics have title and optional link. Each ward has 2 default topics
+      (is_default=true) pre-populated at creation: 'Tema livre'/'Open Topic'/
+      'Tema libre' and 'Seu testemunho'/'Your Testimony'/'Tu testimonio'.
+      Default topics cannot be edited or deleted (swipe disabled). Default
+      topics sort first, then alphabetically by title. No search field on
+      topics screen (removed). Inline add area at bottom of list replaces
+      floating "+" button; tapping expands TopicEditor with title + link fields.
+
+      General topic collections can be activated/deactivated per ward.
+      Collections are language-specific (using locale codes: pt-BR, en-US,
+      es-LA). 'Temas Especiais' collection removed from DB. When ward language
+      changes, old language collections are deactivated and new language
+      collections activated. Collection topics can be expanded inline with
+      accordion pattern. Active topics aggregation combines custom topics +
+      active general collection topics, sorted by "Collection : Title".
+      [Modified by CR-285, CR-286, CR-287, CR-288]
     acceptance_criteria:
       - given: "User with topic:write permission"
-        when: "User creates a ward topic with title and optional link"
-        then: "Topic is created and appears in the ward topics list"
+        when: "User taps the inline add area below the topic list"
+        then: "TopicEditor expands with title and link fields; on save, topic is created"
       - given: "User with collection:toggle permission"
         when: "User toggles a general collection on/off"
         then: "Collection activation status is updated; topics appear/disappear from topic selector"
       - given: "User opens topic selector in speech assignment"
         when: "Selector is opened"
-        then: "Shows all ward topics + topics from active general collections, sorted by collection name"
+        then: "Shows all custom topics + topics from active general collections, sorted by collection name"
       - given: "User expands a collection row in Topics settings"
         when: "Accordion is expanded"
         then: "Topics from that collection are loaded and displayed inline"
+      - given: "User views the custom topics section"
+        when: "Default topics exist"
+        then: "Default topics appear at the top, are not swipeable (cannot edit/delete)"
+      - given: "New ward is created"
+        when: "register-first-user completes"
+        then: "2 default topics with is_default=true are pre-populated matching ward language"
 
   - id: F009
     name: Meeting Actor Management

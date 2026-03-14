@@ -54,67 +54,67 @@ export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
 
 /**
  * Get the default speech template for a given language and position.
- * Falls back to pt-BR if the language is not supported.
+ * Falls back to en-US if the language is not supported.
  */
 export function getDefaultSpeechTemplate(language: string, position: 1 | 2 | 3): string {
   if (position === 1) {
     switch (language) {
-      case 'en-US':
-        return DEFAULT_TEMPLATE_SPEECH_1_EN;
+      case 'pt-BR':
+        return DEFAULT_TEMPLATE_SPEECH_1_PT_BR;
       case 'es-LA':
         return DEFAULT_TEMPLATE_SPEECH_1_ES;
-      case 'pt-BR':
+      case 'en-US':
       default:
-        return DEFAULT_TEMPLATE_SPEECH_1_PT_BR;
+        return DEFAULT_TEMPLATE_SPEECH_1_EN;
     }
   }
   if (position === 2) {
     switch (language) {
-      case 'en-US':
-        return DEFAULT_TEMPLATE_SPEECH_2_EN;
+      case 'pt-BR':
+        return DEFAULT_TEMPLATE_SPEECH_2_PT_BR;
       case 'es-LA':
         return DEFAULT_TEMPLATE_SPEECH_2_ES;
-      case 'pt-BR':
+      case 'en-US':
       default:
-        return DEFAULT_TEMPLATE_SPEECH_2_PT_BR;
+        return DEFAULT_TEMPLATE_SPEECH_2_EN;
     }
   }
   // position === 3
   switch (language) {
-    case 'en-US':
-      return DEFAULT_TEMPLATE_SPEECH_3_EN;
+    case 'pt-BR':
+      return DEFAULT_TEMPLATE_SPEECH_3_PT_BR;
     case 'es-LA':
       return DEFAULT_TEMPLATE_SPEECH_3_ES;
-    case 'pt-BR':
+    case 'en-US':
     default:
-      return DEFAULT_TEMPLATE_SPEECH_3_PT_BR;
+      return DEFAULT_TEMPLATE_SPEECH_3_EN;
   }
 }
 
 /**
  * Get the default prayer template for a given language and prayer type.
- * Falls back to pt-BR if the language is not supported.
+ * Falls back to en-US if the language is not supported.
  */
 export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'closing'): string {
   if (type === 'opening') {
     switch (language) {
-      case 'en-US':
-        return DEFAULT_OPENING_PRAYER_TEMPLATE_EN;
+      case 'pt-BR':
+        return DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR;
       case 'es-LA':
         return DEFAULT_OPENING_PRAYER_TEMPLATE_ES;
-      case 'pt-BR':
+      case 'en-US':
       default:
-        return DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR;
+        return DEFAULT_OPENING_PRAYER_TEMPLATE_EN;
     }
   }
   switch (language) {
-    case 'en-US':
-      return DEFAULT_CLOSING_PRAYER_TEMPLATE_EN;
+    case 'pt-BR':
+      return DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR;
     case 'es-LA':
       return DEFAULT_CLOSING_PRAYER_TEMPLATE_ES;
-    case 'pt-BR':
+    case 'en-US':
     default:
-      return DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR;
+      return DEFAULT_CLOSING_PRAYER_TEMPLATE_EN;
   }
 }
 
@@ -159,7 +159,7 @@ export function buildWhatsAppUrl(
   countryCode: string,
   template: string,
   variables: WhatsAppVariables,
-  language: string = 'pt-BR',
+  language: string = 'en-US',
   position: 1 | 2 | 3 = 1
 ): string {
   // Clean phone number: remove spaces, dashes, parentheses

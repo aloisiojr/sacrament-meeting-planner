@@ -2,8 +2,8 @@
 # Contém TODOS os comandos aprendidos para deploy
 # Atualizado sempre que um novo comando é descoberto
 
-version: 24
-last_updated: "2026-03-08T23:00:00"
+version: 25
+last_updated: "2026-03-14T00:00:00"
 updated_by: "devteam-deployer"
 
 services:
@@ -62,17 +62,22 @@ services:
 
     functions:
       - name: "Deploy todas as functions"
-        command: "supabase functions deploy"
+        command: "supabase functions deploy --no-verify-jwt"
         when: "Apos alterar qualquer edge function"
+        notes: >
+          Flag --no-verify-jwt impede que o Supabase ligue automaticamente a opcao
+          'Verify JWT with legacy secret' no dashboard. Todas as functions do projeto
+          verificam JWT internamente no codigo (as que precisam), entao a verificacao
+          no gateway nao e necessaria. A configuracao tambem esta em config.toml
+          ([functions.<name>] verify_jwt = false) para consistencia.
 
       - name: "Deploy function especifica"
-        command: "supabase functions deploy <function-name>"
-        when: "Alterar apenas uma function"
-
-      - name: "Deploy function publica (sem JWT)"
         command: "supabase functions deploy <function-name> --no-verify-jwt"
-        when: "Alterar function que nao requer autenticacao (ex: reset-redirect, send-reset-email)"
-        notes: "Usa flag --no-verify-jwt para desabilitar verificacao de JWT. Necessario para endpoints publicos."
+        when: "Alterar apenas uma function"
+        notes: >
+          SEMPRE usar --no-verify-jwt em QUALQUER deploy de function, mesmo as que
+          verificam JWT internamente. Sem essa flag, o Supabase liga automaticamente
+          'Verify JWT with legacy secret' e quebra as chamadas ao servidor.
 
     auth_config:
       - name: "Ler configuracao de autenticacao"

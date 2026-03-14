@@ -72,7 +72,7 @@ function extractUserName(user: User | null): string {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [wardLanguage, setWardLanguage] = useState<string>('pt-BR');
+  const [wardLanguage, setWardLanguage] = useState<string>('en-US');
 
   // Derive user, role, wardId, and userName from session
   const user = session?.user ?? null;
@@ -117,7 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
           setWardLanguage(lang);
         } else {
-          setWardLanguage('pt-BR');
+          setWardLanguage('en-US');
         }
 
         // Determine app language: user_metadata > device locale > ward language
@@ -130,12 +130,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // which already ran at module load. If device locale is not supported, fallback to ward language.
         else {
           const currentLang = getCurrentLanguage();
-          // getCurrentLanguage returns whatever i18n detected at init (device locale or pt-BR fallback)
+          // getCurrentLanguage returns whatever i18n detected at init (device locale or en-US fallback)
           // If device locale was detected and is supported, keep it. Otherwise use ward language.
           if (!SUPPORTED_LANGUAGES.includes(currentLang as SupportedLanguage)) {
             const wardLangSafe = (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage))
               ? lang as SupportedLanguage
-              : 'pt-BR';
+              : 'en-US';
             changeLanguage(wardLangSafe);
           }
         }

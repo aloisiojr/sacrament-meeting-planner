@@ -115,8 +115,8 @@ describe('dateUtils', () => {
       expect(() => getMonthAbbr(13, 'en-US')).toThrow('Invalid month');
     });
 
-    it('should default to pt-BR', () => {
-      expect(getMonthAbbr(2)).toBe('FEV');
+    it('should default to en-US', () => {
+      expect(getMonthAbbr(2)).toBe('FEB');
     });
   });
 
@@ -137,8 +137,8 @@ describe('dateUtils', () => {
       expect(formatDate(new Date(2026, 1, 8), 'pt-BR')).toBe('08 FEV');
     });
 
-    it('should default locale to pt-BR', () => {
-      expect(formatDate('2026-02-08')).toBe('08 FEV');
+    it('should default locale to en-US', () => {
+      expect(formatDate('2026-02-08')).toBe('FEB 08');
     });
 
     it('should handle day numbers correctly', () => {

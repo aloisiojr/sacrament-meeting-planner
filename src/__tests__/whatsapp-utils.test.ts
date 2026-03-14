@@ -98,8 +98,8 @@ describe('buildWhatsAppUrl', () => {
       topic: 'Fe',
     });
 
-    // Should contain encoded default template content
-    expect(url).toContain(encodeURIComponent('Bispado'));
+    // Should contain encoded default template content (en-US fallback)
+    expect(url).toContain(encodeURIComponent('Bishopric'));
   });
 
   it('default template contains proper accents', () => {
@@ -123,8 +123,8 @@ describe('getDefaultSpeechTemplate', () => {
     expect(getDefaultSpeechTemplate('es-LA', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
   });
 
-  it('falls back to pt-BR for unknown language', () => {
-    expect(getDefaultSpeechTemplate('fr', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
+  it('falls back to en-US for unknown language', () => {
+    expect(getDefaultSpeechTemplate('fr', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
   });
 
   it('EN template contains Bishopric', () => {
@@ -164,8 +164,8 @@ describe('buildWhatsAppUrl language parameter', () => {
     expect(url).not.toContain(encodeURIComponent('Obispado'));
   });
 
-  it('defaults to pt-BR when language omitted', () => {
+  it('defaults to en-US when language omitted', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars);
-    expect(url).toContain(encodeURIComponent('Bispado'));
+    expect(url).toContain(encodeURIComponent('Bishopric'));
   });
 });

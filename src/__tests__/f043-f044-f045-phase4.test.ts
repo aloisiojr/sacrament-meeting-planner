@@ -352,8 +352,8 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
       expect(rfuSource).toContain('language: wardLanguage');
     });
 
-    it('wardLanguage variable uses input.language with pt-BR fallback', () => {
-      expect(rfuSource).toContain("input.language || 'pt-BR'");
+    it('wardLanguage variable uses input.language with en-US fallback', () => {
+      expect(rfuSource).toContain("input.language || 'en-US'");
     });
 
     it('app_metadata is still present in createUser', () => {
@@ -363,26 +363,26 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
     });
   });
 
-  // --- AC-045-04: register-first-user defaults to pt-BR if no language specified ---
+  // --- AC-045-04: register-first-user defaults to en-US if no language specified ---
   describe('AC-045-04: Ward language default behavior', () => {
-    it('default ward language is pt-BR when not specified', () => {
+    it('default ward language is en-US when not specified', () => {
       // This tests the same pattern used in register-first-user line 88:
-      //   const wardLanguage = input.language || 'pt-BR';
+      //   const wardLanguage = input.language || 'en-US';
       const inputLanguage: string | undefined = undefined;
-      const wardLanguage = inputLanguage || 'pt-BR';
-      expect(wardLanguage).toBe('pt-BR');
-    });
-
-    it('explicit ward language is preserved', () => {
-      const inputLanguage = 'en-US';
-      const wardLanguage = inputLanguage || 'pt-BR';
+      const wardLanguage = inputLanguage || 'en-US';
       expect(wardLanguage).toBe('en-US');
     });
 
-    it('empty string language falls back to pt-BR', () => {
-      const inputLanguage = '';
-      const wardLanguage = inputLanguage || 'pt-BR';
+    it('explicit ward language is preserved', () => {
+      const inputLanguage = 'pt-BR';
+      const wardLanguage = inputLanguage || 'en-US';
       expect(wardLanguage).toBe('pt-BR');
+    });
+
+    it('empty string language falls back to en-US', () => {
+      const inputLanguage = '';
+      const wardLanguage = inputLanguage || 'en-US';
+      expect(wardLanguage).toBe('en-US');
     });
   });
 
@@ -403,8 +403,8 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
       expect(riuSource).toContain('.single()');
     });
 
-    it('defines wardLanguage with fallback to pt-BR', () => {
-      expect(riuSource).toContain("ward?.language || 'pt-BR'");
+    it('defines wardLanguage with fallback to en-US', () => {
+      expect(riuSource).toContain("ward?.language || 'en-US'");
     });
 
     it('createUser includes user_metadata with language', () => {
@@ -435,32 +435,32 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
       expect(userMetadata).toEqual({ language: 'es-LA' });
     });
 
-    it('user_metadata with default pt-BR', () => {
-      const wardLanguage = undefined || 'pt-BR';
+    it('user_metadata with default en-US', () => {
+      const wardLanguage = undefined || 'en-US';
       const userMetadata = { language: wardLanguage };
-      expect(userMetadata).toEqual({ language: 'pt-BR' });
+      expect(userMetadata).toEqual({ language: 'en-US' });
     });
   });
 
-  // --- EC-045-01: Ward has null language -> fallback to pt-BR ---
+  // --- EC-045-01: Ward has null language -> fallback to en-US ---
   describe('EC-045-01: Null ward language fallback', () => {
-    it('null ward.language falls back to pt-BR', () => {
+    it('null ward.language falls back to en-US', () => {
       // Pattern from register-invited-user:
-      //   const wardLanguage = ward?.language || 'pt-BR';
+      //   const wardLanguage = ward?.language || 'en-US';
       const ward: { language: string | null } | null = { language: null };
-      const wardLanguage = ward?.language || 'pt-BR';
-      expect(wardLanguage).toBe('pt-BR');
+      const wardLanguage = ward?.language || 'en-US';
+      expect(wardLanguage).toBe('en-US');
     });
 
-    it('undefined ward falls back to pt-BR', () => {
+    it('undefined ward falls back to en-US', () => {
       const ward: { language: string } | undefined = undefined;
-      const wardLanguage = ward?.language || 'pt-BR';
-      expect(wardLanguage).toBe('pt-BR');
+      const wardLanguage = ward?.language || 'en-US';
+      expect(wardLanguage).toBe('en-US');
     });
 
     it('ward with valid language is used directly', () => {
       const ward = { language: 'es-LA' };
-      const wardLanguage = ward?.language || 'pt-BR';
+      const wardLanguage = ward?.language || 'en-US';
       expect(wardLanguage).toBe('es-LA');
     });
   });
@@ -485,17 +485,17 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
   // --- AC-045-03: App displays in ward language for new user ---
   describe('AC-045-03: Language priority chain', () => {
     it('user_metadata.language is used as app language', () => {
-      // The app priority chain: user_metadata.language > device locale > pt-BR
+      // The app priority chain: user_metadata.language > device locale > en-US
       // If user_metadata.language is set at registration, app will display in that language
-      const userMetadata = { language: 'en-US' };
-      const appLanguage = userMetadata.language || 'pt-BR';
-      expect(appLanguage).toBe('en-US');
+      const userMetadata = { language: 'pt-BR' };
+      const appLanguage = userMetadata.language || 'en-US';
+      expect(appLanguage).toBe('pt-BR');
     });
 
-    it('missing user_metadata.language falls back to pt-BR', () => {
+    it('missing user_metadata.language falls back to en-US', () => {
       const userMetadata: { language?: string } = {};
-      const appLanguage = userMetadata.language || 'pt-BR';
-      expect(appLanguage).toBe('pt-BR');
+      const appLanguage = userMetadata.language || 'en-US';
+      expect(appLanguage).toBe('en-US');
     });
   });
 });

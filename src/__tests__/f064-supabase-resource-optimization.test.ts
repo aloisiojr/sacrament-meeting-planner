@@ -373,14 +373,14 @@ describe('F064-S3: Ward cache in process-notifications', () => {
     }
   });
 
-  it('EC-064-05: deleted ward falls back to pt-BR language', () => {
+  it('EC-064-05: deleted ward falls back to en-US language', () => {
     const wardCache = new Map<string, { language: string; timezone: string }>();
     // ward-deleted is not in cache (ward was deleted after entry was queued)
 
     const ward = wardCache.get('ward-deleted');
-    const language = ward?.language ?? 'pt-BR';
+    const language = ward?.language ?? 'en-US';
 
-    expect(language).toBe('pt-BR');
+    expect(language).toBe('en-US');
   });
 
   it('EC-064-05: ward cache returns undefined for missing ward, fallback works', () => {
@@ -388,9 +388,9 @@ describe('F064-S3: Ward cache in process-notifications', () => {
     wardCache.set('ward-1', { language: 'en-US', timezone: 'America/New_York' });
 
     // Existing ward
-    expect(wardCache.get('ward-1')?.language ?? 'pt-BR').toBe('en-US');
+    expect(wardCache.get('ward-1')?.language ?? 'en-US').toBe('en-US');
     // Missing ward
-    expect(wardCache.get('nonexistent')?.language ?? 'pt-BR').toBe('pt-BR');
+    expect(wardCache.get('nonexistent')?.language ?? 'en-US').toBe('en-US');
   });
 });
 

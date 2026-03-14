@@ -88,7 +88,7 @@ function buildDesignationText(
         body: `${name} fue asignado(a) para la ${prayerLabel} el ${date}. ¡Es hora de enviar la invitación!`,
       },
     };
-    return texts[language] ?? texts['pt-BR'];
+    return texts[language] ?? texts['en-US'];
   }
 
   // Existing speech text (unchanged)
@@ -107,7 +107,7 @@ function buildDesignationText(
       body: `${nameList} ${names.length > 1 ? 'fueron asignados' : 'fue asignado(a)'} para hablar el ${date}. ¡Es hora de enviar la invitación!`,
     },
   };
-  return texts[language] ?? texts['pt-BR'];
+  return texts[language] ?? texts['en-US'];
 }
 
 function buildWeeklyText(language: string): { title: string; body: string } {
@@ -125,7 +125,7 @@ function buildWeeklyText(language: string): { title: string; body: string } {
       body: '¡Aún hay oradores por asignar para el próximo domingo!',
     },
   };
-  return texts[language] ?? texts['pt-BR'];
+  return texts[language] ?? texts['en-US'];
 }
 
 function buildConfirmedText(
@@ -150,7 +150,7 @@ function buildConfirmedText(
         body: `${name} fue confirmado(a) para la ${prayerLabel} el ${date}.`,
       },
     };
-    return texts[language] ?? texts['pt-BR'];
+    return texts[language] ?? texts['en-US'];
   }
   const ordinal = getOrdinal(position, language);
   const texts: Record<string, { title: string; body: string }> = {
@@ -167,7 +167,7 @@ function buildConfirmedText(
       body: `${name} fue confirmado(a) para el ${ordinal} discurso el ${date}.`,
     },
   };
-  return texts[language] ?? texts['pt-BR'];
+  return texts[language] ?? texts['en-US'];
 }
 
 function buildWithdrewText(
@@ -192,7 +192,7 @@ function buildWithdrewText(
         body: `¡ATENCIÓN! ${name} NO podrá hacer la ${prayerLabel} el ${date}. ¡Asigne a otra persona!`,
       },
     };
-    return texts[language] ?? texts['pt-BR'];
+    return texts[language] ?? texts['en-US'];
   }
   const ordinal = getOrdinal(position, language);
   const texts: Record<string, { title: string; body: string }> = {
@@ -209,7 +209,7 @@ function buildWithdrewText(
       body: `¡ATENCIÓN! ${name} NO podrá dar el ${ordinal} discurso el ${date}. ¡Asigne otro orador!`,
     },
   };
-  return texts[language] ?? texts['pt-BR'];
+  return texts[language] ?? texts['en-US'];
 }
 
 function buildSecretaryReviewText(
@@ -237,7 +237,7 @@ function buildSecretaryReviewText(
         body: `Atenci\u00f3n: el secretario asign\u00f3 el tema ${topicTitle} a ${speakerName} el ${date}. Revise la asignaci\u00f3n.`,
       },
     };
-    return texts[language] ?? texts['pt-BR'];
+    return texts[language] ?? texts['en-US'];
   }
 
   // Speaker review variant
@@ -255,7 +255,7 @@ function buildSecretaryReviewText(
       body: `Atenci\u00f3n: el secretario asign\u00f3 a ${speakerName} para el ${ordinal} discurso del ${date}. Revise la asignaci\u00f3n.`,
     },
   };
-  return texts[language] ?? texts['pt-BR'];
+  return texts[language] ?? texts['en-US'];
 }
 
 // --- Main Handler ---
@@ -331,7 +331,7 @@ Deno.serve(async (req: Request) => {
 
       // Get ward language from cache
       const ward = wardCache.get(wardId);
-      const language = ward?.language ?? 'pt-BR';
+      const language = ward?.language ?? 'en-US';
 
       // Build notification text
       const { title, body } = buildDesignationText(language, names, sundayDate);
@@ -349,7 +349,7 @@ Deno.serve(async (req: Request) => {
     // Process immediate entries
     for (const entry of immediateEntries) {
       const ward = wardCache.get(entry.ward_id);
-      const language = ward?.language ?? 'pt-BR';
+      const language = ward?.language ?? 'en-US';
 
       let title = '';
       let body = '';

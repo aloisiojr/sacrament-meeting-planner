@@ -25,3 +25,44 @@ site_url = "http://127.0.0.1:3000"
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+# Edge Functions - all use verify_jwt = false because:
+# - Public endpoints (reset-redirect, invite-redirect, send-reset-email) have no JWT
+# - Registration endpoints (register-first-user, register-invited-user) have no session yet
+# - Cron job (process-notifications) runs without user JWT
+# - Authenticated endpoints (create-invitation, delete-user, list-users, update-user-name, update-user-role)
+#   verify JWT internally in code, so gateway-level verification is not needed.
+# This prevents the "Verify JWT with legacy secret" toggle from being enabled on deploy.
+
+[functions.create-invitation]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.invite-redirect]
+verify_jwt = false
+
+[functions.list-users]
+verify_jwt = false
+
+[functions.process-notifications]
+verify_jwt = false
+
+[functions.register-first-user]
+verify_jwt = false
+
+[functions.register-invited-user]
+verify_jwt = false
+
+[functions.reset-redirect]
+verify_jwt = false
+
+[functions.send-reset-email]
+verify_jwt = false
+
+[functions.update-user-name]
+verify_jwt = false
+
+[functions.update-user-role]
+verify_jwt = false

@@ -54,7 +54,7 @@ const resources = {
 
 /**
  * Detect device locale and map to supported language.
- * Falls back to pt-BR if no match found.
+ * Falls back to en-US if no match found.
  */
 function detectDeviceLocale(): SupportedLanguage {
   try {
@@ -63,7 +63,7 @@ function detectDeviceLocale(): SupportedLanguage {
     const deviceLocale =
       typeof Intl !== 'undefined' && Intl.DateTimeFormat
         ? Intl.DateTimeFormat().resolvedOptions().locale
-        : 'pt-BR';
+        : 'en-US';
 
     // Check exact match first
     if (SUPPORTED_LANGUAGES.includes(deviceLocale as SupportedLanguage)) {
@@ -76,15 +76,15 @@ function detectDeviceLocale(): SupportedLanguage {
     if (langPrefix === 'en') return 'en-US';
     if (langPrefix === 'es') return 'es-LA';
 
-    return 'pt-BR';
+    return 'en-US';
   } catch {
-    return 'pt-BR';
+    return 'en-US';
   }
 }
 
 /**
  * Initialize i18n with the given language or detect from device.
- * Language detection chain: ward setting -> device locale -> pt-BR default.
+ * Language detection chain: ward setting -> device locale -> en-US default.
  *
  * @param wardLanguage - Optional language from ward settings (takes priority)
  */
@@ -95,7 +95,7 @@ export function initI18n(wardLanguage?: SupportedLanguage): void {
     i18n.use(initReactI18next).init({
       resources,
       lng: language,
-      fallbackLng: 'pt-BR',
+      fallbackLng: 'en-US',
       interpolation: {
         escapeValue: false, // React already handles escaping
       },
@@ -119,7 +119,7 @@ export function changeLanguage(language: SupportedLanguage): void {
  * Get the current language.
  */
 export function getCurrentLanguage(): SupportedLanguage {
-  return (i18n.language as SupportedLanguage) || 'pt-BR';
+  return (i18n.language as SupportedLanguage) || 'en-US';
 }
 
 // Initialize with device locale detection by default

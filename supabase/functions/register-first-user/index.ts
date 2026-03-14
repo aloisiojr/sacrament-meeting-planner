@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     }
 
     // Create the ward
-    const wardLanguage = input.language || 'pt-BR';
+    const wardLanguage = input.language || 'en-US';
 
     // CR-231: Per-position default speech templates (3 per language)
     // CR-248: Add {nome} placeholder, update text, add prayer templates
@@ -97,6 +97,7 @@ Deno.serve(async (req) => {
 
     switch (wardLanguage) {
       case 'en-US':
+      default:
         defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
         defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
         defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
@@ -111,7 +112,6 @@ Deno.serve(async (req) => {
         defaultClosingPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
         break;
       case 'pt-BR':
-      default:
         defaultSpeech1Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
         defaultSpeech2Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
         defaultSpeech3Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     const { data: generalCollections } = await supabaseAdmin
       .from('general_collections')
       .select('id, name')
-      .eq('language', input.language || 'pt-BR');
+      .eq('language', input.language || 'en-US');
 
     if (generalCollections && generalCollections.length > 0) {
       // Collections that should be active by default (per language)
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         'Special Topics', 'For the Strength of Youth', 'Gospel Principles',
         'Temas Especiales', 'Para la Fortaleza de la Juventud', 'Principios del Evangelio',
       ]);
-      const activeNames = defaultActiveNames[wardLanguage] ?? defaultActiveNames['pt-BR'];
+      const activeNames = defaultActiveNames[wardLanguage] ?? defaultActiveNames['en-US'];
 
       // Find the latest conference collection (not in knownNames, highest name = newest)
       const conferenceCollections = generalCollections

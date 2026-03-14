@@ -78,7 +78,7 @@ export function zeroPadDay(day: number): string {
  * @param month - Month number (1-12)
  * @param locale - Supported language
  */
-export function getMonthAbbr(month: number, locale: SupportedLanguage = 'pt-BR'): string {
+export function getMonthAbbr(month: number, locale: SupportedLanguage = 'en-US'): string {
   if (month < 1 || month > 12) {
     throw new Error(`Invalid month number: ${month}. Must be 1-12.`);
   }
@@ -91,7 +91,7 @@ export function getMonthAbbr(month: number, locale: SupportedLanguage = 'pt-BR')
  * - en-US: "FEB 08" (month day)
  * - es-LA: "08 FEB" (day month)
  */
-export function formatDate(date: Date | string, locale: SupportedLanguage = 'pt-BR'): string {
+export function formatDate(date: Date | string, locale: SupportedLanguage = 'en-US'): string {
   const d = typeof date === 'string' ? parseLocalDate(date) : date;
   const day = zeroPadDay(d.getDate());
   const month = getMonthAbbr(d.getMonth() + 1, locale);
@@ -189,7 +189,7 @@ export function getPreviousSundays(from: Date | string, count: number): Date[] {
  * - en-US: "February 15, 2026"
  * - es-LA: "15 de Febrero de 2026"
  */
-export function formatDateHumanReadable(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
+export function formatDateHumanReadable(dateStr: string, language: SupportedLanguage = 'en-US'): string {
   const d = parseLocalDate(dateStr);
   const day = d.getDate();
   const month = MONTH_FULL[language][d.getMonth()];
@@ -212,7 +212,7 @@ export function formatDateHumanReadable(dateStr: string, language: SupportedLang
  * - en-US: "Sunday, February 16, 2026"
  * - es-LA: "Domingo, 16 de Febrero de 2026"
  */
-export function formatFullDate(dateStr: string, language: SupportedLanguage = 'pt-BR'): string {
+export function formatFullDate(dateStr: string, language: SupportedLanguage = 'en-US'): string {
   const d = parseLocalDate(dateStr);
   const dayName = DAY_NAMES[language][d.getDay()];
   const day = d.getDate();

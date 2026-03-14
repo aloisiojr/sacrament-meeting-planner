@@ -190,10 +190,10 @@ describe('F040: getDefaultSpeechTemplate (AC-011, AC-012, AC-014)', () => {
     expect(template).toContain('Obispado');
   });
 
-  it('falls back to pt-BR for unknown language (AC-014)', () => {
+  it('falls back to en-US for unknown language (AC-014)', () => {
     const template = getDefaultSpeechTemplate('fr', 1);
-    expect(template).toBe(DEFAULT_TEMPLATE_SPEECH_1_PT_BR);
-    expect(template).toContain('Bispado');
+    expect(template).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
+    expect(template).toContain('Bishopric');
   });
 
   it('returns English template for all positions with en-US', () => {
@@ -248,9 +248,9 @@ describe('F040: getDefaultPrayerTemplate (AC-013)', () => {
     expect(template).toContain('oração de encerramento');
   });
 
-  it('falls back to pt-BR for unknown language', () => {
-    expect(getDefaultPrayerTemplate('fr', 'opening')).toBe(DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR);
-    expect(getDefaultPrayerTemplate('de', 'closing')).toBe(DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR);
+  it('falls back to en-US for unknown language', () => {
+    expect(getDefaultPrayerTemplate('fr', 'opening')).toBe(DEFAULT_OPENING_PRAYER_TEMPLATE_EN);
+    expect(getDefaultPrayerTemplate('de', 'closing')).toBe(DEFAULT_CLOSING_PRAYER_TEMPLATE_EN);
   });
 });
 

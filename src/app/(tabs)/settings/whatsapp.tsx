@@ -118,7 +118,7 @@ export default function WhatsAppTemplateScreen() {
     if (ward && !speech1Initialized) {
       const val = ward.whatsapp_template_speech_1;
       if (val === null || val === undefined) {
-        setSpeech1Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 1));
+        setSpeech1Template(getDefaultSpeechTemplate(wardLanguage ?? 'en-US', 1));
       } else if (val === '') {
         setSpeech1Template('');
       } else {
@@ -133,7 +133,7 @@ export default function WhatsAppTemplateScreen() {
     if (ward && !speech2Initialized) {
       const val = ward.whatsapp_template_speech_2;
       if (val === null || val === undefined) {
-        setSpeech2Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 2));
+        setSpeech2Template(getDefaultSpeechTemplate(wardLanguage ?? 'en-US', 2));
       } else if (val === '') {
         setSpeech2Template('');
       } else {
@@ -148,7 +148,7 @@ export default function WhatsAppTemplateScreen() {
     if (ward && !speech3Initialized) {
       const val = ward.whatsapp_template_speech_3;
       if (val === null || val === undefined) {
-        setSpeech3Template(getDefaultSpeechTemplate(wardLanguage ?? 'pt-BR', 3));
+        setSpeech3Template(getDefaultSpeechTemplate(wardLanguage ?? 'en-US', 3));
       } else if (val === '') {
         setSpeech3Template('');
       } else {
@@ -162,7 +162,7 @@ export default function WhatsAppTemplateScreen() {
     if (ward && !openingInitialized) {
       const val = ward.whatsapp_template_opening_prayer;
       if (val === null || val === undefined) {
-        setOpeningTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'pt-BR', 'opening'));
+        setOpeningTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'en-US', 'opening'));
       } else if (val === '') {
         setOpeningTemplate('');
       } else {
@@ -176,7 +176,7 @@ export default function WhatsAppTemplateScreen() {
     if (ward && !closingInitialized) {
       const val = ward.whatsapp_template_closing_prayer;
       if (val === null || val === undefined) {
-        setClosingTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'pt-BR', 'closing'));
+        setClosingTemplate(getDefaultPrayerTemplate(wardLanguage ?? 'en-US', 'closing'));
       } else if (val === '') {
         setClosingTemplate('');
       } else {

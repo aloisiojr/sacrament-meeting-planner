@@ -264,7 +264,7 @@ export function buildNotificationText(
     },
   };
 
-  const langTexts = texts[language] ?? texts['pt-BR'];
+  const langTexts = texts[language] ?? texts['en-US'];
   const builder = langTexts[type];
   if (!builder) {
     return { title: '', body: '' };

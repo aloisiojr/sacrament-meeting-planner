@@ -165,7 +165,7 @@ async function handleRegister(supabaseAdmin: any, input: RegisterInvitedInput) {
     .select('language')
     .eq('id', invitation.ward_id)
     .single();
-  const wardLanguage = ward?.language || 'pt-BR';
+  const wardLanguage = ward?.language || 'en-US';
 
   // Create user with app_metadata
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

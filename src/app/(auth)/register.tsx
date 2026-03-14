@@ -35,7 +35,7 @@ export default function RegisterScreen() {
   const [stakeName, setStakeName] = useState('');
   const [wardName, setWardName] = useState('');
   const [role, setRole] = useState<'bishopric' | 'secretary'>('bishopric');
-  const [language, setLanguage] = useState<SupportedLanguage>('pt-BR');
+  const [language, setLanguage] = useState<SupportedLanguage>('en-US');
   const [timezone, setTimezone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +46,9 @@ export default function RegisterScreen() {
   useEffect(() => {
     try {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setTimezone(detectedTimezone || DEFAULT_TIMEZONES['pt-BR']);
+      setTimezone(detectedTimezone || DEFAULT_TIMEZONES['en-US']);
     } catch {
-      setTimezone(DEFAULT_TIMEZONES['pt-BR']);
+      setTimezone(DEFAULT_TIMEZONES['en-US']);
     }
   }, []);
 

@@ -349,14 +349,14 @@ describe('F067 EC-067-03: Rapid add/delete discrete operations', () => {
 // =============================================================================
 
 describe('F067 AC-067-18: No database migration for CR-277', () => {
-  it('last migration is 032 (from CR-283), CR-277 did not add any migration', () => {
+  it('CR-277 did not add any migration (033+ are from F021)', () => {
     const migrationsDir = path.join(__dirname, '..', '..', 'supabase', 'migrations');
     const files = fs.readdirSync(migrationsDir).sort();
-    const lastMigration = files[files.length - 1];
-    expect(lastMigration).toBe('032_recognized_names_to_text.sql');
     // CR-277 did not add migration; 032 was added by CR-283
+    // 033 and 034 were added by F021 (CR-285, CR-286)
     const migration033 = files.filter((f) => f.startsWith('033'));
-    expect(migration033).toHaveLength(0);
+    expect(migration033).toHaveLength(1);
+    expect(migration033[0]).toBe('033_delete_special_topics.sql');
   });
 });
 

@@ -902,8 +902,8 @@ describe('F064-S2: Migration 029 device_push_tokens role column', () => {
 // =============================================================================
 
 describe('F064 cross-feature: all optimizations backward-compatible', () => {
-  it('FIXED_COLLECTION_ORDER exported from useTopics with 9 entries', () => {
-    expect(Object.keys(FIXED_COLLECTION_ORDER)).toHaveLength(9);
+  it('FIXED_COLLECTION_ORDER exported from useTopics with 6 entries', () => {
+    expect(Object.keys(FIXED_COLLECTION_ORDER)).toHaveLength(6);
   });
 
   it('SYNCED_TABLES still has 7 tables', () => {

@@ -3,7 +3,7 @@
  * general collections toggle, and inline add/edit.
  */
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,6 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ChevronDownIcon, ChevronRightIcon } from '../../../components/icons';
 import { SwipeableCard } from '../../../components/SwipeableCard';
-import { SearchInput } from '../../../components/SearchInput';
 import {
   useWardTopics,
   useCreateWardTopic,
@@ -276,30 +275,17 @@ export default function TopicsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [expandedCollectionId, setExpandedCollectionId] = useState<string | null>(null);
 
   const canWrite = hasPermission('topic:write');
   const canToggle = hasPermission('collection:toggle');
 
   const { data: wardTopics } = useWardTopics();
-  const filteredTopics = useMemo(() => {
-    return wardTopics?.filter((topic) => {
-      if (!search.trim()) return true;
-      return topic.title.toLowerCase().includes(search.trim().toLowerCase());
-    });
-  }, [wardTopics, search]);
   const { data: collections } = useCollections(language);
   const createTopic = useCreateWardTopic();
   const updateTopic = useUpdateWardTopic();
   const deleteTopic = useDeleteWardTopic();
   const toggleCollection = useToggleCollection();
-
-  const handleAdd = useCallback(() => {
-    setActiveSwipeId(null);
-    setEditingId(null);
-    setIsAdding(true);
-  }, []);
 
   const handleSaveNew = useCallback(
     (data: { title: string; link: string | null }) => {
@@ -383,34 +369,11 @@ export default function TopicsScreen() {
           {t('topics.description')}
         </Text>
 
-        {/* Search field for Ward Topics */}
+        {/* Custom Topics section header */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            {t('topics.wardTopics')}
+            {t('topics.customTopics')}
           </Text>
-          {canWrite && (
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={handleAdd}
-              accessibilityRole="button"
-              accessibilityLabel={t('topics.addTopic')}
-            >
-              <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
-            </Pressable>
-          )}
-        </View>
-
-        <View style={styles.searchContainer}>
-          <SearchInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t('common.search')}
-          />
-          <Pressable onPress={() => setSearch('')} accessibilityRole="button">
-            <Text style={[styles.closeButtonText, { color: colors.primary }]}>
-              {t('common.close')}
-            </Text>
-          </Pressable>
         </View>
 
         {/* Scrollable content: topics list and collections */}
@@ -421,12 +384,8 @@ export default function TopicsScreen() {
         >
           {/* Ward Topics Section */}
           <View style={styles.section}>
-            {isAdding && (
-              <TopicEditor onSave={handleSaveNew} onCancel={() => setIsAdding(false)} colors={colors} />
-            )}
-
-            {filteredTopics && filteredTopics.length > 0 ? (
-              filteredTopics.map((item) => (
+            {wardTopics && wardTopics.length > 0 ? (
+              wardTopics.map((item) => (
                 <TopicRow
                   key={item.id}
                   topic={item}
@@ -437,7 +396,7 @@ export default function TopicsScreen() {
                   onDelete={handleDelete}
                   onSave={handleSaveEdit(item.id)}
                   onCancel={() => setEditingId(null)}
-                  disabled={!canWrite}
+                  disabled={!canWrite || item.is_default}
                   colors={colors}
                 />
               ))
@@ -447,6 +406,30 @@ export default function TopicsScreen() {
                   {t('common.noResults')}
                 </Text>
               </View>
+            )}
+
+            {canWrite && (
+              isAdding ? (
+                <TopicEditor
+                  onSave={handleSaveNew}
+                  onCancel={() => setIsAdding(false)}
+                  colors={colors}
+                />
+              ) : (
+                <Pressable
+                  style={[styles.addTopicRow, { borderBottomColor: colors.divider }]}
+                  onPress={() => {
+                    setActiveSwipeId(null);
+                    setEditingId(null);
+                    setIsAdding(true);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.addTopicPlaceholder, { color: colors.textSecondary }]}>
+                    {t('topics.addTopic')}
+                  </Text>
+                </Pressable>
+              )
             )}
           </View>
 
@@ -518,18 +501,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
-    lineHeight: 26,
-  },
   section: {
     marginBottom: 16,
   },
@@ -545,17 +516,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
   editor: {
     paddingHorizontal: 16,
@@ -663,5 +623,17 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+  },
+  addTopicRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addTopicPlaceholder: {
+    fontSize: 16,
+    fontStyle: 'italic',
   },
 });

@@ -150,7 +150,13 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
   // --- Disabled state ---
   if (disabled) {
     if (items.length === 0) {
-      return <View />;
+      return (
+        <View style={[styles.addInput, { borderColor: colors.border, opacity: 0.5 }]}>
+          <Text style={{ color: colors.textTertiary, fontSize: 15 }}>
+            {placeholder}
+          </Text>
+        </View>
+      );
     }
     return (
       <View>

@@ -272,10 +272,10 @@ describe('F067 S014-02: EditableListField component behavior', () => {
     expect(true).toBe(true);
   });
 
-  it('disabled mode with null value renders nothing', () => {
+  it('disabled mode with null value shows placeholder', () => {
     const items = parseItems(null);
     expect(items.length).toBe(0);
-    // Component returns empty View when disabled and items.length === 0
+    // Component renders disabled placeholder when disabled and items.length === 0
   });
 
   // External sync

@@ -583,10 +583,10 @@ describe('F067 AC-067-01/14: Empty state', () => {
     expect(items).toEqual([]);
   });
 
-  it('disabled with empty items renders nothing (AC-067-14)', () => {
+  it('disabled with empty items shows placeholder (AC-067-14)', () => {
     const items = parseItems(null);
     expect(items.length).toBe(0);
-    // Component returns <View /> when disabled && items.length === 0
+    // Component renders disabled placeholder when disabled && items.length === 0
   });
 });
 

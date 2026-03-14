@@ -144,6 +144,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Insert default ward topics
+    const defaultTopicTitles: Record<string, string[]> = {
+      'pt-BR': ['Tema livre', 'Seu testemunho'],
+      'en-US': ['Open Topic', 'Your Testimony'],
+      'es-LA': ['Tema libre', 'Tu testimonio'],
+    };
+    const topicTitles = defaultTopicTitles[wardLanguage] ?? defaultTopicTitles['en-US'];
+    await supabaseAdmin
+      .from('ward_topics')
+      .insert(topicTitles.map(title => ({
+        ward_id: ward.id,
+        title,
+        is_default: true,
+      })));
+
     // Create the user with app_metadata
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: input.email,
@@ -195,9 +210,9 @@ Deno.serve(async (req) => {
         'es-LA': new Set(['Para la Fortaleza de la Juventud', 'Principios del Evangelio']),
       };
       const knownNames = new Set([
-        'Temas Especiais', 'Para a Forca da Juventude', 'Principios do Evangelho',
-        'Special Topics', 'For the Strength of Youth', 'Gospel Principles',
-        'Temas Especiales', 'Para la Fortaleza de la Juventud', 'Principios del Evangelio',
+        'Para a Forca da Juventude', 'Principios do Evangelho',
+        'For the Strength of Youth', 'Gospel Principles',
+        'Para la Fortaleza de la Juventud', 'Principios del Evangelio',
       ]);
       const activeNames = defaultActiveNames[wardLanguage] ?? defaultActiveNames['en-US'];
 

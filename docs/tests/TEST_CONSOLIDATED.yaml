@@ -4,12 +4,12 @@
 # =============================================================================
 
 type: test_consolidated
-version: 25
-last_updated: "2026-03-09"
+version: 26
+last_updated: "2026-03-14"
 
 summary:
-  total_test_files: 69
-  total_tests: 2135
+  total_test_files: 70
+  total_tests: 2212
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -23,9 +23,10 @@ summary:
   # Note: F018_E2E added 95 tests (tester): CR-284 Phase 2 E2E testID validation + Maestro flow structure
   # Note: F019_E2E added 123 tests (tester): CR-284 Phase 3 E2E testID validation + Maestro 05-speeches/06-members flow structure
   # Note: F020_E2E added 128 tests (tester): CR-284 Phase 4 E2E testID validation + Maestro 07-invite/08-settings flow structure + cleanup script + README
+  # Note: F021 added 77 tests (tester): CR-285/286/287/288 Topic Library Overhaul behavioral tests
   framework: vitest
   categories:
-    module_named: 59
+    module_named: 60
     integration: 6
   infrastructure:
     setup: 1
@@ -989,6 +990,33 @@ module_tests:
       - "Cleanup Deno compatibility (5 tests): Deno.env.get, Deno.exit, esm.sh CDN, top-level await, paginated perPage 50"
       - "Network error handling EC-002 (2 tests): 15s invite timeout, 10s users loading"
       - "Total testID count (2 tests): users.tsx 7 static + 1 dynamic, invite/[token].tsx 5 unique 6 occurrences"
+
+  - file: src/__tests__/f021-topic-library-overhaul.test.ts
+    tests: 77
+    module: "src/hooks/useTopics.ts, src/app/(tabs)/settings/topics.tsx, src/types/database.ts, supabase/functions/register-first-user/index.ts, supabase/migrations/033_delete_special_topics.sql, supabase/migrations/034_add_default_ward_topics.sql, src/i18n/locales/*.json"
+    covers:
+      - "CR-285 migration 033 (8 tests): file exists, DELETE FROM general_collections, 3 language variants, WHERE IN clause, no explicit DELETE on general_topics, no explicit DELETE on ward_collection_config, no speeches reference, single DELETE statement"
+      - "CR-285 FIXED_COLLECTION_ORDER (4 tests): no Temas Especiais, no Special Topics, no Temas Especiales, 6 entries total"
+      - "CR-285 knownNames (2 tests): no special topics in knownNames set, exactly 6 entries"
+      - "CR-286 register-first-user defaults (7 tests): pt-BR topics, en-US topics, es-LA topics, is_default true, en-US fallback, defaultTopicTitles map"
+      - "CR-286 migration 034 (14 tests): file exists, ALTER TABLE, NOT NULL DEFAULT false, pt-BR inserts, en-US inserts, es-LA inserts, 3 NOT EXISTS guards, 3 CROSS JOINs, language filters, is_default true in all inserts"
+      - "CR-286 section rename (2 tests): uses t(topics.customTopics), does not use t(topics.wardTopics)"
+      - "CR-286 sort order (2 tests): is_default DESC first, title ASC second"
+      - "CR-286 swipe disabled (1 test): disabled={!canWrite || item.is_default}"
+      - "CR-286 useActiveTopics label (2 tests): uses topics.customTopics, does not use topics.wardTopics"
+      - "CR-286 WardTopic type (1 test): is_default: boolean in interface"
+      - "CR-286 i18n customTopics (4 tests): pt-BR Temas Personalizados, en-US Custom Topics, es-LA Temas Personalizados, wardTopics key preserved"
+      - "CR-287 description text (3 tests): pt-BR, en-US, es-LA exact strings"
+      - "CR-288 no search (5 tests): no SearchInput import, no search state, no filteredTopics, no searchContainer style, no closeButtonText style"
+      - "CR-288 no add button (2 tests): no addButton/addButtonText styles, no handleAdd in sectionHeader"
+      - "CR-288 inline add (4 tests): addTopicRow style, addTopicPlaceholder style, t(topics.addTopic), italic fontStyle"
+      - "CR-288 TopicEditor (5 tests): setIsAdding(true) on tap, TopicEditor rendered, topicTitle placeholder, topicLink placeholder, save+cancel buttons"
+      - "CR-288 save/cancel (3 tests): createTopic.mutate, setIsAdding(false) on success, onCancel sets isAdding false"
+      - "CR-288 canWrite guard (1 test): canWrite && pattern"
+      - "CR-288 no filtering (2 tests): wardTopics.map direct, useWardTopics() no args"
+      - "Edge cases (5 tests): en-US fallback, single DELETE statement, is_default disabled, FSY priority 0, GP priority 1"
+      - "Cross-cutting (5 tests): no SearchInput import, useWardTopics no params, no select callback, migration order 033<034, addTopic i18n key"
+      - "normalizeForSearch kept (1 test): function still exists in useTopics.ts"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts
@@ -4349,8 +4377,22 @@ gaps:
   #   but 1 test in naming convention overlaps → actual unique tests = 128.
   # No gaps.
 
+  # F021 gaps
+  # All ACs covered: AC-285-1..5, AC-286-1..7, AC-287-1..3, AC-288-1..8. 23 ACs total.
+  # All edge cases covered: EC-021-01 to EC-021-06. 6 ECs total.
+  # 77 tester tests: 8 migration 033 (CR-285), 14 migration 034 (CR-286),
+  #   2 section rename (AC-286-3), 2 sort order (AC-286-4), 1 swipe disabled (AC-286-5),
+  #   2 useActiveTopics label (AC-286-6), 1 WardTopic type, 7 register-first-user (AC-286-1),
+  #   3 i18n description (AC-287-1/2/3), 4 i18n customTopics (CR-286),
+  #   5 no search (AC-288-1), 2 no add button (AC-288-2), 4 inline add placeholder (AC-288-3),
+  #   2 TopicEditor expand (AC-288-4), 2 save (AC-288-5), 1 cancel (AC-288-6),
+  #   1 canWrite guard (AC-288-7), 2 no filtering (AC-288-8), 3 TopicEditor fields,
+  #   5 edge cases, 4 FIXED_COLLECTION_ORDER priorities, 1 normalizeForSearch kept,
+  #   5 cross-cutting no regressions.
+  # No gaps.
+
 stats:
-  total_tests: 2135
-  passing: 2135
+  total_tests: 2212
+  passing: 2212
   failing: 0
   skipped: 0

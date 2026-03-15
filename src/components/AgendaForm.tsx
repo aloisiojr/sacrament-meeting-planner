@@ -5,7 +5,7 @@
  * Special: Welcome, Designations/Sacrament, Special Meeting.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
-import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment } from '../hooks/useSpeeches';
+import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment, useLazyCreateSpeeches } from '../hooks/useSpeeches';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
 import { getCurrentLanguage } from '../i18n';
 import { ActorSelector } from './ActorSelector';
@@ -77,6 +77,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   const { managePrayers } = useWardManagePrayers();
   const assignSpeaker = useAssignSpeaker();
   const removeAssignment = useRemoveAssignment();
+  const lazyCreateSpeeches = useLazyCreateSpeeches();
+
+  // When managePrayers is OFF, prayers are selected directly in the agenda.
+  // Ensure speech records for positions 0/4 exist so the selector can assign to them.
+  const hasCreatedPrayers = useRef(false);
+  useEffect(() => {
+    if (!managePrayers && !hasCreatedPrayers.current && sundayDate && !isObserver) {
+      hasCreatedPrayers.current = true;
+      lazyCreateSpeeches.mutate({ sundayDate });
+    }
+  }, [managePrayers, sundayDate, isObserver]);
 
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);

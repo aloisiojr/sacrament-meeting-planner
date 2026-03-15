@@ -2,20 +2,39 @@
  * AboutScreen: Static info screen showing app name and version.
  */
 
-import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+const CONTACT_EMAIL = 'sacr.meet.plan@gmail.com';
 
 export default function AboutScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
   const supportUrl = t('about.supportUrl');
+
+  const handleEmailPress = () => {
+    Linking.openURL(`mailto:${CONTACT_EMAIL}`);
+  };
+
+  const handleEmailLongPress = () => {
+    Alert.alert(t('about.contact'), CONTACT_EMAIL, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('about.copyEmail'),
+        onPress: async () => {
+          await Clipboard.setStringAsync(CONTACT_EMAIL);
+          Alert.alert(t('about.emailCopied'));
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -66,6 +85,18 @@ export default function AboutScreen() {
             </Text>
           </Pressable>
         ) : null}
+        <Pressable
+          style={[styles.infoRow, { borderTopColor: colors.divider, borderTopWidth: StyleSheet.hairlineWidth }]}
+          onPress={handleEmailPress}
+          onLongPress={handleEmailLongPress}
+        >
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {t('about.contact')}
+          </Text>
+          <Text style={[styles.value, { color: colors.primary }]}>
+            {CONTACT_EMAIL}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.disclaimerContainer}>

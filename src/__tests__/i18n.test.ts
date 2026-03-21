@@ -50,9 +50,33 @@ describe('i18n locale files', () => {
   });
 
   it('should have the correct login title in all languages', () => {
-    expect(ptBR.auth.loginTitle).toBe('Gerenciador da Reunião Sacramental');
+    expect(ptBR.auth.loginTitle).toBe('Sacrament Meeting Planner');
     expect(enUS.auth.loginTitle).toBe('Sacrament Meeting Planner');
-    expect(esLA.auth.loginTitle).toBe('Planificador de Reunión Sacramental');
+    expect(esLA.auth.loginTitle).toBe('Sacrament Meeting Planner');
+  });
+
+  it('should have all account self-deletion i18n keys', () => {
+    const selfDeletionKeys = [
+      'deleteMyAccount',
+      'deleteAccountTitle',
+      'deleteAccountConfirm',
+      'deleteAccountLastMemberWarning',
+    ] as const;
+
+    for (const key of selfDeletionKeys) {
+      expect(
+        ptBR.users[key as keyof typeof ptBR.users],
+        `Missing users.${key} in pt-BR`
+      ).toBeDefined();
+      expect(
+        enUS.users[key as keyof typeof enUS.users],
+        `Missing users.${key} in en-US`
+      ).toBeDefined();
+      expect(
+        esLA.users[key as keyof typeof esLA.users],
+        `Missing users.${key} in es-LA`
+      ).toBeDefined();
+    }
   });
 
   it('should have the correct login subtitle in all languages', () => {

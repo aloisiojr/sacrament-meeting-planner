@@ -4,12 +4,13 @@
 # =============================================================================
 
 type: test_consolidated
-version: 26
-last_updated: "2026-03-14"
+version: 27
+last_updated: "2026-03-21"
 
 summary:
-  total_test_files: 70
-  total_tests: 2212
+  total_test_files: 71
+  total_tests: 2261
+  # Note: F022 added 48 tests (tester): 47 f022-app-store-compliance + 1 i18n.test.ts self-deletion keys
   # Note: F060-F061-F062 added 58 tests (27 coder + 31 tester)
   # Note: F063 added 33 tests (16 coder + 17 tester)
   # Note: F064 added 41 tests (tester)
@@ -59,11 +60,12 @@ module_tests:
       - generateSundayRange, getNextSundays, getPreviousSundays
 
   - file: src/__tests__/i18n.test.ts
-    tests: 13
+    tests: 14
     module: src/i18n/locales/*.json
     covers:
       - Locale key parity across pt-BR, en-US, es-LA
-      - Login title/subtitle translations
+      - Login title/subtitle translations (CR-289: all 3 locales = 'Sacrament Meeting Planner')
+      - Account self-deletion i18n keys (CR-290: deleteMyAccount, deleteAccountTitle, deleteAccountConfirm, deleteAccountLastMemberWarning)
       - Speech status, month abbreviation, theme, and sunday exception translations
 
   - file: src/__tests__/i18n-module.test.ts
@@ -1017,6 +1019,16 @@ module_tests:
       - "Edge cases (5 tests): en-US fallback, single DELETE statement, is_default disabled, FSY priority 0, GP priority 1"
       - "Cross-cutting (5 tests): no SearchInput import, useWardTopics no params, no select callback, migration order 033<034, addTopic i18n key"
       - "normalizeForSearch kept (1 test): function still exists in useTopics.ts"
+
+  - file: src/__tests__/f022-app-store-compliance.test.ts
+    tests: 47
+    module: "src/i18n/locales/*.json, supabase/functions/delete-user/index.ts, src/app/(tabs)/settings/index.tsx, src/app/(tabs)/settings/users.tsx"
+    covers:
+      - "CR-289 login title (4 tests): pt-BR/es-LA/en-US all = 'Sacrament Meeting Planner', all 3 match"
+      - "CR-290 i18n keys (4 tests): deleteMyAccount, deleteAccountTitle, deleteAccountConfirm, deleteAccountLastMemberWarning values in all 3 locales"
+      - "CR-290 delete-user edge function (16 tests): self-deletion branch, body parsed before role check (ADR-061), no cannot_delete_self guard, any role allowed, paginated listUsers (ADR-062), last-member ward deletion (CASCADE), non-last-member push token deletion, auth user deletion, non-self bishopric check, 403 for non-bishopric, ward-mismatch check, getUserById validation, pagination loop, error handling"
+      - "CR-290 settings index (3 tests): no settings:users permission gate, isOnline guard, settings/users route"
+      - "CR-290 users screen (20 tests): Delete My Account button for self, error color styling, deleteAccountConfirm for non-last, deleteAccountLastMemberWarning for last, users.length===1 detection, deleteAccountTitle dialog, observer displayedUsers filter, invite hidden for observer, role selector hidden for observer self, signOut on self-deletion, return before Alert, no cannotDeleteSelf, onError handler, observer self-only filter, admin delete preserved, app_metadata.role detection, displayedUsers.map rendering"
 
 integration_tests:
   - file: src/__tests__/integration/hooks-supabase.integration.test.ts

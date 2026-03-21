@@ -1,0 +1,214 @@
+# =============================================================================
+# QA_PLAN_022.yaml
+# PRE validation for CR-289 (Login Title) and CR-290 (Delete Own Account)
+# =============================================================================
+
+metadata:
+  artifact_id: "022"
+  mode: PRE
+  date: "2026-03-21"
+  scope: "App Store compliance - login title and account deletion"
+  type: feature_request
+  user_request: |
+    "Meu app nao foi aceito na app store. Eu preciso fazer 2 modificações.
+    1. O título que aparece na tela de login tem que ter o mesmo nome do app na app store.
+    Entao, independente de i18n, para todas as linguas, tem que se chamar 'Sacrament Meeting Planner'.
+    2. Eu preciso adicionar a funcionalidade de permitir que o usuário delete sua conta e seus dados sejam apagados."
+  validated: true
+
+pre_validation:
+  request_clarity: clear
+  scope_assessment: well_defined
+  feasibility: confirmed
+  risk_level: medium  # CR-290 involves data deletion and auth changes
+
+  evidence:
+    cr289_login_title:
+      - finding: "pt-BR.json line 26: auth.loginTitle = 'Gerenciador da Reunião Sacramental' (NEEDS CHANGE)"
+        path: "src/i18n/locales/pt-BR.json:26"
+      - finding: "en-US.json line 26: auth.loginTitle = 'Sacrament Meeting Planner' (ALREADY CORRECT)"
+        path: "src/i18n/locales/en-US.json:26"
+      - finding: "es-LA.json line 26: auth.loginTitle = 'Planificador de Reunión Sacramental' (NEEDS CHANGE)"
+        path: "src/i18n/locales/es-LA.json:26"
+      - finding: "login.tsx line 67 uses t('auth.loginTitle') - no code change needed, only i18n values"
+        path: "src/app/(auth)/login.tsx:67"
+      - finding: "Existing test i18n.test.ts lines 53-55 asserts per-language loginTitle values - MUST BE UPDATED"
+        path: "src/__tests__/i18n.test.ts:53-55"
+
+    cr290_delete_own_account:
+      - finding: "users.tsx line 240-256: handleDelete blocks self-deletion (cannotDeleteSelf guard on line 243)"
+        path: "src/app/(tabs)/settings/users.tsx:240-256"
+      - finding: "delete-user edge function line 78: blocks self-deletion with 'cannot_delete_self'"
+        path: "supabase/functions/delete-user/index.ts:78"
+      - finding: "delete-user edge function line 60: only bishopric role can delete (needs relaxation for self-delete)"
+        path: "supabase/functions/delete-user/index.ts:60"
+      - finding: "Existing edge function cleans up push tokens (line 104) before auth.admin.deleteUser (line 110)"
+        path: "supabase/functions/delete-user/index.ts:104-110"
+      - finding: "All ward tables use ON DELETE CASCADE from wards(id) - deleting ward cascades all data"
+        path: "supabase/migrations/001_initial_schema.sql"
+      - finding: "permissions.ts: settings:users permission required for users screen (bishopric + secretary have it)"
+        path: "src/lib/permissions.ts:32,61"
+      - finding: "Observer role does NOT have settings:users - observers cannot access users screen"
+        path: "src/lib/permissions.ts:74-78"
+      - finding: "i18n already has users.cannotDeleteSelf, users.deleteConfirm, users.deleteSuccess keys"
+        path: "src/i18n/locales/pt-BR.json:310-317"
+
+  impact_analysis:
+    cr289:
+      files_to_modify:
+        - "src/i18n/locales/pt-BR.json (change auth.loginTitle to 'Sacrament Meeting Planner')"
+        - "src/i18n/locales/es-LA.json (change auth.loginTitle to 'Sacrament Meeting Planner')"
+        - "src/__tests__/i18n.test.ts (update expected values for loginTitle in all 3 langs)"
+      files_unchanged:
+        - "src/i18n/locales/en-US.json (already correct)"
+        - "src/app/(auth)/login.tsx (no change needed, uses t() which will return new value)"
+
+    cr290:
+      files_to_modify:
+        - "src/app/(tabs)/settings/users.tsx (add 'Delete My Account' button for self, with last-member warning)"
+        - "supabase/functions/delete-user/index.ts (allow self-deletion, add last-member ward cleanup logic)"
+        - "src/i18n/locales/pt-BR.json (new i18n keys for delete account, last member warning)"
+        - "src/i18n/locales/en-US.json (same)"
+        - "src/i18n/locales/es-LA.json (same)"
+      new_behavior:
+        - "User sees 'Delete My Account' button on own expanded card"
+        - "Confirmation dialog warns this is irreversible"
+        - "If user is last member of ward: extra warning that ward and all data will be deleted"
+        - "Edge function: if self-delete, skip role check; count remaining users in ward"
+        - "If last member: delete ward (CASCADE handles all related data), then delete auth user"
+        - "If not last member: just delete push tokens + auth user (existing behavior)"
+        - "After successful deletion: sign out locally"
+
+  architectural_notes:
+    - "CR-289 is trivial: 2 string changes + test update"
+    - "CR-290 requires edge function modification to support self-deletion path"
+    - "The existing delete-user function has 2 guards that block self-delete: role check (bishopric only) and explicit self-check"
+    - "For self-delete: role check should be bypassed (any role can delete themselves)"
+    - "For self-delete: the 'cannot_delete_self' guard must be converted to an allowed path"
+    - "Ward deletion via CASCADE is safe: all tables reference wards(id) ON DELETE CASCADE"
+    - "Observer cannot access users screen (no settings:users perm), needs alternative placement OR grant access to delete-self only"
+    - "Decision needed: should observers be able to delete their account? If yes, need separate UI entry point since they can't access users screen"
+
+validation_checks:
+
+  # =========================================================================
+  # CR-289: Login Title
+  # =========================================================================
+
+  - id: CR289_MP1
+    cr: CR-289
+    type: must_pass
+    description: "pt-BR auth.loginTitle changed to 'Sacrament Meeting Planner'"
+    verification: "Read src/i18n/locales/pt-BR.json, check auth.loginTitle value"
+
+  - id: CR289_MP2
+    cr: CR-289
+    type: must_pass
+    description: "es-LA auth.loginTitle changed to 'Sacrament Meeting Planner'"
+    verification: "Read src/i18n/locales/es-LA.json, check auth.loginTitle value"
+
+  - id: CR289_MP3
+    cr: CR-289
+    type: must_pass
+    description: "en-US auth.loginTitle remains 'Sacrament Meeting Planner'"
+    verification: "Read src/i18n/locales/en-US.json, confirm auth.loginTitle unchanged"
+
+  - id: CR289_MP4
+    cr: CR-289
+    type: must_pass
+    description: "i18n test updated to expect 'Sacrament Meeting Planner' for all 3 locales"
+    verification: "Read src/__tests__/i18n.test.ts, check loginTitle assertions"
+
+  - id: CR289_SP1
+    cr: CR-289
+    type: should_pass
+    description: "login.tsx still uses t('auth.loginTitle') - no hardcoded title"
+    verification: "Read src/app/(auth)/login.tsx, confirm t() usage on title line"
+
+  # =========================================================================
+  # CR-290: Delete Own Account
+  # =========================================================================
+
+  - id: CR290_MP1
+    cr: CR-290
+    type: must_pass
+    description: "User's own expanded card shows a 'Delete My Account' button"
+    verification: "Read users.tsx, find delete-account button rendered when isSelf=true"
+
+  - id: CR290_MP2
+    cr: CR-290
+    type: must_pass
+    description: "Tapping delete-account button shows confirmation dialog"
+    verification: "Read users.tsx, verify Alert.alert with confirm/cancel for self-deletion"
+
+  - id: CR290_MP3
+    cr: CR-290
+    type: must_pass
+    description: "If user is last member of ward, confirmation warns ward will be deleted"
+    verification: "Read users.tsx or edge function, verify last-member count check and warning text"
+
+  - id: CR290_MP4
+    cr: CR-290
+    type: must_pass
+    description: "Edge function allows self-deletion (no longer blocks with cannot_delete_self)"
+    verification: "Read delete-user/index.ts, verify self-deletion path exists"
+
+  - id: CR290_MP5
+    cr: CR-290
+    type: must_pass
+    description: "Edge function: if last member, deletes ward before deleting auth user"
+    verification: "Read delete-user/index.ts, verify ward deletion logic with user count check"
+
+  - id: CR290_MP6
+    cr: CR-290
+    type: must_pass
+    description: "Edge function: any role can self-delete (not restricted to bishopric for self)"
+    verification: "Read delete-user/index.ts, verify role check is skipped for self-deletion"
+
+  - id: CR290_MP7
+    cr: CR-290
+    type: must_pass
+    description: "After successful account deletion, user is signed out locally"
+    verification: "Read users.tsx, verify signOut() call after successful self-deletion"
+
+  - id: CR290_MP8
+    cr: CR-290
+    type: must_pass
+    description: "i18n keys added for delete-account UI in all 3 locales"
+    verification: "Search for new i18n keys in all 3 locale files"
+
+  - id: CR290_MP9
+    cr: CR-290
+    type: must_pass
+    description: "Push tokens for deleted user are cleaned up"
+    verification: "Read delete-user/index.ts, verify device_push_tokens deletion"
+
+  - id: CR290_MP10
+    cr: CR-290
+    type: must_pass
+    description: "All tests pass after changes"
+    verification: "Run test suite, confirm no regressions"
+
+  - id: CR290_SP1
+    cr: CR-290
+    type: should_pass
+    description: "Delete-account button uses destructive styling (red/error color)"
+    verification: "Read users.tsx, check button uses colors.error"
+
+  - id: CR290_SP2
+    cr: CR-290
+    type: should_pass
+    description: "Existing admin delete-other-user flow still works unchanged"
+    verification: "Read users.tsx, verify handleDelete for non-self users is preserved"
+
+  - id: CR290_SP3
+    cr: CR-290
+    type: should_pass
+    description: "Edge function still blocks non-bishopric from deleting OTHER users"
+    verification: "Read delete-user/index.ts, verify role check still applies for non-self deletions"
+
+  - id: CR290_SP4
+    cr: CR-290
+    type: should_pass
+    description: "Ward CASCADE deletion cleans up all related tables"
+    verification: "Confirm initial schema has ON DELETE CASCADE on all ward_id foreign keys"

@@ -5,8 +5,8 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-14"
-  version: 22
+  last_updated: "2026-03-21"
+  version: 23
 
 validations:
 
@@ -4547,3 +4547,155 @@ validations:
         description: "Existing tests updated or removed to reflect search removal"
         result: PASS
         evidence: "All 1784 tests pass (npx vitest run). f021-topic-library-overhaul.test.ts has 77 tests covering all 4 CRs. No test references search functionality in topics screen."
+
+  # ===========================================================================
+  # F022: App Store Compliance (QA_PLAN_022)
+  # ===========================================================================
+
+  - id: QA_023
+    plan: QA_PLAN_022
+    date: "2026-03-21"
+    scope: "F022 - App Store Compliance (CR-289, CR-290)"
+    verdict: passed
+    must_pass: 14/14
+    should_pass: 5/5
+    total_checks: 19/19
+    reviewer_verdict: "APPROVED (2 P2 non-blocking)"
+    tester_verdict: "PASSED (1832 tests, 48 new)"
+
+    checks:
+
+      # --- CR-289: Login Title Fix ---
+      - id: CR289_MP1
+        cr: CR-289
+        type: must_pass
+        description: "pt-BR auth.loginTitle changed to 'Sacrament Meeting Planner'"
+        result: PASS
+        evidence: "pt-BR.json line 26: \"loginTitle\": \"Sacrament Meeting Planner\""
+
+      - id: CR289_MP2
+        cr: CR-289
+        type: must_pass
+        description: "es-LA auth.loginTitle changed to 'Sacrament Meeting Planner'"
+        result: PASS
+        evidence: "es-LA.json line 26: \"loginTitle\": \"Sacrament Meeting Planner\""
+
+      - id: CR289_MP3
+        cr: CR-289
+        type: must_pass
+        description: "en-US auth.loginTitle remains 'Sacrament Meeting Planner'"
+        result: PASS
+        evidence: "en-US.json line 26: \"loginTitle\": \"Sacrament Meeting Planner\" (unchanged)"
+
+      - id: CR289_MP4
+        cr: CR-289
+        type: must_pass
+        description: "i18n test updated to expect 'Sacrament Meeting Planner' for all 3 locales"
+        result: PASS
+        evidence: "i18n.test.ts lines 53-55: all 3 expect('Sacrament Meeting Planner'). f022 test AC-289-1..4 also verify."
+
+      - id: CR289_SP1
+        cr: CR-289
+        type: should_pass
+        description: "login.tsx still uses t('auth.loginTitle') - no hardcoded title"
+        result: PASS
+        evidence: "login.tsx line 67: {t('auth.loginTitle')} — no hardcoded string."
+
+      # --- CR-290: Delete Own Account ---
+      - id: CR290_MP1
+        cr: CR-290
+        type: must_pass
+        description: "User's own expanded card shows a 'Delete My Account' button"
+        result: PASS
+        evidence: "users.tsx lines 516-527: {isSelf ? ( <Pressable ... accessibilityLabel={t('users.deleteMyAccount')}> ... {t('users.deleteMyAccount')} )"
+
+      - id: CR290_MP2
+        cr: CR-290
+        type: must_pass
+        description: "Tapping delete-account button shows confirmation dialog"
+        result: PASS
+        evidence: "users.tsx lines 242-257: handleDelete for isSelf shows Alert.alert(t('users.deleteAccountTitle'), ..., [{cancel}, {delete, destructive}])"
+
+      - id: CR290_MP3
+        cr: CR-290
+        type: must_pass
+        description: "If user is last member of ward, confirmation warns ward will be deleted"
+        result: PASS
+        evidence: "users.tsx line 243: isLastMember = users.length === 1; line 246-247: ternary uses deleteAccountLastMemberWarning vs deleteAccountConfirm"
+
+      - id: CR290_MP4
+        cr: CR-290
+        type: must_pass
+        description: "Edge function allows self-deletion (no longer blocks with cannot_delete_self)"
+        result: PASS
+        evidence: "delete-user/index.ts line 71: if (input.targetUserId === caller.id) { — self-deletion path. No 'cannot_delete_self' string anywhere in file."
+
+      - id: CR290_MP5
+        cr: CR-290
+        type: must_pass
+        description: "Edge function: if last member, deletes ward before deleting auth user"
+        result: PASS
+        evidence: "delete-user/index.ts lines 87-89: if (wardMemberCount === 1) { await supabaseAdmin.from('wards').delete().eq('id', wardId); }"
+
+      - id: CR290_MP6
+        cr: CR-290
+        type: must_pass
+        description: "Edge function: any role can self-delete (not restricted to bishopric for self)"
+        result: PASS
+        evidence: "delete-user/index.ts line 72: comment 'Self-deletion: any role allowed (ADR-061)'. Bishopric check (line 112) is in else branch (non-self only)."
+
+      - id: CR290_MP7
+        cr: CR-290
+        type: must_pass
+        description: "After successful account deletion, user is signed out locally"
+        result: PASS
+        evidence: "users.tsx lines 153-156: onSuccess checks variables.targetUserId === currentUser?.id, calls await supabase.auth.signOut(), then return (skips alert)."
+
+      - id: CR290_MP8
+        cr: CR-290
+        type: must_pass
+        description: "i18n keys added for delete-account UI in all 3 locales"
+        result: PASS
+        evidence: "All 3 locales have: deleteMyAccount (pt:326, en:326, es:326), deleteAccountTitle (pt:327, en:327, es:327), deleteAccountConfirm (pt:328, en:328, es:328), deleteAccountLastMemberWarning (pt:329, en:329, es:329)."
+
+      - id: CR290_MP9
+        cr: CR-290
+        type: must_pass
+        description: "Push tokens for deleted user are cleaned up"
+        result: PASS
+        evidence: "delete-user/index.ts lines 92-93: non-last-member self-deletion path deletes from device_push_tokens. Lines 138-141: non-self deletion also deletes push tokens."
+
+      - id: CR290_MP10
+        cr: CR-290
+        type: must_pass
+        description: "All tests pass after changes"
+        result: PASS
+        evidence: "1832 total tests, 0 failures (48 new in f022-app-store-compliance.test.ts)."
+
+      - id: CR290_SP1
+        cr: CR-290
+        type: should_pass
+        description: "Delete-account button uses destructive styling (red/error color)"
+        result: PASS
+        evidence: "users.tsx line 518: { backgroundColor: colors.error } on self-deletion Pressable."
+
+      - id: CR290_SP2
+        cr: CR-290
+        type: should_pass
+        description: "Existing admin delete-other-user flow still works unchanged"
+        result: PASS
+        evidence: "users.tsx lines 258-266: else branch of handleDelete uses t('users.deleteUser'), t('users.deleteConfirm'). Lines 528-540: non-self delete button renders t('users.deleteUser')."
+
+      - id: CR290_SP3
+        cr: CR-290
+        type: should_pass
+        description: "Edge function still blocks non-bishopric from deleting OTHER users"
+        result: PASS
+        evidence: "delete-user/index.ts line 112: callerRole !== 'bishopric' check in else (non-self) branch returns 403 Insufficient permissions."
+
+      - id: CR290_SP4
+        cr: CR-290
+        type: should_pass
+        description: "Ward CASCADE deletion cleans up all related tables"
+        result: PASS
+        evidence: "001_initial_schema.sql: all ward_id FKs use ON DELETE CASCADE (members, ward_topics, ward_collection_config, sunday_exceptions, speeches, meeting_actors, sunday_agendas, activity_log, invitations, device_push_tokens, notification_queue)."

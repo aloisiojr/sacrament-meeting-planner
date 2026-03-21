@@ -5,9 +5,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-14"
-  version: 23
-  last_updated_by: "phase-021"
+  last_updated: "2026-03-21"
+  version: 24
+  last_updated_by: "phase-022"
 
 reviews:
   - id: REV-001
@@ -6320,3 +6320,186 @@ reviews:
       tests_total: 2212
       tests_passing: 2212
       test_files: 70
+
+  - id: REV-024
+    scope: "CR-289, CR-290 — App Store Compliance (Login Title Fix + Account Self-Deletion)"
+    date: "2026-03-21"
+    reviewer: reviewer-agent
+    commits:
+      - hash: fbd2081
+        message: "feat(i18n): login title fix + account self-deletion keys (CR-289, CR-290)"
+      - hash: 446f58e
+        message: "feat(delete-user): add self-deletion with last-member ward cleanup (CR-290)"
+      - hash: 1bdc734
+        message: "feat(settings): remove permission gate from Users menu item (CR-290)"
+      - hash: 8ed5f91
+        message: "feat(users): add self-deletion UI and observer filtered view (CR-290)"
+      - hash: 82cc52a
+        message: "test: add F022 App Store Compliance tests (CR-289, CR-290)"
+
+    # =========================================================================
+    # CHAIN VALIDATION
+    # =========================================================================
+
+    chain_validation:
+      spec_to_arch: pass
+      spec_to_arch_notes: |
+        All SPEC items covered by ARCH modules:
+        - CR-289 (i18n fix): MOD-022-A
+        - CR-290 (self-deletion): MOD-022-B (settings gate), MOD-022-C (users screen),
+          MOD-022-D (edge function), MOD-022-E (i18n keys)
+        - Tests: MOD-022-F
+        ADRs 061-063 properly documented in ARCH.
+
+      arch_to_plan: pass
+      arch_to_plan_notes: |
+        All modules mapped to plan steps S022-01 through S022-07.
+        AC coverage matrix is complete — all 15 ACs (AC-289-1..4, AC-290-1..11) mapped.
+        6 edge cases (EC-022-01..06) documented with handling.
+
+      plan_to_code: pass
+      plan_to_code_notes: |
+        Each plan step has a corresponding commit:
+        - S022-01 -> fbd2081 (i18n changes)
+        - S022-02 -> 446f58e (edge function self-deletion)
+        - S022-03 -> 1bdc734 (settings gate removal)
+        - S022-04 -> 8ed5f91 (users screen UI)
+        - S022-05 -> 82cc52a (tests)
+        All file targets match. Implementation faithful to plan.
+
+    # =========================================================================
+    # ACCEPTANCE CRITERIA VERIFICATION
+    # =========================================================================
+
+    ac_verification:
+      - id: AC-289-1
+        status: pass
+        evidence: "pt-BR auth.loginTitle = 'Sacrament Meeting Planner' (verified in locale file line 26)"
+      - id: AC-289-2
+        status: pass
+        evidence: "es-LA auth.loginTitle = 'Sacrament Meeting Planner' (verified in locale file line 26)"
+      - id: AC-289-3
+        status: pass
+        evidence: "en-US auth.loginTitle = 'Sacrament Meeting Planner' (unchanged, verified)"
+      - id: AC-289-4
+        status: pass
+        evidence: "i18n.test.ts line 53-55 updated + f022 test file AC-289-1..4 tests pass"
+      - id: AC-290-1
+        status: pass
+        evidence: "users.tsx:516-527 — isSelf renders 'Delete My Account' button with colors.error"
+      - id: AC-290-2
+        status: pass
+        evidence: "users.tsx:248 — non-last-member shows t('users.deleteAccountConfirm')"
+      - id: AC-290-3
+        status: pass
+        evidence: "users.tsx:247 — last-member shows t('users.deleteAccountLastMemberWarning')"
+      - id: AC-290-4
+        status: pass
+        evidence: "delete-user/index.ts:92-93 — non-last-member deletes push tokens; :97 deletes auth"
+      - id: AC-290-5
+        status: pass
+        evidence: "delete-user/index.ts:89 — last member deletes ward (CASCADE); :97 deletes auth"
+      - id: AC-290-6
+        status: pass
+        evidence: "settings/index.tsx:296 — no hasPermission gate; users.tsx:297-299 — displayedUsers filtered for observer"
+      - id: AC-290-7
+        status: pass
+        evidence: "users.tsx:469 — role selector hidden via !(isObserver && isSelf); delete button visible at :516"
+      - id: AC-290-8
+        status: pass
+        evidence: "delete-user/index.ts:112 — non-self requires callerRole === 'bishopric'"
+      - id: AC-290-9
+        status: pass
+        evidence: "delete-user/index.ts:113-116 — returns 403 'Insufficient permissions'"
+      - id: AC-290-10
+        status: pass
+        evidence: "users.tsx:154-156 — onSuccess checks self, calls supabase.auth.signOut(), returns early"
+      - id: AC-290-11
+        status: pass
+        evidence: "All 4 keys present in all 3 locales (verified via grep)"
+
+    # =========================================================================
+    # ISSUES
+    # =========================================================================
+
+    issues:
+      - id: P2-024-001
+        severity: P2
+        title: "CODE_LEDGER missing test commit and test file"
+        description: |
+          CODE_LEDGER.yaml does not include:
+          - Commit 82cc52a (test: add F022 App Store Compliance tests)
+          - Files: src/__tests__/f022-app-store-compliance.test.ts, src/__tests__/i18n.test.ts
+        recommendation: "Update CODE_LEDGER to include test commit and test files"
+
+      - id: P2-024-002
+        severity: P2
+        title: "Dead i18n key: cannotDeleteSelf"
+        description: |
+          The cannotDeleteSelf key remains in all 3 locale files (line 317) but is
+          no longer referenced anywhere in the codebase. The edge function no longer
+          returns 'cannot_delete_self' and the onError handler no longer checks for it.
+        recommendation: "Remove cannotDeleteSelf from all 3 locale files in a follow-up"
+
+    # =========================================================================
+    # DEPLOYS
+    # =========================================================================
+
+    pending_deploys:
+      - component: "delete-user edge function"
+        type: edge_function
+        path: supabase/functions/delete-user/index.ts
+        instructions: |
+          Deploy updated delete-user edge function:
+            supabase functions deploy delete-user --project-ref <ref>
+          This adds self-deletion support (ADR-061) and last-member ward cleanup (ADR-062).
+          Must be deployed BEFORE the app update goes to App Store.
+
+    # =========================================================================
+    # REPOSITORY STATUS
+    # =========================================================================
+
+    repository_status:
+      clean: true
+      uncommitted_code_files: []
+      uncommitted_doc_files:
+        - "docs/specs/SPEC_F022.yaml"
+        - "docs/arch/ARCH_M022.yaml"
+        - "docs/plans/PLAN_P022.yaml"
+        - "docs/reviews/REVIEW_CONSOLIDATED.yaml"
+      notes: |
+        All code changes for F022 are committed across 5 commits
+        (fbd2081..82cc52a). Documentation files are pending Orchestrator commit.
+
+    # =========================================================================
+    # VERDICT & STATS
+    # =========================================================================
+
+    verdict: approved
+    summary: |
+      CR-289 and CR-290 (App Store Compliance) implementation is correct and complete.
+      Chain validation passes at all 4 levels (SPEC->ARCH->PLAN->CODE).
+
+      CR-289: loginTitle changed to 'Sacrament Meeting Planner' in pt-BR and es-LA.
+      en-US unchanged. i18n.test.ts assertions updated. Simple, correct change.
+
+      CR-290: delete-user edge function correctly implements self-deletion with
+      body parsing before role check (ADR-061), paginated listUsers for last-member
+      detection (ADR-062), and ward CASCADE deletion for last member. settings/index.tsx
+      correctly removes hasPermission gate while keeping isOnline guard. users.tsx
+      correctly implements observer filtered view (ADR-063), self-deletion button with
+      destructive styling, last-member-aware dialog, and signOut on self-deletion
+      success. onError handler cleaned up (cannot_delete_self case removed).
+
+      Two P2 issues found: CODE_LEDGER missing test commit, and dead cannotDeleteSelf
+      i18n key. Neither affects functionality. 48 new tests, 1832 total passing.
+
+    stats:
+      p0_count: 0
+      p1_count: 0
+      p2_count: 2
+      files_reviewed: 10
+      total_commits: 5
+      tests_total: 1832
+      tests_passing: 1832
+      test_files: 71

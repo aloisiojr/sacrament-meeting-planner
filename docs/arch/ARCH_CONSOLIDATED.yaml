@@ -6,9 +6,9 @@
 
 metadata:
   project: Sacrament Meeting Planner
-  last_updated: "2026-03-14"
-  total_modules: 14
-  total_adrs: 60
+  last_updated: "2026-03-21"
+  total_modules: 15
+  total_adrs: 63
 
 # =============================================================================
 # TECH STACK
@@ -1528,3 +1528,39 @@ adrs:
       Search adds complexity for a typically small list (under 20 items).
       Inline add at bottom is more discoverable and contextual than a
       floating button. Reuses TopicEditor for consistency with edit flow.
+
+  - id: ADR-061
+    title: "Self-deletion bypasses role check; body parsed before auth gate"
+    decision: |
+      In delete-user edge function, parse the request body (targetUserId) before
+      the bishopric role check. If targetUserId === caller.id, skip the role
+      check entirely (self-deletion allowed for any role). The bishopric check
+      only applies to non-self deletion.
+    rationale: |
+      Apple App Store requires account deletion for all users. Moving body
+      parsing before the role check is necessary to determine self vs other.
+      A new permission would add unnecessary complexity for a simple
+      self-vs-other distinction that only the edge function needs.
+
+  - id: ADR-062
+    title: "Last-member detection via paginated listUsers count"
+    decision: |
+      Use paginated listUsers loop (same pattern as send-reset-email, ADR-030)
+      to count ward members. If count === 1, delete ward (CASCADE) before
+      deleting auth user. Ward deletion cascades to all FK-dependent tables.
+    rationale: |
+      Users are in Supabase Auth with ward_id in app_metadata — no ward_members
+      table to query. Paginated listUsers is proven. CASCADE is safe because all
+      ward-related tables have ON DELETE CASCADE. Ward deleted before auth user
+      ensures no orphaned data.
+
+  - id: ADR-063
+    title: "Observer accesses Users screen with self-only filtered view"
+    decision: |
+      Remove hasPermission('settings:users') gate from settings index Users
+      item. In users.tsx, filter displayedUsers to observer's own card only.
+      Hide invite button and role selector for observers.
+    rationale: |
+      Apple requires all users to delete their account. Reusing Users screen
+      with role-based filtering is simpler than a separate account screen.
+      Observer sees same card UI with management controls hidden.

@@ -7,7 +7,7 @@
 
 metadata:
   product: Sacrament Meeting Planner
-  last_updated: "2026-03-14"
+  last_updated: "2026-03-21"
   total_features: 68
   total_business_rules: 49
   total_design_decisions: 68
@@ -60,7 +60,9 @@ features:
       registration. Session persisted across app restarts. Navigation guard
       redirects unauthenticated users to login and authenticated users to home.
       register-first-user also inserts 2 default ward_topics (is_default=true)
-      with language-appropriate titles. [Modified by CR-286]
+      with language-appropriate titles. Login screen title is always
+      'Sacrament Meeting Planner' regardless of locale (App Store name match).
+      [Modified by CR-286, CR-289]
     acceptance_criteria:
       - given: "User opens the app without a session"
         when: "App loads"
@@ -131,17 +133,32 @@ features:
     description: |
       Bishopric and secretary can manage ward users: list users (list-users EF),
       update roles (update-user-role EF), update names (update-user-name EF),
-      and delete users (delete-user EF). Users screen accessible from Settings.
+      and delete users (delete-user EF). Users screen accessible from Settings
+      for all roles. Bishopric/secretary see all users; observer sees only
+      their own card. All users can delete their own account via a
+      'Delete My Account' button on their expanded card. If the user is the
+      last member of the ward, deleting their account also deletes the ward
+      and all associated data (CASCADE). After self-deletion, the client
+      signs out locally. [Modified by CR-290]
     acceptance_criteria:
-      - given: "User with settings:users permission"
+      - given: "User with bishopric or secretary role"
         when: "User navigates to Settings > Users"
-        then: "List of ward users is displayed with name, email, and role"
+        then: "List of all ward users is displayed with name, email, and role"
       - given: "User with settings:users permission"
         when: "User changes another user's role"
         then: "Role is updated via update-user-role Edge Function"
       - given: "User with settings:users permission"
         when: "User deletes another user"
         then: "User is removed via delete-user Edge Function"
+      - given: "User (any role) views their own expanded card"
+        when: "User taps 'Delete My Account'"
+        then: "Confirmation dialog shown; if confirmed, account is deleted via delete-user EF and user is signed out"
+      - given: "User is the last member of the ward"
+        when: "User confirms account deletion"
+        then: "Ward is deleted (CASCADE), auth user is deleted, session is cleared"
+      - given: "User with observer role"
+        when: "User navigates to Settings > Users"
+        then: "Only the observer's own card is displayed (no other users, no invite button)"
 
   - id: F005
     name: Role-Based Access Control
@@ -162,7 +179,10 @@ features:
       Secretary sees speaker name and topic as read-only text for speech positions
       (1-3): no chevron, no X button. Secretary CAN change status via LED at all
       positions. Secretary CAN assign/unassign prayer speakers (pos 0, 4).
-      [Modified by CR-253]
+
+      Users screen: accessible to all roles. Observer sees limited view (own
+      card only). All users can self-delete their account.
+      [Modified by CR-253, CR-290]
     acceptance_criteria:
       - given: "User with bishopric role"
         when: "User accesses the app"
@@ -175,7 +195,10 @@ features:
         then: "Speaker field is interactive (can assign/unassign prayer speakers)"
       - given: "User with observer role"
         when: "User accesses the app"
-        then: "Can only view members, read agenda, and start presentation mode; Settings shows limited options (app language, theme, about)"
+        then: "Can only view members, read agenda, and start presentation mode; Settings shows limited options (app language, theme, users, about)"
+      - given: "User with observer role"
+        when: "User navigates to Settings > Users"
+        then: "Only own card visible; can delete own account; no other users or invite button shown"
 
   # ---------------------------------------------------------------------------
   # Ward Data Management
@@ -1727,7 +1750,7 @@ business_rules:
 
   - id: BR010
     rule: "Observer limited settings"
-    description: "Observer role sees only App Settings group (app language, theme, about). Ward Settings group is hidden."
+    description: "Observer role sees only App Settings group (app language, theme, about) plus Users (limited to own card for account deletion). Ward Settings group is hidden. [Modified by CR-290]"
 
   - id: BR011
     rule: "Ward language affects collections and templates only"

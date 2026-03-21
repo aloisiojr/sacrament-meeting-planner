@@ -1,0 +1,487 @@
+# =============================================================================
+# PLAN_P022.yaml
+# Artifact ID: 022
+# Feature: F022 - App Store Compliance (Login Title Fix + Account Self-Deletion)
+# Phase: 1 of 1
+# Status: pending
+# =============================================================================
+
+type: plan
+version: 1
+status: pending
+artifact_id: "022"
+feature: "F022"
+phase: 1
+total_phases: 1
+cr_range: "CR-289 to CR-290"
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+
+  # ===========================================================================
+  # S022-01: i18n — Login title fix + self-deletion keys (CR-289 + CR-290)
+  # ===========================================================================
+
+  - id: S022-01
+    title: "i18n: Login title fix (CR-289) + account self-deletion keys (CR-290)"
+    cr: "CR-289 + CR-290"
+    depends_on: []
+    modules: [MOD-022-A, MOD-022-E]
+    files:
+      - path: src/i18n/locales/pt-BR.json
+        action: modify
+      - path: src/i18n/locales/en-US.json
+        action: modify
+      - path: src/i18n/locales/es-LA.json
+        action: modify
+    description: |
+      CR-289: Change auth.loginTitle in pt-BR and es-LA to 'Sacrament Meeting Planner'.
+        - pt-BR: "Gerenciador da Reunião Sacramental" -> "Sacrament Meeting Planner"
+        - es-LA: "Planificador de Reunión Sacramental" -> "Sacrament Meeting Planner"
+        - en-US: already correct, no change needed
+
+      CR-290: Add 4 new i18n keys under the "users" namespace in all 3 locales:
+        - "deleteMyAccount":
+            pt-BR: "Excluir Minha Conta"
+            en-US: "Delete My Account"
+            es-LA: "Eliminar Mi Cuenta"
+        - "deleteAccountTitle":
+            pt-BR: "Excluir Conta"
+            en-US: "Delete Account"
+            es-LA: "Eliminar Cuenta"
+        - "deleteAccountConfirm":
+            pt-BR: "Tem certeza que deseja excluir sua conta? Esta acao e irreversivel e todos os seus dados serao apagados."
+            en-US: "Are you sure you want to delete your account? This action is irreversible and all your data will be erased."
+            es-LA: "Esta seguro de que desea eliminar su cuenta? Esta accion es irreversible y todos sus datos seran borrados."
+        - "deleteAccountLastMemberWarning":
+            pt-BR: "Voce e o unico membro desta ala. Ao excluir sua conta, a ala inteira e todos os dados associados serao permanentemente excluidos. Deseja continuar?"
+            en-US: "You are the only member of this ward. Deleting your account will permanently delete the entire ward and all associated data. Do you want to continue?"
+            es-LA: "Usted es el unico miembro de esta ala. Al eliminar su cuenta, toda la ala y todos los datos asociados seran eliminados permanentemente. Desea continuar?"
+    done_when: |
+      - pt-BR auth.loginTitle === 'Sacrament Meeting Planner'
+      - es-LA auth.loginTitle === 'Sacrament Meeting Planner'
+      - en-US auth.loginTitle === 'Sacrament Meeting Planner' (unchanged)
+      - All 3 locale files contain users.deleteMyAccount, users.deleteAccountTitle, users.deleteAccountConfirm, users.deleteAccountLastMemberWarning
+    acs_covered: [AC-289-1, AC-289-2, AC-289-3, AC-290-11]
+    tests:
+      - "auth.loginTitle === 'Sacrament Meeting Planner' in all 3 locales"
+      - "users.deleteMyAccount exists in all 3 locales with correct values"
+      - "users.deleteAccountTitle exists in all 3 locales with correct values"
+      - "users.deleteAccountConfirm exists in all 3 locales with correct values"
+      - "users.deleteAccountLastMemberWarning exists in all 3 locales with correct values"
+
+  # ===========================================================================
+  # S022-02: Edge function — Self-deletion path (CR-290)
+  # ===========================================================================
+
+  - id: S022-02
+    title: "delete-user edge function: self-deletion support with last-member logic"
+    cr: CR-290
+    depends_on: []
+    modules: [MOD-022-D]
+    files:
+      - path: supabase/functions/delete-user/index.ts
+        action: modify
+    description: |
+      Modify delete-user edge function to support self-deletion (ADR-061, ADR-062):
+
+      1. Move req.json() (body parsing) BEFORE the bishopric role check (line 60-65).
+         Currently body is parsed at line 67, after the role check at line 60.
+
+      2. Remove the 'cannot_delete_self' guard (lines 78-83).
+
+      3. Add self-deletion branch after body parsing + validation:
+         if (input.targetUserId === caller.id) {
+           // Self-deletion: any role allowed (ADR-061)
+           // Count ward members using paginated listUsers (ADR-062)
+           let wardMemberCount = 0;
+           let page = 1;
+           while (true) {
+             const { data: { users: pageUsers }, error } =
+               await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
+             if (error) throw error;
+             wardMemberCount += pageUsers.filter(
+               u => u.app_metadata?.ward_id === wardId
+             ).length;
+             if (pageUsers.length < 50) break;
+             page++;
+           }
+
+           if (wardMemberCount === 1) {
+             // Last member: delete ward (CASCADE clears all data)
+             await supabaseAdmin.from('wards').delete().eq('id', wardId);
+           } else {
+             // Not last member: delete push tokens only
+             await supabaseAdmin.from('device_push_tokens').delete()
+               .eq('user_id', caller.id);
+           }
+
+           // Delete auth user
+           const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(caller.id);
+           if (deleteError) {
+             console.error('Self-deletion error:', deleteError);
+             return new Response(
+               JSON.stringify({ error: 'Failed to delete user' }),
+               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+             );
+           }
+
+           return new Response(
+             JSON.stringify({ success: true, deletedUserId: caller.id }),
+             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+           );
+         }
+
+      4. Move the bishopric role check into the else branch (non-self deletion):
+         The existing code (role check, target user lookup, ward match, push token
+         cleanup, auth delete) moves into the else block. Behavior unchanged.
+
+      5. Update top-of-file comment to reflect self-deletion is now supported.
+    done_when: |
+      - Body is parsed before role check
+      - No 'cannot_delete_self' guard exists
+      - Self-deletion (targetUserId === caller.id) allowed for any role
+      - Last-member detection uses paginated listUsers counting ward members
+      - Last member path: deletes ward (CASCADE) then auth user
+      - Non-last-member self path: deletes push tokens then auth user
+      - Non-self path: bishopric role check + existing behavior unchanged
+      - Top comment updated
+    acs_covered: [AC-290-4, AC-290-5, AC-290-8, AC-290-9]
+    tests:
+      - "Self-deletion allowed for bishopric role"
+      - "Self-deletion allowed for secretary role"
+      - "Self-deletion allowed for observer role"
+      - "Last-member self-deletion deletes ward then auth user"
+      - "Non-last-member self-deletion deletes push tokens then auth user"
+      - "Non-self deletion still requires bishopric role"
+      - "Non-self deletion by secretary returns 403"
+      - "Non-self deletion by observer returns 403"
+      - "Non-self deletion ward-mismatch check still works"
+
+  # ===========================================================================
+  # S022-03: Settings index — Remove Users permission gate (CR-290)
+  # ===========================================================================
+
+  - id: S022-03
+    title: "Settings index: remove hasPermission('settings:users') gate from Users menu"
+    cr: CR-290
+    depends_on: []
+    modules: [MOD-022-B]
+    files:
+      - path: src/app/(tabs)/settings/index.tsx
+        action: modify
+    description: |
+      In settings/index.tsx line 296, change:
+        {hasPermission('settings:users') && isOnline && (
+      To:
+        {isOnline && (
+
+      This allows all roles (including observer) to navigate to the Users screen.
+      The isOnline guard remains (account deletion requires network).
+      The Users screen itself handles role-based content filtering (ADR-063).
+    done_when: |
+      - Users menu item is NOT gated by hasPermission('settings:users')
+      - Users menu item IS still gated by isOnline
+      - All roles can see the Users menu item when online
+    acs_covered: [AC-290-6]
+    tests:
+      - "Users menu item visible for observer role when online"
+      - "Users menu item hidden when offline (all roles)"
+      - "Users menu item still visible for bishopric/secretary when online"
+
+  # ===========================================================================
+  # S022-04: Users screen — Self-deletion UI + Observer view (CR-290)
+  # ===========================================================================
+
+  - id: S022-04
+    title: "Users screen: self-deletion button, observer filtering, signOut on success"
+    cr: CR-290
+    depends_on: [S022-01]
+    modules: [MOD-022-C]
+    files:
+      - path: src/app/(tabs)/settings/users.tsx
+        action: modify
+    description: |
+      Modify users.tsx to support self-deletion UI and observer-only view (ADR-063):
+
+      1. Observer filtering (after currentUserId declaration, ~line 281):
+         - const isObserver = currentUser?.app_metadata?.role === 'observer';
+         - const displayedUsers = isObserver
+             ? users.filter(u => u.id === currentUserId)
+             : users;
+         - Use displayedUsers instead of users in the map rendering (line 336)
+
+      2. Hide invite button for observers:
+         - Wrap invite button (lines 295-303) with {!isObserver && (...)}
+
+      3. Self-deletion button (replace lines 493-506):
+         - Replace {!isSelf && (...delete button...)} block with:
+           {isSelf ? (
+             <Pressable
+               style={[styles.deleteButton, { backgroundColor: colors.error }]}
+               onPress={() => handleDelete(u)}
+               disabled={deleteUserMutation.isPending}
+               accessibilityRole="button"
+               accessibilityLabel={t('users.deleteMyAccount')}
+             >
+               <Text style={styles.deleteButtonText}>
+                 {t('users.deleteMyAccount')}
+               </Text>
+             </Pressable>
+           ) : (
+             <Pressable ... existing delete button for others ... />
+           )}
+
+      4. Modify handleDelete (lines 240-256):
+         - Remove the early return for self (lines 242-244: cannotDeleteSelf guard)
+         - When isSelf: determine last member via users.length === 1
+         - If last member: Alert with deleteAccountLastMemberWarning
+         - If not last member: Alert with deleteAccountConfirm
+         - Both use deleteAccountTitle as dialog title
+         - On confirm: call deleteUserMutation.mutate with self userId
+         - When !isSelf: existing behavior unchanged (deleteUser title + deleteConfirm)
+
+      5. Modify deleteUserMutation onSuccess (lines 153-166):
+         - Check if deleted user is self: variables.targetUserId === currentUser?.id
+         - If self: call supabase.auth.signOut() — no success Alert, no log
+         - If not self: existing behavior (Alert + invalidate + log)
+
+      6. Hide role selector for observer on self card:
+         - Wrap role selector block (lines 448-491) with condition:
+           {!(isObserver && isSelf) && (...role selector...)}
+         - This hides the role selector when observer views own card
+    done_when: |
+      - Observer sees only their own card (displayedUsers filtered)
+      - Invite button hidden for observer
+      - Role selector hidden for observer on self card
+      - Self card shows 'Delete My Account' button (red/error styling)
+      - Other user cards show existing 'Delete User' button
+      - handleDelete for self shows deleteAccountTitle + last-member-aware message
+      - deleteUserMutation onSuccess for self calls supabase.auth.signOut()
+      - deleteUserMutation onSuccess for self does NOT show Alert or log
+      - deleteUserMutation onError still handles errors (remove cannot_delete_self case)
+    acs_covered: [AC-290-1, AC-290-2, AC-290-3, AC-290-6, AC-290-7, AC-290-10]
+    tests:
+      - "Self-deletion button renders with 'Delete My Account' label when isSelf=true"
+      - "Self-deletion button has destructive (error color) styling"
+      - "Observer sees only their own card"
+      - "Observer does not see invite button"
+      - "Observer does not see role selector on self card"
+      - "Last-member warning shows deleteAccountLastMemberWarning text"
+      - "Non-last-member confirmation shows deleteAccountConfirm text"
+      - "signOut called after successful self-deletion"
+      - "Existing admin delete flow unchanged (non-self)"
+
+  # ===========================================================================
+  # S022-05: Tests — i18n + Users screen + Edge function (CR-289 + CR-290)
+  # ===========================================================================
+
+  - id: S022-05
+    title: "Tests: i18n assertions + users screen tests + edge function tests"
+    cr: "CR-289 + CR-290"
+    depends_on: [S022-01, S022-02, S022-03, S022-04]
+    modules: [MOD-022-F]
+    files:
+      - path: src/__tests__/i18n.test.ts
+        action: modify
+      - path: src/__tests__/f022-app-store-compliance.test.ts
+        action: create
+    description: |
+      1. Update src/__tests__/i18n.test.ts:
+         - Line 53: change ptBR.auth.loginTitle assertion from
+           'Gerenciador da Reunião Sacramental' to 'Sacrament Meeting Planner'
+         - Line 55: change esLA.auth.loginTitle assertion from
+           'Planificador de Reunión Sacramental' to 'Sacrament Meeting Planner'
+         - Add new test: 'should have all account self-deletion i18n keys'
+           Verify deleteMyAccount, deleteAccountTitle, deleteAccountConfirm,
+           deleteAccountLastMemberWarning exist in users namespace of all 3 locales
+
+      2. Create src/__tests__/f022-app-store-compliance.test.ts:
+
+         describe('CR-289: Login title fix') — covered by i18n.test.ts updates
+
+         describe('CR-290: Account self-deletion') with sub-suites:
+
+         a) 'i18n keys':
+            - deleteMyAccount, deleteAccountTitle, deleteAccountConfirm,
+              deleteAccountLastMemberWarning present in all 3 locales
+            - Values match SPEC exactly
+
+         b) 'delete-user edge function' (unit-style, import and test logic):
+            - Self-deletion allowed for bishopric/secretary/observer
+            - Last-member path deletes ward then user
+            - Non-last-member path deletes push tokens then user
+            - Non-self still requires bishopric
+            - Non-self rejects secretary/observer with 403
+
+         c) 'settings index Users gate':
+            - Users item not gated by settings:users permission (verify source pattern)
+
+         d) 'users screen self-deletion':
+            - Observer filtering logic (displayedUsers)
+            - Self-deletion button rendering
+            - Last-member vs non-last-member dialog messages
+            - signOut on self-deletion success
+    done_when: |
+      - i18n.test.ts loginTitle assertions updated for pt-BR and es-LA
+      - i18n.test.ts has new test for self-deletion keys
+      - f022-app-store-compliance.test.ts exists with all test suites
+      - All tests pass (npx vitest run)
+    acs_covered: [AC-289-4, AC-290-11]
+    tests:
+      - "i18n.test.ts loginTitle assertions pass with 'Sacrament Meeting Planner' for all 3 locales"
+      - "i18n.test.ts self-deletion keys test passes"
+      - "f022-app-store-compliance.test.ts all suites pass"
+      - "No existing test regressions"
+
+  # ===========================================================================
+  # S022-06: ADR documentation
+  # ===========================================================================
+
+  - id: S022-06
+    title: "Document ADR-061, ADR-062, ADR-063"
+    cr: CR-290
+    depends_on: [S022-04]
+    files:
+      - path: docs/arch/ARCH_M022.yaml
+        action: no_change
+    description: |
+      ADRs are already documented in ARCH_M022.yaml:
+      - ADR-061: Self-deletion bypasses role check; body parsed before auth gate
+      - ADR-062: Last-member detection via paginated listUsers count
+      - ADR-063: Observer accesses Users screen with self-only filtered view
+
+      Update PLAN_CONSOLIDATED.yaml with P022 entry.
+    done_when: |
+      - ADR-061, ADR-062, ADR-063 already in ARCH_M022.yaml
+      - PLAN_CONSOLIDATED.yaml updated with P022
+
+  # ===========================================================================
+  # S022-07: Final verification
+  # ===========================================================================
+
+  - id: S022-07
+    title: "Final verification: all tests pass, no regressions"
+    cr: "CR-289 + CR-290"
+    depends_on: [S022-05, S022-06]
+    files: []
+    description: |
+      Run full test suite to verify:
+      1. All new tests pass
+      2. No existing test regressions
+      3. TypeScript compiles without errors
+      4. No lint errors
+    done_when: |
+      - npx vitest run passes with 0 failures
+      - npx tsc --noEmit passes
+      - No new lint warnings/errors
+    acs_covered: []
+    tests:
+      - "Full test suite passes"
+      - "TypeScript compilation succeeds"
+
+# =============================================================================
+# AC COVERAGE MATRIX
+# =============================================================================
+
+ac_coverage:
+  # CR-289
+  AC-289-1:
+    step: [S022-01]
+    description: "pt-BR login title shows 'Sacrament Meeting Planner'"
+  AC-289-2:
+    step: [S022-01]
+    description: "es-LA login title shows 'Sacrament Meeting Planner'"
+  AC-289-3:
+    step: [S022-01]
+    description: "en-US login title shows 'Sacrament Meeting Planner' (unchanged)"
+  AC-289-4:
+    step: [S022-05]
+    description: "i18n test assertions updated and passing for all 3 locales"
+
+  # CR-290
+  AC-290-1:
+    step: [S022-04]
+    description: "'Delete My Account' button on self card with destructive styling"
+  AC-290-2:
+    step: [S022-04]
+    description: "Non-last-member confirmation shows deleteAccountConfirm"
+  AC-290-3:
+    step: [S022-04]
+    description: "Last-member confirmation shows deleteAccountLastMemberWarning"
+  AC-290-4:
+    step: [S022-02]
+    description: "Non-last-member: push tokens deleted, auth deleted, signOut"
+  AC-290-5:
+    step: [S022-02]
+    description: "Last member: ward deleted (CASCADE), auth deleted, signOut"
+  AC-290-6:
+    step: [S022-03, S022-04]
+    description: "Observer sees Users menu item, Users screen shows only self card"
+  AC-290-7:
+    step: [S022-04]
+    description: "Observer self card: role selector hidden, delete button visible"
+  AC-290-8:
+    step: [S022-02]
+    description: "Non-self deletion: bishopric role check preserved"
+  AC-290-9:
+    step: [S022-02]
+    description: "Non-self deletion: secretary/observer rejected with 403"
+  AC-290-10:
+    step: [S022-04]
+    description: "supabase.auth.signOut() called after successful self-deletion"
+  AC-290-11:
+    step: [S022-01, S022-05]
+    description: "4 new i18n keys present in all 3 locales"
+
+# =============================================================================
+# EDGE CASES
+# =============================================================================
+
+edge_cases:
+  - id: EC-022-01
+    description: "User is the only member of ward (last member) and deletes account"
+    covered_by: S022-02
+    handling: "Paginated listUsers counts ward members; if count===1 deletes ward (CASCADE) before auth user"
+  - id: EC-022-02
+    description: "Ward has >50 users when counting for last-member detection"
+    covered_by: S022-02
+    handling: "Paginated loop (perPage: 50) counts across all pages, same pattern as send-reset-email"
+  - id: EC-022-03
+    description: "Observer tries to delete another user (non-self)"
+    covered_by: S022-02
+    handling: "Non-self path falls through to bishopric role check; observer gets 403"
+  - id: EC-022-04
+    description: "Observer navigates to Users screen offline"
+    covered_by: S022-03
+    handling: "isOnline guard on settings index hides Users menu item when offline"
+  - id: EC-022-05
+    description: "deleteUserMutation onError for self-deletion still handled"
+    covered_by: S022-04
+    handling: "onError remains; 'cannot_delete_self' case removed since it can no longer occur"
+  - id: EC-022-06
+    description: "Auth user delete fails after ward was already deleted (last member)"
+    covered_by: S022-02
+    handling: "Returns 500 error; ward data is already gone but auth user remains for retry"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+summary:
+  total_steps: 7
+  migrations: 0
+  edge_functions_modified: 1
+  new_files: 1
+  modified_files: 6
+  adrs: [ADR-061, ADR-062, ADR-063]
+  key_decisions:
+    - "Body parsing moved before role check to detect self-deletion (ADR-061)"
+    - "Paginated listUsers for last-member detection, same pattern as send-reset-email (ADR-062)"
+    - "Observer sees filtered Users screen (self only), not a new screen (ADR-063)"
+    - "Ward deletion uses CASCADE, no need to explicitly delete related tables"
+    - "signOut on self-deletion success, no Alert shown (user redirected to login)"
+    - "cannot_delete_self error case removed from onError handler"

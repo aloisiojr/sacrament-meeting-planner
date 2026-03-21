@@ -293,7 +293,7 @@ export default function SettingsScreen() {
           {t('settings.appSettingsGroup')}
         </Text>
         <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {hasPermission('settings:users') && isOnline && (
+          {isOnline && (
             <SettingsItem
               label={t('settings.users')}
               onPress={() => router.push('/(tabs)/settings/users')}

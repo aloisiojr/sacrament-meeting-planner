@@ -150,7 +150,11 @@ export default function UserManagementScreen() {
     mutationFn: async ({ targetUserId, targetName, targetEmail }: { targetUserId: string; targetName: string; targetEmail: string }) => {
       return callEdgeFunction('delete-user', { targetUserId });
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: async (_data, variables) => {
+      if (variables.targetUserId === currentUser?.id) {
+        await supabase.auth.signOut();
+        return;
+      }
       Alert.alert(t('common.success'), t('users.deleteSuccess'));
       setExpandedUserId(null);
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
@@ -165,13 +169,8 @@ export default function UserManagementScreen() {
         );
       }
     },
-    onError: (err: any) => {
-      const msg = err?.message || err?.context?.body?.error;
-      if (msg === 'cannot_delete_self') {
-        Alert.alert(t('common.error'), t('users.cannotDeleteSelf'));
-      } else {
-        Alert.alert(t('common.error'), t('users.deleteFailed'));
-      }
+    onError: () => {
+      Alert.alert(t('common.error'), t('users.deleteFailed'));
     },
   });
 
@@ -239,20 +238,35 @@ export default function UserManagementScreen() {
 
   const handleDelete = useCallback(
     (targetUser: WardUser) => {
-      if (targetUser.id === currentUser?.id) {
-        Alert.alert(t('common.error'), t('users.cannotDeleteSelf'));
-        return;
+      const isSelf = targetUser.id === currentUser?.id;
+      if (isSelf) {
+        const isLastMember = users.length === 1;
+        Alert.alert(
+          t('users.deleteAccountTitle'),
+          isLastMember
+            ? t('users.deleteAccountLastMemberWarning')
+            : t('users.deleteAccountConfirm'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('common.delete'),
+              style: 'destructive',
+              onPress: () => deleteUserMutation.mutate({ targetUserId: targetUser.id, targetName: targetUser.full_name || targetUser.email, targetEmail: targetUser.email }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(t('users.deleteUser'), t('users.deleteConfirm'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.delete'),
+            style: 'destructive',
+            onPress: () => deleteUserMutation.mutate({ targetUserId: targetUser.id, targetName: targetUser.full_name || targetUser.email, targetEmail: targetUser.email }),
+          },
+        ]);
       }
-      Alert.alert(t('users.deleteUser'), t('users.deleteConfirm'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => deleteUserMutation.mutate({ targetUserId: targetUser.id, targetName: targetUser.full_name || targetUser.email, targetEmail: targetUser.email }),
-        },
-      ]);
     },
-    [currentUser, deleteUserMutation, t]
+    [currentUser, deleteUserMutation, t, users]
   );
 
   const openInviteModal = useCallback(() => {
@@ -279,6 +293,10 @@ export default function UserManagementScreen() {
   );
 
   const currentUserId = currentUser?.id;
+  const isObserver = currentUser?.app_metadata?.role === 'observer';
+  const displayedUsers = isObserver
+    ? users.filter((u) => u.id === currentUserId)
+    : users;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -292,15 +310,17 @@ export default function UserManagementScreen() {
           <Text style={[styles.title, { color: colors.text }]}>
             {t('users.title')}
           </Text>
-          <Pressable
-            style={[styles.inviteButton, { backgroundColor: colors.primary }]}
-            onPress={openInviteModal}
-            accessibilityRole="button"
-            accessibilityLabel={t('users.inviteUser')}
-            testID="users-invite-button"
-          >
-            <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
-          </Pressable>
+          {!isObserver && (
+            <Pressable
+              style={[styles.inviteButton, { backgroundColor: colors.primary }]}
+              onPress={openInviteModal}
+              accessibilityRole="button"
+              accessibilityLabel={t('users.inviteUser')}
+              testID="users-invite-button"
+            >
+              <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
+            </Pressable>
+          )}
         </View>
 
         {isLoading && (
@@ -333,7 +353,7 @@ export default function UserManagementScreen() {
           </View>
         )}
 
-        {users.map((u) => {
+        {displayedUsers.map((u) => {
           const isExpanded = expandedUserId === u.id;
           const isSelf = u.id === currentUserId;
 
@@ -445,53 +465,67 @@ export default function UserManagementScreen() {
                     </Text>
                   </View>
 
-                  {/* Role selector */}
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                      {t('users.role')}
-                    </Text>
-                    <View style={styles.roleSelector}>
-                      {ROLES.map((role) => (
-                        <Pressable
-                          key={role}
-                          style={[
-                            styles.roleOption,
-                            {
-                              backgroundColor:
-                                u.role === role ? colors.primary : colors.surfaceVariant,
-                              opacity: isSelf ? 0.5 : 1,
-                            },
-                          ]}
-                          onPress={() => {
-                            if (!isSelf && role !== u.role) {
-                              handleRoleChange(u, role);
-                            }
-                          }}
-                          disabled={isSelf || changeRoleMutation.isPending}
-                          accessibilityRole="radio"
-                          accessibilityState={{
-                            selected: u.role === role,
-                            disabled: isSelf,
-                          }}
-                        >
-                          <Text
+                  {/* Role selector (hidden for observer on self card) */}
+                  {!(isObserver && isSelf) && (
+                    <View style={styles.fieldRow}>
+                      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                        {t('users.role')}
+                      </Text>
+                      <View style={styles.roleSelector}>
+                        {ROLES.map((role) => (
+                          <Pressable
+                            key={role}
                             style={[
-                              styles.roleOptionText,
+                              styles.roleOption,
                               {
-                                color:
-                                  u.role === role ? '#FFFFFF' : colors.text,
+                                backgroundColor:
+                                  u.role === role ? colors.primary : colors.surfaceVariant,
+                                opacity: isSelf ? 0.5 : 1,
                               },
                             ]}
+                            onPress={() => {
+                              if (!isSelf && role !== u.role) {
+                                handleRoleChange(u, role);
+                              }
+                            }}
+                            disabled={isSelf || changeRoleMutation.isPending}
+                            accessibilityRole="radio"
+                            accessibilityState={{
+                              selected: u.role === role,
+                              disabled: isSelf,
+                            }}
                           >
-                            {t(`roles.${role}`)}
-                          </Text>
-                        </Pressable>
-                      ))}
+                            <Text
+                              style={[
+                                styles.roleOptionText,
+                                {
+                                  color:
+                                    u.role === role ? '#FFFFFF' : colors.text,
+                                },
+                              ]}
+                            >
+                              {t(`roles.${role}`)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     </View>
-                  </View>
+                  )}
 
-                  {/* Remove button (hidden for self) */}
-                  {!isSelf && (
+                  {/* Delete button */}
+                  {isSelf ? (
+                    <Pressable
+                      style={[styles.deleteButton, { backgroundColor: colors.error }]}
+                      onPress={() => handleDelete(u)}
+                      disabled={deleteUserMutation.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('users.deleteMyAccount')}
+                    >
+                      <Text style={styles.deleteButtonText}>
+                        {t('users.deleteMyAccount')}
+                      </Text>
+                    </Pressable>
+                  ) : (
                     <Pressable
                       style={[styles.deleteButton, { backgroundColor: colors.error }]}
                       onPress={() => handleDelete(u)}

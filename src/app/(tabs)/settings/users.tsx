@@ -465,8 +465,8 @@ export default function UserManagementScreen() {
                     </Text>
                   </View>
 
-                  {/* Role selector (hidden for observer on self card) */}
-                  {!(isObserver && isSelf) && (
+                  {/* Role selector (only for other users' cards) */}
+                  {!isSelf && (
                     <View style={styles.fieldRow}>
                       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                         {t('users.role')}
@@ -480,19 +480,17 @@ export default function UserManagementScreen() {
                               {
                                 backgroundColor:
                                   u.role === role ? colors.primary : colors.surfaceVariant,
-                                opacity: isSelf ? 0.5 : 1,
                               },
                             ]}
                             onPress={() => {
-                              if (!isSelf && role !== u.role) {
+                              if (role !== u.role) {
                                 handleRoleChange(u, role);
                               }
                             }}
-                            disabled={isSelf || changeRoleMutation.isPending}
+                            disabled={changeRoleMutation.isPending}
                             accessibilityRole="radio"
                             accessibilityState={{
                               selected: u.role === role,
-                              disabled: isSelf,
                             }}
                           >
                             <Text

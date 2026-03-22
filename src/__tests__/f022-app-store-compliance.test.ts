@@ -325,10 +325,10 @@ describe('CR-290: Account self-deletion', () => {
       expect(content).toContain('{!isObserver && (');
     });
 
-    // AC-290-7: Role selector hidden for observer on self card
-    it('AC-290-7: role selector hidden for observer on self card', () => {
+    // AC-290-7: Role selector hidden on self card (for all roles)
+    it('AC-290-7: role selector hidden on self card', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
-      expect(content).toContain('!(isObserver && isSelf)');
+      expect(content).toContain('{!isSelf && (');
     });
 
     // AC-290-10: signOut called after successful self-deletion

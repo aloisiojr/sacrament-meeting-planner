@@ -101,7 +101,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
   const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign') && !disabled;
   const canChangeStatus = hasPermission('speech:change_status') && !disabled;
   const isObserver = role === 'observer' || disabled;
-  const isBispado = role === 'bishopric' && !disabled;
+  const isBispado = (role === 'bishopric' || role === 'secretary') && !disabled;
 
   // F118: For position 2, check if toggle is enabled (only when not a prayer slot)
   const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false;

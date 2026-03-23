@@ -148,8 +148,15 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 
   const handleClearTopic = useCallback(() => {
     if (!speech) return;
-    onClearTopic?.(speech.id);
-  }, [speech, onClearTopic]);
+    Alert.alert(t('common.confirm'), t('speeches.clearTopicConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.confirm'),
+        style: 'destructive',
+        onPress: () => onClearTopic?.(speech.id),
+      },
+    ]);
+  }, [speech, t, onClearTopic]);
 
   // Topic display: "Collection : Title" format
   const topicDisplay = speech?.topic_title

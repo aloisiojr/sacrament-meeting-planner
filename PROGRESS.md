@@ -35,6 +35,20 @@
 
 Password-reset bug resolved (Gmail SMTP live) + tsc/lint baselines clean, on `origin/main`.
 
+## v2.0 (branch `v2.0`) — BUILD COMPLETE & VERIFIED (deploy gated by v1.x adoption)
+Unified people model: actors+speakers → `members` with capability flags + contact-delegation;
+people management moved into the unified `PeoplePicker`; settings CSV-only. Built in 6 phases (fresh
+subagent per phase, expand→migrate→contract, verify each handoff) per
+`~/.claude/dev-flow/build-orchestration.md`. Spec `specs/v2-member-management.md`; migrations **037**
+(destructive model change) + **038** (import RPC) — apply at cutover with backup (ADR 001). v1.x
+foundation merged in (`4eee51e`). Final adversarial verify-change: **APPROVED**, all AC1–AC14, no
+P0/P1. **tsc 0 / lint 0 / 1843 tests / 77 files.** `app.json` → 2.0.0. Deploy/merge to main gated by
+v1.x store adoption.
+Open P2 (non-blocking): (1) member-edit cascades `speaker_*` to future speeches but NOT the frozen
+delegation snapshot (`contact_*`) — product decision: freeze vs. cascade; (2) orphan
+responsible-with-no-phone wraps as delegated with empty `{responsavel}`; (3) migrated actor-only
+members get `informal_name` NULL; (4) PersonEditor empty country code stores `''` vs the `+55` default.
+
 ## v1.x (branch `v1.x`, off main) — BUILD COMPLETE, awaiting deploy (GATE 3)
 Prerequisite release before v2.0 (see `docs/decisions/001-v2-release-cutover.md`). Spec:
 `specs/v1x-version-gate.md`. All steps built + adversarially verified (APPROVED, no P0/P1);

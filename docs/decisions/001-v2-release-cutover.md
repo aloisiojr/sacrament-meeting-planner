@@ -18,19 +18,20 @@ Clean cutover with a **backend-driven forced update**, preceded by a gate-capabl
    notification to update.
 3. **Ship v2.0** to stores; wait for store approval.
 4. **Cutover:** raise `min_supported_build` to the v2.0 build (gate-capable clients now prompt to
-   update) → **then** run migration 036.
+   update) → **then** run the v2 migrations 037 + 038. (036 is the v1.x app_config migration,
+   already applied.)
 5. v2.0 clients operate on the new schema.
 
 **Offline cache:** v2.0 bumps a react-query persist cache-version key → stale v1 cache is purged and
 rehydrated on first launch.
 
-**Migration safety:** take a Supabase backup/snapshot immediately before 036; run 036 in a
+**Migration safety:** take a Supabase backup/snapshot immediately before 037/038; run them in a
 transaction during a short maintenance window (block writes) to avoid a half-migrated state;
 rollback = restore the snapshot.
 
 ## Consequences
 - **Old-client impact:** users on the interim v1.x get a graceful "please update". Users still on
-  **pre-gate v1.0** cannot be gated (no gate code) and will hit hard errors once 036 runs — accepted
+  **pre-gate v1.0** cannot be gated (no gate code) and will hit hard errors once 037 runs — accepted
   because the owner wants no v1 lingering; the adoption window minimizes how many remain.
 - No dual-write / no expand-contract → simpler, faster to build; the cost is the interim release +
   an adoption wait, and the hard break for pre-gate holdouts.

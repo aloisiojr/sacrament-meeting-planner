@@ -12,6 +12,8 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { SyncProvider } from '../providers/SyncProvider';
+import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
+import { useVersionGate } from '../hooks/useVersionGate';
 import i18n from '../i18n';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -101,6 +103,16 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Blocks the app with an update screen when this build is below the minimum supported version.
+ * Fail-open: renders children while checking or on any config error (see useVersionGate).
+ */
+function VersionGate({ children }: { children: React.ReactNode }) {
+  const status = useVersionGate();
+  if (status === 'blocked') return <UpdateRequiredScreen />;
+  return children;
+}
+
+/**
  * Inner layout that uses theme context (must be inside ThemeProvider).
  */
 function InnerLayout() {
@@ -109,10 +121,12 @@ function InnerLayout() {
   return (
     <AuthProvider>
       <SyncProvider>
-        <NavigationGuard>
-          <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-          <Slot />
-        </NavigationGuard>
+        <VersionGate>
+          <NavigationGuard>
+            <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+            <Slot />
+          </NavigationGuard>
+        </VersionGate>
       </SyncProvider>
     </AuthProvider>
   );

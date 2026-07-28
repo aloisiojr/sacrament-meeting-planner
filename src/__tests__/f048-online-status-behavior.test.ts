@@ -24,7 +24,7 @@ function renderOnlineStatusHook(isOnline?: boolean) {
   }
 
   const element = isOnline !== undefined
-    ? React.createElement(OnlineStatusProvider, { isOnline }, React.createElement(TestComponent))
+    ? React.createElement(OnlineStatusProvider, { isOnline, children: React.createElement(TestComponent) })
     : React.createElement(TestComponent); // no provider
 
   let renderer: TestRenderer.ReactTestRenderer;
@@ -37,7 +37,7 @@ function renderOnlineStatusHook(isOnline?: boolean) {
     update: (newIsOnline: boolean) => {
       act(() => {
         renderer.update(
-          React.createElement(OnlineStatusProvider, { isOnline: newIsOnline }, React.createElement(TestComponent))
+          React.createElement(OnlineStatusProvider, { isOnline: newIsOnline, children: React.createElement(TestComponent) })
         );
       });
     },

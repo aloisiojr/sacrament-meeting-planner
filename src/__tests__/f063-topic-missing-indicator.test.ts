@@ -267,7 +267,7 @@ describe('F063 SUPPLEMENTARY: getInviteItems + topicMissing integration', () => 
   it('getInviteItems filters out non-invite statuses (not_assigned, confirmed, etc.)', () => {
     const speeches: Speech[] = [
       makeSpeech({ id: 's1', position: 1, status: 'not_assigned', topic_title: null }),
-      makeSpeech({ id: 's2', position: 2, status: 'confirmed', topic_title: null }),
+      makeSpeech({ id: 's2', position: 2, status: 'assigned_confirmed', topic_title: null }),
       makeSpeech({ id: 's3', position: 3, status: 'assigned_not_invited', topic_title: null }),
     ];
     const items = getInviteItems(speeches, 'pt-BR', stubFormat);

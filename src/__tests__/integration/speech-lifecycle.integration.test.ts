@@ -201,6 +201,7 @@ describe('Assign speaker lifecycle', () => {
         speechId: 's1',
         memberId: 'member-1',
         speakerName: 'John Doe',
+        speakerInformalName: null,
         speakerPhone: '+5511999999999',
       });
       expect(speech.status).toBe('assigned_not_invited');

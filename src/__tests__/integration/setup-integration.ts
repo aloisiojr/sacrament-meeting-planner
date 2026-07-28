@@ -485,6 +485,7 @@ export function createMockTopic(overrides?: Partial<WardTopic>): WardTopic {
     ward_id: 'ward-1',
     title: 'Test Topic',
     link: null,
+    is_default: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

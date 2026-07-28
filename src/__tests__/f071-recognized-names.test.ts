@@ -334,7 +334,7 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
   it('ActorSelector disabledNames: add mode = all current names', () => {
     // Test the logic: in add mode, all current items are disabled
     const currentItems = ['Alice', 'Bob'];
-    const mode = 'add' as const;
+    const mode = 'add' as 'add' | 'edit';
     const editIndex = undefined;
     const disabledNames = mode === 'edit' && editIndex !== undefined
       ? currentItems.filter((_, i) => i !== editIndex)

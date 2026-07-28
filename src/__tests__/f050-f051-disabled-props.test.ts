@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { Role } from '../types/database';
 import type { AgendaFormProps } from '../components/AgendaForm';
 import type { SpeechSlotProps } from '../components/SpeechSlot';
 
@@ -80,7 +81,7 @@ describe('SpeechSlot disabled prop', () => {
 
   it('disabled=true makes isObserver true regardless of role', () => {
     const disabled = true;
-    const role = 'bishopric';
+    const role = 'bishopric' as Role;
     const isObserver = role === 'observer' || disabled;
     expect(isObserver).toBe(true);
   });

@@ -470,7 +470,7 @@ describe('F054 (CR-264): Fix ActorSelector TDZ Crash', () => {
   describe('TDZ fix: useMemo depends on useActors data', () => {
     it('useMemo filter works with undefined actors (initial state before data loads)', () => {
       // Simulates what happens before useActors returns data
-      const actors: MeetingActor[] | undefined = undefined;
+      const actors = undefined as MeetingActor[] | undefined;
       const search = '';
 
       const filtered = (() => {
@@ -589,7 +589,7 @@ describe('F055 (CR-265): Fix Hymn Selector Web Compatibility', () => {
       expect(webProps).toHaveProperty('onClick');
 
       // On native (ios/android): no onClick handler
-      const nativePlatform = 'ios';
+      const nativePlatform = 'ios' as 'ios' | 'android' | 'web';
       const nativeProps = nativePlatform === 'web'
         ? { onClick: (e: any) => e.stopPropagation() }
         : {};
@@ -671,7 +671,7 @@ describe('F055 (CR-265): Fix Hymn Selector Web Compatibility', () => {
   // --- AC-F055-06: Native no regression (onStartShouldSetResponder preserved) ---
   describe('AC-F055-06: Native behavior preserved', () => {
     it('native platform does not add onClick prop', () => {
-      const platformOS = 'android';
+      const platformOS = 'android' as 'ios' | 'android' | 'web';
       const extraProps = platformOS === 'web'
         ? { onClick: (e: any) => e.stopPropagation() }
         : {};
@@ -679,7 +679,7 @@ describe('F055 (CR-265): Fix Hymn Selector Web Compatibility', () => {
     });
 
     it('ios platform does not add onClick prop', () => {
-      const platformOS = 'ios';
+      const platformOS = 'ios' as 'ios' | 'android' | 'web';
       const extraProps = platformOS === 'web'
         ? { onClick: (e: any) => e.stopPropagation() }
         : {};

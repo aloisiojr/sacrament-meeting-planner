@@ -752,7 +752,7 @@ describe('CR-283 Tester AC-283-11: recognized_names type change', () => {
   });
 
   it('NULL array migrates to NULL string (no data to convert)', () => {
-    const oldArrayData: string[] | null = null;
+    const oldArrayData = null as string[] | null;
     const migratedString = oldArrayData ? oldArrayData.join('\n') : null;
     expect(migratedString).toBeNull();
     expect(parseItems(migratedString)).toEqual([]);
@@ -939,7 +939,7 @@ describe('CR-283 Tester EC-038: migration 032 NULL handling', () => {
   it('NULL recognized_names stays NULL after migration', () => {
     // Migration WHERE clause: WHERE recognized_names IS NOT NULL
     // NULL rows are not touched
-    const oldValue: string[] | null = null;
+    const oldValue = null as string[] | null;
     const shouldMigrate = oldValue !== null && oldValue.length > 0;
     expect(shouldMigrate).toBe(false);
     // Column stays NULL

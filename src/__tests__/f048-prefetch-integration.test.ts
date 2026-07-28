@@ -190,7 +190,7 @@ describe('F048: useOfflinePrefetch Integration', () => {
       const queryKeys = calls.map((c) => (c[0] as any).queryKey);
       expect(queryKeys).toHaveLength(4);
       // All keys are different
-      const uniqueKeys = new Set(queryKeys.map(JSON.stringify));
+      const uniqueKeys = new Set(queryKeys.map((k) => JSON.stringify(k)));
       expect(uniqueKeys.size).toBe(4);
     });
   });

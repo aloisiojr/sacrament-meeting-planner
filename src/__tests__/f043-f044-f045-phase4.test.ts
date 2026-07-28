@@ -281,8 +281,9 @@ describe('F044 (CR-260): Remove Agenda Change History', () => {
     it('parseLogDescription still parses non-agenda types correctly', async () => {
       const { parseLogDescription } = await import('../lib/activityLog');
       const result = parseLogDescription('member:create|nome=Maria Silva');
-      expect(result.actionType).toBe('member:create');
-      expect(result.params.nome).toBe('Maria Silva');
+      expect(result).not.toBeNull();
+      expect(result!.actionType).toBe('member:create');
+      expect(result!.params.nome).toBe('Maria Silva');
     });
   });
 
@@ -436,7 +437,8 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
     });
 
     it('user_metadata with default en-US', () => {
-      const wardLanguage = undefined || 'en-US';
+      const rawLanguage = undefined as string | undefined;
+      const wardLanguage = rawLanguage || 'en-US';
       const userMetadata = { language: wardLanguage };
       expect(userMetadata).toEqual({ language: 'en-US' });
     });
@@ -453,7 +455,7 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
     });
 
     it('undefined ward falls back to en-US', () => {
-      const ward: { language: string } | undefined = undefined;
+      const ward = undefined as { language: string } | undefined;
       const wardLanguage = ward?.language || 'en-US';
       expect(wardLanguage).toBe('en-US');
     });

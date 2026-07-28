@@ -215,7 +215,7 @@ describe('useActors integration', () => {
 
     try {
       await act(async () => {
-        await result.current.mutateAsync({ name: 'Fail Actor' });
+        await result.current.mutateAsync({ name: 'Fail Actor', role: 'preside' });
       });
     } catch {
       // Expected to fail
@@ -354,6 +354,7 @@ describe('useSpeeches integration', () => {
         speechId: 's1',
         memberId: 'member-1',
         speakerName: 'John Doe',
+        speakerInformalName: null,
         speakerPhone: '+5511999999999',
       });
       expect(speech.status).toBe('assigned_not_invited');

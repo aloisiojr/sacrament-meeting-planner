@@ -677,8 +677,8 @@ describe('F066 Part B: Trigger edge cases (tester)', () => {
 
 describe('F066 Part B: secretary_review is never grouped (AC-066-30)', () => {
   it('secretary_review type is not designation, so not grouped', () => {
-    const entryType = 'secretary_review';
-    const speechPosition = 1;
+    const entryType = 'secretary_review' as 'secretary_review' | 'designation';
+    const speechPosition: number = 1;
 
     // Routing logic from process-notifications
     const isDesignation = entryType === 'designation';

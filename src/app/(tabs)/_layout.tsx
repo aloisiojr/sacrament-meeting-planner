@@ -40,7 +40,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t('tabs.home'),
-          tabBarTestID: "tab-home",
+          tabBarButtonTestID: "tab-home",
           tabBarIcon: ({ color, size }) => (
             <HomeIcon color={color} size={size} />
           ),
@@ -50,7 +50,7 @@ export default function TabsLayout() {
         name="agenda"
         options={{
           title: t('tabs.agenda'),
-          tabBarTestID: "tab-agendas",
+          tabBarButtonTestID: "tab-agendas",
           tabBarIcon: ({ color, size }) => (
             <ClipboardListIcon color={color} size={size} />
           ),
@@ -60,7 +60,7 @@ export default function TabsLayout() {
         name="speeches"
         options={{
           title: speechesTabTitle,
-          tabBarTestID: "tab-speeches",
+          tabBarButtonTestID: "tab-speeches",
           tabBarIcon: ({ color, size }) => (
             <MicIcon color={color} size={size} />
           ),
@@ -80,7 +80,7 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: t('tabs.settings'),
-          tabBarTestID: "tab-settings",
+          tabBarButtonTestID: "tab-settings",
           tabBarIcon: ({ color, size }) => (
             <SettingsIcon color={color} size={size} />
           ),

@@ -285,7 +285,7 @@ describe('AuthContext loading state (EC-082-08)', () => {
 
 describe('manage_prayers toggle guard (COR-005, CR-256)', () => {
   it('bishopric is not observer, so manage_prayers toggle is visible', () => {
-    const role: Role = 'bishopric';
+    const role = 'bishopric' as Role;
     const isObserver = role === 'observer';
     expect(isObserver).toBe(false);
     // The toggle guard is {!isObserver && (...)} - bishopric passes
@@ -293,7 +293,7 @@ describe('manage_prayers toggle guard (COR-005, CR-256)', () => {
   });
 
   it('secretary is not observer, so manage_prayers toggle is visible', () => {
-    const role: Role = 'secretary';
+    const role = 'secretary' as Role;
     const isObserver = role === 'observer';
     expect(isObserver).toBe(false);
     // The toggle guard is {!isObserver && (...)} - secretary passes

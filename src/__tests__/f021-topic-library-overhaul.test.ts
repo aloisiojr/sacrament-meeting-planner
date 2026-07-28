@@ -323,7 +323,7 @@ describe('CR-286: Default ward topics', () => {
 describe('CR-287: Description text updated in all 3 languages', () => {
   // AC-287-1: pt-BR description
   it('AC-287-1: pt-BR topics.description has correct text', () => {
-    const topicsSection = (ptBR as Record<string, Record<string, string>>).topics;
+    const topicsSection = (ptBR.topics as Record<string, string>);
     expect(topicsSection.description).toBe(
       'Crie temas personalizados ou ative cole\u00e7\u00f5es de temas pr\u00e9-definidos. Ativar uma cole\u00e7\u00e3o torna seus temas dispon\u00edveis para serem designados a discursantes. Deslize temas personalizados para editar ou remover.'
     );
@@ -331,7 +331,7 @@ describe('CR-287: Description text updated in all 3 languages', () => {
 
   // AC-287-2: en-US description
   it('AC-287-2: en-US topics.description has correct text', () => {
-    const topicsSection = (enUS as Record<string, Record<string, string>>).topics;
+    const topicsSection = (enUS.topics as Record<string, string>);
     expect(topicsSection.description).toBe(
       'Create custom topics or activate predefined topic collections. Activating a collection makes its topics available for assigning to speakers. Swipe custom topics to edit or remove.'
     );
@@ -339,7 +339,7 @@ describe('CR-287: Description text updated in all 3 languages', () => {
 
   // AC-287-3: es-LA description
   it('AC-287-3: es-LA topics.description has correct text', () => {
-    const topicsSection = (esLA as Record<string, Record<string, string>>).topics;
+    const topicsSection = (esLA.topics as Record<string, string>);
     expect(topicsSection.description).toBe(
       'Cree temas personalizados o active colecciones de temas predefinidos. Activar una colecci\u00f3n hace que sus temas est\u00e9n disponibles para asignar a oradores. Deslice temas personalizados para editar o eliminar.'
     );
@@ -352,24 +352,24 @@ describe('CR-287: Description text updated in all 3 languages', () => {
 
 describe('CR-286 i18n: customTopics key exists in all locales', () => {
   it('pt-BR has topics.customTopics = "Temas Personalizados"', () => {
-    const topicsSection = (ptBR as Record<string, Record<string, string>>).topics;
+    const topicsSection = (ptBR.topics as Record<string, string>);
     expect(topicsSection.customTopics).toBe('Temas Personalizados');
   });
 
   it('en-US has topics.customTopics = "Custom Topics"', () => {
-    const topicsSection = (enUS as Record<string, Record<string, string>>).topics;
+    const topicsSection = (enUS.topics as Record<string, string>);
     expect(topicsSection.customTopics).toBe('Custom Topics');
   });
 
   it('es-LA has topics.customTopics = "Temas Personalizados"', () => {
-    const topicsSection = (esLA as Record<string, Record<string, string>>).topics;
+    const topicsSection = (esLA.topics as Record<string, string>);
     expect(topicsSection.customTopics).toBe('Temas Personalizados');
   });
 
   it('wardTopics key still exists for backward compatibility', () => {
-    const ptTopics = (ptBR as Record<string, Record<string, string>>).topics;
-    const enTopics = (enUS as Record<string, Record<string, string>>).topics;
-    const esTopics = (esLA as Record<string, Record<string, string>>).topics;
+    const ptTopics = (ptBR.topics as Record<string, string>);
+    const enTopics = (enUS.topics as Record<string, string>);
+    const esTopics = (esLA.topics as Record<string, string>);
     expect(ptTopics.wardTopics).toBeDefined();
     expect(enTopics.wardTopics).toBeDefined();
     expect(esTopics.wardTopics).toBeDefined();
@@ -651,9 +651,9 @@ describe('Cross-cutting: No regressions', () => {
   });
 
   it('addTopic i18n key exists in all locales', () => {
-    const ptTopics = (ptBR as Record<string, Record<string, string>>).topics;
-    const enTopics = (enUS as Record<string, Record<string, string>>).topics;
-    const esTopics = (esLA as Record<string, Record<string, string>>).topics;
+    const ptTopics = (ptBR.topics as Record<string, string>);
+    const enTopics = (enUS.topics as Record<string, string>);
+    const esTopics = (esLA.topics as Record<string, string>);
     expect(ptTopics.addTopic).toBeDefined();
     expect(enTopics.addTopic).toBeDefined();
     expect(esTopics.addTopic).toBeDefined();

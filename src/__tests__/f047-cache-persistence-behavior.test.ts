@@ -209,7 +209,7 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       // Should not throw - fails silently
-      const result = await persister.restoreClient().catch(() => undefined);
+      const result = await Promise.resolve(persister.restoreClient()).catch(() => undefined);
       expect(result).toBeUndefined();
     });
 
@@ -227,7 +227,7 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       // Should handle invalid JSON gracefully
-      const result = await persister.restoreClient().catch(() => undefined);
+      const result = await Promise.resolve(persister.restoreClient()).catch(() => undefined);
       // Either returns undefined or throws - we just verify no unhandled crash
       expect(true).toBe(true);
     });

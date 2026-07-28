@@ -33,8 +33,16 @@
   (3 errors + 163 warnings) → `npm run lint` = 0 problems. exhaustive-deps: 11 real deps added (all
   stable refs) + 8 justified disables; no behavior change. tsc 0; 68 files / 1834 tests green.
 
-**No change in flight.** Password-reset bug fully resolved (Gmail SMTP live in prod + client
-hardening) and the tsc + lint baselines are clean. Pushed to `origin/main`.
+Password-reset bug fully resolved (Gmail SMTP live in prod + client hardening); tsc + lint baselines
+clean; pushed to `origin/main`.
+
+## v2.0 (branch `v2.0`)
+- **In flight:** `specs/v2-member-management.md` — unify actors+speakers into `members` (capability
+  flags + contact-delegation), move people management into the picker, CSV stays in Settings.
+  Breaking DB change → release cutover in `docs/decisions/001-v2-release-cutover.md` (forced update).
+  Stage: **spec-first done, awaiting GATE 1**. Interview P1–P18 resolved.
+- **Prerequisite (separate change, on `main`):** a **v1.x min-version gate** must ship + be adopted
+  before v2.0 is deployed (see ADR). Not started.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

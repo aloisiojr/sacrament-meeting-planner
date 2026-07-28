@@ -29,9 +29,12 @@
   ForgotPasswordScreen (failure logs+message, success). Adversarially verified (APPROVED; AC1
   assertion tightened per the P2). Suite now **68 files / 1834 tests green**, tsc 0.
 
-**No change in flight.** The password-reset bug is fully resolved (transport fix live in prod +
-client hardening committed) and the tsc baseline is clean. All work is in local commits on `main`
-— nothing pushed. Next: push when ready; optionally the follow-ups under Open issues.
+- **`specs/fix-lint-baseline.md` — DONE & COMMITTED (`31b3ed1`).** All 166 ESLint problems fixed
+  (3 errors + 163 warnings) → `npm run lint` = 0 problems. exhaustive-deps: 11 real deps added (all
+  stable refs) + 8 justified disables; no behavior change. tsc 0; 68 files / 1834 tests green.
+
+**No change in flight.** Password-reset bug fully resolved (Gmail SMTP live in prod + client
+hardening) and the tsc + lint baselines are clean. Pushed to `origin/main`.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via
@@ -39,10 +42,14 @@ client hardening committed) and the tsc baseline is clean. All work is in local 
 - 2026-07-27: Replaced devteam with dev-flow. Deleted `.devteam/` and
   `docs/{specs,arch,plans,qa,tests,reviews,code}` + `docs/CHANGE_REQUESTS.yaml` (recoverable via git history).
 
+## Resolved
+- `RESEND_*` secrets removed from Supabase (unused after Gmail SMTP switch).
+- Gmail App Password rotation: **user declined** (deliberate) — current password stays in use.
+- Lint + tsc baselines clean; all work pushed to `origin/main`.
+
 ## Open issues
-- Rotate the Supabase keys that were present in `.claude/settings.local.json` (now gitignored) as
-  a precaution — they were committed to the local-only `UX-2.0`/archive snapshot.
-- `main` is 1 commit ahead of `origin/main` (pre-existing, not from this work).
-- The Gmail App Password was shared in chat — optional to rotate later (regenerate in Google +
-  `supabase secrets set GMAIL_APP_PASSWORD=...`).
-- `RESEND_API_KEY` / `RESEND_FROM_EMAIL` secrets are now unused — safe to delete from Supabase.
+- The archived `UX-2.0` snapshot (`9b652db`) committed `.claude/settings.local.json` with Supabase
+  keys locally (never pushed). Rotate if desired — low priority, local-only.
+- `f021-topic-library-overhaul.test.ts` asserts source text (`function normalizeForSearch`) via
+  fs/string-matching — against the "behavioral tests only" rule; keeps dead code alive in
+  `useTopics.ts`. Worth revisiting (test + dead code) as a future cleanup.

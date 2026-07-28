@@ -25,15 +25,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
 import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment, useLazyCreateSpeeches } from '../hooks/useSpeeches';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
+import { useMembers } from '../hooks/useMembers';
 import { getCurrentLanguage } from '../i18n';
-import { ActorSelector } from './ActorSelector';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { EditableListField, parseItems, joinItems } from './EditableListField';
-import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
+import { PeoplePicker, type PeopleCapability } from './PeoplePicker';
 import { SearchInput } from './SearchInput';
 import { XIcon, PencilIcon } from './icons';
+import { resolveContactSnapshot } from '../lib/contact';
+import { buildFullPhone } from '../lib/phone';
 import type {
-  MeetingActor,
+  Member,
   Hymn,
   SundayExceptionReason,
   Speech,
@@ -51,13 +53,18 @@ export interface AgendaFormProps {
   onFieldFocus?: (touchY: number) => void;
 }
 
-type FieldSelectorType = 'actor' | 'hymn' | 'sacrament_hymn' | 'prayer';
+type FieldSelectorType = 'hymn' | 'sacrament_hymn';
 
 interface SelectorState {
   type: FieldSelectorType;
   field: string;
-  roleFilter?: string;
 }
+
+/** Unified people-picker state for the agenda (v2.0). Recognition is multi-select. */
+type PeoplePickerState =
+  | { mode: 'role'; nameField: string; capability: PeopleCapability }
+  | { mode: 'prayer'; position: 0 | 4 }
+  | { mode: 'recognize' };
 
 // --- Component ---
 
@@ -92,12 +99,10 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
 
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
+  const { data: members } = useMembers();
 
   const [selectorModal, setSelectorModal] = useState<SelectorState | null>(null);
-  const [recognizeSelector, setRecognizeSelector] = useState<{
-    mode: 'add' | 'edit';
-    editIndex?: number;
-  } | null>(null);
+  const [peoplePicker, setPeoplePicker] = useState<PeoplePickerState | null>(null);
 
   // Refs for text inputs that need keyboard scroll
   const textInputRef1 = useRef<View>(null);
@@ -134,20 +139,62 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
     [agenda, isObserver, updateAgenda]
   );
 
-  // Handle actor selection
-  const handleActorSelect = useCallback(
-    (actor: MeetingActor, nameField: string, idField: string) => {
+  // Handle actor-role selection (presiding/conducting/pianist/conductor).
+  // v2.0: write ONLY the *_name snapshot column; the *_actor_id columns are being dropped.
+  const handleRoleSelect = useCallback(
+    (member: Member, nameField: string) => {
       if (!agenda || isObserver) return;
       updateAgenda.mutate({
         agendaId: agenda.id,
-        fields: {
-          [nameField]: actor.name,
-          [idField]: actor.id,
-        } as Record<string, unknown>,
+        fields: { [nameField]: member.full_name } as Record<string, unknown>,
       });
     },
     [agenda, isObserver, updateAgenda]
   );
+
+  // Handle prayer selection: snapshot the resolved contact onto the speech (positions 0/4).
+  const handlePrayerSelect = useCallback(
+    (member: Member, position: 0 | 4) => {
+      if (isObserver) return;
+      const speech = getSpeech(position);
+      if (!speech) return;
+      const responsible = member.contact_via_responsible
+        ? (members ?? []).find((m) => m.id === member.responsible_id) ?? null
+        : null;
+      const snapshot = resolveContactSnapshot(member, responsible);
+      assignSpeaker.mutate({
+        speechId: speech.id,
+        memberId: member.id,
+        speakerName: member.full_name,
+        speakerInformalName: member.informal_name,
+        speakerPhone: buildFullPhone(member.country_code, member.phone),
+        contactPhone: snapshot.contact_phone,
+        isDelegated: snapshot.is_delegated,
+        delegateForName: snapshot.delegate_for_name,
+        status: 'assigned_confirmed',
+      });
+    },
+    [isObserver, getSpeech, members, assignSpeaker]
+  );
+
+  // Handle recognition toggle (multi-select). Stores newline-joined member names (snapshot).
+  const handleRecognizeToggle = useCallback(
+    (member: Member) => {
+      if (!agenda || isObserver) return;
+      const currentItems = parseItems(agenda.recognized_names ?? null);
+      const newItems = currentItems.includes(member.full_name)
+        ? currentItems.filter((n) => n !== member.full_name)
+        : [...currentItems, member.full_name];
+      updateField('recognized_names', joinItems(newItems));
+    },
+    [agenda, isObserver, updateField]
+  );
+
+  // Ids of members currently in the recognition list (for multi-select highlighting).
+  const recognizedSelectedIds = useMemo(() => {
+    const set = new Set(parseItems(agenda?.recognized_names ?? null));
+    return (members ?? []).filter((m) => set.has(m.full_name)).map((m) => m.id);
+  }, [members, agenda?.recognized_names]);
 
   // Handle hymn selection
   const handleHymnSelect = useCallback(
@@ -191,17 +238,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.presiding')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'presiding', roleFilter: 'preside' });
+              setPeoplePicker({ mode: 'role', nameField: 'presiding_name', capability: 'preside' });
             }
           }}
           disabled={isObserver}
           colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { presiding_name: null, presiding_actor_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
+          onClear={!isObserver ? () => updateField('presiding_name', null) : undefined}
           hasValue={!!agenda.presiding_name}
           onFieldFocus={onFieldFocus}
         />
@@ -214,17 +256,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.conducting')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'conducting', roleFilter: 'conduct' });
+              setPeoplePicker({ mode: 'role', nameField: 'conducting_name', capability: 'conduct' });
             }
           }}
           disabled={isObserver}
           colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { conducting_name: null, conducting_actor_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
+          onClear={!isObserver ? () => updateField('conducting_name', null) : undefined}
           hasValue={!!agenda.conducting_name}
           onFieldFocus={onFieldFocus}
         />
@@ -237,11 +274,11 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           disabled={isObserver}
           placeholder={t('agenda.addPresence')}
           onFieldFocus={onFieldFocus}
-          onItemPress={(index, _item) => {
-            setRecognizeSelector({ mode: 'edit', editIndex: index });
+          onItemPress={() => {
+            if (!isObserver) setPeoplePicker({ mode: 'recognize' });
           }}
           onAddPress={() => {
-            setRecognizeSelector({ mode: 'add' });
+            if (!isObserver) setPeoplePicker({ mode: 'recognize' });
           }}
         />
       </FieldRow>
@@ -273,17 +310,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.pianist')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'pianist', roleFilter: 'pianist' });
+              setPeoplePicker({ mode: 'role', nameField: 'pianist_name', capability: 'play_piano' });
             }
           }}
           disabled={isObserver}
           colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { pianist_name: null, pianist_actor_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
+          onClear={!isObserver ? () => updateField('pianist_name', null) : undefined}
           hasValue={!!agenda.pianist_name}
           onFieldFocus={onFieldFocus}
         />
@@ -296,17 +328,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           placeholder={t('agenda.conductor')}
           onPress={() => {
             if (!isObserver) {
-              setSelectorModal({ type: 'actor', field: 'conductor', roleFilter: 'conductor' });
+              setPeoplePicker({ mode: 'role', nameField: 'conductor_name', capability: 'lead_music' });
             }
           }}
           disabled={isObserver}
           colors={colors}
-          onClear={!isObserver ? () => {
-            updateAgenda.mutate({
-              agendaId: agenda.id,
-              fields: { conductor_name: null, conductor_actor_id: null } as Record<string, unknown>,
-            });
-          } : undefined}
+          onClear={!isObserver ? () => updateField('conductor_name', null) : undefined}
           hasValue={!!agenda.conductor_name}
           onFieldFocus={onFieldFocus}
         />
@@ -351,11 +378,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           </View>
         ) : (
           <SelectorField
+            testID="agenda-opening-prayer-selector"
             value={getSpeech(0)?.speaker_name ?? ''}
             placeholder={t('agenda.openingPrayer')}
             onPress={() => {
               if (!isObserver) {
-                setSelectorModal({ type: 'prayer', field: 'opening_prayer' });
+                setPeoplePicker({ mode: 'prayer', position: 0 });
               }
             }}
             disabled={isObserver}
@@ -600,11 +628,12 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           </View>
         ) : (
           <SelectorField
+            testID="agenda-closing-prayer-selector"
             value={getSpeech(4)?.speaker_name ?? ''}
             placeholder={t('agenda.closingPrayer')}
             onPress={() => {
               if (!isObserver) {
-                setSelectorModal({ type: 'prayer', field: 'closing_prayer' });
+                setPeoplePicker({ mode: 'prayer', position: 4 });
               }
             }}
             disabled={isObserver}
@@ -621,46 +650,40 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         )}
       </FieldRow>
 
-      {/* Actor selector bottom-sheet */}
-      {selectorModal?.type === 'actor' && (
-        <ActorSelector
+      {/* Unified people picker — actor roles, recognition (multi-select), and prayers (v2.0) */}
+      {peoplePicker?.mode === 'role' && (
+        <PeoplePicker
           visible
-          roleFilter={(selectorModal.roleFilter ?? 'all') as import('../hooks/useActors').ActorRoleFilter}
-          onSelect={(actor) => {
-            const nameField = `${selectorModal.field}_name`;
-            const idField = `${selectorModal.field}_actor_id`;
-            handleActorSelect(actor, nameField, idField);
-            setSelectorModal(null);
+          capability={peoplePicker.capability}
+          onSelect={(member) => {
+            handleRoleSelect(member, peoplePicker.nameField);
+            setPeoplePicker(null);
           }}
-          onClose={() => setSelectorModal(null)}
+          onClose={() => setPeoplePicker(null)}
         />
       )}
 
-      {/* Recognized names ActorSelector */}
-      {recognizeSelector && (
-        <ActorSelector
+      {peoplePicker?.mode === 'recognize' && (
+        <PeoplePicker
           visible
-          roleFilter="recognize"
-          onSelect={(actor) => {
-            const currentItems = parseItems(agenda?.recognized_names ?? null);
-            if (recognizeSelector.mode === 'add') {
-              const newItems = [...currentItems, actor.name];
-              updateField('recognized_names', joinItems(newItems));
-            } else if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
-              const newItems = [...currentItems];
-              newItems[recognizeSelector.editIndex] = actor.name;
-              updateField('recognized_names', joinItems(newItems));
+          capability="be_recognized"
+          multiSelect
+          selectedIds={recognizedSelectedIds}
+          onSelect={handleRecognizeToggle}
+          onClose={() => setPeoplePicker(null)}
+        />
+      )}
+
+      {peoplePicker?.mode === 'prayer' && (
+        <PeoplePicker
+          visible
+          onSelect={(member) => {
+            if (peoplePicker.mode === 'prayer') {
+              handlePrayerSelect(member, peoplePicker.position);
             }
-            setRecognizeSelector(null);
+            setPeoplePicker(null);
           }}
-          onClose={() => setRecognizeSelector(null)}
-          disabledNames={(() => {
-            const currentItems = parseItems(agenda?.recognized_names ?? null);
-            if (recognizeSelector.mode === 'edit' && recognizeSelector.editIndex !== undefined) {
-              return currentItems.filter((_, i) => i !== recognizeSelector.editIndex);
-            }
-            return currentItems;
-          })()}
+          onClose={() => setPeoplePicker(null)}
         />
       )}
 
@@ -677,44 +700,6 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
         />
       )}
 
-      {/* Prayer selector modal */}
-      {selectorModal?.type === 'prayer' && (
-        <PrayerSelector
-          visible={true}
-          modalOnly={true}
-          onClose={() => setSelectorModal(null)}
-          selected={(() => {
-            const position = selectorModal.field === 'opening_prayer' ? 0 : 4;
-            const speech = getSpeech(position);
-            if (!speech?.speaker_name) return null;
-            return { memberId: speech.member_id ?? null, name: speech.speaker_name };
-          })()}
-          onSelect={(selection: PrayerSelection | null) => {
-            if (isObserver) return;
-            const position = selectorModal.field === 'opening_prayer' ? 0 : 4;
-            const speech = getSpeech(position);
-            if (!speech) {
-              setSelectorModal(null);
-              return;
-            }
-            if (selection) {
-              assignSpeaker.mutate({
-                speechId: speech.id,
-                memberId: selection.memberId ?? '',
-                speakerName: selection.name,
-                speakerInformalName: null,
-                speakerPhone: null,
-                status: 'assigned_confirmed',
-              });
-            } else {
-              removeAssignment.mutate({ speechId: speech.id, speakerName: speech.speaker_name ?? undefined });
-            }
-            setSelectorModal(null);
-          }}
-          placeholder={selectorModal.field === 'opening_prayer' ? t('agenda.openingPrayer') : t('agenda.closingPrayer')}
-          disabled={isObserver}
-        />
-      )}
     </View>
   );
 });

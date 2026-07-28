@@ -315,19 +315,21 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
     expect(src).toContain("agenda.addPresence");
   });
 
-  it('ActorSelector opens when recognizeSelector is set', () => {
+  it('recognition opens the unified PeoplePicker (v2.0 migration)', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
     );
-    expect(src).toContain('recognizeSelector');
+    // v2.0: recognition now routes through the unified PeoplePicker, not the old ActorSelector.
+    expect(src).toContain('PeoplePicker');
+    expect(src).not.toContain('ActorSelector');
   });
 
-  it('ActorSelector has roleFilter=\'recognize\' for recognized_names', () => {
+  it('recognition PeoplePicker uses capability be_recognized + multiSelect (v2.0)', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
     );
-    // The new ActorSelector for recognizeSelector should have roleFilter="recognize"
-    expect(src).toContain("roleFilter=\"recognize\"");
+    expect(src).toContain('be_recognized');
+    expect(src).toContain('multiSelect');
   });
 
   it('ActorSelector disabledNames: add mode = all current names', () => {

@@ -80,7 +80,8 @@ export function useRegisterPushToken(isOnline: boolean): void {
           });
         }
 
-        // Upsert token in device_push_tokens (includes role for SQL-based filtering)
+        // Upsert token in device_push_tokens (role for SQL filtering; app_version/platform
+        // let the update-nudge job target outdated clients).
         const { error } = await supabase
           .from('device_push_tokens')
           .upsert(
@@ -89,6 +90,8 @@ export function useRegisterPushToken(isOnline: boolean): void {
               ward_id: wardId,
               expo_push_token: expoPushToken,
               role,
+              app_version: Constants.expoConfig?.version ?? null,
+              platform: Platform.OS,
             },
             {
               onConflict: 'user_id,expo_push_token',

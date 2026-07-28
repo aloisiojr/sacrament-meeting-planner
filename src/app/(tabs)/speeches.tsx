@@ -20,6 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
+import { buildFullPhone } from '../../lib/phone';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -269,7 +270,7 @@ function SpeechesTabContent() {
         memberId: member.id,
         speakerName: member.full_name,
         speakerInformalName: member.informal_name,
-        speakerPhone: member.phone ?? null,
+        speakerPhone: buildFullPhone(member.country_code, member.phone),
         status: statusOverride,
       });
       setSpeakerModalSpeechId(null);

@@ -15,10 +15,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SundayCard } from './SundayCard';
 import { SpeechSlot } from './SpeechSlot';
-import { MemberSelectorModal } from './MemberSelectorModal';
+import { PeoplePicker } from './PeoplePicker';
 import { TopicSelectorModal } from './TopicSelectorModal';
 import { QueryErrorView } from './QueryErrorView';
 import { buildFullPhone } from '../lib/phone';
+import { useMembers } from '../hooks/useMembers';
+import { resolveContactSnapshot } from '../lib/contact';
 import {
   useSpeeches,
   useLazyCreateSpeeches,
@@ -67,6 +69,9 @@ export function NextAssignmentsSection() {
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
 
+  // v2.0: members are needed to resolve the contact-delegation snapshot at assignment time.
+  const { data: members } = useMembers();
+
   const lazyCreate = useLazyCreateSpeeches();
   const assignSpeaker = useAssignSpeaker();
   const assignTopic = useAssignTopic();
@@ -93,16 +98,26 @@ export function NextAssignmentsSection() {
 
   const handleAssignSpeaker = useCallback(
     (speechId: string, member: Member) => {
+      // v2.0: resolve the contact-delegation snapshot. If the member is contacted via a
+      // responsible, snapshot the responsible's phone + delegation flags onto the speech.
+      const responsible = member.responsible_id
+        ? (members ?? []).find((m) => m.id === member.responsible_id) ?? null
+        : null;
+      const contact = resolveContactSnapshot(member, responsible);
+
       assignSpeaker.mutate({
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
         speakerInformalName: member.informal_name,
-        speakerPhone: buildFullPhone(member.country_code, member.phone) ?? '',
+        speakerPhone: buildFullPhone(member.country_code, member.phone),
+        contactPhone: contact.contact_phone,
+        isDelegated: contact.is_delegated,
+        delegateForName: contact.delegate_for_name,
       });
       setSpeakerModalSpeechId(null);
     },
-    [assignSpeaker]
+    [assignSpeaker, members]
   );
 
   const handleAssignTopic = useCallback(
@@ -176,7 +191,8 @@ export function NextAssignmentsSection() {
           })}
       </SundayCard>
 
-      <MemberSelectorModal
+      {/* Speaker Selector (v2.0 unified people picker; undefined capability = everyone) */}
+      <PeoplePicker
         visible={!!speakerModalSpeechId}
         onSelect={(member) => {
           if (speakerModalSpeechId) handleAssignSpeaker(speakerModalSpeechId, member);

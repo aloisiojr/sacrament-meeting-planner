@@ -26,8 +26,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SundayCard } from '../../components/SundayCard';
 import { SpeechSlot } from '../../components/SpeechSlot';
-import { MemberSelectorModal } from '../../components/MemberSelectorModal';
+import { PeoplePicker } from '../../components/PeoplePicker';
 import { TopicSelectorModal } from '../../components/TopicSelectorModal';
+import { useMembers } from '../../hooks/useMembers';
+import { resolveContactSnapshot } from '../../lib/contact';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
 import {
@@ -116,6 +118,9 @@ function SpeechesTabContent() {
   const offlineExpandableDates = useMemo(() => new Set(getNext3Sundays()), []);
 
   const { managePrayers } = useWardManagePrayers();
+
+  // v2.0: members are needed to resolve the contact-delegation snapshot at assignment time.
+  const { data: members } = useMembers();
 
   // Fetch speeches and exceptions for the visible range
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
@@ -265,17 +270,27 @@ function SpeechesTabContent() {
         ? 'assigned_confirmed' as SpeechStatus
         : undefined;
 
+      // v2.0: resolve the contact-delegation snapshot. If the member is contacted via a
+      // responsible, snapshot the responsible's phone + delegation flags onto the speech.
+      const responsible = member.responsible_id
+        ? (members ?? []).find((m) => m.id === member.responsible_id) ?? null
+        : null;
+      const contact = resolveContactSnapshot(member, responsible);
+
       assignSpeaker.mutate({
         speechId,
         memberId: member.id,
         speakerName: member.full_name,
         speakerInformalName: member.informal_name,
         speakerPhone: buildFullPhone(member.country_code, member.phone),
+        contactPhone: contact.contact_phone,
+        isDelegated: contact.is_delegated,
+        delegateForName: contact.delegate_for_name,
         status: statusOverride,
       });
       setSpeakerModalSpeechId(null);
     },
-    [assignSpeaker, speeches, managePrayers]
+    [assignSpeaker, speeches, managePrayers, members]
   );
 
   // Topic assignment
@@ -622,8 +637,8 @@ function SpeechesTabContent() {
         keyboardShouldPersistTaps="handled"
       />
 
-      {/* Speaker Selector Modal */}
-      <MemberSelectorModal
+      {/* Speaker / Prayer Selector (v2.0 unified people picker; undefined capability = everyone) */}
+      <PeoplePicker
         visible={!!speakerModalSpeechId}
         onSelect={(member) => {
           if (speakerModalSpeechId) {

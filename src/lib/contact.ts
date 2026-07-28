@@ -20,22 +20,28 @@ export interface ContactSnapshot {
 /**
  * Resolve the contact snapshot for a member.
  *
- * - If the member opts into contact-via-responsible AND a responsible member is supplied, the
- *   contact is delegated: `contact_phone` = responsible's full phone, `is_delegated` = true,
- *   `delegate_for_name` = the member's informal name (or full name).
- * - Otherwise (own contact, including the orphaned case where the flag is on but no responsible is
- *   supplied), `contact_phone` = the member's own full phone, `is_delegated` = false.
+ * - If the member opts into contact-via-responsible AND a responsible member with a usable phone is
+ *   supplied, the contact is delegated: `contact_phone` = responsible's full phone,
+ *   `is_delegated` = true, `delegate_for_name` = the member's informal name (or full name).
+ * - Otherwise — own contact, including (a) the orphaned case where the flag is on but no responsible
+ *   is supplied, and (b) the case where a responsible is supplied but has NO usable phone — falls
+ *   back to the member's own full phone with `is_delegated` = false. The no-phone fallback keeps the
+ *   WhatsApp message from being wrapped with an empty `{responsavel}`.
  */
 export function resolveContactSnapshot(
   member: Member,
   responsible?: Member | null
 ): ContactSnapshot {
   if (member.contact_via_responsible && responsible) {
-    return {
-      contact_phone: buildFullPhone(responsible.country_code, responsible.phone),
-      is_delegated: true,
-      delegate_for_name: member.informal_name || member.full_name,
-    };
+    const responsiblePhone = buildFullPhone(responsible.country_code, responsible.phone);
+    if (responsiblePhone) {
+      return {
+        contact_phone: responsiblePhone,
+        is_delegated: true,
+        delegate_for_name: member.informal_name || member.full_name,
+      };
+    }
+    // Responsible exists but has no usable phone → fall through to the member's own phone below.
   }
   return {
     contact_phone: buildFullPhone(member.country_code, member.phone),

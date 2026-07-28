@@ -89,18 +89,38 @@ describe('resolveContactSnapshot', () => {
     expect(resolveContactSnapshot(member).contact_phone).toBeNull();
   });
 
-  it('delegated snapshot keeps is_delegated true even if the responsible has no phone', () => {
+  it('falls back to the member own phone (not delegated) when the responsible has no phone', () => {
+    // P2 #2: an orphaned responsible with no usable phone must NOT produce a delegated snapshot,
+    // otherwise the WhatsApp message would be wrapped with an empty {responsavel}.
     const member = makeMember({
       full_name: 'Ana',
       informal_name: 'Ana',
       contact_via_responsible: true,
       responsible_id: 'resp-1',
+      country_code: '+55',
+      phone: '11987654321',
+    });
+    const responsible = makeMember({ id: 'resp-1', full_name: 'Resp', phone: null });
+    expect(resolveContactSnapshot(member, responsible)).toEqual({
+      contact_phone: '+5511987654321',
+      is_delegated: false,
+      delegate_for_name: null,
+    });
+  });
+
+  it('falls back to null (not delegated) when both responsible and member have no phone', () => {
+    const member = makeMember({
+      full_name: 'Ana',
+      informal_name: 'Ana',
+      contact_via_responsible: true,
+      responsible_id: 'resp-1',
+      phone: null,
     });
     const responsible = makeMember({ id: 'resp-1', full_name: 'Resp', phone: null });
     expect(resolveContactSnapshot(member, responsible)).toEqual({
       contact_phone: null,
-      is_delegated: true,
-      delegate_for_name: 'Ana',
+      is_delegated: false,
+      delegate_for_name: null,
     });
   });
 });

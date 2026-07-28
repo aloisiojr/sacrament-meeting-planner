@@ -10,7 +10,15 @@
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).
-- No change in flight. Next: pick the first real change and run **spec-first**.
+- Password reset bug (root cause = Resend had no verified domain):
+  1. `specs/reset-email-gmail-smtp.md` — **DONE & VERIFIED IN PROD.** Switched transport
+     Resend → Gmail SMTP (denomailer). Code committed (f09bbe6); secrets set
+     (`GMAIL_USER=sacr.meet.plan@gmail.com`, `GMAIL_APP_PASSWORD`); function deployed. Live test:
+     external user igor 500 → 200, email delivered. Server-side only, shipped apps unaffected.
+  2. `specs/reset-email-error-visibility.md` — client error hardening (APPROVED, actionable
+     wording). **Queued** — blocked until the tsc baseline is clean (it edits `src/`).
+- **In flight:** `specs/fix-test-typecheck-baseline.md` — fixing 51 pre-existing tsc errors in
+  `src/__tests__/*` (subagent). Unblocks the per-edit typecheck gate + the error-visibility change.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via
@@ -22,3 +30,6 @@
 - Rotate the Supabase keys that were present in `.claude/settings.local.json` (now gitignored) as
   a precaution — they were committed to the local-only `UX-2.0`/archive snapshot.
 - `main` is 1 commit ahead of `origin/main` (pre-existing, not from this work).
+- The Gmail App Password was shared in chat — optional to rotate later (regenerate in Google +
+  `supabase secrets set GMAIL_APP_PASSWORD=...`).
+- `RESEND_API_KEY` / `RESEND_FROM_EMAIL` secrets are now unused — safe to delete from Supabase.

@@ -371,10 +371,8 @@ describe('F061: settings/index.tsx error i18n (STEP-06)', () => {
 describe('F061: members.tsx error i18n (STEP-07)', () => {
   const membersSource = readSource('src/app/(tabs)/settings/members.tsx');
 
-  // AC-061-8: Future speeches warning uses i18n
-  it('handleDelete uses t(members.futureSpeechWarning)', () => {
-    expect(membersSource).toContain("t('members.futureSpeechWarning'");
-  });
+  // v2.0 Phase 4: inline member delete (and its future-speeches warning) moved out of this
+  // CSV-only screen into the People picker, so members.tsx no longer references futureSpeechWarning.
 
   // AC-061-8: No hardcoded "future speeches" English text
   it('no hardcoded "future speeches" in English', () => {

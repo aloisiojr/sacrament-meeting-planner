@@ -1,20 +1,20 @@
 /**
- * MemberManagementScreen: CRUD members with search, inline add/edit,
- * swipe-to-reveal actions, auto-save on blur, and country code with emoji flags.
+ * MembersScreen (v2.0): CSV-only people management.
+ *
+ * People are now added/edited/removed inside the People picker during planning. This settings
+ * screen keeps ONLY the batch CSV workflow: download the current full dump → edit the sheet
+ * (by hand or with AI) → upload to REPLACE everyone (destructive). A read-only count is shown.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Pressable,
   Alert,
-  KeyboardAvoidingView,
   Platform,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,257 +23,19 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
-import { SwipeableCard } from '../../../components/SwipeableCard';
-import { SearchInput } from '../../../components/SearchInput';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
-import { generateCsv, parseCsv, splitPhoneNumber, type CsvErrorCode } from '../../../lib/csvUtils';
-import { COUNTRY_CODES, getFlagForCode, getCountryByLabel } from '../../../lib/countryCodes';
+import {
+  generateCsv,
+  parseCsv,
+  splitPhoneNumber,
+  type CsvErrorCode,
+  type CsvExportMember,
+} from '../../../lib/csvUtils';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import {
-  useMembers,
-  useCreateMember,
-  useUpdateMember,
-  useDeleteMember,
-  checkFutureSpeeches,
-  memberKeys,
-} from '../../../hooks/useMembers';
-import { useSpeechCounts } from '../../../hooks/useSpeechCounts';
-import type { Member } from '../../../types/database';
-
-// --- Inline Editor ---
-
-interface MemberEditorProps {
-  member?: Member;
-  onSave: (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => void;
-  onCancel: () => void;
-  colors: ReturnType<typeof useTheme>['colors'];
-}
-
-function MemberEditor({ member, onSave, onCancel, colors }: MemberEditorProps) {
-  const { t } = useTranslation();
-  const [fullName, setFullName] = useState(member?.full_name ?? '');
-  const [informalName, setInformalName] = useState(member?.informal_name ?? '');
-  const [countryCode, setCountryCode] = useState(member?.country_code ?? '+55');
-  const [countryLabel, setCountryLabel] = useState(
-    () => COUNTRY_CODES.find((c) => c.code === (member?.country_code ?? '+55'))?.label ?? 'Brazil (+55)'
-  );
-  const [phone, setPhone] = useState(member?.phone ?? '');
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const nameRef = useRef<TextInput>(null);
-
-  useEffect(() => {
-    // Focus name field on mount for new member
-    if (!member) {
-      setTimeout(() => nameRef.current?.focus(), 100);
-    }
-    // Mount-only autofocus; `member` is fixed for the lifetime of this editor.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSave = useCallback(() => {
-    const trimmed = fullName.trim();
-    if (!trimmed) return;
-    onSave({ full_name: trimmed, informal_name: informalName.trim() || '', country_code: countryCode, phone: phone.trim() });
-  }, [fullName, informalName, countryCode, phone, onSave]);
-
-  return (
-    <View style={[styles.editor, { backgroundColor: colors.surface }]}>
-      <TextInput
-        ref={nameRef}
-        style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-        value={fullName}
-        onChangeText={setFullName}
-        onBlur={() => {
-          if (!informalName.trim() && fullName.trim()) {
-            setInformalName(fullName.trim().split(' ')[0]);
-          }
-        }}
-        placeholder={t('members.fullName')}
-        placeholderTextColor={colors.placeholder}
-        returnKeyType="next"
-        autoCapitalize="words"
-        textContentType="name"
-        autoComplete="name"
-        testID="members-editor-fullname-input"
-      />
-      <TextInput
-        style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-        value={informalName}
-        onChangeText={setInformalName}
-        placeholder={t('members.informalNamePlaceholder')}
-        placeholderTextColor={colors.placeholder}
-        returnKeyType="next"
-        autoCapitalize="words"
-        testID="members-editor-informal-input"
-      />
-      <View style={styles.phoneRow}>
-        <Pressable
-          style={[styles.countryCodeBtn, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-          onPress={() => setShowCountryPicker(true)}
-          accessibilityLabel={t('members.countryCode')}
-        >
-          <Text style={styles.flagText}>{getCountryByLabel(countryLabel)?.flag ?? getFlagForCode(countryCode)}</Text>
-          <Text style={[styles.codeText, { color: colors.text }]}>{countryCode}</Text>
-        </Pressable>
-        <TextInput
-          style={[styles.phoneInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder={t('members.phone')}
-          placeholderTextColor={colors.placeholder}
-          keyboardType="phone-pad"
-          textContentType="telephoneNumber"
-          autoComplete="tel"
-          testID="members-editor-phone-input"
-        />
-      </View>
-
-      {/* Save/Cancel buttons */}
-      <View style={styles.editorButtons}>
-        <Pressable
-          style={styles.cancelButton}
-          onPress={onCancel}
-          accessibilityRole="button"
-          testID="members-editor-cancel-button"
-        >
-          <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
-            {t('common.cancel')}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.saveButton, { backgroundColor: colors.primary }]}
-          onPress={handleSave}
-          accessibilityRole="button"
-          testID="members-editor-save-button"
-        >
-          <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
-            {t('common.save')}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Country Code Picker Modal */}
-      <Modal
-        visible={showCountryPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCountryPicker(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowCountryPicker(false)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <FlatList
-              data={COUNTRY_CODES}
-              keyExtractor={(item) => item.label}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={[
-                    styles.countryItem,
-                    item.label === countryLabel && { backgroundColor: colors.primaryContainer },
-                  ]}
-                  onPress={() => {
-                    setCountryCode(item.code);
-                    setCountryLabel(item.label);
-                    setShowCountryPicker(false);
-                  }}
-                >
-                  <Text style={styles.countryFlag}>{item.flag}</Text>
-                  <Text style={[styles.countryLabel, { color: colors.text }]}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
-
-// --- Member Row ---
-
-interface MemberRowProps {
-  member: Member;
-  isEditing: boolean;
-  activeSwipeId: string | null;
-  onSwipeReveal: (id: string | null) => void;
-  onEdit: (member: Member) => void;
-  onDelete: (member: Member) => void;
-  onSave: (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => void;
-  onCancel: () => void;
-  disabled: boolean;
-  colors: ReturnType<typeof useTheme>['colors'];
-  speechCount: number;
-}
-
-function MemberRow({
-  member,
-  isEditing,
-  activeSwipeId,
-  onSwipeReveal,
-  onEdit,
-  onDelete,
-  onSave,
-  onCancel,
-  disabled,
-  colors,
-  speechCount,
-}: MemberRowProps) {
-  const { t } = useTranslation();
-
-  if (isEditing) {
-    return (
-      <MemberEditor
-        member={member}
-        onSave={onSave}
-        onCancel={onCancel}
-        colors={colors}
-      />
-    );
-  }
-
-  return (
-    <SwipeableCard
-      id={member.id}
-      activeId={activeSwipeId}
-      onReveal={onSwipeReveal}
-      disabled={disabled}
-      onEdit={() => onEdit(member)}
-      onDelete={() => onDelete(member)}
-      editLabel={t('common.edit')}
-      deleteLabel={t('common.delete')}
-    >
-      <View style={[styles.memberRow, { borderBottomColor: colors.divider }]}>
-        <View style={styles.memberInfo}>
-          <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-            {member.full_name}
-          </Text>
-          {member.informal_name && (
-            <Text style={[styles.memberInformalName, { color: colors.textSecondary }]} numberOfLines={1}>
-              {member.informal_name}
-            </Text>
-          )}
-          {member.phone && (
-            <Text style={[styles.memberPhone, { color: colors.textSecondary }]}>
-              {getFlagForCode(member.country_code)} {member.country_code} {member.phone}
-            </Text>
-          )}
-          {speechCount > 0 && (
-            <Text style={[styles.memberSpeechCount, { color: colors.textSecondary }]}>
-              {t('members.speechCount', { count: speechCount })}
-            </Text>
-          )}
-        </View>
-      </View>
-    </SwipeableCard>
-  );
-}
+import { useMembers, memberKeys } from '../../../hooks/useMembers';
 
 // --- CSV Error Translation Helper ---
 
@@ -300,106 +62,45 @@ export default function MembersScreen() {
   const { hasPermission, wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  const [search, setSearch] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
+  const { data: members, isLoading } = useMembers();
 
-  const canWrite = hasPermission('member:write');
-
-  const { data: members, isLoading } = useMembers(search);
-  const { data: speechCounts } = useSpeechCounts();
-  const createMember = useCreateMember();
-  const updateMember = useUpdateMember();
-  const deleteMember = useDeleteMember();
-
-  const handleAdd = useCallback(() => {
-    setActiveSwipeId(null);
-    setEditingId(null);
-    setIsAdding(true);
-  }, []);
-
-  const handleSaveNew = useCallback(
-    (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => {
-      if (!data.full_name) {
-        setIsAdding(false);
-        return;
-      }
-      createMember.mutate(
-        { full_name: data.full_name, informal_name: data.informal_name || data.full_name.split(' ')[0], country_code: data.country_code, phone: data.phone || null },
-        { onSuccess: () => setIsAdding(false) }
-      );
-    },
-    [createMember]
-  );
-
-  const handleEdit = useCallback((member: Member) => {
-    setActiveSwipeId(null);
-    setIsAdding(false);
-    setEditingId(member.id);
-  }, []);
-
-  const handleSaveEdit = useCallback(
-    (memberId: string) =>
-      (data: { full_name: string; informal_name: string; country_code: string; phone: string }) => {
-        if (!data.full_name) {
-          setEditingId(null);
-          return;
-        }
-        updateMember.mutate(
-          { id: memberId, full_name: data.full_name, informal_name: data.informal_name || data.full_name.split(' ')[0], country_code: data.country_code, phone: data.phone || null },
-          { onSuccess: () => setEditingId(null) }
-        );
-      },
-    [updateMember]
-  );
-
-  const handleDelete = useCallback(
-    async (member: Member) => {
-      try {
-        const futureCount = await checkFutureSpeeches(member.id);
-        const message =
-          futureCount > 0
-            ? `${t('members.deleteConfirm')} (${t('members.futureSpeechWarning', { count: futureCount })})`
-            : t('members.deleteConfirm');
-
-        Alert.alert(t('common.confirm'), message, [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('common.delete'),
-            style: 'destructive',
-            onPress: () => deleteMember.mutate({ memberId: member.id, memberName: member.full_name }),
-          },
-        ]);
-      } catch {
-        Alert.alert(t('common.confirm'), t('members.deleteConfirm'), [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('common.delete'),
-            style: 'destructive',
-            onPress: () => deleteMember.mutate({ memberId: member.id, memberName: member.full_name }),
-          },
-        ]);
-      }
-    },
-    [t, deleteMember]
-  );
+  const canImport = hasPermission('member:import');
 
   // Export guard to prevent double-tap
   const exportingRef = useRef(false);
 
-  // CSV Export handler
+  // CSV Export handler (full dump incl. capabilities + Responsável by name)
   const handleExport = useCallback(async () => {
     if (exportingRef.current) return;
     exportingRef.current = true;
 
     try {
-      const csv = generateCsv(members ?? [], {
+      const list = members ?? [];
+      // Resolve responsible_id → responsible member's full_name for the export.
+      const nameById = new Map(list.map((m) => [m.id, m.full_name]));
+      const exportMembers: CsvExportMember[] = list.map((m) => ({
+        full_name: m.full_name,
+        informal_name: m.informal_name,
+        country_code: m.country_code,
+        phone: m.phone,
+        can_preside: m.can_preside,
+        can_conduct: m.can_conduct,
+        can_lead_music: m.can_lead_music,
+        can_play_piano: m.can_play_piano,
+        can_be_recognized: m.can_be_recognized,
+        responsible_name: m.responsible_id ? nameById.get(m.responsible_id) ?? '' : '',
+      }));
+      const csv = generateCsv(exportMembers, {
         name: t('members.csvHeaderName'),
         informalName: t('members.csvHeaderInformalName'),
         phone: t('members.csvHeaderPhone'),
+        preside: t('members.csvHeaderPreside'),
+        conduct: t('members.csvHeaderConduct'),
+        leadMusic: t('members.csvHeaderLeadMusic'),
+        piano: t('members.csvHeaderPiano'),
+        recognize: t('members.csvHeaderRecognize'),
+        responsible: t('members.csvHeaderResponsible'),
       });
-      console.log('[Export] CSV length:', csv.length);
 
       if (Platform.OS === 'web') {
         // Web: Blob download
@@ -413,10 +114,7 @@ export default function MembersScreen() {
       } else {
         // Mobile: Write temp file and share via expo-sharing
         const file = new File(Paths.cache, 'membros.csv');
-        console.log('[Export] fileUri:', file.uri);
         file.write(csv);
-        console.log('[Export] File written successfully');
-        console.log('[Export] Opening share sheet...');
         await Sharing.shareAsync(file.uri, {
           mimeType: 'text/csv',
           dialogTitle: t('members.exportCsv'),
@@ -424,7 +122,6 @@ export default function MembersScreen() {
         });
       }
     } catch (err: any) {
-      console.error('Export CSV failed:', err);
       const msg = (err?.message ?? '').toLowerCase();
       if (msg !== 'user did not share' && !msg.includes('cancelled')) {
         Alert.alert(t('common.error'), t('members.exportFailed'));
@@ -434,7 +131,7 @@ export default function MembersScreen() {
     }
   }, [members, t]);
 
-  // CSV Import mutation (atomic overwrite via RPC)
+  // CSV Import mutation (destructive atomic overwrite via RPC — full dump)
   const importMutation = useMutation({
     mutationFn: async (csvContent: string) => {
       const result = parseCsv(csvContent);
@@ -450,7 +147,7 @@ export default function MembersScreen() {
         throw new Error(t('members.importEmpty'));
       }
 
-      // Build members array for the RPC
+      // Build members array for the RPC (capabilities + responsible name for 2nd-pass resolution)
       const newMembers = result.members.map((m) => {
         const { countryCode, phone } = splitPhoneNumber(m.phone);
         return {
@@ -458,10 +155,16 @@ export default function MembersScreen() {
           informal_name: m.informal_name || m.full_name.split(' ')[0],
           country_code: countryCode,
           phone: phone || null,
+          can_preside: m.can_preside,
+          can_conduct: m.can_conduct,
+          can_lead_music: m.can_lead_music,
+          can_play_piano: m.can_play_piano,
+          can_be_recognized: m.can_be_recognized,
+          responsible_name: m.responsible_name || null,
         };
       });
 
-      // Atomic transaction via RPC: DELETE all + INSERT new
+      // Atomic transaction via RPC: DELETE all + INSERT new + 2nd-pass responsible resolution
       const { data, error } = await supabase
         .rpc('import_members', {
           target_ward_id: wardId,
@@ -507,18 +210,11 @@ export default function MembersScreen() {
           type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
           copyToCacheDirectory: true,
         });
-        console.log('[Import] DocumentPicker result:', {
-          uri: result.assets?.[0]?.uri,
-          name: result.assets?.[0]?.name,
-          mimeType: result.assets?.[0]?.mimeType,
-        });
         if (result.canceled || !result.assets?.[0]) return;
         const pickedFile = new File(result.assets[0].uri);
         const content = await pickedFile.text();
-        console.log('[Import] File content length:', content.length);
         importMutation.mutate(content);
       } catch (err: any) {
-        console.error('Import CSV failed:', err);
         const msg = (err?.message ?? '').toLowerCase();
         if (msg.includes('cancel') || msg.includes('cancelled')) return;
         const errorKey = (msg.includes('read') || msg.includes('encoding'))
@@ -529,156 +225,98 @@ export default function MembersScreen() {
     }
   }, [importMutation, t]);
 
-  // CSV Import handler with confirmation dialog
+  // CSV Import handler with destructive confirmation dialog
   const handleImport = useCallback(() => {
     Alert.alert(
       t('members.importConfirmTitle'),
       t('members.importConfirmMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.confirm'), style: 'default', onPress: () => performImport() },
+        { text: t('common.confirm'), style: 'destructive', onPress: () => performImport() },
       ]
     );
   }, [t, performImport]);
 
-  const canImport = hasPermission('member:import');
-
-  const renderItem = useCallback(
-    ({ item }: { item: Member }) => (
-      <MemberRow
-        member={item}
-        isEditing={editingId === item.id}
-        activeSwipeId={activeSwipeId}
-        onSwipeReveal={setActiveSwipeId}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onSave={handleSaveEdit(item.id)}
-        onCancel={() => setEditingId(null)}
-        disabled={!canWrite}
-        colors={colors}
-        speechCount={speechCounts[item.id] ?? 0}
-      />
-    ),
-    [editingId, activeSwipeId, handleEdit, handleDelete, handleSaveEdit, canWrite, colors, speechCounts]
-  );
+  const memberCount = members?.length ?? 0;
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="members-back-button">
-            <Text style={[styles.backButton, { color: colors.primary }]}>
-              {t('common.back')}
-            </Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>{t('members.title')}</Text>
-          {canWrite ? (
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={handleAdd}
-              accessibilityRole="button"
-              accessibilityLabel={t('members.addMember')}
-              testID="members-add-button"
-            >
-              <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>+</Text>
-            </Pressable>
-          ) : (
-            <View style={{ width: 36 }} />
-          )}
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="members-back-button">
+          <Text style={[styles.backButton, { color: colors.primary }]}>
+            {t('common.back')}
+          </Text>
+        </Pressable>
+        <Text style={[styles.title, { color: colors.text }]}>{t('members.title')}</Text>
+        <View style={{ width: 36 }} />
+      </View>
 
-        {/* Screen description */}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Screen description — the batch CSV workflow */}
         <Text style={[styles.description, { color: colors.textSecondary }]}>
-          {t('members.description')}
+          {t('members.csvScreenDescription')}
         </Text>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <SearchInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t('common.search')}
-            testID="members-search-input"
-          />
-        </View>
-
-        {/* CSV Import/Export */}
-        {canImport && (
-          <>
-          <View style={styles.csvActions}>
-            <Pressable
-              style={[styles.csvButton, { borderColor: colors.primary }]}
-              onPress={handleExport}
-              accessibilityRole="button"
-              accessibilityLabel={t('members.exportCsv')}
-            >
-              <Text style={[styles.csvButtonText, { color: colors.primary }]}>
-                {t('members.exportCsv')}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.csvButton, { borderColor: colors.primary }]}
-              onPress={handleImport}
-              disabled={importMutation.isPending}
-              accessibilityRole="button"
-              accessibilityLabel={t('members.importCsv')}
-            >
-              {importMutation.isPending ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={[styles.csvButtonText, { color: colors.primary }]}>
-                  {t('members.importCsv')}
-                </Text>
-              )}
-            </Pressable>
-          </View>
-          <Text style={[styles.csvHelp, { color: colors.textSecondary }]}>
-            {t('members.csvHelp')}
+        {/* Read-only member count */}
+        {!isLoading && (
+          <Text style={[styles.count, { color: colors.text }]} testID="members-count">
+            {t('members.memberCount', { count: memberCount })}
           </Text>
-          </>
         )}
 
-        {/* Add new member form */}
-        {isAdding && (
-          <MemberEditor
-            onSave={handleSaveNew}
-            onCancel={() => setIsAdding(false)}
-            colors={colors}
-          />
-        )}
-
-        {/* Member list */}
-        <FlatList
-          style={styles.flex}
-          data={members}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListEmptyComponent={
-            !isLoading ? (
-              <View style={styles.empty}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('common.noResults')}
+        {canImport ? (
+          <>
+            {/* CSV Import/Export */}
+            <View style={styles.csvActions}>
+              <Pressable
+                style={[styles.csvButton, { borderColor: colors.primary }]}
+                onPress={handleExport}
+                accessibilityRole="button"
+                accessibilityLabel={t('members.exportCsv')}
+                testID="members-export-button"
+              >
+                <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                  {t('members.exportCsv')}
                 </Text>
-              </View>
-            ) : null
-          }
-          onScrollBeginDrag={() => setActiveSwipeId(null)}
-          keyboardShouldPersistTaps="handled"
-        />
-      </KeyboardAvoidingView>
+              </Pressable>
+              <Pressable
+                style={[styles.csvButton, { borderColor: colors.primary }]}
+                onPress={handleImport}
+                disabled={importMutation.isPending}
+                accessibilityRole="button"
+                accessibilityLabel={t('members.importCsv')}
+                testID="members-import-button"
+              >
+                {importMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                    {t('members.importCsv')}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+
+            {/* Destructive replace warning */}
+            <View style={[styles.warningBox, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
+              <Text style={[styles.warningText, { color: colors.error }]} testID="members-import-warning">
+                {t('members.csvImportWarning')}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
+            {t('members.csvNoPermission')}
+          </Text>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  flex: {
     flex: 1,
   },
   header: {
@@ -696,177 +334,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
   description: {
-    fontSize: 13,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
   },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
-    lineHeight: 26,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+  count: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 16,
   },
   csvActions: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 12,
     gap: 8,
   },
   csvButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderWidth: 1,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 44,
   },
   csvButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  warningBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 4,
+  },
+  warningText: {
     fontSize: 13,
-    fontWeight: '600',
-  },
-  csvHelp: {
-    fontSize: 12,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  editor: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  input: {
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  countryCodeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    gap: 4,
-  },
-  flagText: {
-    fontSize: 18,
-  },
-  codeText: {
-    fontSize: 14,
-  },
-  phoneInput: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-  },
-  editorButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
-  },
-  cancelButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  saveButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  saveButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  memberRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    fontSize: 16,
+    lineHeight: 19,
     fontWeight: '500',
-  },
-  memberInformalName: {
-    fontSize: 13,
-    marginTop: 1,
-    fontStyle: 'italic',
-  },
-  memberPhone: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  memberSpeechCount: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  empty: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 15,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  modalContent: {
-    borderRadius: 12,
-    width: '100%',
-    maxHeight: 400,
-    paddingVertical: 8,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-  },
-  countryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  countryFlag: {
-    fontSize: 22,
-  },
-  countryLabel: {
-    fontSize: 16,
   },
 });

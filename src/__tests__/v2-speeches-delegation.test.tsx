@@ -221,7 +221,7 @@ beforeEach(() => {
 });
 
 describe('Speeches tab — v2.0 people picker + delegation snapshot (Phase 3a)', () => {
-  it('renders the PeoplePicker (not the old MemberSelectorModal) and it starts hidden', () => {
+  it('renders the PeoplePicker and it starts hidden', () => {
     render();
     expect(peoplePickerProps).not.toBeNull();
     expect(peoplePickerProps!.visible).toBe(false);

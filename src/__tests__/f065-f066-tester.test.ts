@@ -99,8 +99,8 @@ describe('F065: filterMembers informal_name edge cases', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('MemberSelectorModal inherits nickname search (AC-065-05 - tested via filterMembers)', () => {
-    // MemberSelectorModal uses useMembers(search) which calls filterMembers internally
+  it('PeoplePicker inherits nickname search (AC-065-05 - tested via filterMembers)', () => {
+    // PeoplePicker uses useMembers(search) which calls filterMembers internally
     // Testing filterMembers covers this AC automatically
     const members = [
       makeMember({ full_name: 'Roberto Carlos', informal_name: 'Beto' }),
@@ -110,8 +110,8 @@ describe('F065: filterMembers informal_name edge cases', () => {
     expect(result[0].full_name).toBe('Roberto Carlos');
   });
 
-  it('PrayerSelector inherits nickname search (AC-065-06 - tested via filterMembers)', () => {
-    // PrayerSelector also uses filterMembers
+  it('prayer selection inherits nickname search (AC-065-06 - tested via filterMembers)', () => {
+    // Prayer selection also uses filterMembers via PeoplePicker
     const members = [
       makeMember({ full_name: 'Francisco de Assis', informal_name: 'Chico' }),
     ];

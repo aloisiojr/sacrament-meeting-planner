@@ -7,7 +7,7 @@
  * the assign flow and assert the contact-delegation snapshot passed to useAssignSpeaker.
  *
  * The pure snapshot helper (resolveContactSnapshot) and buildFullPhone stay real — this test
- * verifies the *wiring*: the section uses PeoplePicker (not the old MemberSelectorModal) and the
+ * verifies the *wiring*: the section uses PeoplePicker and the
  * responsible lookup + snapshot fields are passed on assignment.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -194,7 +194,7 @@ beforeEach(() => {
 });
 
 describe('Home NextAssignmentsSection — v2.0 people picker + delegation snapshot (Phase 3c)', () => {
-  it('renders the PeoplePicker (not the old MemberSelectorModal) and it starts hidden', () => {
+  it('renders the PeoplePicker and it starts hidden', () => {
     render();
     expect(peoplePickerProps).not.toBeNull();
     expect(peoplePickerProps!.visible).toBe(false);

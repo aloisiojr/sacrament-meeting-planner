@@ -1,8 +1,7 @@
 /**
  * PeoplePicker (v2.0 unified people model): one picker for speakers, prayers and every actor role.
  *
- * Additive component — will later replace MemberSelectorModal + ActorSelector + PrayerSelector
- * (do NOT modify those yet). Behavior (see specs/v2-member-management.md):
+ * The single, unified picker for all people selection. Behavior (see specs/v2-member-management.md):
  *  - `capability` context: when set, defaults to listing only members with that flag, plus a
  *    "ver todos" toggle that lists everyone. Undefined = speaker/prayer (everyone).
  *  - Grant-on-select: picking (via "ver todos") a member lacking the required capability shows a
@@ -11,8 +10,6 @@
  *    "Responsável por <name(s)>" when the member is a responsible_id for others.
  *  - Per-row edit / remove (member:write) open PersonEditor / delete; an "add person" entry.
  *  - Selecting is gated by agenda:write / speech:assign; observers are view-only.
- *
- * Mirrors the styling of MemberSelectorModal / ActorSelector.
  */
 
 import React, { useState, useCallback, useMemo } from 'react';

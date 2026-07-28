@@ -1,12 +1,10 @@
 /**
  * PersonEditor (v2.0 unified people model): create/edit a person.
  *
- * Additive component — will later be opened from the unified PeoplePicker. Edits identity
+ * Opened from the unified PeoplePicker. Edits identity
  * (full_name, informal_name, country_code, phone), the 5 capability flags, and contact delegation
  * (`contact_via_responsible` + a `responsible_id` picker that EXCLUDES self). When delegation is on,
  * a responsible must be chosen. Persists via `useCreateMember` / `useUpdateMember`.
- *
- * Mirrors the styling conventions of MemberSelectorModal / ActorSelector (do NOT modify those).
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

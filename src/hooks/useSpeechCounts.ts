@@ -3,7 +3,7 @@
  * Fetches all speech records for the ward (positions 1-3, member_id IS NOT NULL),
  * counts occurrences per member_id client-side, and returns Record<string, number>.
  * Uses plain object (not Map) for JSON-safe cache persistence (PersistQueryClientProvider).
- * Used by MemberRow (Settings) and MemberSelectorModal.
+ * Used by MemberRow (Settings) and PeoplePicker.
  */
 
 import { useMemo } from 'react';

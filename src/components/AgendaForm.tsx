@@ -140,7 +140,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   );
 
   // Handle actor-role selection (presiding/conducting/pianist/conductor).
-  // v2.0: write ONLY the *_name snapshot column; the *_actor_id columns are being dropped.
+  // v2.0: write ONLY the name snapshot column; the actor FK columns no longer exist.
   const handleRoleSelect = useCallback(
     (member: Member, nameField: string) => {
       if (!agenda || isObserver) return;

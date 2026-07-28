@@ -238,49 +238,6 @@ describe('CR-283 S016-05: onItemPress/onAddPress callback props', () => {
 });
 
 // =============================================================================
-// CR-283: S016-06 - ActorSelector disabledNames prop
-// =============================================================================
-
-describe('CR-283 S016-06: ActorSelector disabledNames prop', () => {
-  it('ActorSelectorProps includes disabledNames?: string[]', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/ActorSelector.tsx'), 'utf-8'
-    );
-    expect(src).toContain('disabledNames');
-  });
-
-  it('Disabled actors have opacity 0.4', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/ActorSelector.tsx'), 'utf-8'
-    );
-    expect(src).toContain('opacity: 0.4');
-  });
-
-  it('Disabled actors have onPress undefined', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/ActorSelector.tsx'), 'utf-8'
-    );
-    // When disabled, onPress should be undefined
-    expect(src).toContain('isDisabled');
-  });
-
-  it('Disabled actors have disabled={true}', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/ActorSelector.tsx'), 'utf-8'
-    );
-    expect(src).toContain('disabled={isDisabled}');
-  });
-
-  it('Non-disabled actors remain selectable', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/ActorSelector.tsx'), 'utf-8'
-    );
-    // handleSelect is still used for non-disabled actors
-    expect(src).toContain('handleSelect(item)');
-  });
-});
-
-// =============================================================================
 // CR-283: S016-07 - AgendaForm recognized_names rework + usePresentationMode
 // =============================================================================
 
@@ -332,7 +289,7 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
     expect(src).toContain('multiSelect');
   });
 
-  it('ActorSelector disabledNames: add mode = all current names', () => {
+  it('recognition disabledNames: add mode = all current names', () => {
     // Test the logic: in add mode, all current items are disabled
     const currentItems = ['Alice', 'Bob'];
     const mode = 'add' as 'add' | 'edit';
@@ -343,7 +300,7 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
     expect(disabledNames).toEqual(['Alice', 'Bob']);
   });
 
-  it('ActorSelector disabledNames: edit mode = all except current', () => {
+  it('recognition disabledNames: edit mode = all except current', () => {
     // Test the logic: in edit mode, all except current are disabled
     const currentItems = ['Alice', 'Bob', 'Charlie'];
     const mode = 'edit' as const;

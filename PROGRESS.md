@@ -17,8 +17,20 @@
      external user igor 500 → 200, email delivered. Server-side only, shipped apps unaffected.
   2. `specs/reset-email-error-visibility.md` — client error hardening (APPROVED, actionable
      wording). **Queued** — blocked until the tsc baseline is clean (it edits `src/`).
-- **In flight:** `specs/fix-test-typecheck-baseline.md` — fixing 51 pre-existing tsc errors in
-  `src/__tests__/*` (subagent). Unblocks the per-edit typecheck gate + the error-visibility change.
+- **`specs/fix-test-typecheck-baseline.md` — done & verified, but UNCOMMITTED, NEEDS DECISION.**
+  Subagent fixed all 51 errors: `tsc --noEmit` = 0 errors, 1832 tests green, no `any`/`@ts-ignore`
+  added. **Correction to earlier scoping (which was wrong):** 4 of the 51 were in PRODUCTION, not
+  tests — `src/app/(tabs)/_layout.tsx` used `tabBarTestID`, which is invalid in
+  `@react-navigation/bottom-tabs` 7.x (correct: `tabBarButtonTestID`); the tab testIDs were being
+  silently dropped (real latent bug). The fix (4-line rename) is user-invisible and nothing
+  references the old IDs. This deviates from AC4 (no prod changes), so it was left UNCOMMITTED for
+  the user to accept/handle. Recommendation: accept — it's correct and low-risk. The 17 test-file
+  fixes + new `src/__tests__/types/react-test-renderer.d.ts` are safe/in-scope.
+
+## Needs your decision (paused per instruction)
+- Accept the `src/app/(tabs)/_layout.tsx` production fix (testID rename)? Once decided, commit the
+  tsc cleanup, then build the queued `reset-email-error-visibility` hardening (blocked until the
+  tsc gate is green). Nothing pushed/deployed.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

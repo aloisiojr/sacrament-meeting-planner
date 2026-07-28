@@ -20,6 +20,13 @@ function makeMember(overrides: Partial<Member> & { full_name: string }): Member 
     informal_name: overrides.informal_name ?? null,
     country_code: overrides.country_code ?? '+55',
     phone: overrides.phone ?? null,
+    can_preside: overrides.can_preside ?? false,
+    can_conduct: overrides.can_conduct ?? false,
+    can_lead_music: overrides.can_lead_music ?? false,
+    can_play_piano: overrides.can_play_piano ?? false,
+    can_be_recognized: overrides.can_be_recognized ?? false,
+    contact_via_responsible: overrides.contact_via_responsible ?? false,
+    responsible_id: overrides.responsible_id ?? null,
     created_at: overrides.created_at ?? '2026-01-01T00:00:00Z',
     updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
   };

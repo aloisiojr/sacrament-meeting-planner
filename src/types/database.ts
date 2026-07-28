@@ -86,6 +86,8 @@ export interface Ward {
   manage_prayers: boolean;
   whatsapp_template_opening_prayer: string | null;
   whatsapp_template_closing_prayer: string | null;
+  // v2.0 — ward-level WhatsApp delegation wrapper (NULL => locale default).
+  whatsapp_template_delegation_wrapper: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +99,15 @@ export interface Member {
   informal_name: string | null;
   country_code: string;
   phone: string | null;
+  // v2.0 — capability flags (unified people model, migration 037).
+  can_preside: boolean;
+  can_conduct: boolean;
+  can_lead_music: boolean;
+  can_play_piano: boolean;
+  can_be_recognized: boolean;
+  // v2.0 — contact delegation.
+  contact_via_responsible: boolean;
+  responsible_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -153,6 +164,10 @@ export interface Speech {
   topic_collection: string | null;
   assigned_by_role: string | null;
   status: SpeechStatus;
+  // v2.0 — delegation snapshot (resolved contact captured at assignment time).
+  contact_phone: string | null;
+  is_delegated: boolean;
+  delegate_for_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -310,6 +325,14 @@ export interface CreateMemberInput {
   informal_name?: string | null;
   country_code: string;
   phone?: string | null;
+  // v2.0 — capability flags + contact delegation (optional; default false/null).
+  can_preside?: boolean;
+  can_conduct?: boolean;
+  can_lead_music?: boolean;
+  can_play_piano?: boolean;
+  can_be_recognized?: boolean;
+  contact_via_responsible?: boolean;
+  responsible_id?: string | null;
 }
 
 export interface UpdateMemberInput {
@@ -318,6 +341,14 @@ export interface UpdateMemberInput {
   informal_name?: string | null;
   country_code?: string;
   phone?: string | null;
+  // v2.0 — capability flags + contact delegation.
+  can_preside?: boolean;
+  can_conduct?: boolean;
+  can_lead_music?: boolean;
+  can_play_piano?: boolean;
+  can_be_recognized?: boolean;
+  contact_via_responsible?: boolean;
+  responsible_id?: string | null;
 }
 
 export interface CreateTopicInput {

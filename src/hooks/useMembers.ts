@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
+import { resolveContactSnapshot } from '../lib/contact';
 import { speechKeys } from './useSpeeches';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
@@ -172,6 +173,15 @@ export function useUpdateMember() {
       }
       const today = new Date().toISOString().split('T')[0];
       const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
+      // v2.0: also recompute the contact-delegation snapshot for the member's not-yet-past
+      // speeches, so editing a member's phone or delegation propagates to their not-yet-sent
+      // invites (consistent with how speaker_* already cascades). The responsible is looked up
+      // from the member cache by the (possibly updated) responsible_id.
+      const cachedMembers = queryClient.getQueryData<Member[]>(memberKeys.list(wardId));
+      const responsible = data.responsible_id
+        ? cachedMembers?.find((m) => m.id === data.responsible_id) ?? null
+        : null;
+      const contact = resolveContactSnapshot(data, responsible);
       try {
         await supabase
           .from('speeches')
@@ -179,6 +189,9 @@ export function useUpdateMember() {
             speaker_name: data.full_name,
             speaker_phone: fullPhone,
             speaker_informal_name: data.informal_name,
+            contact_phone: contact.contact_phone,
+            is_delegated: contact.is_delegated,
+            delegate_for_name: contact.delegate_for_name,
           })
           .eq('member_id', data.id)
           .gte('sunday_date', today);

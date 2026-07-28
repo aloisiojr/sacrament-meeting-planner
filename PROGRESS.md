@@ -20,21 +20,18 @@
 - **`specs/fix-test-typecheck-baseline.md` — DONE & COMMITTED (`544138a`).** All 51 tsc errors
   fixed (incl. the `src/app/(tabs)/_layout.tsx` `tabBarTestID`→`tabBarButtonTestID` prod bug,
   accepted by user); `tsc --noEmit` = 0, 1832 tests green. Per-edit typecheck gate now GREEN.
-- **`specs/reset-email-error-visibility.md` — PAUSED at test approach (render path found infeasible).**
-  Steps 1-2 done in working tree (UNCOMMITTED): actionable `auth.resetFailed` wording in all 3
-  locales + `catch (err) { console.error(...) }` in `handleSendReset`. tsc 0, 1832 tests green.
-  User picked "render test", but it's blocked at infra: vitest (`environment: node`, no RN alias)
-  **cannot import `react-native`** — vite fails parsing RN's Flow syntax (`import typeof ...` in
-  `react-native/index.js`). A render test would require a GLOBAL vitest.config change (alias
-  `react-native`→`react-native-web` + jsdom, or a stub), affecting all 1832 tests. Reverted the
-  failed test + d.ts edit. Re-decision needed.
+- **`specs/reset-email-error-visibility.md` — DONE & COMMITTED (`18dc9cf`).** Client logs the real
+  error in the `catch` (was swallowed) + shows an actionable, enumeration-safe message; success
+  path unchanged. `auth.resetFailed` reworded in all 3 locales. Built the project's first
+  component render-test infra: `react-native` aliased to a local stub
+  (`src/__tests__/stubs/react-native.tsx`) in `vitest.config.ts` → screens render via
+  react-test-renderer in `node` (no jsdom, no new deps); added a behavioral test for
+  ForgotPasswordScreen (failure logs+message, success). Adversarially verified (APPROVED; AC1
+  assertion tightened per the P2). Suite now **68 files / 1834 tests green**, tsc 0.
 
-## Needs your decision (paused per instruction)
-- AC5 test approach, now that render needs a full test-infra overhaul: (a) **extract the
-  reset-request logic to `src/lib/` and unit-test it** — no infra change, matches the project's
-  logic-test convention, reusable (recommended); (b) build the RN render infra
-  (alias react-native→react-native-web + jsdom in vitest.config) so screen tests work project-wide
-  — bigger, risks the existing 1832 tests. Steps 1-2 sit uncommitted pending this. Nothing pushed.
+**No change in flight.** The password-reset bug is fully resolved (transport fix live in prod +
+client hardening committed) and the tsc baseline is clean. All work is in local commits on `main`
+— nothing pushed. Next: push when ready; optionally the follow-ups under Open issues.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

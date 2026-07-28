@@ -20,18 +20,21 @@
 - **`specs/fix-test-typecheck-baseline.md` — DONE & COMMITTED (`544138a`).** All 51 tsc errors
   fixed (incl. the `src/app/(tabs)/_layout.tsx` `tabBarTestID`→`tabBarButtonTestID` prod bug,
   accepted by user); `tsc --noEmit` = 0, 1832 tests green. Per-edit typecheck gate now GREEN.
-- **`specs/reset-email-error-visibility.md` — PAUSED at build for a testing-approach decision.**
-  Plan written (`.plan.md`). Steps 1-2 (actionable wording in 3 locales + log the real error in the
-  `catch`) are unambiguous. Step 3 (AC5 behavioral test) needs a call: the project has NO
-  screen-render tests, so testing the handler requires either extracting the request logic to
-  `src/lib/` and unit-testing it (recommended — testable, reusable, matches convention) or
-  introducing the project's first render test. Nothing pushed/deployed.
+- **`specs/reset-email-error-visibility.md` — PAUSED at test approach (render path found infeasible).**
+  Steps 1-2 done in working tree (UNCOMMITTED): actionable `auth.resetFailed` wording in all 3
+  locales + `catch (err) { console.error(...) }` in `handleSendReset`. tsc 0, 1832 tests green.
+  User picked "render test", but it's blocked at infra: vitest (`environment: node`, no RN alias)
+  **cannot import `react-native`** — vite fails parsing RN's Flow syntax (`import typeof ...` in
+  `react-native/index.js`). A render test would require a GLOBAL vitest.config change (alias
+  `react-native`→`react-native-web` + jsdom, or a stub), affecting all 1832 tests. Reverted the
+  failed test + d.ts edit. Re-decision needed.
 
 ## Needs your decision (paused per instruction)
-- How to satisfy AC5 for the error-visibility change, given no screen-render tests exist in the
-  project: (a) extract the reset-request logic to `src/lib/` + unit-test it (recommended);
-  (b) render-test the screen (first of its kind); (c) minimal (wording+log only, lighter test).
-  See the question in chat.
+- AC5 test approach, now that render needs a full test-infra overhaul: (a) **extract the
+  reset-request logic to `src/lib/` and unit-test it** — no infra change, matches the project's
+  logic-test convention, reusable (recommended); (b) build the RN render infra
+  (alias react-native→react-native-web + jsdom in vitest.config) so screen tests work project-wide
+  — bigger, risks the existing 1832 tests. Steps 1-2 sit uncommitted pending this. Nothing pushed.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

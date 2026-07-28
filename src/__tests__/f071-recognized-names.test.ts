@@ -3,7 +3,7 @@
  *
  * CR-281: Inline edit TextInput multiline/blurOnSubmit/paddingVertical
  * CR-282: DraggableFlatList activationDistance={9999}
- * CR-283: recognized_names rework (EditableListField + ActorSelector)
+ * CR-283: recognized_names rework (EditableListField + PeoplePicker)
  *
  * Tests import BEHAVIOR - no fs.readFileSync or string matching.
  */
@@ -33,16 +33,12 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     ward_id: 'w1',
     sunday_date: '2026-03-08',
     presiding_name: null,
-    presiding_actor_id: null,
     conducting_name: null,
-    conducting_actor_id: null,
     recognized_names: null,
     welcome_new_families: null,
     announcements: null,
     pianist_name: null,
-    pianist_actor_id: null,
     conductor_name: null,
-    conductor_actor_id: null,
     opening_hymn_id: null,
     sacrament_hymn_id: null,
     intermediate_hymn_id: null,
@@ -276,9 +272,9 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
     );
-    // v2.0: recognition now routes through the unified PeoplePicker, not the old ActorSelector.
+    // v2.0: recognition now routes through the unified PeoplePicker; the old picker is gone.
     expect(src).toContain('PeoplePicker');
-    expect(src).not.toContain('ActorSelector');
+    expect(src).not.toContain('MemberSelectorModal');
   });
 
   it('recognition PeoplePicker uses capability be_recognized + multiSelect (v2.0)', () => {

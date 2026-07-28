@@ -71,16 +71,12 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     ward_id: 'w1',
     sunday_date: '2026-03-08',
     presiding_name: null,
-    presiding_actor_id: null,
     conducting_name: null,
-    conducting_actor_id: null,
     recognized_names: null,
     welcome_new_families: null,
     announcements: null,
     pianist_name: null,
-    pianist_actor_id: null,
     conductor_name: null,
-    conductor_actor_id: null,
     opening_hymn_id: null,
     sacrament_hymn_id: null,
     intermediate_hymn_id: null,
@@ -201,7 +197,7 @@ describe('F068 Tester: sustaining_releasing integration (AC-068-06 to AC-068-08)
 });
 
 // =============================================================================
-// F068 AC-068-09: recognized_names still uses ActorSelector
+// F068 AC-068-09: recognized_names still uses PeoplePicker
 // =============================================================================
 
 describe('F068 Tester: recognized_names uses bullet_list (updated by CR-283)', () => {

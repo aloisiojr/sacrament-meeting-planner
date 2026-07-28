@@ -4,7 +4,7 @@
  * Behavioral tests verifying:
  * - CR-281: Inline edit TextInput multiline/blurOnSubmit/paddingVertical
  * - CR-282: DraggableFlatList activationDistance for scroll fix
- * - CR-283: recognized_names rework (EditableListField + ActorSelector integration)
+ * - CR-283: recognized_names rework (EditableListField + PeoplePicker integration)
  *
  * All tests import and test BEHAVIOR - no fs.readFileSync or string matching.
  */
@@ -83,16 +83,12 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     ward_id: 'w1',
     sunday_date: '2026-03-08',
     presiding_name: null,
-    presiding_actor_id: null,
     conducting_name: null,
-    conducting_actor_id: null,
     recognized_names: null,
     welcome_new_families: null,
     announcements: null,
     pianist_name: null,
-    pianist_actor_id: null,
     conductor_name: null,
-    conductor_actor_id: null,
     opening_hymn_id: null,
     sacrament_hymn_id: null,
     intermediate_hymn_id: null,
@@ -426,10 +422,10 @@ describe('CR-283 Tester AC-283-01: recognized persons as separate items', () => 
 });
 
 // =============================================================================
-// CR-283: AC-283-02 - Add area opens ActorSelector single-select
+// CR-283: AC-283-02 - Add area opens PeoplePicker single-select
 // =============================================================================
 
-describe('CR-283 Tester AC-283-02: add area opens ActorSelector', () => {
+describe('CR-283 Tester AC-283-02: add area opens PeoplePicker', () => {
   it('onAddPress callback is used when provided (Pressable replaces TextInput)', () => {
     const onAddPress = vi.fn();
     // Simulates user tapping the add area
@@ -495,7 +491,7 @@ describe('CR-283 Tester AC-283-03: selecting actor appends name', () => {
 });
 
 // =============================================================================
-// CR-283: AC-283-04 - Editing name opens ActorSelector to replace
+// CR-283: AC-283-04 - Editing name opens PeoplePicker to replace
 // =============================================================================
 
 describe('CR-283 Tester AC-283-04: onItemPress for edit/replace', () => {
@@ -765,10 +761,10 @@ describe('CR-283 Tester AC-283-11: recognized_names type change', () => {
 });
 
 // =============================================================================
-// CR-283: AC-283-12 - ActorSelector disabledNames prop
+// CR-283: AC-283-12 - PeoplePicker disabledNames prop
 // =============================================================================
 
-describe('CR-283 Tester AC-283-12: ActorSelector disabledNames', () => {
+describe('CR-283 Tester AC-283-12: PeoplePicker disabledNames', () => {
   it('disabledNames matches current recognized items in add mode', () => {
     const items = ['Alice', 'Bob'];
     const disabledNames = computeDisabledNames(items, 'add');
@@ -811,11 +807,11 @@ describe('CR-283 Tester AC-283-12: ActorSelector disabledNames', () => {
 });
 
 // =============================================================================
-// CR-283: EC-283-01 (EC036) - Close ActorSelector without selecting
+// CR-283: EC-283-01 (EC036) - Close PeoplePicker without selecting
 // =============================================================================
 
 describe('CR-283 Tester EC-283-01: close without selecting preserves name', () => {
-  it('closing ActorSelector without selecting preserves original list', () => {
+  it('closing PeoplePicker without selecting preserves original list', () => {
     const originalItems = ['Alice', 'Bob'];
     // Simulate: user opens selector then closes without selecting
     // recognizeSelector set to { mode: 'edit', editIndex: 0 }
@@ -866,7 +862,7 @@ describe('CR-283 Tester EC-283-02: all items deleted saves null', () => {
 });
 
 // =============================================================================
-// CR-283: EC-283-03 - Actor created inline in ActorSelector
+// CR-283: EC-283-03 - Actor created inline in PeoplePicker
 // =============================================================================
 
 describe('CR-283 Tester EC-283-03: inline actor creation', () => {

@@ -10,7 +10,6 @@ import type {
   Ward,
   Member,
   Speech,
-  MeetingActor,
   Hymn,
   SundayAgenda,
   Invitation,
@@ -20,7 +19,6 @@ import type {
   DateRange,
   CreateMemberInput,
   UpdateMemberInput,
-  CreateActorInput,
   ImportResult,
 } from '../types/database';
 
@@ -239,16 +237,12 @@ describe('Database Types', () => {
         ward_id: 'uuid-1',
         sunday_date: '2026-02-15',
         presiding_name: null,
-        presiding_actor_id: null,
         conducting_name: null,
-        conducting_actor_id: null,
         recognized_names: null,
         welcome_new_families: null,
         announcements: null,
         pianist_name: null,
-        pianist_actor_id: null,
         conductor_name: null,
-        conductor_actor_id: null,
         opening_hymn_id: null,
         opening_prayer_member_id: null,
         opening_prayer_name: null,
@@ -303,18 +297,6 @@ describe('Database Types', () => {
       };
       expect(hymn.is_sacramental).toBe(true);
       expect(hymn.number).toBe(123);
-    });
-
-    it('should construct a valid MeetingActor object', () => {
-      const actor: MeetingActor = {
-        id: 'uuid-7',
-        ward_id: 'uuid-1',
-        name: 'Bispo Fulano',
-        role: 'preside',
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-      };
-      expect(actor.role).toBe('preside');
     });
 
     it('should construct a valid NotificationQueue object', () => {
@@ -400,20 +382,6 @@ describe('Database Types', () => {
       };
       expect(input.id).toBe('uuid-1');
       expect(input.country_code).toBeUndefined();
-    });
-
-    it('should construct a valid CreateActorInput with role', () => {
-      const input1: CreateActorInput = {
-        name: 'New Actor',
-        role: 'preside',
-      };
-      expect(input1.role).toBe('preside');
-
-      const input2: CreateActorInput = {
-        name: 'Pianist Actor',
-        role: 'pianist',
-      };
-      expect(input2.role).toBe('pianist');
     });
 
     it('should construct a valid ImportResult', () => {

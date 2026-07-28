@@ -172,17 +172,6 @@ export interface Speech {
   updated_at: string;
 }
 
-export type ActorRole = 'preside' | 'conduct' | 'recognize' | 'pianist' | 'conductor';
-
-export interface MeetingActor {
-  id: string;
-  ward_id: string;
-  name: string;
-  role: ActorRole;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Hymn {
   id: string;
   language: string;
@@ -197,16 +186,12 @@ export interface SundayAgenda {
   sunday_date: string; // ISO date string (YYYY-MM-DD)
   // Welcome
   presiding_name: string | null;
-  presiding_actor_id: string | null;
   conducting_name: string | null;
-  conducting_actor_id: string | null;
   recognized_names: string | null;
   welcome_new_families: string | null;
   announcements: string | null;
   pianist_name: string | null;
-  pianist_actor_id: string | null;
   conductor_name: string | null;
-  conductor_actor_id: string | null;
   opening_hymn_id: string | null;
   opening_prayer_member_id: string | null;
   opening_prayer_name: string | null;
@@ -354,17 +339,6 @@ export interface UpdateMemberInput {
 export interface CreateTopicInput {
   title: string;
   link?: string | null;
-}
-
-export interface CreateActorInput {
-  name: string;
-  role: ActorRole;
-}
-
-export interface UpdateActorInput {
-  id: string;
-  name?: string;
-  role?: ActorRole;
 }
 
 export interface ImportResult {

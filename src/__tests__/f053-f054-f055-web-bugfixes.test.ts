@@ -480,7 +480,7 @@ describe('F055 (CR-265): Fix Hymn Selector Web Compatibility', () => {
       expect(closed).toBe(true);
     });
 
-    it('onClose resets search state (pattern from ActorSelector handleClose)', () => {
+    it('onClose resets search state (handleClose pattern)', () => {
       // Simulates the handleClose callback pattern
       let search = 'some search';
       let showAddInput = true;

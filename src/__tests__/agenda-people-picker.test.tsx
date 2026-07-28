@@ -5,7 +5,7 @@
  * that records the props it is opened with and lets the test invoke `onSelect`. All data hooks,
  * contexts and i18n are mocked per-file. Asserts:
  *  - each actor-role field opens PeoplePicker with the correct `capability`;
- *  - selecting a member writes ONLY the `*_name` snapshot (never `*_actor_id`);
+ *  - selecting a member writes ONLY the `*_name` snapshot (no actor FK columns);
  *  - recognition opens multiSelect with capability `be_recognized` and newline-joins names;
  *  - prayers open PeoplePicker with NO capability and assign the member to the speech.
  */
@@ -174,12 +174,12 @@ function press(root: TestRenderer.TestInstance, testID: string) {
 beforeEach(() => {
   AGENDA = {
     id: 'ag1', ward_id: 'w1', sunday_date: '2026-01-04',
-    presiding_name: null, presiding_actor_id: null,
-    conducting_name: null, conducting_actor_id: null,
+    presiding_name: null,
+    conducting_name: null,
     recognized_names: null,
     welcome_new_families: null, announcements: null,
-    pianist_name: null, pianist_actor_id: null,
-    conductor_name: null, conductor_actor_id: null,
+    pianist_name: null,
+    conductor_name: null,
     opening_hymn_id: null, opening_prayer_member_id: null, opening_prayer_name: null,
     sustaining_releasing: null, has_baby_blessing: false, baby_blessing_names: null,
     has_baptism_confirmation: false, baptism_confirmation_names: null, has_stake_announcements: false,
@@ -217,9 +217,8 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
       expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
       const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
       expect(fields[nameField]).toBe('Alice Smith');
-      // v2.0: the *_actor_id columns must NEVER be written.
+      // v2.0: only the name snapshot column is written (no actor FK columns).
       expect(Object.keys(fields)).toEqual([nameField]);
-      expect(fields).not.toHaveProperty(nameField.replace('_name', '_actor_id'));
     });
   }
 

@@ -15,7 +15,6 @@ import { AuthContext, type AuthContextValue } from '../../contexts/AuthContext';
 import { hasPermission as checkPermission } from '../../lib/permissions';
 import { vi } from 'vitest';
 import type {
-  MeetingActor,
   Member,
   Speech,
   Hymn,
@@ -366,18 +365,6 @@ export function createMockSession(overrides?: {
 // 6. Mock Data Factories
 // ---------------------------------------------------------------------------
 
-export function createMockActor(overrides?: Partial<MeetingActor>): MeetingActor {
-  return {
-    id: 'actor-1',
-    ward_id: 'ward-1',
-    name: 'Test Actor',
-    role: 'preside',
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-    ...overrides,
-  };
-}
-
 export function createMockMember(overrides?: Partial<Member>): Member {
   return {
     id: 'member-1',
@@ -440,16 +427,12 @@ export function createMockAgenda(overrides?: Partial<SundayAgenda>): SundayAgend
     ward_id: 'ward-1',
     sunday_date: '2026-03-01',
     presiding_name: null,
-    presiding_actor_id: null,
     conducting_name: null,
-    conducting_actor_id: null,
     recognized_names: null,
     welcome_new_families: null,
     announcements: null,
     pianist_name: null,
-    pianist_actor_id: null,
     conductor_name: null,
-    conductor_actor_id: null,
     opening_hymn_id: null,
     opening_prayer_member_id: null,
     opening_prayer_name: null,

@@ -44,9 +44,13 @@ tsc 0, lint 0, 71 files / 1850 tests. `app.json` → 1.1.0.
   link; Android pre-launch shows message). `semver.ts`.
 - `app_version`/`platform` on push token upsert; `push-update-nudge` scheduled edge function.
 - WhatsApp `buildFullPhone` fix (new snapshots carry country code).
-**Deploy pending (GATE 3):** functions deploy + migration 036 + push branch (agent-doable);
-Supabase cron for the nudge (ops); EAS build + App Store submit (user). 5 P2 findings left as-is.
-Store URLs: iOS provided; Android not published yet.
+**Deploy status (GATE 3):** ✅ functions deployed (`app-config`, `push-update-nudge`); ✅ migration
+036 applied (via `migration repair` for 001–035 then `db push`) — VERIFIED: `app-config` returns
+seeded `min_supported_version=1.0.0`; ✅ branch `v1.x` pushed. **Remaining (user):** Supabase cron
+for the nudge (SQL provided in chat); EAS build + App Store submit (v1.1.0). 5 P2 findings left as-is.
+Operating the gate/nudge (config-only, no redeploy): keep `min_supported_version=1.0.0` (nobody
+blocked/nudged) until v1.1.0 is adopted; set it to `1.1.0` to nudge 1.0.0 users; at v2 cutover set
+it to the v2 build to force-update. iOS store URL wired; Android not published yet.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

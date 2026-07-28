@@ -33,8 +33,20 @@
   (3 errors + 163 warnings) → `npm run lint` = 0 problems. exhaustive-deps: 11 real deps added (all
   stable refs) + 8 justified disables; no behavior change. tsc 0; 68 files / 1834 tests green.
 
-**No change in flight.** Password-reset bug fully resolved (Gmail SMTP live in prod + client
-hardening) and the tsc + lint baselines are clean. Pushed to `origin/main`.
+Password-reset bug resolved (Gmail SMTP live) + tsc/lint baselines clean, on `origin/main`.
+
+## v1.x (branch `v1.x`, off main) — BUILD COMPLETE, awaiting deploy (GATE 3)
+Prerequisite release before v2.0 (see `docs/decisions/001-v2-release-cutover.md`). Spec:
+`specs/v1x-version-gate.md`. All steps built + adversarially verified (APPROVED, no P0/P1);
+tsc 0, lint 0, 71 files / 1850 tests. `app.json` → 1.1.0.
+- Migration 036 (additive: `app_config` + push `app_version`/`platform`/`last_update_nudge_at`).
+- `app-config` edge function (fail-open) + launch version gate + `UpdateRequiredScreen` (iOS store
+  link; Android pre-launch shows message). `semver.ts`.
+- `app_version`/`platform` on push token upsert; `push-update-nudge` scheduled edge function.
+- WhatsApp `buildFullPhone` fix (new snapshots carry country code).
+**Deploy pending (GATE 3):** functions deploy + migration 036 + push branch (agent-doable);
+Supabase cron for the nudge (ops); EAS build + App Store submit (user). 5 P2 findings left as-is.
+Store URLs: iOS provided; Android not published yet.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

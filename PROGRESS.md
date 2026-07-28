@@ -58,6 +58,13 @@ NOT schedule before 1.1.0 exists). At v2 cutover, raise `min` to the v2 build �
 force-gated; 1.0.0 can't be gated (breaks at the v2 schema migration — accepted per ADR). iOS store
 URL wired; Android not published yet.
 
+## v2.0 (branch `v2.0`) — plan-change (GATE 2)
+Merged the v1.x foundation into `v2.0` (`4eee51e`). Spec + ADR approved (GATE 1). Atomic plan:
+`specs/v2-member-management.plan.md` — 5 phases: (1) model + migration 037 (destructive; applied at
+cutover), (2) hooks/sync (retire actors), (3) unified People picker + editor, (4) settings CSV-only
++ full-dump import, (5) i18n/version/verify. Awaiting GATE 2. Deploy/merge waits for v1.x adoption
+(ADR 001). Base green: tsc 0 / 71 files / 1850 tests.
+
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via
   branch `UX-2.0` and tag `archive/UX-2.0-2026-06-07` (tip `9b652db`).

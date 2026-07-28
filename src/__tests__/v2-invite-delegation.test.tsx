@@ -12,6 +12,8 @@ import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member, Speech } from '../types/database';
 
+import { InviteManagementSection } from '../components/InviteManagementSection';
+
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -92,8 +94,6 @@ vi.mock('../hooks/useSpeeches', async (importOriginal) => {
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
-
-import { InviteManagementSection } from '../components/InviteManagementSection';
 
 // --- Helpers ---
 

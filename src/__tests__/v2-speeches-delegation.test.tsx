@@ -13,6 +13,9 @@ import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member } from '../types/database';
 
+// Import after mocks are registered.
+import SpeechesTab from '../app/(tabs)/speeches';
+
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -186,9 +189,6 @@ vi.mock('../hooks/useSundayTypes', () => ({
 
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
-// Import after mocks are registered.
-import SpeechesTab from '../app/(tabs)/speeches';
-
 // --- Helpers ---
 
 function render() {
@@ -222,7 +222,7 @@ beforeEach(() => {
 
 describe('Speeches tab — v2.0 people picker + delegation snapshot (Phase 3a)', () => {
   it('renders the PeoplePicker (not the old MemberSelectorModal) and it starts hidden', () => {
-    const renderer = render();
+    render();
     expect(peoplePickerProps).not.toBeNull();
     expect(peoplePickerProps!.visible).toBe(false);
   });

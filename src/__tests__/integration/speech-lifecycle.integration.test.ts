@@ -258,6 +258,108 @@ describe('Assign speaker lifecycle', () => {
 });
 
 // ==========================================================================
+// v2.0: delegation snapshot persistence on assign/unassign
+// ==========================================================================
+
+describe('v2.0 delegation snapshot on assign/unassign', () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient = createTestQueryClient();
+  });
+
+  /** Mocks supabase.from('speeches') and captures the payload passed to .update(). */
+  function captureUpdate(returnData: any): { getPayload: () => any } {
+    let captured: any;
+    mockedSupabase.from.mockImplementation(() => {
+      const resolvedPromise = Promise.resolve({ data: returnData, error: null });
+      const chain: any = new Proxy(
+        {},
+        {
+          get(_t, p: string) {
+            if (p === 'then') return resolvedPromise.then.bind(resolvedPromise);
+            if (p === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
+            if (p === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
+            if (p === 'update')
+              return (payload: any) => {
+                captured = payload;
+                return chain;
+              };
+            return () => chain;
+          },
+        }
+      );
+      return chain;
+    });
+    return { getPayload: () => captured };
+  }
+
+  it('persists the resolved delegation snapshot when provided', async () => {
+    const cap = captureUpdate(createMockSpeech({ id: 's1' }));
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useAssignSpeaker(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        speechId: 's1',
+        memberId: 'member-1',
+        speakerName: 'Ana Menor',
+        speakerInformalName: 'Ana',
+        speakerPhone: '+5511000000000',
+        contactPhone: '+5511999998888',
+        isDelegated: true,
+        delegateForName: 'Ana',
+      });
+    });
+
+    expect(cap.getPayload()).toMatchObject({
+      contact_phone: '+5511999998888',
+      is_delegated: true,
+      delegate_for_name: 'Ana',
+    });
+  });
+
+  it('defaults to a not-delegated snapshot when delegation inputs are omitted', async () => {
+    const cap = captureUpdate(createMockSpeech({ id: 's1' }));
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useAssignSpeaker(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        speechId: 's1',
+        memberId: 'member-1',
+        speakerName: 'John Doe',
+        speakerInformalName: null,
+        speakerPhone: '+5511999999999',
+      });
+    });
+
+    expect(cap.getPayload()).toMatchObject({
+      contact_phone: null,
+      is_delegated: false,
+      delegate_for_name: null,
+    });
+  });
+
+  it('clears the delegation snapshot on unassign', async () => {
+    const cap = captureUpdate(createMockSpeech({ id: 's1', member_id: null, status: 'not_assigned' }));
+    const wrapper = createWrapper(undefined, queryClient);
+    const { result } = renderHook(() => useRemoveAssignment(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ speechId: 's1', speakerName: 'John Doe' });
+    });
+
+    expect(cap.getPayload()).toMatchObject({
+      contact_phone: null,
+      is_delegated: false,
+      delegate_for_name: null,
+    });
+  });
+});
+
+// ==========================================================================
 // EC-082-13: Full lifecycle sequence
 // ==========================================================================
 

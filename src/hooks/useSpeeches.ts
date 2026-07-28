@@ -43,6 +43,10 @@ export interface AssignSpeakerInput {
   speakerInformalName: string | null;
   speakerPhone: string | null;
   status?: SpeechStatus;
+  // v2.0 — resolved contact-delegation snapshot (optional; default not-delegated).
+  contactPhone?: string | null;
+  isDelegated?: boolean;
+  delegateForName?: string | null;
 }
 
 export interface AssignTopicInput {
@@ -253,6 +257,9 @@ export function useAssignSpeaker() {
           speaker_name: input.speakerName,
           speaker_informal_name: input.speakerInformalName,
           speaker_phone: input.speakerPhone,
+          contact_phone: input.contactPhone ?? null,
+          is_delegated: input.isDelegated ?? false,
+          delegate_for_name: input.delegateForName ?? null,
           status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
           assigned_by_role: role,
         })
@@ -367,6 +374,9 @@ export function useRemoveAssignment() {
           speaker_name: null,
           speaker_informal_name: null,
           speaker_phone: null,
+          contact_phone: null,
+          is_delegated: false,
+          delegate_for_name: null,
           status: 'not_assigned' as SpeechStatus,
           assigned_by_role: role,
         })

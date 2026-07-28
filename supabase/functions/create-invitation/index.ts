@@ -142,37 +142,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Auto-create meeting actor for bishopric invitations (best-effort)
-    if (input.role === 'bishopric') {
-      try {
-        const actorName = input.email
-          .split('@')[0]
-          .replace(/[._]/g, ' ')
-          .replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-        if (actorName) {
-          const { data: existing } = await supabaseAdmin
-            .from('meeting_actors')
-            .select('id, role')
-            .eq('ward_id', wardId)
-            .ilike('name', actorName)
-            .maybeSingle();
-
-          if (!existing) {
-            await supabaseAdmin
-              .from('meeting_actors')
-              .insert({
-                ward_id: wardId,
-                name: actorName,
-                role: 'preside',
-              });
-          }
-        }
-      } catch (actorErr) {
-        // Best-effort: don't block invitation creation
-        console.error('Auto-actor creation failed:', actorErr);
-      }
-    }
+    // v2: the old "auto-create bishopric presider actor" step was removed with meeting_actors.
+    // Presiders now come from members with can_preside (managed in the People picker).
 
     // Build invitation URL (HTTPS link to invite-redirect Edge Function)
     const deepLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/invite-redirect?token=${invitationToken}`;

@@ -160,40 +160,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Auto-create meeting actor when changing TO bishopric (best-effort)
-    if (input.newRole === 'bishopric') {
-      try {
-        // Use full_name from app_metadata when available, fall back to email prefix
-        const fullName = targetUser.app_metadata?.full_name;
-        const actorName = fullName
-          ? fullName.trim()
-          : (targetUser.email ?? '')
-              .split('@')[0]
-              .replace(/[._]/g, ' ')
-              .replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-        if (actorName) {
-          const { data: existing } = await supabaseAdmin
-            .from('meeting_actors')
-            .select('id, role')
-            .eq('ward_id', wardId)
-            .ilike('name', actorName)
-            .maybeSingle();
-
-          if (!existing) {
-            await supabaseAdmin
-              .from('meeting_actors')
-              .insert({
-                ward_id: wardId,
-                name: actorName,
-                role: 'preside',
-              });
-          }
-        }
-      } catch (actorErr) {
-        console.error('Auto-actor creation on role change failed:', actorErr);
-      }
-    }
+    // v2: the old "auto-create bishopric presider actor" step was removed with meeting_actors.
+    // Presiders now come from members with can_preside (managed in the People picker).
 
     return new Response(
       JSON.stringify({

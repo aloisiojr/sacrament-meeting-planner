@@ -238,33 +238,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Auto-create meeting actor for bishopric role (best-effort)
-    if (input.role === 'bishopric') {
-      try {
-        const actorName = input.fullName.trim();
-
-        // Check if actor with same name already exists
-        const { data: existing } = await supabaseAdmin
-          .from('meeting_actors')
-          .select('id, role')
-          .eq('ward_id', ward.id)
-          .ilike('name', actorName)
-          .maybeSingle();
-
-        if (!existing) {
-          await supabaseAdmin
-            .from('meeting_actors')
-            .insert({
-              ward_id: ward.id,
-              name: actorName,
-              role: 'preside',
-            });
-        }
-      } catch (actorErr) {
-        console.error('Auto-actor creation failed:', actorErr);
-        // Best-effort: do not fail registration
-      }
-    }
+    // v2: the old "auto-create bishopric presider actor" step was removed with meeting_actors.
+    // Presiders now come from members with can_preside (managed in the People picker).
 
     // Sign in the new user to get a session
     const supabaseClient = createClient(

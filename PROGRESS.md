@@ -48,9 +48,15 @@ tsc 0, lint 0, 71 files / 1850 tests. `app.json` → 1.1.0.
 036 applied (via `migration repair` for 001–035 then `db push`) — VERIFIED: `app-config` returns
 seeded `min_supported_version=1.0.0`; ✅ branch `v1.x` pushed. **Remaining (user):** Supabase cron
 for the nudge (SQL provided in chat); EAS build + App Store submit (v1.1.0). 5 P2 findings left as-is.
-Operating the gate/nudge (config-only, no redeploy): keep `min_supported_version=1.0.0` (nobody
-blocked/nudged) until v1.1.0 is adopted; set it to `1.1.0` to nudge 1.0.0 users; at v2 cutover set
-it to the v2 build to force-update. iOS store URL wired; Android not published yet.
+Two independent levers:
+- **Gate** (in-app update screen) exists ONLY in 1.1.0+; `min_supported_version` gates clients that
+  HAVE the gate. It can NEVER affect 1.0.0 (no gate code there).
+- **Nudge** (push) reaches 1.0.0 too (they receive push). 1.0.0 tokens have `app_version=NULL`,
+  which the nudge treats as outdated → they get nudged once the cron runs, regardless of `min`.
+Rollout: to move 1.0.0 users to 1.1.0, publish 1.1.0 then SCHEDULE THE CRON (keep `min=1.0.0`; do
+NOT schedule before 1.1.0 exists). At v2 cutover, raise `min` to the v2 build → 1.1.0 is
+force-gated; 1.0.0 can't be gated (breaks at the v2 schema migration — accepted per ADR). iOS store
+URL wired; Android not published yet.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

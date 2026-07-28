@@ -1,9 +1,10 @@
 // Edge Function: send-reset-email
-// Sends multilingual password reset email via Resend API.
+// Sends multilingual password reset email via Gmail SMTP.
 // Unauthenticated endpoint (no JWT required) - user has no session during forgot-password flow.
 // Looks up ward language, generates recovery token, sends translated email with deep link.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -207,12 +208,12 @@ Deno.serve(async (req) => {
     // Get email template
     const template = getEmailTemplate(language, deepLink);
 
-    // Check Resend env vars
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    const RESEND_FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL');
+    // Check Gmail SMTP env vars
+    const GMAIL_USER = Deno.env.get('GMAIL_USER');
+    const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD');
 
-    if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
-      console.error('Missing RESEND_API_KEY or RESEND_FROM_EMAIL');
+    if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+      console.error('Missing GMAIL_USER or GMAIL_APP_PASSWORD');
       return new Response(
         JSON.stringify({ error: 'Email service not configured' }),
         {
@@ -222,24 +223,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send email via Resend API
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+    // Send email via Gmail SMTP (authenticated with an App Password)
+    const smtp = new SMTPClient({
+      connection: {
+        hostname: 'smtp.gmail.com',
+        port: 465,
+        tls: true,
+        auth: { username: GMAIL_USER, password: GMAIL_APP_PASSWORD },
       },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [user.email],
-        subject: template.subject,
-        html: template.html,
-      }),
     });
 
-    if (!resendResponse.ok) {
-      const resendError = await resendResponse.text();
-      console.error('Resend API error:', resendError);
+    try {
+      await smtp.send({
+        from: `Sacrament Meeting Planner <${GMAIL_USER}>`,
+        to: user.email!,
+        subject: template.subject,
+        content: `Reset your password: ${deepLink}`,
+        html: template.html,
+      });
+      await smtp.close();
+    } catch (smtpError) {
+      console.error('Gmail SMTP error:', smtpError);
+      try {
+        await smtp.close();
+      } catch (_) {
+        // ignore close error after a failed send
+      }
       return new Response(
         JSON.stringify({ error: 'Failed to send email' }),
         {

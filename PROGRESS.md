@@ -17,20 +17,21 @@
      external user igor 500 → 200, email delivered. Server-side only, shipped apps unaffected.
   2. `specs/reset-email-error-visibility.md` — client error hardening (APPROVED, actionable
      wording). **Queued** — blocked until the tsc baseline is clean (it edits `src/`).
-- **`specs/fix-test-typecheck-baseline.md` — done & verified, but UNCOMMITTED, NEEDS DECISION.**
-  Subagent fixed all 51 errors: `tsc --noEmit` = 0 errors, 1832 tests green, no `any`/`@ts-ignore`
-  added. **Correction to earlier scoping (which was wrong):** 4 of the 51 were in PRODUCTION, not
-  tests — `src/app/(tabs)/_layout.tsx` used `tabBarTestID`, which is invalid in
-  `@react-navigation/bottom-tabs` 7.x (correct: `tabBarButtonTestID`); the tab testIDs were being
-  silently dropped (real latent bug). The fix (4-line rename) is user-invisible and nothing
-  references the old IDs. This deviates from AC4 (no prod changes), so it was left UNCOMMITTED for
-  the user to accept/handle. Recommendation: accept — it's correct and low-risk. The 17 test-file
-  fixes + new `src/__tests__/types/react-test-renderer.d.ts` are safe/in-scope.
+- **`specs/fix-test-typecheck-baseline.md` — DONE & COMMITTED (`544138a`).** All 51 tsc errors
+  fixed (incl. the `src/app/(tabs)/_layout.tsx` `tabBarTestID`→`tabBarButtonTestID` prod bug,
+  accepted by user); `tsc --noEmit` = 0, 1832 tests green. Per-edit typecheck gate now GREEN.
+- **`specs/reset-email-error-visibility.md` — PAUSED at build for a testing-approach decision.**
+  Plan written (`.plan.md`). Steps 1-2 (actionable wording in 3 locales + log the real error in the
+  `catch`) are unambiguous. Step 3 (AC5 behavioral test) needs a call: the project has NO
+  screen-render tests, so testing the handler requires either extracting the request logic to
+  `src/lib/` and unit-testing it (recommended — testable, reusable, matches convention) or
+  introducing the project's first render test. Nothing pushed/deployed.
 
 ## Needs your decision (paused per instruction)
-- Accept the `src/app/(tabs)/_layout.tsx` production fix (testID rename)? Once decided, commit the
-  tsc cleanup, then build the queued `reset-email-error-visibility` hardening (blocked until the
-  tsc gate is green). Nothing pushed/deployed.
+- How to satisfy AC5 for the error-visibility change, given no screen-render tests exist in the
+  project: (a) extract the reset-request logic to `src/lib/` + unit-test it (recommended);
+  (b) render-test the screen (first of its kind); (c) minimal (wording+log only, lighter test).
+  See the question in chat.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

@@ -1,5 +1,11 @@
 # Progress
 
+## How to drive dev-flow (entry commands)
+- **New change:** describe it — e.g. *"New change on SMP: <description>. Use dev-flow."* → runs `spec-first`.
+- **Resume after a context clear:** *"Read PROGRESS.md and continue the change in flight."* → picks up from the stage in **Now**.
+- **Force a stage by name:** `spec-first` · `plan-change` · `build-change` · `verify-change` · `mobile-release-advisor`.
+- Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
+
 ## Now
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed

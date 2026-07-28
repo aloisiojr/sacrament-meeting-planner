@@ -25,11 +25,17 @@ import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
-import { buildWhatsAppUrl, buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
-import { getDefaultPrayerTemplate, resolveTemplate as resolvePrayerTemplate } from '../lib/whatsappUtils';
+import { buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
+import {
+  getDefaultPrayerTemplate,
+  getDefaultSpeechTemplate,
+  resolveTemplate,
+  wrapDelegationMessage,
+} from '../lib/whatsappUtils';
+import { useMembers } from '../hooks/useMembers';
 import { getInviteItems } from '../lib/speechUtils';
 import { supabase } from '../lib/supabase';
-import type { Speech, SpeechStatus } from '../types/database';
+import type { Member, Speech, SpeechStatus } from '../types/database';
 
 // Re-export for backward compatibility
 export { getInviteItems } from '../lib/speechUtils';
@@ -48,13 +54,33 @@ export function InviteManagementSection() {
 
   const { managePrayers } = useWardManagePrayers();
 
+  // v2.0: members are needed to resolve the responsible's name for delegated sends.
+  const { data: members } = useMembers();
+  const memberMap = useMemo(() => {
+    const map = new Map<string, Member>();
+    for (const m of members ?? []) map.set(m.id, m);
+    return map;
+  }, [members]);
+
+  // Resolve the responsible's display name LIVE from the member chain
+  // (speech.member_id -> member -> responsible_id -> responsible.full_name).
+  // Returns '' when unavailable (still sends, with a generic greeting).
+  const resolveResponsibleName = useCallback(
+    (speech: Speech): string => {
+      const member = speech.member_id ? memberMap.get(speech.member_id) : undefined;
+      const responsible = member?.responsible_id ? memberMap.get(member.responsible_id) : undefined;
+      return responsible?.full_name ?? '';
+    },
+    [memberMap]
+  );
+
   // F142: Fetch ward's custom WhatsApp template from database
   const { data: ward } = useQuery({
     queryKey: ['ward', wardId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('wards')
-        .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer')
+        .select('whatsapp_template_speech_1, whatsapp_template_speech_2, whatsapp_template_speech_3, whatsapp_template_opening_prayer, whatsapp_template_closing_prayer, whatsapp_template_delegation_wrapper')
         .eq('id', wardId)
         .single();
       if (error) throw error;
@@ -103,9 +129,12 @@ export function InviteManagementSection() {
 
   const handleNotInvitedAction = useCallback(
     async (speech: Speech) => {
-      // Open WhatsApp and set status to invited
-      if (speech.speaker_phone) {
-        let url: string;
+      // v2.0: send to the resolved contact snapshot; fall back to the legacy own-phone snapshot
+      // (also covers orphaned delegation where contact_phone was never captured).
+      const phone = speech.contact_phone || speech.speaker_phone;
+      if (phone) {
+        // Build the normal per-position base message.
+        let baseMessage: string;
         if (speech.position === 0 || speech.position === 4) {
           // Prayer: use prayer-specific template with {nome} and {data} placeholders
           const prayerType = speech.position === 0 ? 'opening' : 'closing';
@@ -114,39 +143,45 @@ export function InviteManagementSection() {
             : 'whatsapp_template_closing_prayer';
           const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
           const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
-          const message = resolvePrayerTemplate(template, {
+          baseMessage = resolveTemplate(template, {
             speakerName: speech.speaker_informal_name || speech.speaker_name || '',
             date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
             topic: '',
           });
-
-          // Build URL manually since prayer templates only use {nome}/{data}
-          let cleanPhone = speech.speaker_phone.replace(/[\s\-\(\)]/g, '');
-          if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
-          url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         } else {
-          // Speech: use position-specific speech template
+          // Speech: use position-specific speech template (locale default when unset).
           const speechTemplateMap: Record<number, string> = {
             1: ward?.whatsapp_template_speech_1 ?? '',
             2: ward?.whatsapp_template_speech_2 ?? '',
             3: ward?.whatsapp_template_speech_3 ?? '',
           };
-          const selectedTemplate = speechTemplateMap[speech.position] ?? '';
-          url = buildWhatsAppUrl(
-            speech.speaker_phone,
-            '', // countryCode already in phone
-            selectedTemplate,
-            {
-              speakerName: speech.speaker_informal_name || speech.speaker_name || '',
-              date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-              topic: speech.topic_title ?? '',
-              collection: speech.topic_collection ?? '',
-              link: speech.topic_link ?? '',
-            },
-            locale,
-            speech.position as 1 | 2 | 3
+          const selectedTemplate =
+            speechTemplateMap[speech.position] || getDefaultSpeechTemplate(locale, speech.position as 1 | 2 | 3);
+          baseMessage = resolveTemplate(selectedTemplate, {
+            speakerName: speech.speaker_informal_name || speech.speaker_name || '',
+            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+            topic: speech.topic_title ?? '',
+            collection: speech.topic_collection ?? '',
+            link: speech.topic_link ?? '',
+          });
+        }
+
+        // v2.0: when delegated, wrap the base message with the ward delegation wrapper.
+        let message = baseMessage;
+        if (speech.is_delegated) {
+          message = wrapDelegationMessage(
+            baseMessage,
+            ward?.whatsapp_template_delegation_wrapper ?? null,
+            resolveResponsibleName(speech),
+            speech.delegate_for_name ?? '',
+            locale
           );
         }
+
+        let cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+        if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
+        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+
         await openWhatsApp(url);
         changeStatus.mutate({
           speechId: speech.id,
@@ -171,7 +206,7 @@ export function InviteManagementSection() {
         );
       }
     },
-    [changeStatus, locale, ward, t]
+    [changeStatus, locale, ward, t, resolveResponsibleName]
   );
 
   const handleInvitedAction = useCallback(
@@ -184,8 +219,10 @@ export function InviteManagementSection() {
   const handleDropdownWhatsApp = useCallback(
     async (speech: Speech) => {
       setDropdownSpeech(null);
-      if (speech.speaker_phone) {
-        const url = buildWhatsAppConversationUrl(speech.speaker_phone);
+      // v2.0: open the conversation with the resolved contact (fallback to legacy own phone).
+      const phone = speech.contact_phone || speech.speaker_phone;
+      if (phone) {
+        const url = buildWhatsAppConversationUrl(phone);
         await openWhatsApp(url);
       }
     },

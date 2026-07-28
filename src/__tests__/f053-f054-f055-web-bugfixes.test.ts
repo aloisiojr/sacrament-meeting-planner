@@ -1,18 +1,15 @@
 /**
  * Phase 7 Tests: F053 (CR-263) Friendly Registration Errors
- *                F054 (CR-264) Fix ActorSelector TDZ
  *                F055 (CR-265) Fix Hymn Selector Web Compatibility
  *
  * Tests:
  * - F053: i18n keys for registration errors + error-handling logic patterns
- * - F054: ActorSelector hook ordering and filtering behavior
  * - F055: HymnSelectorModal filtering and display behavior
  */
 
 import { describe, it, expect } from 'vitest';
-import { filterActorsByRole } from '../hooks/useActors';
 import { filterHymns, formatHymnDisplay } from '../hooks/useHymns';
-import type { MeetingActor , Hymn } from '../types/database';
+import type { Hymn } from '../types/database';
 
 // =============================================================================
 // F053 (CR-263): FRIENDLY REGISTRATION ERROR MESSAGES
@@ -350,168 +347,6 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
         fullName: 'John', email: 'a@b.com', stakeName: 'Stake', wardName: 'Ward',
         password: '123456', confirmPassword: '123456',
       })).toBeNull();
-    });
-  });
-});
-
-// =============================================================================
-// F054 (CR-264): FIX ACTORSELECTOR TDZ CRASH
-// =============================================================================
-
-describe('F054 (CR-264): Fix ActorSelector TDZ Crash', () => {
-
-  // --- AC-F054-01 through AC-F054-05: filterActorsByRole works for all roles ---
-  describe('AC-F054-01/02/03/04/05: filterActorsByRole for all actor roles', () => {
-    const actors: MeetingActor[] = [
-      { id: '1', ward_id: 'w1', name: 'Bishop Jones', role: 'preside', created_at: '', updated_at: '' },
-      { id: '2', ward_id: 'w1', name: 'Counselor Smith', role: 'conduct', created_at: '', updated_at: '' },
-      { id: '3', ward_id: 'w1', name: 'Sister Piano', role: 'pianist', created_at: '', updated_at: '' },
-      { id: '4', ward_id: 'w1', name: 'Brother Baton', role: 'conductor', created_at: '', updated_at: '' },
-      { id: '5', ward_id: 'w1', name: 'Sister Welcome', role: 'recognize', created_at: '', updated_at: '' },
-      { id: '6', ward_id: 'w1', name: 'Bishop Brown', role: 'preside', created_at: '', updated_at: '' },
-    ];
-
-    // AC-F054-01: preside role filter
-    it('filters actors by preside role', () => {
-      const result = filterActorsByRole(actors, 'preside');
-      expect(result).toHaveLength(2);
-      expect(result.every((a) => a.role === 'preside')).toBe(true);
-    });
-
-    // AC-F054-02: conduct role filter
-    it('filters actors by conduct role', () => {
-      const result = filterActorsByRole(actors, 'conduct');
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Counselor Smith');
-    });
-
-    // AC-F054-03: pianist role filter
-    it('filters actors by pianist role', () => {
-      const result = filterActorsByRole(actors, 'pianist');
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Sister Piano');
-    });
-
-    // AC-F054-04: conductor role filter
-    it('filters actors by conductor role', () => {
-      const result = filterActorsByRole(actors, 'conductor');
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Brother Baton');
-    });
-
-    // AC-F054-05: recognize role filter (multi-select in ActorSelector)
-    it('filters actors by recognize role', () => {
-      const result = filterActorsByRole(actors, 'recognize');
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Sister Welcome');
-    });
-
-    it('returns all actors for "all" filter', () => {
-      const result = filterActorsByRole(actors, 'all');
-      expect(result).toHaveLength(6);
-    });
-  });
-
-  // --- AC-F054-06: Scroll-to-editingId uses filtered list ---
-  describe('AC-F054-06: Filtered list search for scroll-to-editingId', () => {
-    it('findIndex locates the correct actor in filtered list', () => {
-      const filtered = [
-        { id: 'a1', name: 'Alpha' },
-        { id: 'a2', name: 'Beta' },
-        { id: 'a3', name: 'Gamma' },
-      ];
-      const editingId = 'a2';
-      const index = filtered.findIndex((a) => a.id === editingId);
-      expect(index).toBe(1);
-    });
-
-    it('findIndex returns -1 when actor not in filtered list', () => {
-      const filtered = [
-        { id: 'a1', name: 'Alpha' },
-        { id: 'a3', name: 'Gamma' },
-      ];
-      const editingId = 'a2';
-      const index = filtered.findIndex((a) => a.id === editingId);
-      expect(index).toBe(-1);
-    });
-
-    it('filtered list updates when search term changes', () => {
-      const actors: MeetingActor[] = [
-        { id: '1', ward_id: 'w1', name: 'Bishop Jones', role: 'preside', created_at: '', updated_at: '' },
-        { id: '2', ward_id: 'w1', name: 'Bishop Smith', role: 'preside', created_at: '', updated_at: '' },
-        { id: '3', ward_id: 'w1', name: 'Counselor Doe', role: 'conduct', created_at: '', updated_at: '' },
-      ];
-
-      // Simulates the useMemo filter logic from ActorSelector
-      const filterBySearch = (list: MeetingActor[], search: string) => {
-        if (!search.trim()) return list;
-        const q = search.toLowerCase();
-        return list.filter((a) => a.name.toLowerCase().includes(q));
-      };
-
-      // No search: all actors
-      expect(filterBySearch(actors, '')).toHaveLength(3);
-
-      // Search "Bishop": 2 results
-      expect(filterBySearch(actors, 'Bishop')).toHaveLength(2);
-
-      // Search "Jones": 1 result
-      const jones = filterBySearch(actors, 'Jones');
-      expect(jones).toHaveLength(1);
-      expect(jones[0].name).toBe('Bishop Jones');
-
-      // Search "xyz": 0 results
-      expect(filterBySearch(actors, 'xyz')).toHaveLength(0);
-    });
-  });
-
-  // --- TDZ fix verification: hook order dependency ---
-  describe('TDZ fix: useMemo depends on useActors data', () => {
-    it('useMemo filter works with undefined actors (initial state before data loads)', () => {
-      // Simulates what happens before useActors returns data
-      const actors = undefined as MeetingActor[] | undefined;
-      const search = '';
-
-      const filtered = (() => {
-        const list = actors ?? [];
-        if (!search.trim()) return list;
-        const q = search.toLowerCase();
-        return list.filter((a) => a.name.toLowerCase().includes(q));
-      })();
-
-      expect(filtered).toEqual([]);
-    });
-
-    it('useMemo filter works with empty actors array', () => {
-      const actors: MeetingActor[] = [];
-      const search = 'test';
-
-      const filtered = (() => {
-        const list = actors ?? [];
-        if (!search.trim()) return list;
-        const q = search.toLowerCase();
-        return list.filter((a) => a.name.toLowerCase().includes(q));
-      })();
-
-      expect(filtered).toEqual([]);
-    });
-
-    it('useMemo filter works with populated actors and search', () => {
-      const actors: MeetingActor[] = [
-        { id: '1', ward_id: 'w1', name: 'Alpha', role: 'preside', created_at: '', updated_at: '' },
-        { id: '2', ward_id: 'w1', name: 'Beta', role: 'conduct', created_at: '', updated_at: '' },
-      ];
-      const search = 'alpha';
-
-      const filtered = (() => {
-        const list = actors ?? [];
-        if (!search.trim()) return list;
-        const q = search.toLowerCase();
-        return list.filter((a) => a.name.toLowerCase().includes(q));
-      })();
-
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe('Alpha');
     });
   });
 });

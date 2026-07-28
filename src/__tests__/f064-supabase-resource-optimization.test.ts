@@ -906,8 +906,8 @@ describe('F064 cross-feature: all optimizations backward-compatible', () => {
     expect(Object.keys(FIXED_COLLECTION_ORDER)).toHaveLength(6);
   });
 
-  it('SYNCED_TABLES still has 7 tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(7);
+  it('SYNCED_TABLES still has 6 tables', () => {
+    expect(SYNCED_TABLES).toHaveLength(6);
   });
 
   it('TABLE_TO_QUERY_KEYS.speeches includes speechCountKeys', () => {

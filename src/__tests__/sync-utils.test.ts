@@ -6,15 +6,14 @@ import { describe, it, expect } from 'vitest';
 import { SYNCED_TABLES, getQueryKeysForTable, POLLING_INTERVAL_MS } from '../lib/sync';
 
 describe('SYNCED_TABLES', () => {
-  it('contains all 7 synced tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(7);
+  it('contains all 6 synced tables', () => {
+    expect(SYNCED_TABLES).toHaveLength(6);
     expect(SYNCED_TABLES).toContain('members');
     expect(SYNCED_TABLES).toContain('ward_topics');
     expect(SYNCED_TABLES).toContain('ward_collection_config');
     expect(SYNCED_TABLES).toContain('sunday_exceptions');
     expect(SYNCED_TABLES).toContain('speeches');
     expect(SYNCED_TABLES).toContain('sunday_agendas');
-    expect(SYNCED_TABLES).toContain('meeting_actors');
   });
 });
 
@@ -31,11 +30,6 @@ describe('getQueryKeysForTable', () => {
 
   it('returns query keys for sunday_agendas table', () => {
     const keys = getQueryKeysForTable('sunday_agendas');
-    expect(keys.length).toBeGreaterThan(0);
-  });
-
-  it('returns query keys for meeting_actors table', () => {
-    const keys = getQueryKeysForTable('meeting_actors');
     expect(keys.length).toBeGreaterThan(0);
   });
 

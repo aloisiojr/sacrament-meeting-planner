@@ -9,7 +9,6 @@ import { sundayTypeKeys } from '../hooks/useSundayTypes';
 import { speechKeys } from '../hooks/useSpeeches';
 import { speechCountKeys } from '../hooks/useSpeechCounts';
 import { agendaKeys } from '../hooks/useAgenda';
-import { actorKeys } from '../hooks/useActors';
 
 // --- Types ---
 
@@ -19,8 +18,7 @@ export type SyncedTable =
   | 'ward_collection_config'
   | 'sunday_exceptions'
   | 'speeches'
-  | 'sunday_agendas'
-  | 'meeting_actors';
+  | 'sunday_agendas';
 
 // --- Constants ---
 
@@ -34,7 +32,6 @@ export const SYNCED_TABLES: readonly SyncedTable[] = [
   'sunday_exceptions',
   'speeches',
   'sunday_agendas',
-  'meeting_actors',
 ] as const;
 
 /**
@@ -48,7 +45,6 @@ export const TABLE_TO_QUERY_KEYS: Record<SyncedTable, readonly (readonly string[
   sunday_exceptions: [sundayTypeKeys.all],
   speeches: [speechKeys.all, speechCountKeys.all],
   sunday_agendas: [agendaKeys.all],
-  meeting_actors: [actorKeys.all],
 };
 
 /**

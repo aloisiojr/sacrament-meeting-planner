@@ -13,14 +13,12 @@ import {
   createWrapper,
   createMockAuthContext,
   mockSupabaseFrom,
-  createMockActor,
   createMockMember,
 } from './setup-integration';
 import { hasPermission, getPermissions, ALL_PERMISSIONS, ALL_ROLES } from '../../lib/permissions';
 import type { Role, Permission } from '../../types/database';
 
 import { supabase } from '../../lib/supabase';
-import { useActors } from '../../hooks/useActors';
 import { useMembers } from '../../hooks/useMembers';
 
 // --- Module mocks ---
@@ -191,11 +189,11 @@ describe('Auth context permission gating', () => {
   });
 
   it('bishopric user can access all hook data', async () => {
-    const mockActors = [createMockActor({ id: 'a1', name: 'Actor 1' })];
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: mockActors, error: null });
+    const mockMembers = [createMockMember({ id: 'm1', full_name: 'Member 1' })];
+    mockSupabaseFrom(mockedSupabase, 'members', { data: mockMembers, error: null });
 
     const wrapper = createWrapper({ role: 'bishopric' }, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
+    const { result } = renderHook(() => useMembers(), { wrapper });
 
     await waitFor(() => expect(result.current.data).toBeDefined());
     expect(result.current.data).toHaveLength(1);
@@ -253,10 +251,10 @@ describe('Unknown role handling (EC-082-07)', () => {
 describe('AuthContext loading state (EC-082-08)', () => {
   it('hooks respect enabled flag when wardId is empty', async () => {
     const queryClient = createTestQueryClient();
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: [], error: null });
+    mockSupabaseFrom(mockedSupabase, 'members', { data: [], error: null });
 
     const wrapper = createWrapper({ wardId: '' }, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
+    const { result } = renderHook(() => useMembers(), { wrapper });
 
     // With empty wardId, queries should not fire
     await new Promise((r) => setTimeout(r, 50));
@@ -266,11 +264,11 @@ describe('AuthContext loading state (EC-082-08)', () => {
 
   it('hooks fire when wardId is present', async () => {
     const queryClient = createTestQueryClient();
-    const mockActors = [createMockActor()];
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: mockActors, error: null });
+    const mockMembers = [createMockMember()];
+    mockSupabaseFrom(mockedSupabase, 'members', { data: mockMembers, error: null });
 
     const wrapper = createWrapper({ wardId: 'ward-1' }, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
+    const { result } = renderHook(() => useMembers(), { wrapper });
 
     await waitFor(() => expect(result.current.data).toBeDefined());
     expect(result.current.data).toHaveLength(1);

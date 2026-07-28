@@ -13,7 +13,6 @@ import {
   createTestQueryClient,
   createWrapper,
   mockSupabaseFrom,
-  createMockActor,
   createMockMember,
   createMockSpeech,
   createMockHymn,
@@ -24,7 +23,6 @@ import {
 
 // Import after mocks
 import { supabase } from '../../lib/supabase';
-import { useActors, useCreateActor, useUpdateActor, useDeleteActor } from '../../hooks/useActors';
 import { useLazyCreateAgenda, useUpdateAgenda } from '../../hooks/useAgenda';
 import { useSpeeches, useAssignSpeaker, useChangeStatus } from '../../hooks/useSpeeches';
 import { useMembers, useCreateMember, useUpdateMember, useDeleteMember } from '../../hooks/useMembers';
@@ -98,162 +96,6 @@ beforeEach(() => {
 
 afterEach(() => {
   queryClient.clear();
-});
-
-// ==========================================================================
-// 1. useActors
-// ==========================================================================
-
-describe('useActors integration', () => {
-  it('fetches actors from Supabase (AC-082-01)', async () => {
-    const mockActors = [
-      createMockActor({ id: 'a1', name: 'Bishop Jones', role: 'preside' }),
-      createMockActor({ id: 'a2', name: 'Elder Smith', role: 'conduct' }),
-    ];
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: mockActors, error: null });
-
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
-
-    await waitFor(() => expect(result.current.data).toBeDefined());
-    expect(result.current.data).toEqual(mockActors);
-    expect(result.current.isError).toBe(false);
-  });
-
-  it('creates actor and invalidates cache (AC-082-02)', async () => {
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', {
-      data: createMockActor({ id: 'new-1', name: 'New Actor' }),
-      error: null,
-    });
-
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useCreateActor(), { wrapper });
-
-    await act(async () => {
-      await result.current.mutateAsync({ name: 'New Actor', role: 'preside' });
-    });
-
-    expect(spy).toHaveBeenCalled();
-  });
-
-  it('updates actor and invalidates cache', async () => {
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', {
-      data: createMockActor({ id: 'a1', name: 'Updated Actor' }),
-      error: null,
-    });
-
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useUpdateActor(), { wrapper });
-
-    await act(async () => {
-      await result.current.mutateAsync({ id: 'a1', name: 'Updated Actor' });
-    });
-
-    expect(spy).toHaveBeenCalled();
-  });
-
-  it('deletes actor and invalidates cache', async () => {
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: null, error: null });
-
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useDeleteActor(), { wrapper });
-
-    await act(async () => {
-      await result.current.mutateAsync({ actorId: 'a1', actorName: 'Actor 1' });
-    });
-
-    expect(spy).toHaveBeenCalled();
-  });
-
-  it('returns isError when Supabase errors (EC-082-01)', async () => {
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', {
-      data: null,
-      error: { message: 'DB error', code: '500' },
-    });
-
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-  });
-
-  it('does not fetch when wardId is empty (EC-082-02)', async () => {
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: [], error: null });
-
-    const wrapper = createWrapper({ wardId: '' }, queryClient);
-    const { result } = renderHook(() => useActors(), { wrapper });
-
-    // Wait a tick to ensure no query fires
-    await new Promise((r) => setTimeout(r, 50));
-    expect(result.current.data).toBeUndefined();
-    expect(result.current.fetchStatus).toBe('idle');
-  });
-
-  it('does not invalidate cache on mutation failure (EC-082-03)', async () => {
-    mockedSupabase.from.mockImplementation(() => {
-      const errorPromise = Promise.resolve({
-        data: null,
-        error: { message: 'Constraint violation', code: '23505' },
-      });
-      const chain: any = new Proxy({}, {
-        get(_t, p: string) {
-          if (p === 'then') return errorPromise.then.bind(errorPromise);
-          if (p === 'catch') return errorPromise.catch.bind(errorPromise);
-          if (p === 'finally') return errorPromise.finally.bind(errorPromise);
-          return () => chain;
-        },
-      });
-      return chain;
-    });
-
-    const spy = vi.spyOn(queryClient, 'invalidateQueries');
-    const wrapper = createWrapper(undefined, queryClient);
-    const { result } = renderHook(() => useCreateActor(), { wrapper });
-
-    try {
-      await act(async () => {
-        await result.current.mutateAsync({ name: 'Fail Actor', role: 'preside' });
-      });
-    } catch {
-      // Expected to fail
-    }
-
-    // onSuccess should not have fired, so no actor-specific invalidation
-    const calls = spy.mock.calls.filter(
-      (call) => JSON.stringify(call).includes('actors')
-    );
-    expect(calls.length).toBe(0);
-  });
-
-  it('does not cause errors when unmounted before query completes (EC-082-06)', async () => {
-    let resolveQuery: any;
-    const delayedPromise = new Promise((r) => { resolveQuery = r; });
-    mockedSupabase.from.mockImplementation(() => {
-      const chain: any = new Proxy({}, {
-        get(_t, p: string) {
-          if (p === 'then') return delayedPromise.then.bind(delayedPromise);
-          if (p === 'catch') return delayedPromise.catch.bind(delayedPromise);
-          if (p === 'finally') return delayedPromise.finally.bind(delayedPromise);
-          return () => chain;
-        },
-      });
-      return chain;
-    });
-
-    const wrapper = createWrapper(undefined, queryClient);
-    const { unmount } = renderHook(() => useActors(), { wrapper });
-
-    unmount();
-
-    // Resolve after unmount - should not throw
-    resolveQuery({ data: [createMockActor()], error: null });
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(true).toBe(true);
-  });
 });
 
 // ==========================================================================
@@ -639,15 +481,15 @@ describe('TestQueryClient configuration', () => {
 // ==========================================================================
 
 describe('Shared QueryClient cache', () => {
-  it('useActors and useCreateActor share same QueryClient (EC-082-05)', async () => {
-    const mockActors = [createMockActor({ id: 'a1', name: 'Actor 1' })];
-    mockSupabaseFrom(mockedSupabase, 'meeting_actors', { data: mockActors, error: null });
+  it('useMembers and useCreateMember share same QueryClient (EC-082-05)', async () => {
+    const mockMembers = [createMockMember({ id: 'm1', full_name: 'Member 1' })];
+    mockSupabaseFrom(mockedSupabase, 'members', { data: mockMembers, error: null });
 
     const sharedClient = createTestQueryClient();
     const wrapper = createWrapper(undefined, sharedClient);
 
-    const { result: fetchResult } = renderHook(() => useActors(), { wrapper });
-    renderHook(() => useCreateActor(), { wrapper });
+    const { result: fetchResult } = renderHook(() => useMembers(), { wrapper });
+    renderHook(() => useCreateMember(), { wrapper });
 
     await waitFor(() => expect(fetchResult.current.data).toBeDefined());
 

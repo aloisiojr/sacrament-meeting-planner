@@ -18,6 +18,7 @@ import { SpeechSlot } from './SpeechSlot';
 import { MemberSelectorModal } from './MemberSelectorModal';
 import { TopicSelectorModal } from './TopicSelectorModal';
 import { QueryErrorView } from './QueryErrorView';
+import { buildFullPhone } from '../lib/phone';
 import {
   useSpeeches,
   useLazyCreateSpeeches,
@@ -97,7 +98,7 @@ export function NextAssignmentsSection() {
         memberId: member.id,
         speakerName: member.full_name,
         speakerInformalName: member.informal_name,
-        speakerPhone: member.phone ?? '',
+        speakerPhone: buildFullPhone(member.country_code, member.phone) ?? '',
       });
       setSpeakerModalSpeechId(null);
     },

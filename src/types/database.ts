@@ -250,6 +250,10 @@ export interface DevicePushToken {
   user_id: string;
   ward_id: string;
   expo_push_token: string;
+  role: string | null;
+  app_version: string | null;
+  platform: string | null;
+  last_update_nudge_at: string | null;
   created_at: string;
   updated_at: string;
 }

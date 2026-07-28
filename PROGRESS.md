@@ -33,16 +33,30 @@
   (3 errors + 163 warnings) → `npm run lint` = 0 problems. exhaustive-deps: 11 real deps added (all
   stable refs) + 8 justified disables; no behavior change. tsc 0; 68 files / 1834 tests green.
 
-Password-reset bug fully resolved (Gmail SMTP live in prod + client hardening); tsc + lint baselines
-clean; pushed to `origin/main`.
+Password-reset bug resolved (Gmail SMTP live) + tsc/lint baselines clean, on `origin/main`.
 
-## v2.0 (branch `v2.0`)
-- **In flight:** `specs/v2-member-management.md` — unify actors+speakers into `members` (capability
-  flags + contact-delegation), move people management into the picker, CSV stays in Settings.
-  Breaking DB change → release cutover in `docs/decisions/001-v2-release-cutover.md` (forced update).
-  Stage: **spec-first done, awaiting GATE 1**. Interview P1–P18 resolved.
-- **Prerequisite (separate change, on `main`):** a **v1.x min-version gate** must ship + be adopted
-  before v2.0 is deployed (see ADR). Not started.
+## v1.x (branch `v1.x`, off main) — BUILD COMPLETE, awaiting deploy (GATE 3)
+Prerequisite release before v2.0 (see `docs/decisions/001-v2-release-cutover.md`). Spec:
+`specs/v1x-version-gate.md`. All steps built + adversarially verified (APPROVED, no P0/P1);
+tsc 0, lint 0, 71 files / 1850 tests. `app.json` → 1.1.0.
+- Migration 036 (additive: `app_config` + push `app_version`/`platform`/`last_update_nudge_at`).
+- `app-config` edge function (fail-open) + launch version gate + `UpdateRequiredScreen` (iOS store
+  link; Android pre-launch shows message). `semver.ts`.
+- `app_version`/`platform` on push token upsert; `push-update-nudge` scheduled edge function.
+- WhatsApp `buildFullPhone` fix (new snapshots carry country code).
+**Deploy status (GATE 3):** ✅ functions deployed (`app-config`, `push-update-nudge`); ✅ migration
+036 applied (via `migration repair` for 001–035 then `db push`) — VERIFIED: `app-config` returns
+seeded `min_supported_version=1.0.0`; ✅ branch `v1.x` pushed. **Remaining (user):** Supabase cron
+for the nudge (SQL provided in chat); EAS build + App Store submit (v1.1.0). 5 P2 findings left as-is.
+Two independent levers:
+- **Gate** (in-app update screen) exists ONLY in 1.1.0+; `min_supported_version` gates clients that
+  HAVE the gate. It can NEVER affect 1.0.0 (no gate code there).
+- **Nudge** (push) reaches 1.0.0 too (they receive push). 1.0.0 tokens have `app_version=NULL`,
+  which the nudge treats as outdated → they get nudged once the cron runs, regardless of `min`.
+Rollout: to move 1.0.0 users to 1.1.0, publish 1.1.0 then SCHEDULE THE CRON (keep `min=1.0.0`; do
+NOT schedule before 1.1.0 exists). At v2 cutover, raise `min` to the v2 build → 1.1.0 is
+force-gated; 1.0.0 can't be gated (breaks at the v2 schema migration — accepted per ADR). iOS store
+URL wired; Android not published yet.
 
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via

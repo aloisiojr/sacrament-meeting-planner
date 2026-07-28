@@ -42,7 +42,8 @@ export default function ForgotPasswordScreen() {
       );
       if (invokeError) throw invokeError;
       setSuccess(true);
-    } catch {
+    } catch (err) {
+      console.error('Password reset request failed:', err);
       setError(t('auth.resetFailed'));
     } finally {
       setLoading(false);

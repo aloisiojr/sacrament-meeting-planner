@@ -6,13 +6,21 @@
 declare module 'react-test-renderer' {
   import { ReactElement } from 'react';
 
+  export interface TestInstance {
+    type: unknown;
+    props: Record<string, unknown>;
+    children: TestInstance[];
+    findAll(predicate: (node: TestInstance) => boolean): TestInstance[];
+    find(predicate: (node: TestInstance) => boolean): TestInstance;
+  }
+
   export interface ReactTestRenderer {
     update(nextElement: ReactElement): void;
     unmount(): void;
     toJSON(): unknown;
     toTree(): unknown;
     getInstance(): unknown;
-    root: unknown;
+    root: TestInstance;
   }
 
   export function create(nextElement: ReactElement, options?: unknown): ReactTestRenderer;

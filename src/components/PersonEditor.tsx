@@ -169,7 +169,8 @@ export function PersonEditor({
     const fields = {
       full_name: trimmedName,
       informal_name: informalName.trim() || null,
-      country_code: countryCode.trim(),
+      // Default to the app/DB default (+55) rather than persisting an empty country code.
+      country_code: countryCode.trim() || '+55',
       phone: phone.trim() || null,
       can_preside: caps.preside,
       can_conduct: caps.conduct,

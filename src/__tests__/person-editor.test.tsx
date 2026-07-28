@@ -143,6 +143,21 @@ describe('PersonEditor', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('defaults an empty country code to +55 on save (P2 #4)', () => {
+    const { renderer } = render();
+    change(renderer, 'person-editor-full-name', 'No Country Code');
+    change(renderer, 'person-editor-phone', '11999');
+    // country_code left empty
+    press(renderer, 'person-editor-save');
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock.mock.calls[0][0]).toMatchObject({
+      full_name: 'No Country Code',
+      country_code: '+55',
+      phone: '11999',
+    });
+  });
+
   it('prefills fields from the edited member and updates via id (AC7)', () => {
     const member = makeMember({
       id: 'self', full_name: 'Self Person', informal_name: 'Selfie', can_conduct: true,

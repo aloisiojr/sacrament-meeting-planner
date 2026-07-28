@@ -11,6 +11,12 @@ Per-change docs live in `specs/<slug>.md` (+ `.plan.md`); running state in `PROG
 For any change touching the DB schema, Supabase API, persisted local data, or app-version
 compatibility, consult **mobile-release-advisor** before locking the spec.
 
+## Skills & code quality
+
+Quality/review layer = built-in first-party skills: `/simplify` (reuse/quality), `review`
+(code review), `security-review`. Do NOT install external skills without vetting the `SKILL.md`
+first (security). Prefer built-ins or a reviewed project-local skill over anything copied.
+
 ## Commands
 
 - Tests (one-shot): `npm run test:run` · watch: `npm test` · single file: `npx vitest run <path>`

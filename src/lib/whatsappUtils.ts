@@ -52,6 +52,33 @@ export const DEFAULT_CLOSING_PRAYER_TEMPLATE_EN =
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
   'Hola {nome}, has sido designado(a) para hacer la oración de cierre de la Reunión Sacramental del día {data}. Nos gustaría pedirte que te unas al obispado en el púlpito durante el himno intermedio. ¿Podemos contar contigo?';
 
+// --- Default Delegation Wrapper Templates (v2.0) ---
+
+export const DEFAULT_DELEGATION_WRAPPER_PT_BR =
+  'Olá {responsavel}, tudo bom? Temos um convite para {nome}:\n\n{mensagem}';
+
+export const DEFAULT_DELEGATION_WRAPPER_EN =
+  'Hi {responsavel}, how are you? We have an invitation for {nome}:\n\n{mensagem}';
+
+export const DEFAULT_DELEGATION_WRAPPER_ES =
+  'Hola {responsavel}, ¿qué tal? Tenemos una invitación para {nome}:\n\n{mensagem}';
+
+/**
+ * Get the default delegation-wrapper template for a language.
+ * Falls back to en-US if the language is not supported.
+ */
+export function getDefaultDelegationWrapper(language: string): string {
+  switch (language) {
+    case 'pt-BR':
+      return DEFAULT_DELEGATION_WRAPPER_PT_BR;
+    case 'es-LA':
+      return DEFAULT_DELEGATION_WRAPPER_ES;
+    case 'en-US':
+    default:
+      return DEFAULT_DELEGATION_WRAPPER_EN;
+  }
+}
+
 /**
  * Get the default speech template for a given language and position.
  * Falls back to en-US if the language is not supported.
@@ -143,6 +170,34 @@ export function resolveTemplate(template: string, vars: WhatsAppVariables): stri
   // Clean up extra whitespace from empty placeholders
   result = result.replace(/\s{2,}/g, ' ').trim();
   return result;
+}
+
+/**
+ * Wrap an already-resolved base message with the ward's delegation wrapper (v2.0).
+ *
+ * Used when a speech's contact is delegated to a responsible person: the normal per-position
+ * message becomes the `{mensagem}` inside a friendly wrapper addressed to the responsible.
+ *
+ * @param baseMessage - The resolved per-position message (goes into `{mensagem}`).
+ * @param wrapperTemplate - The ward's `whatsapp_template_delegation_wrapper`, or null for the
+ *   locale default.
+ * @param responsibleName - Name of the responsible person (`{responsavel}`).
+ * @param delegateName - Name of the member the invitation is for (`{nome}`).
+ * @param language - Language for the default wrapper fallback (default 'en-US').
+ */
+export function wrapDelegationMessage(
+  baseMessage: string,
+  wrapperTemplate: string | null,
+  responsibleName: string,
+  delegateName: string,
+  language: string = 'en-US'
+): string {
+  const template = wrapperTemplate || getDefaultDelegationWrapper(language);
+  // Resolve {mensagem} last so tokens inside the base message are not re-substituted.
+  return template
+    .replace(/\{responsavel\}/g, responsibleName)
+    .replace(/\{nome\}/g, delegateName)
+    .replace(/\{mensagem\}/g, baseMessage);
 }
 
 /**

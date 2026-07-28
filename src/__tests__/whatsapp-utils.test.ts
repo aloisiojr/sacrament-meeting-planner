@@ -10,6 +10,11 @@ import {
   DEFAULT_TEMPLATE_SPEECH_1_PT_BR,
   DEFAULT_TEMPLATE_SPEECH_1_EN,
   DEFAULT_TEMPLATE_SPEECH_1_ES,
+  wrapDelegationMessage,
+  getDefaultDelegationWrapper,
+  DEFAULT_DELEGATION_WRAPPER_PT_BR,
+  DEFAULT_DELEGATION_WRAPPER_EN,
+  DEFAULT_DELEGATION_WRAPPER_ES,
 } from '../lib/whatsappUtils';
 
 describe('resolveTemplate', () => {
@@ -167,5 +172,66 @@ describe('buildWhatsAppUrl language parameter', () => {
   it('defaults to en-US when language omitted', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars);
     expect(url).toContain(encodeURIComponent('Bishopric'));
+  });
+});
+
+describe('getDefaultDelegationWrapper', () => {
+  it('returns the pt-BR wrapper', () => {
+    expect(getDefaultDelegationWrapper('pt-BR')).toBe(DEFAULT_DELEGATION_WRAPPER_PT_BR);
+  });
+
+  it('returns the es-LA wrapper', () => {
+    expect(getDefaultDelegationWrapper('es-LA')).toBe(DEFAULT_DELEGATION_WRAPPER_ES);
+  });
+
+  it('returns the en-US wrapper for en-US and unknown languages', () => {
+    expect(getDefaultDelegationWrapper('en-US')).toBe(DEFAULT_DELEGATION_WRAPPER_EN);
+    expect(getDefaultDelegationWrapper('fr-FR')).toBe(DEFAULT_DELEGATION_WRAPPER_EN);
+  });
+});
+
+describe('wrapDelegationMessage', () => {
+  it('applies a custom ward wrapper template with all tokens', () => {
+    const result = wrapDelegationMessage(
+      'Base invite',
+      'Oi {responsavel}! Convite para {nome}: {mensagem}',
+      'Maria',
+      'João',
+      'pt-BR'
+    );
+    expect(result).toBe('Oi Maria! Convite para João: Base invite');
+  });
+
+  it('falls back to the locale default when wrapper is null (pt-BR)', () => {
+    const result = wrapDelegationMessage('MENSAGEM', null, 'Maria', 'João', 'pt-BR');
+    expect(result).toBe('Olá Maria, tudo bom? Temos um convite para João:\n\nMENSAGEM');
+  });
+
+  it('falls back to the en-US default when wrapper is null and language omitted', () => {
+    const result = wrapDelegationMessage('MSG', null, 'Mary', 'John');
+    expect(result).toBe('Hi Mary, how are you? We have an invitation for John:\n\nMSG');
+  });
+
+  it('uses the es-LA default for language es-LA', () => {
+    const result = wrapDelegationMessage('MSG', null, 'Ana', 'Luis', 'es-LA');
+    expect(result).toContain('Hola Ana, ¿qué tal?');
+    expect(result).toContain('para Luis');
+    expect(result.endsWith('\n\nMSG')).toBe(true);
+  });
+
+  it('replaces all occurrences of each token', () => {
+    const result = wrapDelegationMessage(
+      'X',
+      '{responsavel} {responsavel} / {nome} {nome} / {mensagem}',
+      'R',
+      'N'
+    );
+    expect(result).toBe('R R / N N / X');
+  });
+
+  it('does not re-substitute tokens that appear inside the base message', () => {
+    // A base message that itself contains {responsavel} must be left intact.
+    const result = wrapDelegationMessage('call {responsavel} back', null, 'Maria', 'João', 'pt-BR');
+    expect(result).toContain('call {responsavel} back');
   });
 });

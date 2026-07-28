@@ -13,9 +13,7 @@ import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
 import {
   buildNotificationText,
-  formatNameList,
 } from '../lib/notificationUtils';
-import type { OrdinalLanguage } from '../lib/notificationUtils';
 
 // Helper: read source file relative to project root
 const projectRoot = resolve(__dirname, '../..');

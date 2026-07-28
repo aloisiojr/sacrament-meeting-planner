@@ -29,25 +29,21 @@ describe('F052: Settings Tab Offline UI Logic', () => {
     it('app language item is not conditional on isOnline', () => {
       // In settings/index.tsx, app language is always rendered
       // It is not wrapped in {isOnline && ...}
-      const isOnline = false;
       const appLanguageRendered = true; // not conditional
       expect(appLanguageRendered).toBe(true);
     });
 
     it('theme item is not conditional on isOnline', () => {
-      const isOnline = false;
       const themeRendered = true;
       expect(themeRendered).toBe(true);
     });
 
     it('about item is not conditional on isOnline', () => {
-      const isOnline = false;
       const aboutRendered = true;
       expect(aboutRendered).toBe(true);
     });
 
     it('history item is not conditional on isOnline (only on permission)', () => {
-      const isOnline = false;
       const hasHistoryPermission = true;
       const historyRendered = hasHistoryPermission; // not && isOnline
       expect(historyRendered).toBe(true);
@@ -103,21 +99,18 @@ describe('F052: Settings Tab Offline UI Logic', () => {
       // {hasPermission('member:read') && (<SettingsItem ... />)}
       // No isOnline check
       const hasPermission = true;
-      const isOnline = false;
       const membersRendered = hasPermission; // not && isOnline
       expect(membersRendered).toBe(true);
     });
 
     it('manage prayers toggle rendered for non-observers', () => {
       const isObserver = false;
-      const isOnline = false;
       const managePrayersRendered = !isObserver; // not && isOnline
       expect(managePrayersRendered).toBe(true);
     });
 
     it('topics item rendered based on topic:write permission only', () => {
       const hasPermission = true;
-      const isOnline = false;
       const topicsRendered = hasPermission;
       expect(topicsRendered).toBe(true);
     });

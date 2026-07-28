@@ -16,6 +16,18 @@ import {
   createMockSundayException,
 } from './setup-integration';
 
+import { supabase } from '../../lib/supabase';
+import {
+  getAutoAssignedType,
+  getSundayOfMonth,
+  SUNDAY_TYPE_SPEECHES,
+  SUNDAY_TYPE_OPTIONS,
+  useAutoAssignSundayTypes,
+  useSundayExceptions,
+  useRemoveSundayException,
+} from '../../hooks/useSundayTypes';
+import type { QueryClient } from '@tanstack/react-query';
+
 // --- Module mocks ---
 
 vi.mock('../../lib/supabase', () => ({
@@ -66,19 +78,6 @@ vi.mock('../../lib/dateUtils', async (importOriginal) => {
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
-
-import { supabase } from '../../lib/supabase';
-import {
-  getAutoAssignedType,
-  getSundayOfMonth,
-  SUNDAY_TYPE_SPEECHES,
-  SUNDAY_TYPE_OPTIONS,
-  useAutoAssignSundayTypes,
-  useSundayExceptions,
-  useSetSundayType,
-  useRemoveSundayException,
-} from '../../hooks/useSundayTypes';
-import type { QueryClient } from '@tanstack/react-query';
 
 const mockedSupabase = vi.mocked(supabase);
 

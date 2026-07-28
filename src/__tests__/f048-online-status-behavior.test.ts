@@ -12,6 +12,13 @@ import { OnlineStatusProvider, useOnlineStatus } from '../contexts/OnlineStatusC
 
 const { act } = TestRenderer;
 
+// Provider typed with optional children so children can be passed as the
+// third createElement argument (react/no-children-prop) without a tsc error.
+const Provider = OnlineStatusProvider as React.ComponentType<{
+  isOnline: boolean;
+  children?: React.ReactNode;
+}>;
+
 /**
  * Helper to render a hook within OnlineStatusProvider.
  */
@@ -24,7 +31,7 @@ function renderOnlineStatusHook(isOnline?: boolean) {
   }
 
   const element = isOnline !== undefined
-    ? React.createElement(OnlineStatusProvider, { isOnline, children: React.createElement(TestComponent) })
+    ? React.createElement(Provider, { isOnline }, React.createElement(TestComponent))
     : React.createElement(TestComponent); // no provider
 
   let renderer: TestRenderer.ReactTestRenderer;
@@ -37,7 +44,7 @@ function renderOnlineStatusHook(isOnline?: boolean) {
     update: (newIsOnline: boolean) => {
       act(() => {
         renderer.update(
-          React.createElement(OnlineStatusProvider, { isOnline: newIsOnline, children: React.createElement(TestComponent) })
+          React.createElement(Provider, { isOnline: newIsOnline }, React.createElement(TestComponent))
         );
       });
     },

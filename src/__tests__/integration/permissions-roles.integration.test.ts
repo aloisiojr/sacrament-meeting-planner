@@ -19,6 +19,10 @@ import {
 import { hasPermission, getPermissions, ALL_PERMISSIONS, ALL_ROLES } from '../../lib/permissions';
 import type { Role, Permission } from '../../types/database';
 
+import { supabase } from '../../lib/supabase';
+import { useActors } from '../../hooks/useActors';
+import { useMembers } from '../../hooks/useMembers';
+
 // --- Module mocks ---
 
 vi.mock('../../lib/supabase', () => ({
@@ -62,10 +66,6 @@ vi.mock('../../lib/dateUtils', async (importOriginal) => {
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
-
-import { supabase } from '../../lib/supabase';
-import { useActors, useCreateActor } from '../../hooks/useActors';
-import { useMembers } from '../../hooks/useMembers';
 
 const mockedSupabase = vi.mocked(supabase);
 

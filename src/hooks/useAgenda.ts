@@ -161,7 +161,7 @@ export function useUpdateAgenda() {
  * Used by speeches tab to toggle has_second_speech without requiring agenda ID.
  */
 export function useUpdateAgendaByDate() {
-  const { wardId, user, userName } = useAuth();
+  const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({

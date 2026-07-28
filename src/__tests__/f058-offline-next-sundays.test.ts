@@ -12,7 +12,6 @@ import { describe, it, expect } from 'vitest';
 describe('F058: Offline Home NextSundaysSection', () => {
   describe('AC-058-1: NextSundaysSection visible offline', () => {
     it('NextSundaysSection renders without isOnline guard', () => {
-      const isOnline = false;
       // Pattern in index.tsx: <NextSundaysSection /> (no guard)
       const rendered = true; // always rendered
       expect(rendered).toBe(true);
@@ -80,9 +79,6 @@ describe('F058: Offline Home NextSundaysSection', () => {
 
   describe('EC-058-1: App opened cold while offline (no cache)', () => {
     it('NextSundaysSection renders even with no cached data', () => {
-      const isOnline = false;
-      const speeches = undefined; // no cache
-      const exceptions = undefined;
       // Section still renders; TanStack Query shows loading state
       const rendered = true;
       expect(rendered).toBe(true);

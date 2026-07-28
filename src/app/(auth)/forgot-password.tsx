@@ -36,7 +36,7 @@ export default function ForgotPasswordScreen() {
     setError(null);
 
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke(
+      const { error: invokeError } = await supabase.functions.invoke(
         'send-reset-email',
         { body: { email: trimmedEmail } }
       );

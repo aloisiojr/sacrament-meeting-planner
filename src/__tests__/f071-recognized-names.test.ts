@@ -8,14 +8,13 @@
  * Tests import BEHAVIOR - no fs.readFileSync or string matching.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
-import type { PresentationField } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
 
 // Inline copies (cannot import from react-native component)

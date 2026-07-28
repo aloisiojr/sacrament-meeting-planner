@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
       console.error('Gmail SMTP error:', smtpError);
       try {
         await smtp.close();
-      } catch (_) {
+      } catch {
         // ignore close error after a failed send
       }
       return new Response(

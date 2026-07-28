@@ -3,6 +3,9 @@
  */
 
 // Mock AsyncStorage (used by Supabase auth)
+// Mock the module
+import { vi } from 'vitest';
+
 const mockStorage = new Map<string, string>();
 
 const mockAsyncStorage = {
@@ -20,9 +23,6 @@ const mockAsyncStorage = {
     keys.forEach((key) => mockStorage.delete(key));
   },
 };
-
-// Mock the module
-import { vi } from 'vitest';
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: mockAsyncStorage,
   __esModule: true,

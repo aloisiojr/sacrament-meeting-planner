@@ -131,7 +131,7 @@ export function ActorSelector({
         }
       },
     });
-  }, [addingName, roleFilter, createActor, onSelect]);
+  }, [addingName, roleFilter, createActor, onSelect, multiSelect]);
 
   const handleEditSave = useCallback(
     (id: string) => {

@@ -34,8 +34,6 @@ import { areNext3FullyAssigned, findNextPendingSunday } from '../lib/speechUtils
 import type {
   Member,
   TopicWithCollection,
-  SpeechStatus,
-  SundayExceptionReason,
 } from '../types/database';
 
 // Look ahead window

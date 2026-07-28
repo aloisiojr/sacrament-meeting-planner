@@ -10,14 +10,6 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
-interface WardUser {
-  id: string;
-  email: string;
-  role: string;
-  full_name: string;
-  created_at: string;
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

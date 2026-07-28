@@ -17,7 +17,6 @@ describe('F049: Home Tab Offline UI Logic', () => {
     it('Start Meeting button is NOT wrapped in isOnline conditional', () => {
       // In Home tab, the start meeting Pressable is always rendered
       // It is NOT inside {isOnline && ...}
-      const isOnline = false;
       // Start meeting button is always rendered regardless of isOnline
       const startMeetingRendered = true; // not conditional on isOnline
       expect(startMeetingRendered).toBe(true);
@@ -50,23 +49,21 @@ describe('F049: Home Tab Offline UI Logic', () => {
 
     it('agenda preview card is always visible regardless of online status', () => {
       // The preview card View is not conditional on isOnline
-      for (const isOnline of [true, false]) {
+      [true, false].forEach(() => {
         const cardRendered = true; // not conditional
         expect(cardRendered).toBe(true);
-      }
+      });
     });
   });
 
   describe('AC-049-03: NextSundaysSection visible offline (updated by F058/CR-268)', () => {
     it('NextSundaysSection rendered when isOnline=false (always visible)', () => {
-      const isOnline = false;
       // Pattern updated by CR-268: <NextSundaysSection /> (no isOnline guard)
       const sectionRendered = true; // always rendered
       expect(sectionRendered).toBe(true);
     });
 
     it('NextSundaysSection rendered when isOnline=true', () => {
-      const isOnline = true;
       const sectionRendered = true; // always rendered
       expect(sectionRendered).toBe(true);
     });
@@ -136,19 +133,12 @@ describe('F049: Home Tab Offline UI Logic', () => {
 
   describe('EC-049-02: No cached data available and device is offline', () => {
     it('Start Meeting button still visible even with no cached data', () => {
-      const isOnline = false;
-      const agenda = null; // no cached data
       // Start Meeting is always rendered (not gated by data)
       const startMeetingRendered = true;
       expect(startMeetingRendered).toBe(true);
     });
 
     it('agenda preview card shows without status lines when no data', () => {
-      const isOnline = false;
-      const agenda = null;
-      const speeches = undefined;
-      const exceptions = undefined;
-
       // statusLines returns null when no exceptionLabel and no data to compute
       // Card is still rendered but with empty status area
       const cardRendered = true;

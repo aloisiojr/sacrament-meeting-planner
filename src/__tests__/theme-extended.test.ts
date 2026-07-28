@@ -7,7 +7,6 @@ import {
 import type {
   ThemeMode,
   ResolvedTheme,
-  ThemeColors,
   ThemeContextValue,
 } from '../lib/theme';
 

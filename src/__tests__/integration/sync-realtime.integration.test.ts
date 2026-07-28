@@ -6,12 +6,22 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Import sync utilities (pure, no RN dependency)
+import { SYNCED_TABLES, getQueryKeysForTable, TABLE_TO_QUERY_KEYS, POLLING_INTERVAL_MS } from '../../lib/sync';
+import { isNetInfoOnline } from '../../lib/connectionUtils';
 import {
-  createTestQueryClient,
-  createWrapper,
-  renderHook,
-  waitFor,
-} from './setup-integration';
+  enqueue,
+  dequeue,
+  readQueue,
+  clearQueue,
+  getQueueSize,
+  peek,
+  hasCapacity,
+  shouldRetry,
+  getMaxQueueSize,
+  getMaxRetries,
+} from '../../lib/offlineQueue';
 
 // --- Module mocks ---
 
@@ -51,22 +61,6 @@ vi.mock('react-i18next', () => ({
   }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
-
-// Import sync utilities (pure, no RN dependency)
-import { SYNCED_TABLES, getQueryKeysForTable, TABLE_TO_QUERY_KEYS, POLLING_INTERVAL_MS } from '../../lib/sync';
-import { isNetInfoOnline } from '../../lib/connectionUtils';
-import {
-  enqueue,
-  dequeue,
-  readQueue,
-  clearQueue,
-  getQueueSize,
-  peek,
-  hasCapacity,
-  shouldRetry,
-  getMaxQueueSize,
-  getMaxRetries,
-} from '../../lib/offlineQueue';
 
 // ==========================================================================
 // 1. Sync Configuration (AC-082-15)

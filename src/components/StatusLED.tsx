@@ -83,7 +83,7 @@ export function StatusLED({
     return () => {
       listener.remove();
     };
-  }, []);
+  }, [fadeOpacity]);
 
   // Animate fading for assigned_not_invited status
   useEffect(() => {
@@ -104,7 +104,7 @@ export function StatusLED({
     return () => {
       cancelAnimation(fadeOpacity);
     };
-  }, [status]);
+  }, [status, fadeOpacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeOpacity.value,

@@ -66,6 +66,9 @@ export default function ResetPasswordScreen() {
     return () => {
       subscription.unsubscribe();
     };
+    // `t` is only used inside async callbacks; excluding it avoids re-subscribing
+    // the auth listener on every language change. Effect keys off token/type only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, type]);
 
   const handleUpdatePassword = async () => {

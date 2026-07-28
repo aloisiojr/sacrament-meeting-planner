@@ -33,7 +33,6 @@ import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import { SearchInput } from './SearchInput';
 import { XIcon, PencilIcon } from './icons';
 import type {
-  SundayAgenda,
   MeetingActor,
   Hymn,
   SundayExceptionReason,
@@ -87,6 +86,8 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       hasCreatedPrayers.current = true;
       lazyCreateSpeeches.mutate({ sundayDate });
     }
+    // One-time (ref-guarded) prayer-slot creation; lazyCreateSpeeches is a stable mutation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managePrayers, sundayDate, isObserver]);
 
   const { data: allHymns } = useHymns(locale);

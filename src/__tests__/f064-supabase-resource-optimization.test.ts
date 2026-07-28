@@ -82,7 +82,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
    * This is the exact algorithm: while loop with page/perPage=50, break on found or length<50.
    */
   async function paginatedFindUser(
-    listUsers: (opts: { page: number; perPage: number }) => Promise<{ data: { users: Array<{ email?: string }> }; error: any }>,
+    listUsers: (opts: { page: number; perPage: number }) => Promise<{ data: { users: { email?: string }[] }; error: any }>,
     targetEmail: string
   ): Promise<{ email?: string } | null> {
     let user = null;
@@ -456,7 +456,7 @@ describe('F064-S4: notification_queue 7-day retention cleanup', () => {
       // Simulate cleanup step
       try {
         throw new Error('Cleanup query failed');
-      } catch (cleanupErr) {
+      } catch {
         // Error is logged but does not affect response
         // console.error('Notification queue cleanup error:', cleanupErr);
       }

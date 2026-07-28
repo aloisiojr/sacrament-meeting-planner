@@ -23,7 +23,7 @@ import {
   SUNDAY_TYPE_OPTIONS,
   type SundayTypeOption,
 } from '../hooks/useSundayTypes';
-import { formatDate, zeroPadDay } from '../lib/dateUtils';
+import { formatDate, zeroPadDay, getMonthAbbr } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import type { Speech, SundayException, SpeechStatus, SundayExceptionReason } from '../types/database';
 
@@ -77,12 +77,11 @@ interface DateBlockProps {
 
 function DateBlock({ date, locale }: DateBlockProps) {
   const { colors } = useTheme();
-  const [year, month, day] = date.split('-');
+  const [, month, day] = date.split('-');
   const dayNum = parseInt(day, 10);
   const monthNum = parseInt(month, 10);
 
   // Get month abbreviation from dateUtils
-  const { getMonthAbbr } = require('../lib/dateUtils');
   const monthAbbr = getMonthAbbr(monthNum, locale);
   const dayStr = zeroPadDay(dayNum);
 

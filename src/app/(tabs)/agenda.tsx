@@ -12,7 +12,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  ActivityIndicator,
   Dimensions,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +28,7 @@ import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY
 import { useSpeeches, useDeleteSpeechesByDate } from '../../hooks/useSpeeches';
 import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
-import { formatDate, toISODateString, zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
+import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
 import { PlayIcon, ChevronUpIcon, ChevronDownIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
@@ -180,6 +179,9 @@ function AgendaTabContent() {
 
     // Clear param to prevent re-triggering on tab re-focus
     router.setParams({ expandDate: undefined });
+    // Intentionally keyed off the expandDate param (and list readiness via length);
+    // lazyCreate/router are stable and listItems is read fresh inside the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.expandDate, listItems.length]);
 
   // Auto-collapse non-next-Sunday card when going offline
@@ -276,7 +278,7 @@ function AgendaTabContent() {
         />
       );
     },
-    [expandedDate, nextSunday, locale, handleToggle, isOnline, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
+    [expandedDate, nextSunday, locale, handleToggle, handleFieldFocus, isOnline, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -378,7 +380,7 @@ function AgendaSundayCard({
   const { t } = useTranslation();
   const router = useRouter();
 
-  const [year, month, day] = date.split('-');
+  const [, month, day] = date.split('-');
   const dayNum = parseInt(day, 10);
   const monthNum = parseInt(month, 10);
   const monthAbbr = getMonthAbbr(monthNum, locale);

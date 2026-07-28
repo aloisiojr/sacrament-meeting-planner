@@ -9,6 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 
+// Import AFTER mocks (vitest hoists vi.mock above imports).
+import ForgotPasswordScreen from '../app/(auth)/forgot-password';
+
 const { act } = TestRenderer;
 
 // --- Mocks (per-file) --------------------------------------------------------
@@ -35,9 +38,6 @@ const invokeMock = vi.fn();
 vi.mock('../lib/supabase', () => ({
   supabase: { functions: { invoke: (...args: unknown[]) => invokeMock(...args) } },
 }));
-
-// Import AFTER mocks (vitest hoists vi.mock above imports).
-import ForgotPasswordScreen from '../app/(auth)/forgot-password';
 
 // --- Helpers -----------------------------------------------------------------
 

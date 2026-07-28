@@ -42,7 +42,6 @@ import {
 } from '../../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useAutoAssignSundayTypes, useRemoveSundayException } from '../../hooks/useSundayTypes';
 import { supabase } from '../../lib/supabase';
-import { getTodaySundayDate } from '../../hooks/usePresentationMode';
 import { getNext3Sundays } from '../../hooks/useOfflinePrefetch';
 import { toISODateString } from '../../lib/dateUtils';
 import type { Member, TopicWithCollection, SpeechStatus, SundayExceptionReason } from '../../types/database';
@@ -96,7 +95,7 @@ const YearSeparator = React.memo(function YearSeparator({ year }: { year: string
 function SpeechesTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, role } = useAuth();
+  const { hasPermission } = useAuth();
   const isOnline = useOnlineStatus();
   const flatListRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{ expandDate?: string }>();
@@ -110,7 +109,6 @@ function SpeechesTabContent() {
   const sundayList = useSundayList();
   const { sundays, startDate, endDate, nextSunday, loadMoreFuture, loadMorePast, hasMoreFuture, hasMorePast } = sundayList;
 
-  const isObserver = role === 'observer';
   const canWriteSundayType = hasPermission('sunday_type:write');
 
   // Offline: compute the set of next 3 Sundays that are expandable offline
@@ -141,7 +139,10 @@ function SpeechesTabContent() {
     if (sundays.length > 0) {
       autoAssign.mutate(sundays, { meta: { suppressGlobalError: true } } as any);
     }
-  }, [sundays.length]); // Only re-run when sundays count changes
+    // Only re-run when the sundays count changes; `sundays` is read fresh and
+    // `autoAssign` is a stable React Query mutation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sundays.length]);
 
   // Group speeches by sunday
   const speechesBySunday = useMemo(
@@ -212,6 +213,9 @@ function SpeechesTabContent() {
 
     // Clear param to prevent re-triggering on tab re-focus
     router.setParams({ expandDate: undefined });
+    // Intentionally keyed off the expandDate param (and list readiness via length);
+    // exceptions/lazyCreate/router are stable and listItems is read fresh here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.expandDate, listItems.length]);
 
   // Auto-collapse card outside next 3 Sundays when going offline

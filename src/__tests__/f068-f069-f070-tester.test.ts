@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { lightColors, darkColors } from '../lib/theme';
 import type { ThemeColors } from '../lib/theme';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
-import type { PresentationField, PresentationCard } from '../hooks/usePresentationMode';
+import type { PresentationField } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
@@ -427,7 +427,6 @@ describe('F069 Tester: drag-to-reorder behavior (AC-069-01, AC-069-02, AC-069-03
 
   it('drag reorder saves via onSave with \\n-joined string', () => {
     const onSave = vi.fn();
-    const items = ['First', 'Second', 'Third'];
     const reordered = ['Second', 'First', 'Third']; // drag first to second
     onSave(joinItems(reordered));
     expect(onSave).toHaveBeenCalledWith('Second\nFirst\nThird');

@@ -25,7 +25,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { ChevronDownIcon, XIcon } from './icons';
 import { StatusLED } from './StatusLED';
 import { StatusChangeModal } from './StatusChangeModal';
-import { PrayerSelector, type PrayerSelection } from './PrayerSelector';
 import type { Speech, SpeechStatus, Member, TopicWithCollection } from '../types/database';
 
 // --- Types ---

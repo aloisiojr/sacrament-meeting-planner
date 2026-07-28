@@ -152,7 +152,7 @@ function parseCsvLine(line: string): string[] {
  * Format: "Nome,Nome Informal,Telefone Completo" (3 columns)
  */
 export function generateCsv(
-  members: Array<{ full_name: string; informal_name: string | null; country_code: string; phone: string | null }>,
+  members: { full_name: string; informal_name: string | null; country_code: string; phone: string | null }[],
   headers?: CsvHeaders
 ): string {
   const h = headers ?? CSV_DEFAULT_HEADERS;

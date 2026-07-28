@@ -54,6 +54,8 @@ function TopicEditor({ topic, onSave, onCancel, colors }: TopicEditorProps) {
     if (!topic) {
       setTimeout(() => titleRef.current?.focus(), 100);
     }
+    // Mount-only autofocus; `topic` is fixed for the lifetime of this editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSave = useCallback(() => {

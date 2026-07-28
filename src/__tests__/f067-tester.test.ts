@@ -15,8 +15,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
-import type { PresentationField, PresentationCard } from '../hooks/usePresentationMode';
-import type { SundayAgenda, Speech } from '../types/database';
+import type { PresentationField } from '../hooks/usePresentationMode';
+import type { SundayAgenda } from '../types/database';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
@@ -552,7 +552,6 @@ describe('F067 AC-067-09: Inline edit empty text deletion', () => {
   it('editing first item to empty deletes it, rest shifts', () => {
     const items = ['Delete me', 'B', 'C'];
     const editIndex = 0;
-    const editText = '';
     const newItems = items.filter((_, i) => i !== editIndex);
     expect(newItems).toEqual(['B', 'C']);
     expect(joinItems(newItems)).toBe('B\nC');

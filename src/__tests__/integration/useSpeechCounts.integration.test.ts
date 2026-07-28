@@ -25,6 +25,11 @@ import {
   mockSupabaseFrom,
 } from './setup-integration';
 
+// Import after mocks
+import { supabase } from '../../lib/supabase';
+import { useSpeechCounts } from '../../hooks/useSpeechCounts';
+import type { QueryClient } from '@tanstack/react-query';
+
 // --- Module mocks ---
 
 vi.mock('../../lib/supabase', () => ({
@@ -56,11 +61,6 @@ vi.mock('react-i18next', () => ({
   }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
-
-// Import after mocks
-import { supabase } from '../../lib/supabase';
-import { useSpeechCounts, speechCountKeys } from '../../hooks/useSpeechCounts';
-import type { QueryClient } from '@tanstack/react-query';
 
 const mockedSupabase = vi.mocked(supabase);
 

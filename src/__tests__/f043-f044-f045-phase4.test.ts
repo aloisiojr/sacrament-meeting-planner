@@ -12,11 +12,10 @@
  *       in register-first-user and register-invited-user via source code.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { lightColors, darkColors } from '../lib/theme';
-import type { ThemeColors } from '../lib/theme';
 
 // Helper: read source file relative to project root
 const projectRoot = resolve(__dirname, '../..');

@@ -5,13 +5,11 @@
  * Only one card can be revealed at a time (managed by parent via activeId).
  */
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   Pressable,
-  AccessibilityInfo,
-  LayoutAnimation,
   Platform,
   UIManager,
 } from 'react-native';
@@ -87,14 +85,14 @@ export function SwipeableCard({
     if (!isRevealed && translateX.value !== 0) {
       translateX.value = withSpring(0, SPRING_CONFIG);
     }
-  }, [isRevealed]);
+  }, [isRevealed, translateX]);
 
   // Snap to revealed position when set externally
   useEffect(() => {
     if (isRevealed && translateX.value === 0) {
       translateX.value = withSpring(-actionWidth, SPRING_CONFIG);
     }
-  }, [isRevealed, actionWidth]);
+  }, [isRevealed, actionWidth, translateX]);
 
   const handleReveal = useCallback(
     (revealed: boolean) => {
@@ -138,13 +136,13 @@ export function SwipeableCard({
     translateX.value = withSpring(0, SPRING_CONFIG);
     onReveal(null);
     onEdit?.();
-  }, [onEdit, onReveal]);
+  }, [onEdit, onReveal, translateX]);
 
   const handleDelete = useCallback(() => {
     translateX.value = withSpring(0, SPRING_CONFIG);
     onReveal(null);
     onDelete?.();
-  }, [onDelete, onReveal]);
+  }, [onDelete, onReveal, translateX]);
 
   return (
     <View style={styles.container}>

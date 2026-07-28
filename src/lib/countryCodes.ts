@@ -209,7 +209,7 @@ export function getCountryByLabel(label: string): CountryCode | undefined {
 /**
  * Build lookup sets grouped by digit length (longest first) from COUNTRY_CODES.
  */
-const CODE_SETS_BY_LENGTH: Array<{ len: number; codes: Set<string> }> = (() => {
+const CODE_SETS_BY_LENGTH: { len: number; codes: Set<string> }[] = (() => {
   const byLen = new Map<number, Set<string>>();
   for (const entry of COUNTRY_CODES) {
     const digits = entry.code.substring(1); // remove '+'

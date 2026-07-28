@@ -20,7 +20,6 @@ import {
   actorKeys,
 } from '../hooks/useActors';
 import type {
-  Role,
   Permission,
   ActorRole,
   MeetingActor,

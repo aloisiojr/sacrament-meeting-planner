@@ -2,7 +2,7 @@
  * Tests for usePresentationMode utilities (pure functions).
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   isTodaySunday,
   getTodaySundayDate,

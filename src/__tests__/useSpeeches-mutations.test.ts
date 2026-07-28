@@ -7,13 +7,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
-  waitFor,
   createTestQueryClient,
   createWrapper,
-  mockSupabaseFrom,
   createMockSpeech,
 } from './integration/setup-integration';
 import { act } from 'react';
+
+import { supabase } from '../lib/supabase';
+import { useAssignSpeaker, useAssignTopic, useRemoveAssignment } from '../hooks/useSpeeches';
 
 // --- Module mocks ---
 
@@ -59,9 +60,6 @@ vi.mock('../lib/dateUtils', async (importOriginal) => {
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
-
-import { supabase } from '../lib/supabase';
-import { useAssignSpeaker, useAssignTopic, useRemoveAssignment } from '../hooks/useSpeeches';
 
 const mockedSupabase = vi.mocked(supabase);
 

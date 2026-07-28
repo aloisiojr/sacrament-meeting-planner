@@ -12,9 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeForSearch,
   filterMembers,
-  sortMembers,
 } from '../hooks/useMembers';
 import {
   hasPermission,
@@ -23,9 +21,8 @@ import {
 } from '../lib/permissions';
 import {
   buildNotificationText,
-  getOrdinal,
 } from '../lib/notificationUtils';
-import type { Member, Speech, NotificationQueue, NotificationType, Role, Permission } from '../types/database';
+import type { Member, Speech, NotificationQueue, NotificationType } from '../types/database';
 
 // ============================================================================
 // Helper: makeMember (mirrors useMembers-utils.test.ts factory)

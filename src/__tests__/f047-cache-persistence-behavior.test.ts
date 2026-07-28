@@ -5,7 +5,7 @@
  * Verifies _layout.tsx configuration and persister behavior.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 
@@ -227,7 +227,7 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       // Should handle invalid JSON gracefully
-      const result = await Promise.resolve(persister.restoreClient()).catch(() => undefined);
+      await Promise.resolve(persister.restoreClient()).catch(() => undefined);
       // Either returns undefined or throws - we just verify no unhandled crash
       expect(true).toBe(true);
     });

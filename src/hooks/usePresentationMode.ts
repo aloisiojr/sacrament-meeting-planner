@@ -5,13 +5,12 @@
  */
 
 import { useMemo } from 'react';
-import { useAgenda } from './useAgenda';
+import { useAgenda , isSpecialMeeting } from './useAgenda';
 import { useSpeeches } from './useSpeeches';
 import { useSundayExceptions } from './useSundayTypes';
 import { useHymns, useSacramentalHymns, formatHymnDisplay } from './useHymns';
 import { getCurrentLanguage } from '../i18n';
 import { toISODateString } from '../lib/dateUtils';
-import { isSpecialMeeting } from './useAgenda';
 import type { SundayAgenda, Speech, SundayException, Hymn } from '../types/database';
 
 // --- Types ---

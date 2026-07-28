@@ -21,7 +21,7 @@ import { NextAssignmentsSection } from '../../components/NextAssignmentsSection'
 import { InviteManagementSection } from '../../components/InviteManagementSection';
 import { getTodaySundayDate } from '../../hooks/usePresentationMode';
 import { useAgenda } from '../../hooks/useAgenda';
-import { useSpeeches, useWardManagePrayers } from '../../hooks/useSpeeches';
+import { useSpeeches } from '../../hooks/useSpeeches';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
 import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
 import { getCurrentLanguage } from '../../i18n';
@@ -36,7 +36,6 @@ function HomeTabContent() {
   const isOnline = useOnlineStatus();
 
   const sundayDate = useMemo(() => getTodaySundayDate(), []);
-  const { managePrayers } = useWardManagePrayers();
 
   // Fetch data for preview card
   const { data: agenda } = useAgenda(sundayDate);

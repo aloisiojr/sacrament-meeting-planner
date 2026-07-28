@@ -37,9 +37,11 @@ export default function InviteRegistrationScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validate token on mount
+  // Validate token on mount and whenever the token changes.
+  // validateToken is a stable inline handler that only depends on token.
   useEffect(() => {
     validateToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const validateToken = async () => {
@@ -70,7 +72,7 @@ export default function InviteRegistrationScreen() {
       } else {
         setError(t('auth.inviteInvalid'));
       }
-    } catch (err) {
+    } catch {
       setError(t('auth.requiresConnection'));
     } finally {
       setLoading(false);

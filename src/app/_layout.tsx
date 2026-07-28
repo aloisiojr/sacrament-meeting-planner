@@ -87,7 +87,7 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
       // Redirect to home
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments]);
+  }, [session, loading, segments, router]);
 
   if (loading) {
     return (

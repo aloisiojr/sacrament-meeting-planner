@@ -34,10 +34,13 @@ export const topicKeys = {
 
 // --- Utilities ---
 
+// Kept per team-lead instruction (see f021-topic-library-overhaul test);
+// retained as a reusable helper even though not currently referenced.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function normalizeForSearch(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 }
 

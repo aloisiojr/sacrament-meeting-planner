@@ -22,7 +22,6 @@ describe('F057: Topic Field Visibility Parity', () => {
   describe('AC-057-1: Topic and speaker fields have identical visibility', () => {
     it('position 1 with speech=null: topic row visible (matches speaker row)', () => {
       const isPrayer = false;
-      const speech = null;
       const showTopicRow = computeShowTopicRow(isPrayer);
       // Speaker row is always rendered in the non-disabled branch (no !!speech guard)
       const showSpeakerRow = !isPrayer;
@@ -33,7 +32,6 @@ describe('F057: Topic Field Visibility Parity', () => {
 
     it('position 1 with speech assigned: both fields visible with data', () => {
       const isPrayer = false;
-      const speech = { id: 's1', speaker_name: 'John', topic_title: 'Faith' };
       const showTopicRow = computeShowTopicRow(isPrayer);
       const showSpeakerRow = !isPrayer;
       expect(showTopicRow).toBe(true);
@@ -81,7 +79,6 @@ describe('F057: Topic Field Visibility Parity', () => {
 
     it('prayer position 0 with speech assigned: topic still hidden', () => {
       const isPrayer = true;
-      const speech = { id: 's1', speaker_name: 'Jane' };
       const showTopicRow = computeShowTopicRow(isPrayer);
       expect(showTopicRow).toBe(false);
     });
@@ -116,10 +113,10 @@ describe('F057: Topic Field Visibility Parity', () => {
 
   describe('Additional visibility edge cases', () => {
     it('all speech positions (1, 2, 3) show topic row', () => {
-      for (const position of [1, 2, 3]) {
+      [1, 2, 3].forEach(() => {
         const isPrayer = false; // positions 1-3 are never prayer
         expect(computeShowTopicRow(isPrayer)).toBe(true);
-      }
+      });
     });
 
     it('showTopicRow does not depend on speech value (regression guard)', () => {

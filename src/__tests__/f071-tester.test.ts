@@ -11,7 +11,6 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
-import type { PresentationField, PresentationCard } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';

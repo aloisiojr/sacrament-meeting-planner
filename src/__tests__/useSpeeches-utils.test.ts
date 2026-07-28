@@ -10,7 +10,7 @@ import {
   getAvailableStatuses,
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
-import type { Speech, SundayException, SpeechStatus } from '../types/database';
+import type { Speech, SundayException } from '../types/database';
 
 // --- Factory ---
 

@@ -22,6 +22,18 @@ import {
   createMockActivityLog,
 } from './setup-integration';
 
+// Import after mocks
+import { supabase } from '../../lib/supabase';
+import { useActors, useCreateActor, useUpdateActor, useDeleteActor } from '../../hooks/useActors';
+import { useLazyCreateAgenda, useUpdateAgenda } from '../../hooks/useAgenda';
+import { useSpeeches, useAssignSpeaker, useChangeStatus } from '../../hooks/useSpeeches';
+import { useMembers, useCreateMember, useUpdateMember, useDeleteMember } from '../../hooks/useMembers';
+import { useHymns } from '../../hooks/useHymns';
+import { useCreateWardTopic } from '../../hooks/useTopics';
+import { useSetSundayType } from '../../hooks/useSundayTypes';
+import { useActivityLog } from '../../hooks/useActivityLog';
+import type { QueryClient } from '@tanstack/react-query';
+
 // --- Module mocks (each test file owns its mocks) ---
 
 vi.mock('../../lib/supabase', () => ({
@@ -72,18 +84,6 @@ vi.mock('../../lib/dateUtils', async (importOriginal) => {
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
-
-// Import after mocks
-import { supabase } from '../../lib/supabase';
-import { useActors, useCreateActor, useUpdateActor, useDeleteActor } from '../../hooks/useActors';
-import { useLazyCreateAgenda, useUpdateAgenda } from '../../hooks/useAgenda';
-import { useSpeeches, useAssignSpeaker, useChangeStatus } from '../../hooks/useSpeeches';
-import { useMembers, useCreateMember, useUpdateMember, useDeleteMember } from '../../hooks/useMembers';
-import { useHymns } from '../../hooks/useHymns';
-import { useCreateWardTopic } from '../../hooks/useTopics';
-import { useSetSundayType } from '../../hooks/useSundayTypes';
-import { useActivityLog } from '../../hooks/useActivityLog';
-import type { QueryClient } from '@tanstack/react-query';
 
 const mockedSupabase = vi.mocked(supabase);
 

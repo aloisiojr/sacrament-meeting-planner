@@ -9,11 +9,10 @@
  * - F055: HymnSelectorModal filtering and display behavior
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { filterActorsByRole, sortActors, actorKeys } from '../hooks/useActors';
-import { filterHymns, formatHymnDisplay, hymnKeys } from '../hooks/useHymns';
-import type { MeetingActor } from '../types/database';
-import type { Hymn } from '../types/database';
+import { describe, it, expect } from 'vitest';
+import { filterActorsByRole } from '../hooks/useActors';
+import { filterHymns, formatHymnDisplay } from '../hooks/useHymns';
+import type { MeetingActor , Hymn } from '../types/database';
 
 // =============================================================================
 // F053 (CR-263): FRIENDLY REGISTRATION ERROR MESSAGES

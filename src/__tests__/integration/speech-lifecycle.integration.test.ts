@@ -15,6 +15,19 @@ import {
   createMockSpeech,
 } from './setup-integration';
 
+import { supabase } from '../../lib/supabase';
+import {
+  VALID_TRANSITIONS,
+  isValidTransition,
+  getAvailableStatuses,
+  useAssignSpeaker,
+  useAssignTopic,
+  useRemoveAssignment,
+  useChangeStatus,
+} from '../../hooks/useSpeeches';
+import type { SpeechStatus } from '../../types/database';
+import type { QueryClient } from '@tanstack/react-query';
+
 // --- Module mocks ---
 
 vi.mock('../../lib/supabase', () => ({
@@ -65,19 +78,6 @@ vi.mock('../../lib/dateUtils', async (importOriginal) => {
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
-
-import { supabase } from '../../lib/supabase';
-import {
-  VALID_TRANSITIONS,
-  isValidTransition,
-  getAvailableStatuses,
-  useAssignSpeaker,
-  useAssignTopic,
-  useRemoveAssignment,
-  useChangeStatus,
-} from '../../hooks/useSpeeches';
-import type { SpeechStatus } from '../../types/database';
-import type { QueryClient } from '@tanstack/react-query';
 
 const mockedSupabase = vi.mocked(supabase);
 

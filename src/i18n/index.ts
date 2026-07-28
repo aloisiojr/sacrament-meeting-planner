@@ -92,6 +92,8 @@ export function initI18n(wardLanguage?: SupportedLanguage): void {
   const language = wardLanguage ?? detectDeviceLocale();
 
   if (!i18n.isInitialized) {
+    // i18n is the i18next default instance; `.use` is an instance method here.
+    // eslint-disable-next-line import/no-named-as-default-member
     i18n.use(initReactI18next).init({
       resources,
       lng: language,
@@ -104,6 +106,8 @@ export function initI18n(wardLanguage?: SupportedLanguage): void {
       },
     });
   } else {
+    // Instance method on the i18next default instance.
+    // eslint-disable-next-line import/no-named-as-default-member
     i18n.changeLanguage(language);
   }
 }
@@ -112,6 +116,8 @@ export function initI18n(wardLanguage?: SupportedLanguage): void {
  * Change the current language at runtime.
  */
 export function changeLanguage(language: SupportedLanguage): void {
+  // Instance method on the i18next default instance.
+  // eslint-disable-next-line import/no-named-as-default-member
   i18n.changeLanguage(language);
 }
 

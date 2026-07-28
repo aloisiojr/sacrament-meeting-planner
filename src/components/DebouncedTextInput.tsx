@@ -20,6 +20,8 @@ export function DebouncedTextInput({
   value,
   onSave,
   delay = 800,
+  onFocus,
+  onBlur,
   ...rest
 }: DebouncedTextInputProps) {
   const [localValue, setLocalValue] = useState(value);
@@ -69,18 +71,18 @@ export function DebouncedTextInput({
   const handleFocus = useCallback(
     (e: Parameters<NonNullable<TextInputProps['onFocus']>>[0]) => {
       isFocusedRef.current = true;
-      rest.onFocus?.(e);
+      onFocus?.(e);
     },
-    [rest.onFocus]
+    [onFocus]
   );
 
   const handleBlur = useCallback(
     (e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
       isFocusedRef.current = false;
       flush();
-      rest.onBlur?.(e);
+      onBlur?.(e);
     },
-    [flush, rest.onBlur]
+    [flush, onBlur]
   );
 
   // Cleanup on unmount - flush pending changes

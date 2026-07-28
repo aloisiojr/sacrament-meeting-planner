@@ -42,7 +42,7 @@ export default function LoginScreen() {
     try {
       await signIn(email.trim(), password);
       // Navigation handled by auth state change in root layout
-    } catch (err) {
+    } catch {
       setError(t('auth.loginFailed'));
     } finally {
       setLoading(false);

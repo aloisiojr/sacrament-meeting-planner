@@ -4,6 +4,7 @@ import {
   filterMembers,
   sortMembers,
   memberKeys,
+  getResponsibleForMap,
 } from '../hooks/useMembers';
 import type { Member } from '../types/database';
 
@@ -228,6 +229,42 @@ describe('useMembers utilities', () => {
       const key1 = memberKeys.list('ward-1');
       const key2 = memberKeys.list('ward-2');
       expect(key1).not.toEqual(key2);
+    });
+  });
+
+  describe('getResponsibleForMap', () => {
+    it('should return an empty map when no member has a responsible', () => {
+      const members = [
+        makeMember({ id: 'a', full_name: 'Alice' }),
+        makeMember({ id: 'b', full_name: 'Bob' }),
+      ];
+      expect(getResponsibleForMap(members).size).toBe(0);
+    });
+
+    it('should map a responsible to the dependent it is responsible for', () => {
+      const members = [
+        makeMember({ id: 'parent', full_name: 'Parent' }),
+        makeMember({ id: 'kid', full_name: 'Kid', responsible_id: 'parent' }),
+      ];
+      const map = getResponsibleForMap(members);
+      expect(map.get('parent')).toEqual(['Kid']);
+      expect(map.has('kid')).toBe(false);
+    });
+
+    it('should collect and alphabetically sort multiple dependents of one responsible', () => {
+      const members = [
+        makeMember({ id: 'parent', full_name: 'Parent' }),
+        makeMember({ id: 'c', full_name: 'Carol', responsible_id: 'parent' }),
+        makeMember({ id: 'a', full_name: 'Ana', responsible_id: 'parent' }),
+        makeMember({ id: 'b', full_name: 'Bruno', responsible_id: 'parent' }),
+      ];
+      expect(getResponsibleForMap(members).get('parent')).toEqual(['Ana', 'Bruno', 'Carol']);
+    });
+
+    it('should ignore self-referencing responsible_id gracefully by still mapping it', () => {
+      // Data-layer helper does not enforce the DB CHECK; it just groups by responsible_id.
+      const members = [makeMember({ id: 'x', full_name: 'Xavier', responsible_id: 'x' })];
+      expect(getResponsibleForMap(members).get('x')).toEqual(['Xavier']);
     });
   });
 });

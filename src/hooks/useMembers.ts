@@ -51,6 +51,31 @@ export function sortMembers(members: Member[]): Member[] {
   );
 }
 
+/**
+ * Build a reverse lookup of contact-delegation dependents (v2.0).
+ *
+ * Given the full member list, returns a Map keyed by a responsible member's id whose value is
+ * the sorted list of `full_name`s of the members that point at it via `responsible_id`. Used by
+ * the People picker to show a "Responsável por <name(s)>" label on members that are responsible
+ * for others' contact. Members that are nobody's responsible are absent from the map.
+ */
+export function getResponsibleForMap(members: Member[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const m of members) {
+    if (!m.responsible_id) continue;
+    const list = map.get(m.responsible_id) ?? [];
+    list.push(m.full_name);
+    map.set(m.responsible_id, list);
+  }
+  for (const [id, names] of map) {
+    map.set(
+      id,
+      names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    );
+  }
+  return map;
+}
+
 // --- Hooks ---
 
 /**
@@ -97,6 +122,13 @@ export function useCreateMember() {
           informal_name: input.informal_name || input.full_name.split(' ')[0],
           country_code: input.country_code,
           phone: input.phone ?? null,
+          can_preside: input.can_preside ?? false,
+          can_conduct: input.can_conduct ?? false,
+          can_lead_music: input.can_lead_music ?? false,
+          can_play_piano: input.can_play_piano ?? false,
+          can_be_recognized: input.can_be_recognized ?? false,
+          contact_via_responsible: input.contact_via_responsible ?? false,
+          responsible_id: input.responsible_id ?? null,
         })
         .select()
         .single();

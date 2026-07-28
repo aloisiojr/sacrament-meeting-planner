@@ -4,7 +4,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-import type { VersionGateStatus } from '../hooks/useVersionGate';
+import { useVersionGate, type VersionGateStatus } from '../hooks/useVersionGate';
+import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -23,9 +24,6 @@ vi.mock('../contexts/ThemeContext', () => ({
     colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', onPrimary: '#fff' },
   }),
 }));
-
-import { useVersionGate } from '../hooks/useVersionGate';
-import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 
 async function resolveStatus(): Promise<VersionGateStatus> {
   let status: VersionGateStatus = 'checking';

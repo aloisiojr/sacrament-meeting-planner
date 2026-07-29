@@ -79,6 +79,24 @@ cutover), (2) hooks/sync (retire actors), (3) unified People picker + editor, (4
 + full-dump import, (5) i18n/version/verify. Awaiting GATE 2. Deploy/merge waits for v1.x adoption
 (ADR 001). Base green: tsc 0 / 71 files / 1850 tests.
 
+## v2.0 People Refinements (branch `v2.0`) — BUILD COMPLETE & VERIFIED (2026-07-28)
+Spec `specs/v2-people-refinements.md` (+`.plan.md`). Follow-up polish on the unified people model.
+Built in 6 atomic commits (`27c01e3`..`aa68757`), fresh subagent per step, kept green:
+- **Schema:** `members.calling` (chamado) — additive migration `039_add_member_calling.sql` (+ `calling`
+  in `import_members` RPC + CSV full dump). Applied to STAGING via Management API; sample callings set.
+- **PeoplePicker:** fixed title "Selecionar Pessoa" + per-context subtitle; per-context 2nd line
+  (speaker/prayer = 6mo speech + responsável; preside/conduct/lead_music/play_piano = name only;
+  be_recognized = calling + functions); "Ver todos" = subtitle+Switch (capability contexts); no trash
+  icon (delete moved to editor); informal in parens; keep-selected under filter. New `context` prop
+  wired from AgendaForm + speeches.
+- **PersonEditor:** informal label, country picker (reuses `countryCodes.ts`), "Permissões" section
+  (icon + Switch rows), `calling` field, read-only "Responsável por" list, destructive "Excluir
+  pessoa".
+- **Presentation:** recognized people show "Nome — Chamado" (unique name match with calling).
+- Adversarial verify-change: **APPROVED**, all ACs (S1/S2, P1–P7, E1–E5, PR1), no P0/P1. Suite
+  **79 files / 1879 tests**, tsc 0, lint 0. Not pushed. Deploy to prod gated by v1.x adoption (ADR 001);
+  `039` ships to prod at the v2 cutover with 037/038.
+
 ## Decisions
 - 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via
   branch `UX-2.0` and tag `archive/UX-2.0-2026-06-07` (tip `9b652db`).

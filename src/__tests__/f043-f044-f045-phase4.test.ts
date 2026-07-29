@@ -118,16 +118,16 @@ describe('F043 (CR-259): Play Icon Redesign - Theme Color Contract', () => {
     });
   });
 
-  // --- AC-043-03: Play button position unchanged (left of chevron) ---
-  describe('AC-043-03: Play button position relative to chevron', () => {
+  // --- AC-043-03: Play button retained after unified-card refactor ---
+  describe('AC-043-03: Play button retained after unified-card refactor', () => {
     const agendaSource = readSource('src/app/(tabs)/agenda.tsx');
 
-    it('play button appears before ChevronUpIcon in JSX', () => {
-      const playIdx = agendaSource.indexOf('PlayIcon');
-      const chevronIdx = agendaSource.indexOf('ChevronUpIcon');
-      expect(playIdx).toBeGreaterThan(-1);
-      expect(chevronIdx).toBeGreaterThan(-1);
-      expect(playIdx).toBeLessThan(chevronIdx);
+    it('play button is still present; the collapsed chevron moved to UnifiedSundayCard', () => {
+      // v2 unified cards (phase 4): the collapsed header (incl. the expand chevron) now lives in
+      // UnifiedSundayCard, so agenda.tsx no longer renders ChevronUpIcon. The play button remains
+      // in the expanded body.
+      expect(agendaSource).toContain('PlayIcon');
+      expect(agendaSource).not.toContain('ChevronUpIcon');
     });
 
     it('play button is only shown when card is expanded', () => {

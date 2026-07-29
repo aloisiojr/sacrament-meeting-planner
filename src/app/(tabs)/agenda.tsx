@@ -25,12 +25,12 @@ import { QueryErrorView } from '../../components/QueryErrorView';
 import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
-import { useSpeeches, useDeleteSpeechesByDate } from '../../hooks/useSpeeches';
+import { useSpeeches, useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
 import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
-import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
-import { getCurrentLanguage, type SupportedLanguage } from '../../i18n';
-import { PlayIcon, ChevronUpIcon, ChevronDownIcon } from '../../components/icons';
+import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
+import { buildUnifiedCardData } from '../../lib/unifiedCard';
+import { PlayIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
 
 // --- Types ---
@@ -50,7 +50,6 @@ type ListItem =
 function AgendaTabContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const locale = getCurrentLanguage();
   const params = useLocalSearchParams<{ expandDate?: string }>();
   const router = useRouter();
 
@@ -72,6 +71,7 @@ function AgendaTabContent() {
   const setSundayType = useSetSundayType();
   const removeSundayException = useRemoveSundayException();
   const deleteSpeechesByDate = useDeleteSpeechesByDate();
+  const { managePrayers } = useWardManagePrayers();
   const { hasPermission } = useAuth();
   const isOnline = useOnlineStatus();
   const canEditType = hasPermission('sunday_type:write');
@@ -254,7 +254,8 @@ function AgendaTabContent() {
       const sundayDate = new Date(date + 'T12:00:00');
       const isPast = sundayDate < today;
 
-      const baseExpandable = !exception || !isExcludedFromAgenda(exception.reason);
+      // All Sundays expand (no-sacrament ones open to the type dropdown so the type can be changed).
+      const baseExpandable = true;
       const isExpandable = baseExpandable && (isOnline || date === nextSunday);
 
       return (
@@ -264,12 +265,12 @@ function AgendaTabContent() {
           isExpanded={isExpanded}
           isNext={isNext}
           isPast={isPast}
-          locale={locale}
           expandable={isExpandable}
           isOffline={!isOnline}
           onToggle={() => handleToggle(date)}
           speeches={speechMap.get(date) ?? []}
           agenda={agendaMap.get(date) ?? null}
+          managePrayers={managePrayers}
           typeDisabled={!canEditType}
           onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
           onRemoveException={(d) => removeSundayException.mutate(d)}
@@ -278,7 +279,7 @@ function AgendaTabContent() {
         />
       );
     },
-    [expandedDate, nextSunday, locale, handleToggle, handleFieldFocus, isOnline, colors, speechMap, agendaMap, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
+    [expandedDate, nextSunday, handleToggle, handleFieldFocus, isOnline, colors, speechMap, agendaMap, managePrayers, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -345,12 +346,12 @@ interface AgendaSundayCardProps {
   isExpanded: boolean;
   isNext: boolean;
   isPast: boolean;
-  locale: SupportedLanguage;
   expandable: boolean;
   isOffline: boolean;
   onToggle: () => void;
   speeches: Speech[];
   agenda: SundayAgenda | null;
+  managePrayers: boolean;
   typeDisabled: boolean;
   onTypeChange: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   onRemoveException: (date: string) => void;
@@ -364,12 +365,12 @@ function AgendaSundayCard({
   isExpanded,
   isNext,
   isPast,
-  locale,
   expandable,
   isOffline,
   onToggle,
   speeches,
   agenda,
+  managePrayers,
   typeDisabled,
   onTypeChange,
   onRemoveException,
@@ -377,20 +378,34 @@ function AgendaSundayCard({
   onFieldFocus,
 }: AgendaSundayCardProps) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
   const router = useRouter();
 
-  const [, month, day] = date.split('-');
-  const dayNum = parseInt(day, 10);
-  const monthNum = parseInt(month, 10);
-  const monthAbbr = getMonthAbbr(monthNum, locale);
-  const dayStr = zeroPadDay(dayNum);
-
-  const exceptionLabel = (exception && exception.reason !== 'speeches')
-    ? t(`sundayExceptions.${exception.reason}`, exception.reason)
-    : null;
-
   const currentType = exception?.reason ?? SUNDAY_TYPE_SPEECHES;
+  // No-sacrament Sundays (gen/stake conf, etc.) still expand — but only to the type dropdown,
+  // so the type can be changed; the welcome/hymns AgendaForm + Play don't apply to them.
+  const excluded = !!exception && isExcludedFromAgenda(exception.reason);
+
+  const cardData = useMemo(
+    () =>
+      buildUnifiedCardData({
+        agenda,
+        speeches,
+        exceptionReason: exception?.reason ?? null,
+        managePrayers,
+      }),
+    [agenda, speeches, exception?.reason, managePrayers]
+  );
+
+  const handlePressStatus = useCallback(() => {
+    if (expandable) onToggle();
+  }, [expandable, onToggle]);
+
+  const handlePressSpeakers = useCallback(
+    (d: string) => {
+      router.push({ pathname: '/speeches/[date]', params: { date: d } });
+    },
+    [router]
+  );
 
   const handleTypeSelect = useCallback(
     (type: SundayExceptionReason, customReason?: string) => {
@@ -403,190 +418,46 @@ function AgendaSundayCard({
     onRemoveException(date);
   }, [date, onRemoveException]);
 
-  const SPECIAL_MEETING_WITH_STATUS = ['testimony_meeting', 'primary_presentation'];
-  const isSpecialWithStatus = exceptionLabel &&
-    exception?.reason &&
-    SPECIAL_MEETING_WITH_STATUS.includes(exception.reason);
-
   return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        isNext && { borderColor: colors.primary, borderWidth: 2 },
-        isPast && !isExpanded && { opacity: 0.6 },
-      ]}
-    >
-      <Pressable
+    <View style={isPast && !isExpanded ? styles.pastDim : undefined}>
+      <UnifiedSundayCard
+        date={date}
+        highlighted={isNext}
+        exceptionReason={exception?.reason ?? null}
+        customReason={exception?.custom_reason ?? null}
+        roles={cardData.roles}
+        speakers={cardData.speakers}
+        prayers={cardData.prayers}
+        hymns={cardData.hymns}
+        managePrayers={managePrayers}
+        nameRows={cardData.nameRows}
+        onPressStatus={handlePressStatus}
+        onPressSpeakers={handlePressSpeakers}
         testID={`agenda-card-${date}`}
-        style={styles.cardHeader}
-        onPress={expandable ? onToggle : undefined}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: isExpanded }}
-      >
-        <View style={[styles.dateBlock, { backgroundColor: colors.surfaceVariant }]}>
-          <Text style={[styles.dateDay, { color: colors.text }]}>{dayStr}</Text>
-          <Text style={[styles.dateMonth, { color: colors.textSecondary }]}>
-            {monthAbbr}
-          </Text>
-        </View>
-
-        <View style={styles.cardCenter}>
-          {exceptionLabel && !isSpecialWithStatus && (
-            <Text
-              style={[styles.exceptionText, { color: colors.warning }]}
-              numberOfLines={1}
-            >
-              {exceptionLabel}
-            </Text>
-          )}
-          {!isExpanded && isSpecialWithStatus && (() => {
-            // Compute status lines for collapsed special meeting card
-            const missingRoles: string[] = [];
-            if (!agenda?.presiding_name) missingRoles.push(t('agenda.statusPresiding'));
-            if (!agenda?.conducting_name) missingRoles.push(t('agenda.statusConducting'));
-            if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
-            if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
-
-            let prayersFilled = 0;
-            for (const s of speeches) {
-              if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
-            }
-
-            let hymnsFilled = 0;
-            const hymnsTotal = 3; // opening, sacrament, closing (no intermediate for special meetings)
-            if (agenda?.opening_hymn_id) hymnsFilled++;
-            if (agenda?.sacrament_hymn_id) hymnsFilled++;
-            if (agenda?.closing_hymn_id) hymnsFilled++;
-
-            const GREEN = '#22c55e';
-
-            return (
-              <>
-                {missingRoles.length > 0 && (
-                  <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {`${t('agenda.statusMissing')}${missingRoles.join(' | ')}`}
-                  </Text>
-                )}
-                <Text
-                  style={[styles.exceptionText, { color: colors.warning }]}
-                  numberOfLines={1}
-                >
-                  {exceptionLabel}
-                </Text>
-                <Text
-                  style={[styles.statusLine, { color: prayersFilled === 2 ? GREEN : colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {`${t('agenda.statusPrayersLabel')}: ${prayersFilled} de ${2}`}
-                </Text>
-                <Text
-                  style={[styles.statusLine, { color: hymnsFilled === hymnsTotal ? GREEN : colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {t('agenda.statusHymns', { filled: hymnsFilled, total: hymnsTotal })}
-                </Text>
-              </>
-            );
-          })()}
-          {!isExpanded && !exceptionLabel && (() => {
-            // Compute status lines for collapsed speeches card
-            const missingRoles: string[] = [];
-            if (!agenda?.presiding_name) missingRoles.push(t('agenda.statusPresiding'));
-            if (!agenda?.conducting_name) missingRoles.push(t('agenda.statusConducting'));
-            if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
-            if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
-
-            // F132: Dynamic speaker count based on has_second_speech
-            const hasSecondSpeech = agenda?.has_second_speech ?? true;
-            const speakersTotal = hasSecondSpeech ? 3 : 2;
-            const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
-            let speakersFilled = 0;
-            for (const pos of positionsToCheck) {
-              const overrideField = `speaker_${pos}_override` as keyof SundayAgenda;
-              const overrideVal = agenda?.[overrideField] as string | null;
-              const speech = speeches.find((s) => s.position === pos);
-              if (overrideVal ?? speech?.speaker_name) speakersFilled++;
-            }
-
-            let prayersFilled = 0;
-            for (const s of speeches) {
-              if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
-            }
-
-            let hymnsFilled = 0;
-            let hymnsTotal = 3; // opening, sacrament, closing
-            if (agenda?.opening_hymn_id) hymnsFilled++;
-            if (agenda?.sacrament_hymn_id) hymnsFilled++;
-            if (agenda?.closing_hymn_id) hymnsFilled++;
-            if (agenda?.has_intermediate_hymn !== false && !agenda?.has_special_presentation) {
-              hymnsTotal = 4;
-              if (agenda?.intermediate_hymn_id) hymnsFilled++;
-            }
-
-            const GREEN = '#22c55e';
-
-            return (
-              <>
-                {missingRoles.length > 0 && (
-                  <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {`${t('agenda.statusMissing')}${missingRoles.join(' | ')}`}
-                  </Text>
-                )}
-                <Text
-                  style={[styles.statusLine, { color: speakersFilled === speakersTotal ? GREEN : colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {t('agenda.statusSpeakers', { filled: speakersFilled, total: speakersTotal })}
-                </Text>
-                <Text
-                  style={[styles.statusLine, { color: prayersFilled === 2 ? GREEN : colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {t('agenda.statusPrayers', { filled: prayersFilled, total: 2 })}
-                </Text>
-                <Text
-                  style={[styles.statusLine, { color: hymnsFilled === hymnsTotal ? GREEN : colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {t('agenda.statusHymns', { filled: hymnsFilled, total: hymnsTotal })}
-                </Text>
-              </>
-            );
-          })()}
-        </View>
-
-        {expandable && isExpanded && (
-          <Pressable
-            testID={`agenda-play-${date}`}
-            onPress={() => router.push({ pathname: '/presentation', params: { date } })}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Open presentation"
-            style={[
-              styles.playButton,
-              {
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                backgroundColor: colors.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-              },
-            ]}
-          >
-            <PlayIcon size={20} color={colors.onPrimary} />
-          </Pressable>
-        )}
-        {expandable && (
-          isExpanded
-            ? <ChevronUpIcon size={12} color={colors.textSecondary} />
-            : <ChevronDownIcon size={12} color={colors.textSecondary} />
-        )}
-      </Pressable>
+      />
 
       {expandable && isExpanded && (
-        <View style={styles.expandedContent}>
+        <View
+          style={[
+            styles.expandedCard,
+            { backgroundColor: colors.card, borderColor: isNext ? colors.primary : colors.border },
+            isNext && { borderWidth: 2 },
+          ]}
+        >
+          {!excluded && (
+            <View style={styles.expandedHeader}>
+              <Pressable
+                testID={`agenda-play-${date}`}
+                onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Open presentation"
+                style={[styles.playButton, { backgroundColor: colors.primary }]}
+              >
+                <PlayIcon size={20} color={colors.onPrimary} />
+              </Pressable>
+            </View>
+          )}
           <SundayTypeDropdown
             currentType={currentType}
             onSelect={handleTypeSelect}
@@ -595,16 +466,19 @@ function AgendaSundayCard({
             speeches={speeches}
             date={date}
             onDeleteSpeeches={onDeleteSpeeches}
+            managePrayers={managePrayers}
           />
-          <ThemedErrorBoundary>
-            <AgendaForm
-              sundayDate={date}
-              exceptionReason={exception?.reason ?? null}
-              customReason={exception?.custom_reason ?? null}
-              disabled={isOffline}
-              onFieldFocus={onFieldFocus}
-            />
-          </ThemedErrorBoundary>
+          {!excluded && (
+            <ThemedErrorBoundary>
+              <AgendaForm
+                sundayDate={date}
+                exceptionReason={exception?.reason ?? null}
+                customReason={exception?.custom_reason ?? null}
+                disabled={isOffline}
+                onFieldFocus={onFieldFocus}
+              />
+            </ThemedErrorBoundary>
+          )}
         </View>
       )}
     </View>
@@ -640,53 +514,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  card: {
+  pastDim: {
+    opacity: 0.6,
+  },
+  expandedCard: {
     borderWidth: 1,
     borderRadius: 8,
     marginHorizontal: 12,
-    marginVertical: 4,
+    marginTop: -4,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     overflow: 'hidden',
   },
-  cardHeader: {
+  expandedHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    justifyContent: 'flex-end',
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  dateBlock: {
-    width: 44,
-    height: 44,
+  playButton: {
+    width: 36,
+    height: 36,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  dateDay: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  dateMonth: {
-    fontSize: 10,
-    fontWeight: '600',
-    lineHeight: 12,
-    textTransform: 'uppercase',
-  },
-  cardCenter: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  exceptionText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  statusLine: {
-    fontSize: 11,
-  },
-  playButton: {
-    marginRight: 16,
-  },
-  expandedContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
   },
 });

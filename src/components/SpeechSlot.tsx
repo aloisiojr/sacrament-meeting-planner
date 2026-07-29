@@ -205,7 +205,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
             </Text>
             <StatusLED
               status={status}
-              size={14}
+              size={16}
               onPress={handleStatusPress}
               disabled={isObserver || status === 'not_assigned'}
             />
@@ -222,20 +222,18 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 {t('speeches.selectSpeaker')}
               </Text>
             </View>
-            <View style={styles.actionArea} />
           </View>
           <View style={styles.topicRow}>
             <View style={[styles.topicField, { borderColor: colors.divider, backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
-              <Text style={[styles.topicText, { color: colors.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.topicText, { color: colors.textSecondary }]} numberOfLines={2}>
                 {t('speeches.selectTopic')}
               </Text>
             </View>
-            <View style={styles.topicActionArea} />
           </View>
         </>
       ) : (
         <>
-          {/* Row 2: Speaker field + X button (ADR-081) */}
+          {/* Row 2: full-width speaker field with an internal clear (X) when assigned */}
           <View style={styles.speakerRow}>
             <Pressable
               style={[styles.field, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
@@ -246,20 +244,12 @@ export const SpeechSlot = React.memo(function SpeechSlot({
               testID={`speech-slot-${position}-speaker-button`}
             >
               <Text
-                style={[
-                  styles.fieldText,
-                  { color: hasSpeaker ? colors.text : colors.placeholder },
-                ]}
+                style={[styles.fieldText, { color: hasSpeaker ? colors.text : colors.placeholder }]}
                 numberOfLines={1}
               >
                 {speech?.speaker_name ?? t('speeches.selectSpeaker')}
               </Text>
-              {canAssign && (
-                <ChevronDownIcon size={8} color={colors.textSecondary} />
-              )}
-            </Pressable>
-            <View style={styles.actionArea}>
-              {hasSpeaker && canUnassign && (
+              {hasSpeaker && canUnassign ? (
                 <Pressable
                   onPress={handleRemove}
                   hitSlop={8}
@@ -267,13 +257,15 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                   accessibilityLabel={t('speeches.unassign')}
                   testID={`speech-slot-${position}-remove-button`}
                 >
-                  <XIcon size={24} color={colors.error} />
+                  <XIcon size={18} color={colors.textSecondary} />
                 </Pressable>
-              )}
-            </View>
+              ) : canAssign ? (
+                <ChevronDownIcon size={10} color={colors.textSecondary} />
+              ) : null}
+            </Pressable>
           </View>
 
-          {/* Row 3: Topic field + X button (ADR-081) */}
+          {/* Row 3: full-width topic field (up to 2 lines) with an internal clear (X) when set */}
           {showTopicRow && (
             <View style={styles.topicRow}>
               <Pressable
@@ -285,30 +277,25 @@ export const SpeechSlot = React.memo(function SpeechSlot({
                 testID={`speech-slot-${position}-topic-button`}
               >
                 <Text
-                  style={[
-                    styles.topicText,
-                    { color: topicDisplay ? colors.text : colors.placeholder },
-                  ]}
-                  numberOfLines={1}
+                  style={[styles.topicText, { color: topicDisplay ? colors.text : colors.placeholder }]}
+                  numberOfLines={2}
                 >
                   {topicDisplay ?? t('speeches.selectTopic')}
                 </Text>
-                {canAssign && (
-                  <ChevronDownIcon size={8} color={colors.textSecondary} />
-                )}
-              </Pressable>
-              <View style={styles.topicActionArea}>
-                {topicDisplay && canAssign && (
+                {topicDisplay && canAssign ? (
                   <Pressable
                     hitSlop={8}
                     onPress={handleClearTopic}
+                    accessibilityRole="button"
                     accessibilityLabel={t('common.delete')}
                     testID={`speech-slot-${position}-clear-topic-button`}
                   >
-                    <XIcon size={20} color={colors.error} />
+                    <XIcon size={18} color={colors.textSecondary} />
                   </Pressable>
-                )}
-              </View>
+                ) : canAssign ? (
+                  <ChevronDownIcon size={10} color={colors.textSecondary} />
+                ) : null}
+              </Pressable>
             </View>
           )}
         </>
@@ -335,7 +322,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   label: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -353,7 +340,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
-    paddingRight: 36,
   },
   statusSection: {
     flexDirection: 'row',
@@ -361,7 +347,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 13,
   },
   speakerRow: {
     flexDirection: 'row',
@@ -371,52 +357,35 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 38,
+    gap: 8,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   fieldText: {
     flex: 1,
-    fontSize: 14,
-  },
-  fieldArrow: {
-    fontSize: 8,
-    marginLeft: 4,
-  },
-  actionArea: {
-    width: 36,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeButton: {
-    fontSize: 24,
-    fontWeight: '300',
-    paddingHorizontal: 4,
+    fontSize: 16,
   },
   topicRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
   },
-  topicActionArea: {
-    width: 36,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   topicField: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 34,
+    gap: 8,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   topicText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
   },
 });

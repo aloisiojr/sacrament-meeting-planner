@@ -8,11 +8,11 @@ import {
   type CsvExportMember,
 } from '../lib/csvUtils';
 
-const FULL_HEADER = 'Nome,Nome Informal,Telefone Completo,Preside,Conduz,Rege,Piano,Reconhecer,Responsável';
+const FULL_HEADER = 'Nome,Nome Informal,Telefone Completo,Preside,Conduz,Rege,Piano,Reconhecer,Responsável,Chamado';
 
 describe('parseCsv', () => {
   it('parses a valid full-dump CSV with capabilities and responsible', () => {
-    const csv = `${FULL_HEADER}\nJoao Silva,Joao,+5511999999999,true,false,false,false,true,Maria Santos\nMaria Santos,Maria,+5521888888888,false,true,false,false,false,`;
+    const csv = `${FULL_HEADER}\nJoao Silva,Joao,+5511999999999,true,false,false,false,true,Maria Santos,Bispo\nMaria Santos,Maria,+5521888888888,false,true,false,false,false,,`;
     const result = parseCsv(csv);
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(2);
@@ -26,6 +26,7 @@ describe('parseCsv', () => {
       can_play_piano: false,
       can_be_recognized: true,
       responsible_name: 'Maria Santos',
+      calling: 'Bispo',
     });
     expect(result.members[1].can_conduct).toBe(true);
     expect(result.members[1].responsible_name).toBe('');
@@ -45,6 +46,7 @@ describe('parseCsv', () => {
       can_play_piano: false,
       can_be_recognized: false,
       responsible_name: '',
+      calling: '',
     });
   });
 
@@ -169,7 +171,7 @@ describe('parseCsvBool', () => {
 });
 
 describe('generateCsv', () => {
-  it('generates full-dump CSV with BOM, 9-column header, capabilities and responsible', () => {
+  it('generates full-dump CSV with BOM, 10-column header, capabilities, responsible and calling', () => {
     const members: CsvExportMember[] = [
       {
         full_name: 'Joao Silva',
@@ -182,13 +184,14 @@ describe('generateCsv', () => {
         can_play_piano: false,
         can_be_recognized: true,
         responsible_name: 'Maria Santos',
+        calling: 'Bispo',
       },
     ];
     const csv = generateCsv(members);
     expect(csv.startsWith('\uFEFF')).toBe(true);
     const lines = csv.split('\n');
     expect(lines[0]).toBe(`\uFEFF${FULL_HEADER}`);
-    expect(lines[1]).toBe('Joao Silva,Joao,+5511999999999,true,false,false,false,true,Maria Santos');
+    expect(lines[1]).toBe('Joao Silva,Joao,+5511999999999,true,false,false,false,true,Maria Santos,Bispo');
   });
 
   it('handles null phone and missing responsible', () => {
@@ -197,7 +200,7 @@ describe('generateCsv', () => {
     ];
     const csv = generateCsv(members);
     const lines = csv.split('\n');
-    expect(lines[1]).toBe('Joao Silva,Joao,,false,false,false,false,false,');
+    expect(lines[1]).toBe('Joao Silva,Joao,,false,false,false,false,false,,');
   });
 
   it('escapes names and responsible with commas', () => {
@@ -212,7 +215,7 @@ describe('generateCsv', () => {
     ];
     const csv = generateCsv(members);
     const lines = csv.split('\n');
-    expect(lines[1]).toBe('"Silva, Joao",Joao,+5511999999999,false,false,false,false,false,"Santos, Maria"');
+    expect(lines[1]).toBe('"Silva, Joao",Joao,+5511999999999,false,false,false,false,false,"Santos, Maria",');
   });
 
   it('uses provided (localized) headers', () => {
@@ -220,9 +223,10 @@ describe('generateCsv', () => {
       ...CSV_DEFAULT_HEADERS,
       name: 'Name',
       responsible: 'Responsible',
+      calling: 'Calling',
     });
     const header = csv.replace('\uFEFF', '').split('\n')[0];
-    expect(header).toBe('Name,Nome Informal,Telefone Completo,Preside,Conduz,Rege,Piano,Reconhecer,Responsible');
+    expect(header).toBe('Name,Nome Informal,Telefone Completo,Preside,Conduz,Rege,Piano,Reconhecer,Responsible,Calling');
   });
 });
 
@@ -240,6 +244,7 @@ describe('CSV full-dump round-trip', () => {
         can_play_piano: false,
         can_be_recognized: true,
         responsible_name: '',
+        calling: 'Bispo',
       },
       {
         full_name: 'Maria Santos',
@@ -252,6 +257,7 @@ describe('CSV full-dump round-trip', () => {
         can_play_piano: true,
         can_be_recognized: false,
         responsible_name: 'Joao Silva',
+        calling: '',
       },
     ];
     const csv = generateCsv(members);
@@ -269,6 +275,7 @@ describe('CSV full-dump round-trip', () => {
       can_play_piano: false,
       can_be_recognized: true,
       responsible_name: '',
+      calling: 'Bispo',
     });
     expect(parsed.members[1]).toEqual({
       full_name: 'Maria Santos',
@@ -280,7 +287,26 @@ describe('CSV full-dump round-trip', () => {
       can_play_piano: true,
       can_be_recognized: false,
       responsible_name: 'Joao Silva',
+      calling: '',
     });
+  });
+
+  it('round-trips a calling with a comma (quoted)', () => {
+    const members: CsvExportMember[] = [
+      {
+        full_name: 'Ricardo Almeida',
+        informal_name: 'Ricardo',
+        country_code: '+55',
+        phone: '11999999999',
+        can_be_recognized: true,
+        responsible_name: '',
+        calling: 'Bispo, Ala Central',
+      },
+    ];
+    const csv = generateCsv(members);
+    const parsed = parseCsv(csv);
+    expect(parsed.success).toBe(true);
+    expect(parsed.members[0].calling).toBe('Bispo, Ala Central');
   });
 });
 

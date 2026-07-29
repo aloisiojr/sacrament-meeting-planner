@@ -169,6 +169,7 @@ describe('Database Types', () => {
         can_be_recognized: false,
         contact_via_responsible: false,
         responsible_id: null,
+        calling: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };
@@ -191,6 +192,7 @@ describe('Database Types', () => {
         can_be_recognized: false,
         contact_via_responsible: false,
         responsible_id: null,
+        calling: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };

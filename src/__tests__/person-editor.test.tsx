@@ -29,6 +29,7 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
     can_be_recognized: false,
     contact_via_responsible: false,
     responsible_id: null,
+    calling: null,
     created_at: '',
     updated_at: '',
     ...over,

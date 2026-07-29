@@ -24,7 +24,7 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
     ward_id: 'w1', informal_name: null, country_code: '+1', phone: null,
     can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
     can_be_recognized: false, contact_via_responsible: false, responsible_id: null,
-    created_at: '', updated_at: '', ...over,
+    calling: null, created_at: '', updated_at: '', ...over,
   };
 }
 

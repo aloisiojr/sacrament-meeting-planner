@@ -130,6 +130,7 @@ export function useCreateMember() {
           can_be_recognized: input.can_be_recognized ?? false,
           contact_via_responsible: input.contact_via_responsible ?? false,
           responsible_id: input.responsible_id ?? null,
+          calling: input.calling ?? null,
         })
         .select()
         .single();

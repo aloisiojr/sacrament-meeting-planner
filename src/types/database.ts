@@ -108,6 +108,8 @@ export interface Member {
   // v2.0 — contact delegation.
   contact_via_responsible: boolean;
   responsible_id: string | null;
+  // v2.0 — free-text calling (chamado), optional (migration 039).
+  calling: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -318,6 +320,8 @@ export interface CreateMemberInput {
   can_be_recognized?: boolean;
   contact_via_responsible?: boolean;
   responsible_id?: string | null;
+  // v2.0 — free-text calling (chamado), optional.
+  calling?: string | null;
 }
 
 export interface UpdateMemberInput {
@@ -334,6 +338,8 @@ export interface UpdateMemberInput {
   can_be_recognized?: boolean;
   contact_via_responsible?: boolean;
   responsible_id?: string | null;
+  // v2.0 — free-text calling (chamado), optional.
+  calling?: string | null;
 }
 
 export interface CreateTopicInput {

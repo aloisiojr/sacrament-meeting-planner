@@ -380,6 +380,7 @@ export function createMockMember(overrides?: Partial<Member>): Member {
     can_be_recognized: false,
     contact_via_responsible: false,
     responsible_id: null,
+    calling: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

@@ -89,6 +89,7 @@ export default function MembersScreen() {
         can_play_piano: m.can_play_piano,
         can_be_recognized: m.can_be_recognized,
         responsible_name: m.responsible_id ? nameById.get(m.responsible_id) ?? '' : '',
+        calling: m.calling,
       }));
       const csv = generateCsv(exportMembers, {
         name: t('members.csvHeaderName'),
@@ -100,6 +101,7 @@ export default function MembersScreen() {
         piano: t('members.csvHeaderPiano'),
         recognize: t('members.csvHeaderRecognize'),
         responsible: t('members.csvHeaderResponsible'),
+        calling: t('members.csvHeaderCalling'),
       });
 
       if (Platform.OS === 'web') {
@@ -161,6 +163,7 @@ export default function MembersScreen() {
           can_play_piano: m.can_play_piano,
           can_be_recognized: m.can_be_recognized,
           responsible_name: m.responsible_name || null,
+          calling: m.calling || null,
         };
       });
 

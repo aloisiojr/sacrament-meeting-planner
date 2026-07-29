@@ -3,9 +3,10 @@
  *
  * The CSV is a FULL DUMP of the member record: identity (name, informal name, full phone),
  * the 5 capability flags (preside / conduct / lead music / play piano / be recognized) as
- * booleans, and a `Responsável` column holding the responsible member's `full_name` (not the
- * UUID). Import is destructive (DELETE-ALL + INSERT via the `import_members` RPC) and resolves
- * the responsible name → id in a second pass on the server.
+ * booleans, a `Responsável` column holding the responsible member's `full_name` (not the
+ * UUID), and a free-text `Chamado` (calling) column. Import is destructive (DELETE-ALL +
+ * INSERT via the `import_members` RPC) and resolves the responsible name → id in a second
+ * pass on the server.
  */
 
 // Re-export splitPhoneNumber from shared countryCodes module
@@ -21,6 +22,7 @@ export interface CsvMember {
   can_play_piano: boolean;
   can_be_recognized: boolean;
   responsible_name: string; // full_name of the responsible member; empty if none
+  calling: string; // free-text calling (chamado); empty if none
 }
 
 export type CsvErrorCode =
@@ -40,6 +42,7 @@ export interface CsvHeaders {
   piano: string;
   recognize: string;
   responsible: string;
+  calling: string;
 }
 
 export const CSV_DEFAULT_HEADERS: CsvHeaders = {
@@ -52,6 +55,7 @@ export const CSV_DEFAULT_HEADERS: CsvHeaders = {
   piano: 'Piano',
   recognize: 'Reconhecer',
   responsible: 'Responsável',
+  calling: 'Chamado',
 };
 
 /** Minimum columns required for a valid row: Nome, Nome Informal, Telefone Completo. */
@@ -155,6 +159,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
       can_play_piano: parseCsvBool(parts[6]),
       can_be_recognized: parseCsvBool(parts[7]),
       responsible_name: (parts[8] ?? '').trim(),
+      calling: (parts[9] ?? '').trim(),
     });
   }
 
@@ -210,12 +215,13 @@ export interface CsvExportMember {
   can_play_piano?: boolean;
   can_be_recognized?: boolean;
   responsible_name?: string | null;
+  calling?: string | null;
 }
 
 /**
  * Generate full-dump CSV content from member data.
  * Columns: Nome, Nome Informal, Telefone Completo, Preside, Conduz, Rege, Piano, Reconhecer,
- * Responsável (responsible member's full_name).
+ * Responsável (responsible member's full_name), Chamado (free-text calling).
  */
 export function generateCsv(members: CsvExportMember[], headers?: CsvHeaders): string {
   const h = headers ?? CSV_DEFAULT_HEADERS;
@@ -229,6 +235,7 @@ export function generateCsv(members: CsvExportMember[], headers?: CsvHeaders): s
     h.piano,
     h.recognize,
     h.responsible,
+    h.calling,
   ]
     .map(escapeCsvField)
     .join(',');
@@ -244,6 +251,7 @@ export function generateCsv(members: CsvExportMember[], headers?: CsvHeaders): s
       formatCsvBool(m.can_play_piano),
       formatCsvBool(m.can_be_recognized),
       escapeCsvField(m.responsible_name || ''),
+      escapeCsvField(m.calling || ''),
     ].join(',');
   });
   // Add UTF-8 BOM for Excel compatibility

@@ -28,6 +28,7 @@ function makeMember(overrides: Partial<Member> & { full_name: string }): Member 
     can_be_recognized: overrides.can_be_recognized ?? false,
     contact_via_responsible: overrides.contact_via_responsible ?? false,
     responsible_id: overrides.responsible_id ?? null,
+    calling: overrides.calling ?? null,
     created_at: overrides.created_at ?? '2026-01-01T00:00:00Z',
     updated_at: overrides.updated_at ?? '2026-01-01T00:00:00Z',
   };

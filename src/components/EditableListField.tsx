@@ -210,7 +210,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
             />
           )}
           <Pressable hitSlop={6} onPress={() => handleDelete(idx)}>
-            <XIcon size={18} color={colors.error} />
+            <XIcon size={18} color={colors.textSecondary} />
           </Pressable>
         </View>
       </ScaleDecorator>

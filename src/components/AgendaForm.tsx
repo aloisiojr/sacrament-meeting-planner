@@ -788,7 +788,7 @@ function SelectorField({
       </Text>
       {onClear && hasValue && (
         <Pressable hitSlop={8} onPress={onClear}>
-          <XIcon size={20} color={colors.error} />
+          <XIcon size={18} color={colors.textSecondary} />
         </Pressable>
       )}
     </Pressable>

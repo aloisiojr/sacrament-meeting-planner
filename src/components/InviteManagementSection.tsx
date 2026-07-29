@@ -23,6 +23,8 @@ import { useAgendaRange } from '../hooks/useAgenda';
 import { QueryErrorView } from './QueryErrorView';
 import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
+import { PersonEditor } from './PersonEditor';
+import { buildFullPhone } from '../lib/phone';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
@@ -51,6 +53,13 @@ export function InviteManagementSection() {
   const locale = (wardLanguage as SupportedLanguage) || getCurrentLanguage();
   const changeStatus = useChangeStatus();
   const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
+
+  // Contact editor (PersonEditor) state: the member being edited, the originating speech, and
+  // whether saving should offer to send the invite afterwards.
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editorSpeech, setEditorSpeech] = useState<Speech | null>(null);
+  const [editorThenSend, setEditorThenSend] = useState(false);
 
   const { managePrayers } = useWardManagePrayers();
 
@@ -127,86 +136,141 @@ export function InviteManagementSection() {
     [speeches, locale, agendaMap, managePrayers]
   );
 
-  const handleNotInvitedAction = useCallback(
-    async (speech: Speech) => {
-      // v2.0: send to the resolved contact snapshot; fall back to the legacy own-phone snapshot
-      // (also covers orphaned delegation where contact_phone was never captured).
-      const phone = speech.contact_phone || speech.speaker_phone;
-      if (phone) {
-        // Build the normal per-position base message.
-        let baseMessage: string;
-        if (speech.position === 0 || speech.position === 4) {
-          // Prayer: use prayer-specific template with {nome} and {data} placeholders
-          const prayerType = speech.position === 0 ? 'opening' : 'closing';
-          const templateField = speech.position === 0
-            ? 'whatsapp_template_opening_prayer'
-            : 'whatsapp_template_closing_prayer';
-          const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
-          const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
-          baseMessage = resolveTemplate(template, {
-            speakerName: speech.speaker_informal_name || speech.speaker_name || '',
-            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-            topic: '',
-          });
-        } else {
-          // Speech: use position-specific speech template (locale default when unset).
-          const speechTemplateMap: Record<number, string> = {
-            1: ward?.whatsapp_template_speech_1 ?? '',
-            2: ward?.whatsapp_template_speech_2 ?? '',
-            3: ward?.whatsapp_template_speech_3 ?? '',
-          };
-          const selectedTemplate =
-            speechTemplateMap[speech.position] || getDefaultSpeechTemplate(locale, speech.position as 1 | 2 | 3);
-          baseMessage = resolveTemplate(selectedTemplate, {
-            speakerName: speech.speaker_informal_name || speech.speaker_name || '',
-            date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
-            topic: speech.topic_title ?? '',
-            collection: speech.topic_collection ?? '',
-            link: speech.topic_link ?? '',
-          });
-        }
+  // Build the per-position/delegation invite message, open WhatsApp, then mark as invited.
+  // Recipient: phoneOverride (e.g. a freshly edited contact) ?? contact snapshot ?? legacy own phone.
+  const sendInvite = useCallback(
+    async (speech: Speech, phoneOverride?: string) => {
+      const phone = phoneOverride ?? speech.contact_phone ?? speech.speaker_phone;
+      if (!phone) return;
 
-        // v2.0: when delegated, wrap the base message with the ward delegation wrapper.
-        let message = baseMessage;
-        if (speech.is_delegated) {
-          message = wrapDelegationMessage(
-            baseMessage,
-            ward?.whatsapp_template_delegation_wrapper ?? null,
-            resolveResponsibleName(speech),
-            speech.delegate_for_name ?? '',
-            locale
-          );
-        }
-
-        let cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-        if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
-        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-
-        await openWhatsApp(url);
-        changeStatus.mutate({
-          speechId: speech.id,
-          status: 'assigned_invited',
+      // Build the normal per-position base message.
+      let baseMessage: string;
+      if (speech.position === 0 || speech.position === 4) {
+        // Prayer: use prayer-specific template with {nome} and {data} placeholders
+        const prayerType = speech.position === 0 ? 'opening' : 'closing';
+        const templateField = speech.position === 0
+          ? 'whatsapp_template_opening_prayer'
+          : 'whatsapp_template_closing_prayer';
+        const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
+        const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
+        baseMessage = resolveTemplate(template, {
+          speakerName: speech.speaker_informal_name || speech.speaker_name || '',
+          date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+          topic: '',
         });
       } else {
+        // Speech: use position-specific speech template (locale default when unset).
+        const speechTemplateMap: Record<number, string> = {
+          1: ward?.whatsapp_template_speech_1 ?? '',
+          2: ward?.whatsapp_template_speech_2 ?? '',
+          3: ward?.whatsapp_template_speech_3 ?? '',
+        };
+        const selectedTemplate =
+          speechTemplateMap[speech.position] || getDefaultSpeechTemplate(locale, speech.position as 1 | 2 | 3);
+        baseMessage = resolveTemplate(selectedTemplate, {
+          speakerName: speech.speaker_informal_name || speech.speaker_name || '',
+          date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
+          topic: speech.topic_title ?? '',
+          collection: speech.topic_collection ?? '',
+          link: speech.topic_link ?? '',
+        });
+      }
+
+      // v2.0: when delegated, wrap the base message with the ward delegation wrapper.
+      let message = baseMessage;
+      if (speech.is_delegated) {
+        message = wrapDelegationMessage(
+          baseMessage,
+          ward?.whatsapp_template_delegation_wrapper ?? null,
+          resolveResponsibleName(speech),
+          speech.delegate_for_name ?? '',
+          locale
+        );
+      }
+
+      let cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+      if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
+      const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+
+      await openWhatsApp(url);
+      changeStatus.mutate({
+        speechId: speech.id,
+        status: 'assigned_invited',
+      });
+    },
+    [changeStatus, locale, ward, resolveResponsibleName]
+  );
+
+  // Open the contact (PersonEditor) for the speech's member. `thenSend` remembers whether to offer
+  // sending the invite after a successful save (used from the no-phone dialog).
+  const openContactEditor = useCallback(
+    (speech: Speech, thenSend: boolean) => {
+      const member = speech.member_id ? memberMap.get(speech.member_id) : undefined;
+      setEditingMember(member ?? null);
+      setEditorSpeech(speech);
+      setEditorThenSend(thenSend);
+      setEditorVisible(true);
+    },
+    [memberMap]
+  );
+
+  const handleEditorSaved = useCallback(
+    (saved: Member) => {
+      setEditorVisible(false);
+      const speech = editorSpeech;
+      if (editorThenSend && saved.phone && speech) {
         Alert.alert(
-          t('invite.noPhoneTitle'),
-          t('invite.noPhoneMessage'),
+          t('home.sendInviteTitle'),
+          t('home.sendInviteQuestion'),
           [
             { text: t('common.cancel'), style: 'cancel' },
             {
-              text: t('invite.markAsInvited'),
+              text: t('home.sendInvite'),
               onPress: () => {
-                changeStatus.mutate({
-                  speechId: speech.id,
-                  status: 'assigned_invited',
-                });
+                sendInvite(speech, buildFullPhone(saved.country_code, saved.phone) ?? undefined);
               },
             },
           ]
         );
       }
     },
-    [changeStatus, locale, ward, t, resolveResponsibleName]
+    [editorThenSend, editorSpeech, t, sendInvite]
+  );
+
+  const handleNotInvitedAction = useCallback(
+    (speech: Speech) => {
+      // v2.0: send to the resolved contact snapshot; fall back to the legacy own-phone snapshot
+      // (also covers orphaned delegation where contact_phone was never captured).
+      const phone = speech.contact_phone || speech.speaker_phone;
+      if (phone) {
+        sendInvite(speech);
+      } else {
+        const buttons: {
+          text: string;
+          style?: 'cancel' | 'default' | 'destructive';
+          onPress?: () => void;
+        }[] = [];
+        // Only offer "Edit Contact" when there is a member to edit.
+        if (speech.member_id) {
+          buttons.push({
+            text: t('home.editContact'),
+            onPress: () => openContactEditor(speech, /* thenSend */ true),
+          });
+        }
+        buttons.push({
+          text: t('invite.markAsInvited'),
+          onPress: () => {
+            changeStatus.mutate({
+              speechId: speech.id,
+              status: 'assigned_invited',
+            });
+          },
+        });
+        buttons.push({ text: t('common.cancel'), style: 'cancel' });
+        Alert.alert(t('invite.noPhoneTitle'), t('invite.noPhoneMessage'), buttons);
+      }
+    },
+    [sendInvite, changeStatus, t, openContactEditor]
   );
 
   const handleInvitedAction = useCallback(
@@ -338,7 +402,22 @@ export function InviteManagementSection() {
         speech={dropdownSpeech}
         onOpenWhatsApp={handleDropdownWhatsApp}
         onChangeStatus={handleDropdownStatusChange}
+        onEditContact={(s) => {
+          setDropdownSpeech(null);
+          openContactEditor(s, /* thenSend */ false);
+        }}
+        onResendInvite={(s) => {
+          setDropdownSpeech(null);
+          sendInvite(s);
+        }}
         onClose={() => setDropdownSpeech(null)}
+      />
+
+      <PersonEditor
+        visible={editorVisible}
+        member={editingMember}
+        onClose={() => setEditorVisible(false)}
+        onSaved={handleEditorSaved}
       />
     </View>
   );

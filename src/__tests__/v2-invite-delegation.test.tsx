@@ -81,6 +81,7 @@ vi.mock('../components/icons', () => ({
 }));
 vi.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
 vi.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: () => null }));
+vi.mock('../components/PersonEditor', () => ({ PersonEditor: () => null }));
 vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 
 vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));

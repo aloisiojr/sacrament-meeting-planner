@@ -1,7 +1,11 @@
 /**
  * InviteActionDropdown: Custom modal dropdown for invite actions.
- * Shows options: View conversation, status changes, and cancel.
- * Follows visual pattern of StatusChangeModal (Modal + overlay + card).
+ * Two labeled sections:
+ *  - "Alterar Status": all four assigned statuses with a colored indicator; the current status is
+ *    shown but disabled (greyed, not pressable). Others fire onChangeStatus.
+ *  - "Fazer uma ação": edit phone (onEditContact), resend invite (onResendInvite), view
+ *    conversation (onOpenWhatsApp). Each row is enabled only when its precondition is met.
+ * Tapping the overlay closes (onClose). Follows the StatusChangeModal visual pattern.
  */
 
 import React from 'react';
@@ -14,7 +18,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
-import { WhatsAppIcon } from './icons';
+import { WhatsAppIcon, PhoneIcon, SendIcon } from './icons';
 import { STATUS_INDICATOR_COLORS } from './StatusChangeModal';
 import type { Speech, SpeechStatus } from '../types/database';
 
@@ -29,9 +33,21 @@ export interface InviteActionDropdownProps {
   onOpenWhatsApp: (speech: Speech) => void;
   /** Called when a status change option is selected. */
   onChangeStatus: (speechId: string, status: SpeechStatus) => void;
+  /** Called when "Alterar telefone" (edit contact) is selected. */
+  onEditContact: (speech: Speech) => void;
+  /** Called when "Re-enviar convite" (resend invite) is selected. */
+  onResendInvite: (speech: Speech) => void;
   /** Called when the dropdown is closed without action. */
   onClose: () => void;
 }
+
+// All four assigned statuses, shown in lifecycle order.
+const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
+  'assigned_not_invited',
+  'assigned_invited',
+  'assigned_confirmed',
+  'gave_up',
+];
 
 // --- Component ---
 
@@ -40,22 +56,15 @@ export function InviteActionDropdown({
   speech,
   onOpenWhatsApp,
   onChangeStatus,
+  onEditContact,
+  onResendInvite,
   onClose,
 }: InviteActionDropdownProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  const hasPhone = !!speech?.speaker_phone;
-
-  const ALL_ASSIGNED_STATUSES: SpeechStatus[] = [
-    'assigned_not_invited',
-    'assigned_invited',
-    'assigned_confirmed',
-    'gave_up',
-  ];
-  const statusOptions = ALL_ASSIGNED_STATUSES.filter(
-    (s) => s !== speech?.status
-  );
+  const hasPhone = !!(speech?.contact_phone || speech?.speaker_phone);
+  const hasMember = !!speech?.member_id;
 
   return (
     <Modal
@@ -66,59 +75,116 @@ export function InviteActionDropdown({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <View style={[styles.content, { backgroundColor: colors.card }]}>
-          {/* Title: i18n status change label */}
-          <Text style={[styles.title, { color: colors.text }]}>
-            {t('speeches.changeStatus')}
+          {/* Section: Change status */}
+          <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+            {t('home.changeStatusSection')}
+          </Text>
+          {ALL_ASSIGNED_STATUSES.map((statusOption) => {
+            const isCurrent = statusOption === speech?.status;
+            return (
+              <Pressable
+                key={statusOption}
+                testID={`invite-dropdown-status-${statusOption}`}
+                style={[styles.optionRow, isCurrent && styles.disabledOption]}
+                disabled={isCurrent}
+                onPress={() => {
+                  if (speech && !isCurrent) {
+                    onChangeStatus(speech.id, statusOption);
+                  }
+                }}
+              >
+                <View
+                  style={[
+                    styles.indicator,
+                    { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    { color: isCurrent ? colors.textSecondary : colors.text },
+                  ]}
+                >
+                  {t(`speechStatus.${statusOption}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+
+          {/* Section: Take an action */}
+          <Text
+            style={[
+              styles.sectionHeader,
+              styles.sectionHeaderSpaced,
+              { color: colors.textSecondary },
+            ]}
+          >
+            {t('home.actionSection')}
           </Text>
 
-          {/* Option 1: View conversation (WhatsApp) */}
+          {/* Edit phone (enabled only when there is a member to edit) */}
           <Pressable
-            style={[styles.optionRow, !hasPhone && styles.disabledOption]}
+            testID="invite-dropdown-edit-phone"
+            style={[styles.optionRow, !hasMember && styles.disabledOption]}
+            disabled={!hasMember}
             onPress={() => {
-              if (speech && hasPhone) {
-                onOpenWhatsApp(speech);
-              }
+              if (speech && hasMember) onEditContact(speech);
             }}
+          >
+            <View style={styles.iconContainer}>
+              <PhoneIcon size={12} color={hasMember ? colors.text : colors.textSecondary} />
+            </View>
+            <Text
+              style={[
+                styles.optionLabel,
+                { color: hasMember ? colors.text : colors.textSecondary },
+              ]}
+            >
+              {t('home.editPhone')}
+            </Text>
+          </Pressable>
+
+          {/* Resend invite (enabled only when there is a phone) */}
+          <Pressable
+            testID="invite-dropdown-resend"
+            style={[styles.optionRow, !hasPhone && styles.disabledOption]}
             disabled={!hasPhone}
+            onPress={() => {
+              if (speech && hasPhone) onResendInvite(speech);
+            }}
+          >
+            <View style={styles.iconContainer}>
+              <SendIcon size={12} color={hasPhone ? colors.text : colors.textSecondary} />
+            </View>
+            <Text
+              style={[
+                styles.optionLabel,
+                { color: hasPhone ? colors.text : colors.textSecondary },
+              ]}
+            >
+              {t('home.resendInvite')}
+            </Text>
+          </Pressable>
+
+          {/* View conversation (enabled only when there is a phone) */}
+          <Pressable
+            testID="invite-dropdown-view-conversation"
+            style={[styles.optionRow, !hasPhone && styles.disabledOption]}
+            disabled={!hasPhone}
+            onPress={() => {
+              if (speech && hasPhone) onOpenWhatsApp(speech);
+            }}
           >
             <View style={styles.iconContainer}>
               <WhatsAppIcon size={12} color={hasPhone ? '#25D366' : colors.textSecondary} />
             </View>
-            <Text style={[styles.optionLabel, { color: hasPhone ? colors.text : colors.textSecondary }]}>
-              {t('home.viewConversation')}
-            </Text>
-          </Pressable>
-
-          {/* Dynamic status options (all assigned statuses except current) */}
-          {statusOptions.map((statusOption) => (
-            <Pressable
-              key={statusOption}
-              style={styles.optionRow}
-              onPress={() => {
-                if (speech) {
-                  onChangeStatus(speech.id, statusOption);
-                }
-              }}
+            <Text
+              style={[
+                styles.optionLabel,
+                { color: hasPhone ? colors.text : colors.textSecondary },
+              ]}
             >
-              <View
-                style={[
-                  styles.indicator,
-                  { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
-                ]}
-              />
-              <Text style={[styles.optionLabel, { color: colors.text }]}>
-                {t(`speechStatus.${statusOption}`)}
-              </Text>
-            </Pressable>
-          ))}
-
-          {/* Option 5: Cancel */}
-          <Pressable
-            style={[styles.closeButton, { borderTopColor: colors.divider }]}
-            onPress={onClose}
-          >
-            <Text style={[styles.closeText, { color: colors.primary }]}>
-              {t('common.cancel')}
+              {t('home.viewConversation')}
             </Text>
           </Pressable>
         </View>
@@ -140,17 +206,23 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     paddingTop: 16,
+    paddingBottom: 8,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
   },
-  title: {
-    fontSize: 17,
+  sectionHeader: {
+    fontSize: 13,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 4,
+  },
+  sectionHeaderSpaced: {
+    marginTop: 12,
   },
   optionRow: {
     flexDirection: 'row',
@@ -176,14 +248,5 @@ const styles = StyleSheet.create({
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  closeButton: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  closeText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
 });

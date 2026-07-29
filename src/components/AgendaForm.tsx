@@ -419,6 +419,14 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       </FieldRow>
 
       <ToggleField
+        label={t('agenda.stakeAnnouncements', 'Stake Announcements')}
+        value={agenda.has_stake_announcements}
+        onToggle={(val) => updateField('has_stake_announcements', val)}
+        disabled={isObserver}
+        colors={colors}
+      />
+
+      <ToggleField
         label={t('agenda.babyBlessing', 'Baby Blessing')}
         value={agenda.has_baby_blessing}
         onToggle={(val) => updateField('has_baby_blessing', val)}
@@ -459,14 +467,6 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           />
         </View>
       )}
-
-      <ToggleField
-        label={t('agenda.stakeAnnouncements', 'Stake Announcements')}
-        value={agenda.has_stake_announcements}
-        onToggle={(val) => updateField('has_stake_announcements', val)}
-        disabled={isObserver}
-        colors={colors}
-      />
 
       <FieldRow label={t('agenda.sacramentHymn')} colors={colors}>
         <SelectorField

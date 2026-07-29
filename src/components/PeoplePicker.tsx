@@ -11,7 +11,7 @@
  *    confirmation; on confirm the capability is granted (useUpdateMember) then the member selected.
  *  - Header: a fixed title ("Selecionar Pessoa") plus a per-context subtitle.
  *  - Row secondary line varies by context: speaker/prayers → speech count + "Responsável por…";
- *    preside/conduct/lead_music/play_piano → none; be_recognized → calling + functions.
+ *    preside/conduct/lead_music/play_piano → none; be_recognized → calling only.
  *  - Per-row edit (member:write) opens PersonEditor; deletion now lives in PersonEditor (no per-row
  *    trash). An "add person" entry creates a new member.
  *  - Selecting is gated by agenda:write / speech:assign; observers are view-only.
@@ -32,7 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SearchInput } from './SearchInput';
-import { CheckSquareIcon, SquareIcon, PencilIcon } from './icons';
+import { CheckSquareIcon, SquareIcon, PencilIcon, PlusIcon } from './icons';
 import {
   useMembers,
   useUpdateMember,
@@ -40,7 +40,7 @@ import {
   filterMembers,
 } from '../hooks/useMembers';
 import { useSpeechCounts } from '../hooks/useSpeechCounts';
-import { PersonEditor, CAPABILITY_ORDER, CAPABILITY_FIELD, type PeopleCapability } from './PersonEditor';
+import { PersonEditor, CAPABILITY_FIELD, type PeopleCapability } from './PersonEditor';
 import type { Member } from '../types/database';
 
 export type { PeopleCapability };
@@ -215,7 +215,6 @@ export function PeoplePicker({
     ({ item }: { item: Member }) => {
       const isSelected = selectedSet.has(item.id);
       const count = speechCounts[item.id] ?? 0;
-      const activeCaps = CAPABILITY_ORDER.filter((cap) => item[CAPABILITY_FIELD[cap]] === true);
       const responsibleFor = responsibleForMap.get(item.id);
 
       return (
@@ -271,23 +270,14 @@ export function PeoplePicker({
                 </>
               ) : null}
 
-              {/* P5b: be_recognized — calling (when set) + functions. */}
-              {secondaryMode === 'recognized' ? (
-                <>
-                  {item.calling ? (
-                    <Text
-                      style={[styles.meta, { color: colors.textSecondary }]}
-                      testID={`people-picker-calling-${item.id}`}
-                    >
-                      {item.calling}
-                    </Text>
-                  ) : null}
-                  {activeCaps.length > 0 ? (
-                    <Text style={[styles.meta, { color: colors.textTertiary }]}>
-                      {activeCaps.map((cap) => t(`capabilitiesShort.${cap}`)).join(' · ')}
-                    </Text>
-                  ) : null}
-                </>
+              {/* P5b: be_recognized — calling ONLY (when set); no functions. */}
+              {secondaryMode === 'recognized' && item.calling ? (
+                <Text
+                  style={[styles.meta, { color: colors.textSecondary }]}
+                  testID={`people-picker-calling-${item.id}`}
+                >
+                  {item.calling}
+                </Text>
               ) : null}
             </View>
           </Pressable>
@@ -323,8 +313,25 @@ export function PeoplePicker({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Top bar: Cancel (left) / centered title / right spacer (mirrors PersonEditor). */}
+        <View style={[styles.topBar, { borderBottomColor: colors.divider }]}>
+          <Pressable testID="people-picker-close" onPress={handleClose} style={styles.topBarBtn}>
+            <Text style={[styles.topBarBtnText, { color: colors.primary }]}>
+              {t('common.cancel')}
+            </Text>
+          </Pressable>
+          <Text
+            testID="people-picker-title"
+            style={[styles.title, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {t('people.pickerTitle')}
+          </Text>
+          <View style={styles.topBarBtn} />
+        </View>
+
+        {/* Search + compact add button (member:write only). */}
+        <View style={styles.searchRow}>
           <SearchInput
             testID="people-picker-search"
             style={styles.searchInput}
@@ -333,28 +340,29 @@ export function PeoplePicker({
             placeholder={t('common.search')}
             autoCapitalize="words"
           />
-          <Pressable testID="people-picker-close" onPress={handleClose} style={styles.closeBtn}>
-            <Text style={[styles.closeText, { color: colors.primary }]}>{t('common.close')}</Text>
-          </Pressable>
+          {canManage ? (
+            <Pressable
+              testID="people-picker-add"
+              accessibilityLabel={t('people.addPerson')}
+              onPress={() => openEditor(null)}
+              hitSlop={8}
+              style={[styles.addIconBtn, { backgroundColor: colors.primary }]}
+            >
+              <PlusIcon size={22} color={colors.onPrimary} />
+            </Pressable>
+          ) : null}
         </View>
 
-        {/* P2: fixed title + per-context subtitle; P6: "Ver todos" Switch in capability contexts. */}
-        <View style={styles.titleBlock}>
-          <Text testID="people-picker-title" style={[styles.title, { color: colors.text }]}>
-            {t('people.pickerTitle')}
-          </Text>
-          {effectiveCapability ? (
-            <View style={styles.subtitleRow}>
-              {context ? (
-                <Text
-                  testID="people-picker-subtitle"
-                  style={[styles.subtitle, { color: colors.textSecondary }]}
-                >
-                  {t(`people.subtitles.${context}`)}
-                </Text>
-              ) : (
-                <View style={styles.subtitleSpacer} />
-              )}
+        {/* Subtitle (left) + "Ver todos" toggle (right, capability contexts only). */}
+        {context ? (
+          <View style={styles.subtitleRow}>
+            <Text
+              testID="people-picker-subtitle"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
+              {t(`people.subtitles.${context}`)}
+            </Text>
+            {effectiveCapability ? (
               <View style={styles.viewAllControl}>
                 <Text style={[styles.viewAllText, { color: colors.text }]}>
                   {t('people.viewAll')}
@@ -365,28 +373,22 @@ export function PeoplePicker({
                   onValueChange={setShowAll}
                 />
               </View>
+            ) : null}
+          </View>
+        ) : effectiveCapability ? (
+          <View style={styles.subtitleRow}>
+            <View style={styles.subtitleSpacer} />
+            <View style={styles.viewAllControl}>
+              <Text style={[styles.viewAllText, { color: colors.text }]}>
+                {t('people.viewAll')}
+              </Text>
+              <Switch
+                testID="people-picker-view-all"
+                value={showAll}
+                onValueChange={setShowAll}
+              />
             </View>
-          ) : context ? (
-            <Text
-              testID="people-picker-subtitle"
-              style={[styles.subtitle, { color: colors.textSecondary }]}
-            >
-              {t(`people.subtitles.${context}`)}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Add person */}
-        {canManage ? (
-          <Pressable
-            testID="people-picker-add"
-            style={[styles.addButton, { borderColor: colors.primary }]}
-            onPress={() => openEditor(null)}
-          >
-            <Text style={[styles.addButtonText, { color: colors.primary }]}>
-              + {t('people.addPerson')}
-            </Text>
-          </Pressable>
+          </View>
         ) : null}
 
         <FlatList
@@ -422,11 +424,33 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 60,
   },
-  header: {
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  topBarBtn: {
+    paddingVertical: 8,
+    minWidth: 72,
+  },
+  topBarBtnText: {
+    fontSize: 16,
+  },
+  title: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
     gap: 12,
   },
   searchInput: {
@@ -437,26 +461,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 15,
   },
-  closeBtn: {
-    paddingVertical: 8,
-  },
-  closeText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  titleBlock: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
+  addIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   subtitle: {
     flex: 1,
@@ -472,19 +489,6 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    fontWeight: '500',
-  },
-  addButton: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderRadius: 8,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    fontSize: 15,
     fontWeight: '500',
   },
   row: {

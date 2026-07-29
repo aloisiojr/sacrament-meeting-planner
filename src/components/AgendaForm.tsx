@@ -26,6 +26,7 @@ import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda
 import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment, useLazyCreateSpeeches } from '../hooks/useSpeeches';
 import { useHymns, useSacramentalHymns, formatHymnDisplay, filterHymns } from '../hooks/useHymns';
 import { useMembers } from '../hooks/useMembers';
+import { resolveCallingForName } from '../hooks/usePresentationMode';
 import { getCurrentLanguage } from '../i18n';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { EditableListField, parseItems, joinItems } from './EditableListField';
@@ -274,6 +275,10 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           disabled={isObserver}
           placeholder={t('agenda.addPresence')}
           onFieldFocus={onFieldFocus}
+          renderItemLabel={(name) => {
+            const c = resolveCallingForName(name, members ?? []);
+            return c ? `${name} — ${c}` : name;
+          }}
           onItemPress={() => {
             if (!isObserver) setPeoplePicker({ mode: 'recognize' });
           }}

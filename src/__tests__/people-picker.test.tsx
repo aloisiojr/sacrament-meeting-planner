@@ -245,6 +245,37 @@ describe('PeoplePicker', () => {
 
   // --- Context: title / subtitle / toggle (P2, P6) ---
 
+  it('top bar shows "Cancel" on the left (replaces Close) and still closes (A)', () => {
+    const { renderer, onClose } = render();
+    const closeBtn = find(renderer.root, 'people-picker-close')[0];
+    const label = closeBtn
+      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+      .map((n) => n.props.children as string)
+      .join('');
+    expect(label).toContain('common.cancel');
+    expect(label).not.toContain('common.close');
+    press(renderer.root, 'people-picker-close');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('title is centered in the top bar (A)', () => {
+    const { renderer } = render();
+    const title = find(renderer.root, 'people-picker-title')[0];
+    expect(JSON.stringify(title.props.style)).toContain('center');
+  });
+
+  it('add control is a compact icon button next to search — not a dashed text button (A)', () => {
+    const { renderer } = render();
+    const add = find(renderer.root, 'people-picker-add')[0];
+    expect(add).toBeDefined();
+    expect(add.props.accessibilityLabel).toBe('people.addPerson');
+    // Renders an icon (Svg), not the old "+ Add person" text label.
+    expect(add.findAll((n) => n.type === 'Svg').length).toBeGreaterThan(0);
+    const flatten = (c: unknown): string =>
+      Array.isArray(c) ? c.map(flatten).join('') : typeof c === 'string' ? c : '';
+    expect(flatten(add.props.children)).not.toContain('addPerson');
+  });
+
   it('always shows the fixed picker title (P2)', () => {
     for (const ctx of [undefined, 'speaker', 'preside', 'be_recognized'] as const) {
       const { renderer } = render(ctx ? { context: ctx } : {});
@@ -306,7 +337,7 @@ describe('PeoplePicker', () => {
     expect(text).not.toContain('capabilitiesShort');
   });
 
-  it('be_recognized context: 2nd line shows calling + functions (P5b)', () => {
+  it('be_recognized context: 2nd line shows calling ONLY — no functions (P5b)', () => {
     MEMBERS = [
       makeMember({
         id: 'r',
@@ -320,7 +351,17 @@ describe('PeoplePicker', () => {
     const row = renderRow(renderer, MEMBERS[0]);
     expect(textOf(row.root, 'people-picker-calling-r')).toBe('Bispo');
     const text = JSON.stringify(row.toJSON());
-    expect(text).toContain('capabilitiesShort');
+    // Functions (capabilitiesShort) must NOT appear on the recognize line.
+    expect(text).not.toContain('capabilitiesShort');
+  });
+
+  it('be_recognized context: no calling → no secondary line (P5b)', () => {
+    MEMBERS = [
+      makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: null, can_be_recognized: true }),
+    ];
+    const { renderer } = render({ context: 'be_recognized' });
+    const row = renderRow(renderer, MEMBERS[0]);
+    expect(find(row.root, 'people-picker-calling-r2').length).toBe(0);
   });
 
   // --- Multi-select keep-selected (P7) ---

@@ -7,6 +7,7 @@ import {
   isTodaySunday,
   getTodaySundayDate,
   buildPresentationCards,
+  resolveCallingForName,
 } from '../hooks/usePresentationMode';
 import type { SundayAgenda, Speech, SundayException, Member } from '../types/database';
 
@@ -214,6 +215,46 @@ describe('buildPresentationCards', () => {
     const lastCard = cards[2];
     const typeField = lastCard.fields.find((f) => f.label.includes('Meeting Type'));
     expect(typeField).toBeDefined();
+  });
+});
+
+describe('resolveCallingForName', () => {
+  it('returns the calling on a unique match with a non-empty calling', () => {
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' })];
+    expect(resolveCallingForName('Ricardo Almeida', members)).toBe('Bispo');
+  });
+
+  it('matches accent- and whitespace-insensitively', () => {
+    const members = [makeMember({ full_name: 'João Vasconcelos', calling: '1º Conselheiro' })];
+    expect(resolveCallingForName('joao  vasconcelos', members)).toBe('1º Conselheiro');
+  });
+
+  it('returns null when the unique match has no calling', () => {
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: null })];
+    expect(resolveCallingForName('Ricardo Almeida', members)).toBeNull();
+  });
+
+  it('returns null when the calling is only whitespace', () => {
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: '   ' })];
+    expect(resolveCallingForName('Ricardo Almeida', members)).toBeNull();
+  });
+
+  it('returns null when no member matches', () => {
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' })];
+    expect(resolveCallingForName('Someone Unknown', members)).toBeNull();
+  });
+
+  it('returns null for ambiguous matches (multiple members)', () => {
+    const members = [
+      makeMember({ id: 'm-1', full_name: 'Ricardo Almeida', calling: 'Bispo' }),
+      makeMember({ id: 'm-2', full_name: 'Ricardo Almeida', calling: 'Secretário' }),
+    ];
+    expect(resolveCallingForName('Ricardo Almeida', members)).toBeNull();
+  });
+
+  it('returns null for an empty/whitespace name', () => {
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' })];
+    expect(resolveCallingForName('   ', members)).toBeNull();
   });
 });
 

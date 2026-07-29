@@ -48,6 +48,20 @@ function normalizeName(name: string): string {
 }
 
 /**
+ * Resolve the `calling` (chamado) for a single recognized name. Returns the calling
+ * only when EXACTLY ONE member has a matching `full_name` (accent/whitespace-insensitive)
+ * AND a non-empty calling; otherwise (ambiguous, no match, or no calling) returns null.
+ */
+export function resolveCallingForName(name: string, members: Member[]): string | null {
+  const key = normalizeName(name);
+  if (!key) return null;
+  const matches = members.filter((m) => normalizeName(m.full_name) === key);
+  if (matches.length !== 1) return null;
+  const calling = matches[0].calling?.trim();
+  return calling ? calling : null;
+}
+
+/**
  * Enrich a newline-joined string of recognized `full_name`s with each person's
  * `calling` (chamado). For each line, if exactly ONE member has a matching
  * `full_name` (accent/whitespace-insensitive) AND a non-empty `calling`, the
@@ -58,25 +72,11 @@ function normalizeName(name: string): string {
 export function enrichRecognizedNames(recognizedNames: string, members: Member[]): string {
   if (!recognizedNames) return recognizedNames;
 
-  const byName = new Map<string, Member[]>();
-  for (const m of members) {
-    const key = normalizeName(m.full_name);
-    const list = byName.get(key) ?? [];
-    list.push(m);
-    byName.set(key, list);
-  }
-
   return recognizedNames
     .split('\n')
     .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return line;
-      const matches = byName.get(normalizeName(trimmed));
-      if (matches && matches.length === 1) {
-        const calling = matches[0].calling?.trim();
-        if (calling) return `${line} — ${calling}`;
-      }
-      return line;
+      const calling = resolveCallingForName(line, members);
+      return calling ? `${line} — ${calling}` : line;
     })
     .join('\n');
 }

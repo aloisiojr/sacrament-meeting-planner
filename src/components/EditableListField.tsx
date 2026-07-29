@@ -38,11 +38,17 @@ interface EditableListFieldProps {
   onItemPress?: (index: number, item: string) => void;
   onAddPress?: () => void;
   onFieldFocus?: (touchY: number) => void;
+  /**
+   * Optional DISPLAY-ONLY label transform. Applied to the text shown for an item in the
+   * onItemPress (read/select) row and the disabled read-only row. Never applied to the raw
+   * item used for parsing/saving/deleting/onItemPress, so stored data stays untouched.
+   */
+  renderItemLabel?: (item: string) => string;
 }
 
 // --- Component ---
 
-export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress, onFieldFocus }: EditableListFieldProps) {
+export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress, onFieldFocus, renderItemLabel }: EditableListFieldProps) {
   const { colors } = useTheme();
   const [items, setItems] = useState<string[]>(() => parseItems(value));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -163,7 +169,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
         {items.map((item, idx) => (
           <View key={idx} style={styles.disabledRow}>
             <Text style={[styles.disabledText, { color: colors.text }]}>
-              {item}
+              {renderItemLabel ? renderItemLabel(item) : item}
             </Text>
           </View>
         ))}
@@ -183,7 +189,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
           {onItemPress ? (
             <Pressable style={styles.itemTextPressable} onPress={() => { handleInputFocus(); onItemPress(idx, item); }}>
               <Text style={[styles.itemText, { color: colors.text }]}>
-                {item}
+                {renderItemLabel ? renderItemLabel(item) : item}
               </Text>
             </Pressable>
           ) : (

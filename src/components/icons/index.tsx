@@ -262,6 +262,28 @@ export const XIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   </Svg>
 );
 
+/** Lucide: plus (https://lucide.dev/icons/plus) */
+export const PlusIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M5 12h14"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M12 5v14"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
 /** Lucide: chevron-down (https://lucide.dev/icons/chevron-down) */
 export const ChevronDownIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

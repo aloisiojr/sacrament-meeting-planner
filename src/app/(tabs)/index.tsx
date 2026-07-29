@@ -160,7 +160,7 @@ function HomeTabContent() {
         </View>
 
         {upcomingCards.length > 0 && (
-          <View style={styles.section}>
+          <View>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               {t('home.upcomingSundays')}
             </Text>
@@ -192,14 +192,12 @@ const styles = StyleSheet.create({
   scroll: {
     paddingBottom: 24,
   },
-  section: {
-    marginTop: 12,
-  },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   meetingButton: {
     marginHorizontal: 16,

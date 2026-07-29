@@ -212,13 +212,12 @@ export function NextAssignmentsSection() {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    marginBottom: 24,
-  },
+  section: {},
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
 });

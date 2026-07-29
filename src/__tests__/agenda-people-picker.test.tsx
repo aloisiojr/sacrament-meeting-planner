@@ -23,6 +23,7 @@ const { act } = TestRenderer;
 
 const h = vi.hoisted(() => ({
   lastPickerProps: null as null | {
+    context?: string;
     capability?: string;
     multiSelect?: boolean;
     selectedIds?: string[];
@@ -200,18 +201,18 @@ beforeEach(() => {
 // --- Tests ---
 
 describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
-  const roleCases: { testID: string; capability: string; nameField: string }[] = [
-    { testID: 'agenda-presiding-selector', capability: 'preside', nameField: 'presiding_name' },
-    { testID: 'agenda-conducting-selector', capability: 'conduct', nameField: 'conducting_name' },
-    { testID: 'agenda-pianist-selector', capability: 'play_piano', nameField: 'pianist_name' },
-    { testID: 'agenda-conductor-selector', capability: 'lead_music', nameField: 'conductor_name' },
+  const roleCases: { testID: string; context: string; nameField: string }[] = [
+    { testID: 'agenda-presiding-selector', context: 'preside', nameField: 'presiding_name' },
+    { testID: 'agenda-conducting-selector', context: 'conduct', nameField: 'conducting_name' },
+    { testID: 'agenda-pianist-selector', context: 'play_piano', nameField: 'pianist_name' },
+    { testID: 'agenda-conductor-selector', context: 'lead_music', nameField: 'conductor_name' },
   ];
 
-  for (const { testID, capability, nameField } of roleCases) {
-    it(`${nameField}: opens PeoplePicker with capability='${capability}' and writes only the name snapshot`, () => {
+  for (const { testID, context, nameField } of roleCases) {
+    it(`${nameField}: opens PeoplePicker with context='${context}' and writes only the name snapshot`, () => {
       const renderer = render();
       press(renderer.root, testID);
-      expect(h.lastPickerProps?.capability).toBe(capability);
+      expect(h.lastPickerProps?.context).toBe(context);
       expect(h.lastPickerProps?.multiSelect).toBeFalsy();
 
       act(() => h.lastPickerProps!.onSelect(MEMBER));
@@ -223,10 +224,10 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     });
   }
 
-  it('recognition: opens multiSelect with capability be_recognized and newline-joins names', () => {
+  it('recognition: opens multiSelect with context be_recognized and newline-joins names', () => {
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
-    expect(h.lastPickerProps?.capability).toBe('be_recognized');
+    expect(h.lastPickerProps?.context).toBe('be_recognized');
     expect(h.lastPickerProps?.multiSelect).toBe(true);
     expect(h.lastPickerProps?.selectedIds).toEqual([]);
 
@@ -259,9 +260,10 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     expect(fields.recognized_names).toBeNull();
   });
 
-  it('prayers: open PeoplePicker with NO capability and assign the member to the speech', () => {
+  it('prayers: open PeoplePicker with context opening_prayer and assign the member to the speech', () => {
     const renderer = render();
     press(renderer.root, 'agenda-opening-prayer-selector');
+    expect(h.lastPickerProps?.context).toBe('opening_prayer');
     expect(h.lastPickerProps?.capability).toBeUndefined();
     expect(h.lastPickerProps?.multiSelect).toBeFalsy();
 
@@ -283,6 +285,7 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     MEMBERS = [responsible, delegated];
     const renderer = render();
     press(renderer.root, 'agenda-closing-prayer-selector');
+    expect(h.lastPickerProps?.context).toBe('closing_prayer');
     act(() => h.lastPickerProps!.onSelect(delegated));
     const input = assignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s4');

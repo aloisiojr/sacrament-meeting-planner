@@ -26,7 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SundayCard } from '../../components/SundayCard';
 import { SpeechSlot } from '../../components/SpeechSlot';
-import { PeoplePicker } from '../../components/PeoplePicker';
+import { PeoplePicker, type PickerContext } from '../../components/PeoplePicker';
 import { TopicSelectorModal } from '../../components/TopicSelectorModal';
 import { useMembers } from '../../hooks/useMembers';
 import { resolveContactSnapshot } from '../../lib/contact';
@@ -430,6 +430,14 @@ function SpeechesTabContent() {
 
   const today = useMemo(() => toISODateString(new Date()), []);
 
+  // Picker context for the open speaker/prayer selector: prayers (position 0/4) vs speakers.
+  const speakerModalContext = useMemo<PickerContext>(() => {
+    const speech = (speeches ?? []).find((s) => s.id === speakerModalSpeechId);
+    if (speech?.position === 0) return 'opening_prayer';
+    if (speech?.position === 4) return 'closing_prayer';
+    return 'speaker';
+  }, [speeches, speakerModalSpeechId]);
+
   const renderItem = useCallback(
     ({ item }: { item: ListItem }) => {
       if (item.type === 'year') {
@@ -640,6 +648,7 @@ function SpeechesTabContent() {
       {/* Speaker / Prayer Selector (v2.0 unified people picker; undefined capability = everyone) */}
       <PeoplePicker
         visible={!!speakerModalSpeechId}
+        context={speakerModalContext}
         onSelect={(member) => {
           if (speakerModalSpeechId) {
             handleAssignSpeaker(speakerModalSpeechId, member);

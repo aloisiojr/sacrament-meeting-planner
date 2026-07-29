@@ -69,26 +69,32 @@ const DIRECT = makeMember({
 
 const MEMBERS = [RESPONSIBLE, DELEGATE, DIRECT];
 
-const SPEECH_1 = {
-  id: 'sp1',
-  ward_id: 'w1',
-  sunday_date: EXPAND_DATE,
-  position: 1,
-  member_id: null,
-  speaker_name: null,
-  speaker_informal_name: null,
-  speaker_phone: null,
-  topic_title: null,
-  topic_link: null,
-  topic_collection: null,
-  assigned_by_role: null,
-  status: 'not_assigned' as const,
-  contact_phone: null,
-  is_delegated: false,
-  delegate_for_name: null,
-  created_at: '',
-  updated_at: '',
-};
+function makeSpeech(id: string, position: number) {
+  return {
+    id,
+    ward_id: 'w1',
+    sunday_date: EXPAND_DATE,
+    position,
+    member_id: null,
+    speaker_name: null,
+    speaker_informal_name: null,
+    speaker_phone: null,
+    topic_title: null,
+    topic_link: null,
+    topic_collection: null,
+    assigned_by_role: null,
+    status: 'not_assigned' as const,
+    contact_phone: null,
+    is_delegated: false,
+    delegate_for_name: null,
+    created_at: '',
+    updated_at: '',
+  };
+}
+
+const SPEECH_0 = makeSpeech('sp0', 0);
+const SPEECH_1 = makeSpeech('sp1', 1);
+const SPEECH_4 = makeSpeech('sp4', 4);
 
 const assignSpeakerMock = vi.fn();
 
@@ -138,9 +144,9 @@ vi.mock('../components/SpeechSlot', () => ({
 }));
 
 // PeoplePicker mock: capture props each render so we can invoke onSelect.
-let peoplePickerProps: { visible: boolean; onSelect: (m: Member) => void; onClose: () => void } | null = null;
+let peoplePickerProps: { visible: boolean; context?: string; onSelect: (m: Member) => void; onClose: () => void } | null = null;
 vi.mock('../components/PeoplePicker', () => ({
-  PeoplePicker: (props: { visible: boolean; onSelect: (m: Member) => void; onClose: () => void }) => {
+  PeoplePicker: (props: { visible: boolean; context?: string; onSelect: (m: Member) => void; onClose: () => void }) => {
     peoplePickerProps = props;
     return null;
   },
@@ -170,14 +176,14 @@ vi.mock('../hooks/useSpeeches', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: [SPEECH_1], isError: false, error: null, refetch: vi.fn() }),
+    useSpeeches: () => ({ data: [SPEECH_0, SPEECH_1, SPEECH_4], isError: false, error: null, refetch: vi.fn() }),
     useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
     useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
     useAssignTopic: () => ({ mutate: vi.fn() }),
     useChangeStatus: () => ({ mutate: vi.fn() }),
     useRemoveAssignment: () => ({ mutate: vi.fn() }),
     useDeleteSpeechesByDate: () => ({ mutate: vi.fn() }),
-    useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
+    useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
 
@@ -232,6 +238,8 @@ describe('Speeches tab — v2.0 people picker + delegation snapshot (Phase 3a)',
     const renderer = render();
     openSelectorForPosition(renderer, 1);
     expect(peoplePickerProps!.visible).toBe(true);
+    // A regular speech slot opens the picker in the 'speaker' context.
+    expect(peoplePickerProps!.context).toBe('speaker');
 
     act(() => peoplePickerProps!.onSelect(DELEGATE));
 
@@ -248,6 +256,15 @@ describe('Speeches tab — v2.0 people picker + delegation snapshot (Phase 3a)',
         delegateForName: 'Del',
       })
     );
+  });
+
+  it('opens the picker in the opening_prayer / closing_prayer context for prayer slots', () => {
+    const renderer = render();
+    openSelectorForPosition(renderer, 0);
+    expect(peoplePickerProps!.context).toBe('opening_prayer');
+
+    openSelectorForPosition(renderer, 4);
+    expect(peoplePickerProps!.context).toBe('closing_prayer');
   });
 
   it('records a non-delegated snapshot (own phone) for a direct member (AC8)', () => {

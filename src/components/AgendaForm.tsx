@@ -654,7 +654,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       {peoplePicker?.mode === 'role' && (
         <PeoplePicker
           visible
-          capability={peoplePicker.capability}
+          context={peoplePicker.capability}
           onSelect={(member) => {
             handleRoleSelect(member, peoplePicker.nameField);
             setPeoplePicker(null);
@@ -666,7 +666,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       {peoplePicker?.mode === 'recognize' && (
         <PeoplePicker
           visible
-          capability="be_recognized"
+          context="be_recognized"
           multiSelect
           selectedIds={recognizedSelectedIds}
           onSelect={handleRecognizeToggle}
@@ -677,6 +677,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       {peoplePicker?.mode === 'prayer' && (
         <PeoplePicker
           visible
+          context={peoplePicker.position === 0 ? 'opening_prayer' : 'closing_prayer'}
           onSelect={(member) => {
             if (peoplePicker.mode === 'prayer') {
               handlePrayerSelect(member, peoplePicker.position);

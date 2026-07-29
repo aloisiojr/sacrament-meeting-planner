@@ -9,9 +9,10 @@ import { useAgenda , isSpecialMeeting } from './useAgenda';
 import { useSpeeches } from './useSpeeches';
 import { useSundayExceptions } from './useSundayTypes';
 import { useHymns, useSacramentalHymns, formatHymnDisplay } from './useHymns';
+import { useMembers, normalizeForSearch } from './useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { toISODateString } from '../lib/dateUtils';
-import type { SundayAgenda, Speech, SundayException, Hymn } from '../types/database';
+import type { SundayAgenda, Speech, SundayException, Hymn, Member } from '../types/database';
 
 // --- Types ---
 
@@ -36,6 +37,49 @@ export interface PresentationData {
 }
 
 // --- Utilities ---
+
+/**
+ * Normalize a name for accent- and whitespace-insensitive exact matching.
+ * Strips diacritics + lowercases (via normalizeForSearch), then trims and
+ * collapses internal whitespace so "  João   Silva " matches "Joao Silva".
+ */
+function normalizeName(name: string): string {
+  return normalizeForSearch(name).trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Enrich a newline-joined string of recognized `full_name`s with each person's
+ * `calling` (chamado). For each line, if exactly ONE member has a matching
+ * `full_name` (accent/whitespace-insensitive) AND a non-empty `calling`, the
+ * line becomes "Name — Calling"; otherwise the line is left unchanged.
+ * Ambiguous (multiple matches), no match, or no calling → name only.
+ * The newline-joined `bullet_list` shape is preserved.
+ */
+export function enrichRecognizedNames(recognizedNames: string, members: Member[]): string {
+  if (!recognizedNames) return recognizedNames;
+
+  const byName = new Map<string, Member[]>();
+  for (const m of members) {
+    const key = normalizeName(m.full_name);
+    const list = byName.get(key) ?? [];
+    list.push(m);
+    byName.set(key, list);
+  }
+
+  return recognizedNames
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+      const matches = byName.get(normalizeName(trimmed));
+      if (matches && matches.length === 1) {
+        const calling = matches[0].calling?.trim();
+        if (calling) return `${line} — ${calling}`;
+      }
+      return line;
+    })
+    .join('\n');
+}
 
 /**
  * Check if today is Sunday (00:00-23:59 in local time).
@@ -66,7 +110,8 @@ export function buildPresentationCards(
   speeches: Speech[],
   exception: SundayException | null,
   hymnLookup: (id: string | null) => string,
-  t: (key: string, fallback?: string) => string
+  t: (key: string, fallback?: string) => string,
+  members: Member[] = []
 ): PresentationCard[] {
   const isSpecial = isSpecialMeeting(exception?.reason ?? null);
   const cards: PresentationCard[] = [];
@@ -79,7 +124,7 @@ export function buildPresentationCards(
   if (agenda?.recognized_names) {
     welcomeFields.push({
       label: t('agenda.recognizing'),
-      value: agenda.recognized_names,
+      value: enrichRecognizedNames(agenda.recognized_names, members),
       type: 'bullet_list',
     });
   }
@@ -231,6 +276,7 @@ export function usePresentationData(sundayDate: string) {
   );
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
+  const { data: members } = useMembers();
 
   const exception = useMemo(() => {
     return exceptions?.find((e) => e.date === sundayDate) ?? null;
@@ -262,6 +308,7 @@ export function usePresentationData(sundayDate: string) {
     isSpecial,
     isLoading,
     hymnLookup,
+    members: members ?? [],
     sundayDate,
   };
 }

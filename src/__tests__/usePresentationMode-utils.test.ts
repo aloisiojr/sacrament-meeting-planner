@@ -8,7 +8,7 @@ import {
   getTodaySundayDate,
   buildPresentationCards,
 } from '../hooks/usePresentationMode';
-import type { SundayAgenda, Speech, SundayException } from '../types/database';
+import type { SundayAgenda, Speech, SundayException, Member } from '../types/database';
 
 function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
   return {
@@ -67,6 +67,28 @@ function makeSpeech(position: number, overrides: Partial<Speech> = {}): Speech {
     contact_phone: null,
     is_delegated: false,
     delegate_for_name: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function makeMember(overrides: Partial<Member> = {}): Member {
+  return {
+    id: 'mem-1',
+    ward_id: 'w-1',
+    full_name: 'Ricardo Almeida',
+    informal_name: null,
+    country_code: '+55',
+    phone: null,
+    can_preside: false,
+    can_conduct: false,
+    can_lead_music: false,
+    can_play_piano: false,
+    can_be_recognized: true,
+    contact_via_responsible: false,
+    responsible_id: null,
+    calling: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -192,5 +214,65 @@ describe('buildPresentationCards', () => {
     const lastCard = cards[2];
     const typeField = lastCard.fields.find((f) => f.label.includes('Meeting Type'));
     expect(typeField).toBeDefined();
+  });
+});
+
+describe('buildPresentationCards — recognized people callings (PR1)', () => {
+  function getRecognizedValue(
+    agenda: SundayAgenda,
+    members: Member[]
+  ): string | undefined {
+    const cards = buildPresentationCards(agenda, [], null, mockHymnLookup, mockT, members);
+    const welcomeCard = cards[0];
+    return welcomeCard.fields.find((f) => f.label === 'agenda.recognizing')?.value;
+  }
+
+  it('appends "— Calling" when a recognized person has a matching member with a calling', () => {
+    const agenda = makeAgenda({ recognized_names: 'Ricardo Almeida' });
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' })];
+    expect(getRecognizedValue(agenda, members)).toBe('Ricardo Almeida — Bispo');
+  });
+
+  it('leaves the name unchanged when the matching member has no calling', () => {
+    const agenda = makeAgenda({ recognized_names: 'Ricardo Almeida' });
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: null })];
+    expect(getRecognizedValue(agenda, members)).toBe('Ricardo Almeida');
+  });
+
+  it('leaves the name unchanged when no member matches', () => {
+    const agenda = makeAgenda({ recognized_names: 'Someone Unknown' });
+    const members = [makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' })];
+    expect(getRecognizedValue(agenda, members)).toBe('Someone Unknown');
+  });
+
+  it('matches accent- and whitespace-insensitively', () => {
+    const agenda = makeAgenda({ recognized_names: 'joao  vasconcelos' });
+    const members = [makeMember({ full_name: 'João Vasconcelos', calling: '1º Conselheiro' })];
+    expect(getRecognizedValue(agenda, members)).toBe('joao  vasconcelos — 1º Conselheiro');
+  });
+
+  it('leaves ambiguous names (multiple matches) unchanged', () => {
+    const agenda = makeAgenda({ recognized_names: 'Ricardo Almeida' });
+    const members = [
+      makeMember({ id: 'm-1', full_name: 'Ricardo Almeida', calling: 'Bispo' }),
+      makeMember({ id: 'm-2', full_name: 'Ricardo Almeida', calling: 'Secretário' }),
+    ];
+    expect(getRecognizedValue(agenda, members)).toBe('Ricardo Almeida');
+  });
+
+  it('enriches each line of a multi-name recognized list independently', () => {
+    const agenda = makeAgenda({ recognized_names: 'Ricardo Almeida\nPaulo Santos' });
+    const members = [
+      makeMember({ id: 'm-1', full_name: 'Ricardo Almeida', calling: 'Bispo' }),
+      makeMember({ id: 'm-2', full_name: 'Paulo Santos', calling: null }),
+    ];
+    expect(getRecognizedValue(agenda, members)).toBe('Ricardo Almeida — Bispo\nPaulo Santos');
+  });
+
+  it('leaves names unchanged when no members list is provided (default param)', () => {
+    const agenda = makeAgenda({ recognized_names: 'Ricardo Almeida' });
+    const cards = buildPresentationCards(agenda, [], null, mockHymnLookup, mockT);
+    const value = cards[0].fields.find((f) => f.label === 'agenda.recognizing')?.value;
+    expect(value).toBe('Ricardo Almeida');
   });
 });

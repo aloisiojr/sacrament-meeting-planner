@@ -53,6 +53,7 @@ export default function PresentationScreen() {
     exception,
     isLoading,
     hymnLookup,
+    members,
   } = usePresentationData(sundayDate);
 
   const tFn = useCallback(
@@ -61,8 +62,8 @@ export default function PresentationScreen() {
   );
 
   const cards = useMemo(
-    () => buildPresentationCards(agenda ?? null, speeches, exception, hymnLookup, tFn),
-    [agenda, speeches, exception, hymnLookup, tFn]
+    () => buildPresentationCards(agenda ?? null, speeches, exception, hymnLookup, tFn, members),
+    [agenda, speeches, exception, hymnLookup, tFn, members]
   );
 
   const accordionCards = useMemo(

@@ -346,9 +346,12 @@ export function PeoplePicker({
               accessibilityLabel={t('people.addPerson')}
               onPress={() => openEditor(null)}
               hitSlop={8}
-              style={[styles.addIconBtn, { backgroundColor: colors.primary }]}
+              style={[styles.addBtn, { backgroundColor: colors.primary }]}
             >
-              <PlusIcon size={22} color={colors.onPrimary} />
+              <PlusIcon size={18} color={colors.onPrimary} />
+              <Text style={[styles.addBtnText, { color: colors.onPrimary }]}>
+                {t('people.add')}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -358,17 +361,18 @@ export function PeoplePicker({
           <View style={styles.subtitleRow}>
             <Text
               testID="people-picker-subtitle"
-              style={[styles.subtitle, { color: colors.textSecondary }]}
+              style={[styles.subtitle, { color: colors.text }]}
             >
               {t(`people.subtitles.${context}`)}
             </Text>
             {effectiveCapability ? (
               <View style={styles.viewAllControl}>
-                <Text style={[styles.viewAllText, { color: colors.text }]}>
+                <Text style={[styles.viewAllText, { color: colors.textSecondary }]}>
                   {t('people.viewAll')}
                 </Text>
                 <Switch
                   testID="people-picker-view-all"
+                  style={styles.viewAllSwitch}
                   value={showAll}
                   onValueChange={setShowAll}
                 />
@@ -441,7 +445,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -450,7 +454,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 20,
     gap: 12,
   },
   searchInput: {
@@ -461,12 +465,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 15,
   },
-  addIconBtn: {
-    width: 40,
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     height: 40,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   subtitleRow: {
     flexDirection: 'row',
@@ -477,7 +486,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
   },
   subtitleSpacer: {
     flex: 1,
@@ -490,6 +500,9 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  viewAllSwitch: {
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   row: {
     flexDirection: 'row',

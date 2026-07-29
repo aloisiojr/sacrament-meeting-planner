@@ -148,7 +148,7 @@ export default function MembersScreen() {
     } finally {
       exportingRef.current = false;
     }
-  }, [members, t]);
+  }, [members, t, i18n.language]);
 
   // CSV Import mutation (destructive atomic overwrite via RPC — full dump).
   const importMutation = useMutation({

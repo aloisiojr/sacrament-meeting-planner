@@ -33,13 +33,19 @@ export function normalizeForSearch(text: string): string {
 
 /**
  * Filter members by search term (case-insensitive, accent-insensitive).
+ * When `includeCalling` is true, also matches the member's calling (chamado).
  */
-export function filterMembers(members: Member[], search: string): Member[] {
+export function filterMembers(
+  members: Member[],
+  search: string,
+  includeCalling = false
+): Member[] {
   if (!search.trim()) return members;
   const normalized = normalizeForSearch(search);
   return members.filter((m) =>
     normalizeForSearch(m.full_name).includes(normalized) ||
-    normalizeForSearch(m.informal_name ?? '').includes(normalized)
+    normalizeForSearch(m.informal_name ?? '').includes(normalized) ||
+    (includeCalling && normalizeForSearch(m.calling ?? '').includes(normalized))
   );
 }
 

@@ -106,6 +106,23 @@ describe('useMembers utilities', () => {
     });
   });
 
+  describe('filterMembers - calling search (includeCalling)', () => {
+    const members = [
+      makeMember({ full_name: 'Ricardo Almeida', calling: 'Bispo' }),
+      makeMember({ full_name: 'Paulo Santos', calling: 'Secretário' }),
+    ];
+
+    it('does NOT match by calling by default', () => {
+      expect(filterMembers(members, 'Bispo')).toHaveLength(0);
+    });
+
+    it('matches by calling when includeCalling is true (accent-insensitive)', () => {
+      const result = filterMembers(members, 'secretario', true);
+      expect(result).toHaveLength(1);
+      expect(result[0].full_name).toBe('Paulo Santos');
+    });
+  });
+
   describe('filterMembers - informal_name search', () => {
     it('matches member by informal_name', () => {
       const members = [

@@ -327,14 +327,42 @@ describe('PeoplePicker', () => {
     expect(text).not.toContain('capabilitiesShort');
   });
 
-  it('preside context: name only — no speech count, responsible, functions or calling (P5)', () => {
+  it('preside context: 2nd line shows calling (when set), no speech/responsible/functions', () => {
+    MEMBERS = [
+      makeMember({ id: 'p', full_name: 'Ana Lima', calling: 'Presidente da SS', can_preside: true }),
+    ];
     const { renderer } = render({ context: 'preside' });
-    const row = renderRow(renderer, MEMBER_A);
-    expect(find(row.root, 'people-picker-responsible-a').length).toBe(0);
-    expect(find(row.root, 'people-picker-calling-a').length).toBe(0);
+    const row = renderRow(renderer, MEMBERS[0]);
+    expect(textOf(row.root, 'people-picker-calling-p')).toBe('Presidente da SS');
+    expect(find(row.root, 'people-picker-responsible-p').length).toBe(0);
     const text = JSON.stringify(row.toJSON());
     expect(text).not.toContain('members.speechCount');
     expect(text).not.toContain('capabilitiesShort');
+  });
+
+  it('play_piano/lead_music context: never shows calling — name only', () => {
+    MEMBERS = [
+      makeMember({ id: 'k', full_name: 'Beto Piano', calling: 'Organista', can_play_piano: true }),
+    ];
+    for (const ctx of ['play_piano', 'lead_music'] as const) {
+      const { renderer } = render({ context: ctx });
+      const row = renderRow(renderer, MEMBERS[0]);
+      expect(find(row.root, 'people-picker-calling-k').length).toBe(0);
+    }
+  });
+
+  it('calling contexts: search also matches the calling text', () => {
+    MEMBERS = [
+      makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo', can_be_recognized: true }),
+      makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: 'Secretário', can_be_recognized: true }),
+    ];
+    const { renderer } = render({ context: 'be_recognized' });
+    act(() => {
+      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+        'Bispo'
+      );
+    });
+    expect(ids(renderer)).toEqual(['r']);
   });
 
   it('be_recognized context: 2nd line shows calling ONLY — no functions (P5b)', () => {

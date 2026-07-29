@@ -118,14 +118,12 @@ export function PeoplePicker({
     : capability ?? null;
   const capabilityField = effectiveCapability ? CAPABILITY_FIELD[effectiveCapability] : null;
 
-  // Secondary-line mode per context (P4/P5/P5b). Undefined context falls back to the speaker rules.
-  const secondaryMode: 'speech' | 'none' | 'recognized' =
-    context === 'be_recognized'
-      ? 'recognized'
-      : context === 'preside' ||
-        context === 'conduct' ||
-        context === 'lead_music' ||
-        context === 'play_piano'
+  // Secondary-line mode per context. preside/conduct/be_recognized → calling (always);
+  // lead_music/play_piano → none; speaker/prayers (and undefined) → speech count + responsible.
+  const secondaryMode: 'speech' | 'none' | 'calling' =
+    context === 'be_recognized' || context === 'preside' || context === 'conduct'
+      ? 'calling'
+      : context === 'lead_music' || context === 'play_piano'
       ? 'none'
       : 'speech';
 
@@ -146,12 +144,12 @@ export function PeoplePicker({
         ? list.filter((m) => m[capabilityField] === true)
         : list;
     if (!search.trim()) return scoped;
-    const filtered = filterMembers(scoped, search);
+    const filtered = filterMembers(scoped, search, secondaryMode === 'calling');
     if (!multiSelect) return filtered;
     const filteredIds = new Set(filtered.map((m) => m.id));
     const keepSelected = list.filter((m) => selectedSet.has(m.id) && !filteredIds.has(m.id));
     return [...filtered, ...keepSelected];
-  }, [allMembers, capabilityField, showAll, search, multiSelect, selectedSet]);
+  }, [allMembers, capabilityField, showAll, search, multiSelect, selectedSet, secondaryMode]);
 
   const resetTransient = useCallback(() => {
     setSearch('');
@@ -270,8 +268,8 @@ export function PeoplePicker({
                 </>
               ) : null}
 
-              {/* P5b: be_recognized — calling ONLY (when set); no functions. */}
-              {secondaryMode === 'recognized' && item.calling ? (
+              {/* preside/conduct/be_recognized — calling (when set); no functions. */}
+              {secondaryMode === 'calling' && item.calling ? (
                 <Text
                   style={[styles.meta, { color: colors.textSecondary }]}
                   testID={`people-picker-calling-${item.id}`}

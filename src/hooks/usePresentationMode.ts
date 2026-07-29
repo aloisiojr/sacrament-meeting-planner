@@ -25,6 +25,8 @@ export interface PresentationField {
   label: string;
   value: string;
   type: 'text' | 'hymn' | 'multiline' | 'bullet_list';
+  /** When true, this field shows a "text to read" icon opening the sacrament-prayer interstitial. */
+  sacramentPrayer?: boolean;
 }
 
 export interface PresentationData {
@@ -186,6 +188,7 @@ export function buildPresentationCards(
     label: t('agenda.sacramentHymn'),
     value: hymnLookup(agenda?.sacrament_hymn_id ?? null),
     type: 'hymn',
+    sacramentPrayer: true,
   });
   cards.push({ title: t('agenda.sectionSacrament'), fields: designationFields });
 

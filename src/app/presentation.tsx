@@ -23,9 +23,10 @@ import {
   buildPresentationCards,
 } from '../hooks/usePresentationMode';
 import { AccordionCard } from '../components/AccordionCard';
+import { SacramentPrayerModal } from '../components/SacramentPrayerModal';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
-import { PencilIcon, XIcon } from '../components/icons';
+import { PencilIcon, XIcon, ScrollTextIcon } from '../components/icons';
 import type { PresentationField } from '../hooks/usePresentationMode';
 
 const FONT_SIZES = {
@@ -41,6 +42,10 @@ export default function PresentationScreen() {
 
   const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
   const fontSizes = FONT_SIZES[fontSizeMode];
+  const [prayerModalVisible, setPrayerModalVisible] = useState(false);
+
+  const openPrayerModal = useCallback(() => setPrayerModalVisible(true), []);
+  const closePrayerModal = useCallback(() => setPrayerModalVisible(false), []);
 
   const sundayDate = params.date ?? getTodaySundayDate();
   const dateLabel = useMemo(
@@ -78,12 +83,13 @@ export default function PresentationScreen() {
                 field={field}
                 colors={colors}
                 fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
+                onPrayerPress={openPrayerModal}
               />
             ))}
           </View>
         ),
       })),
-    [cards, colors, fontSizes]
+    [cards, colors, fontSizes, openPrayerModal]
   );
 
   return (
@@ -139,8 +145,15 @@ export default function PresentationScreen() {
           cards={accordionCards}
           initialExpanded={0}
           cardTitleFontSize={fontSizes.cardTitle}
+          slideAnimation
         />
       )}
+
+      <SacramentPrayerModal
+        visible={prayerModalVisible}
+        onClose={closePrayerModal}
+        fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
+      />
     </SafeAreaView>
   );
 }
@@ -151,10 +164,12 @@ function PresentationFieldRow({
   field,
   colors,
   fontSizes,
+  onPrayerPress,
 }: {
   field: PresentationField;
   colors: ThemeColors;
   fontSizes?: { label: number; value: number };
+  onPrayerPress?: () => void;
 }) {
   if (field.type === 'bullet_list') {
     const bulletItems = (field.value || '')
@@ -190,6 +205,38 @@ function PresentationFieldRow({
             {'\u2022 '}{item}
           </Text>
         ))}
+      </View>
+    );
+  }
+
+  if (field.sacramentPrayer) {
+    return (
+      <View style={[styles.fieldRow, styles.prayerFieldRow]}>
+        <View style={styles.prayerFieldTextColumn}>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+            {field.label}
+          </Text>
+          <Text
+            style={[
+              styles.fieldValue,
+              { color: colors.text, fontSize: fontSizes?.value ?? 16 },
+              field.type === 'hymn' && styles.hymnValue,
+              !field.value && { color: colors.textTertiary },
+            ]}
+            numberOfLines={2}
+          >
+            {field.value || '---'}
+          </Text>
+        </View>
+        <Pressable
+          testID="sacrament-prayer-icon-button"
+          style={[styles.prayerIconButton, { backgroundColor: colors.surfaceVariant }]}
+          onPress={onPrayerPress}
+          accessibilityRole="button"
+          accessibilityLabel={field.label}
+        >
+          <ScrollTextIcon size={20} color={colors.text} />
+        </Pressable>
       </View>
     );
   }
@@ -270,6 +317,21 @@ const styles = StyleSheet.create({
   },
   fieldRow: {
     marginBottom: 12,
+  },
+  prayerFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  prayerFieldTextColumn: {
+    flex: 1,
+  },
+  prayerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
   fieldLabel: {
     fontWeight: '600',

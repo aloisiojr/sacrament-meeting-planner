@@ -16,6 +16,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
 import { ChevronDownIcon, ChevronUpIcon } from './icons';
 
@@ -35,6 +36,12 @@ export interface AccordionCardProps {
   cards: AccordionCardConfig[];
   initialExpanded?: number;
   cardTitleFontSize?: number;
+  /**
+   * When true, the expanded card body animates with a vertical slide (opening content slides
+   * down in, closing slides up out) via reanimated, instead of the plain height LayoutAnimation.
+   * Off by default so other usages are unchanged.
+   */
+  slideAnimation?: boolean;
 }
 
 // --- Constants ---
@@ -43,17 +50,26 @@ const COLLAPSED_HEIGHT = 48;
 
 // --- Component ---
 
-export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }: AccordionCardProps) {
+export function AccordionCard({
+  cards,
+  initialExpanded = 0,
+  cardTitleFontSize,
+  slideAnimation = false,
+}: AccordionCardProps) {
   const { colors } = useTheme();
   const [expandedIndex, setExpandedIndex] = useState(initialExpanded);
 
   const handlePress = useCallback(
     (index: number) => {
       if (index === expandedIndex) return;
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      // With the reanimated slide, the body's own entering/exiting animations drive the
+      // transition; the plain height LayoutAnimation is only used in the default (non-slide) mode.
+      if (!slideAnimation) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
       setExpandedIndex(index);
     },
-    [expandedIndex]
+    [expandedIndex, slideAnimation]
   );
 
   return (
@@ -62,8 +78,9 @@ export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }:
         const isExpanded = index === expandedIndex;
 
         return (
-          <View
+          <Animated.View
             key={index}
+            layout={slideAnimation ? LinearTransition.duration(300) : undefined}
             style={[
               styles.card,
               { backgroundColor: colors.card, borderColor: colors.border },
@@ -107,7 +124,7 @@ export function AccordionCard({ cards, initialExpanded = 0, cardTitleFontSize }:
                 {card.content}
               </ScrollView>
             )}
-          </View>
+          </Animated.View>
         );
       })}
     </View>

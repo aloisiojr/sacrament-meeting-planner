@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
+import { Alert } from 'react-native';
 import type { Member } from '../types/database';
 // vi.mock calls below are hoisted above this import, so the mocks still apply.
 import { PersonEditor, type PersonEditorProps } from '../components/PersonEditor';
@@ -46,6 +47,11 @@ const createMock = vi.fn((_input: unknown, opts?: { onSuccess?: (m: Member) => v
 const updateMock = vi.fn((_input: unknown, opts?: { onSuccess?: (m: Member) => void }) =>
   opts?.onSuccess?.(SELF)
 );
+const deleteMock = vi.fn((_input: unknown, opts?: { onSuccess?: (name: string) => void }) =>
+  opts?.onSuccess?.('deleted')
+);
+
+let hasPermissionResult = true;
 
 vi.mock('../hooks/useMembers', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -54,8 +60,13 @@ vi.mock('../hooks/useMembers', async (importOriginal) => {
     useMembers: () => ({ data: MEMBERS }),
     useCreateMember: () => ({ mutate: createMock }),
     useUpdateMember: () => ({ mutate: updateMock }),
+    useDeleteMember: () => ({ mutate: deleteMock }),
   };
 });
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => hasPermissionResult }),
+}));
 
 // `react-native-svg` (via icons/SearchInput) ships untransformed Flow/TS — stub it.
 vi.mock('react-native-svg', async () => {
@@ -113,20 +124,28 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
   });
 }
 
+function toggleSwitch(renderer: TestRenderer.ReactTestRenderer, testID: string) {
+  const sw = node(renderer, testID);
+  act(() => {
+    (sw.props.onValueChange as (v: boolean) => void)(!sw.props.value);
+  });
+}
+
 beforeEach(() => {
   MEMBERS = [SELF, OTHER];
+  hasPermissionResult = true;
   createMock.mockClear();
   updateMock.mockClear();
+  deleteMock.mockClear();
 });
 
 describe('PersonEditor', () => {
   it('creates a person with identity + capability flags (AC7)', () => {
     const { renderer, onSaved, onClose } = render();
     change(renderer, 'person-editor-full-name', 'New Person');
-    change(renderer, 'person-editor-country-code', '+55');
     change(renderer, 'person-editor-phone', '11999');
-    press(renderer, 'person-editor-cap-preside');
-    press(renderer, 'person-editor-cap-play_piano');
+    toggleSwitch(renderer, 'person-editor-cap-switch-preside');
+    toggleSwitch(renderer, 'person-editor-cap-switch-play_piano');
     press(renderer, 'person-editor-save');
 
     expect(createMock).toHaveBeenCalledTimes(1);
@@ -142,6 +161,131 @@ describe('PersonEditor', () => {
     });
     expect(onSaved).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('E1: shows a visible label above the informal-name field', () => {
+    const { renderer } = render();
+    const labels = renderer.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.children === 'personEditor.informalNameLabel'
+    );
+    expect(labels.length).toBe(1);
+  });
+
+  it('E3b: saves the calling free-text field', () => {
+    const { renderer } = render();
+    change(renderer, 'person-editor-full-name', 'With Calling');
+    change(renderer, 'person-editor-calling', 'Bispo');
+    press(renderer, 'person-editor-save');
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(createMock.mock.calls[0][0]).toMatchObject({ full_name: 'With Calling', calling: 'Bispo' });
+  });
+
+  it('E3b: prefills the calling from an edited member', () => {
+    const member = makeMember({ id: 'self', full_name: 'Self Person', calling: 'Bispo' });
+    const { renderer } = render({ member });
+    expect(node(renderer, 'person-editor-calling').props.value).toBe('Bispo');
+  });
+
+  it('E3: permission switches reflect caps and toggle + persist on save', () => {
+    const member = makeMember({ id: 'self', full_name: 'Self Person', can_conduct: true });
+    const { renderer } = render({ member });
+    // Switch reflects the current cap value.
+    expect(node(renderer, 'person-editor-cap-switch-conduct').props.value).toBe(true);
+    expect(node(renderer, 'person-editor-cap-switch-preside').props.value).toBe(false);
+
+    // Toggling flips them and persists on save.
+    toggleSwitch(renderer, 'person-editor-cap-switch-conduct');
+    toggleSwitch(renderer, 'person-editor-cap-switch-preside');
+    press(renderer, 'person-editor-save');
+    expect(updateMock.mock.calls[0][0]).toMatchObject({
+      id: 'self',
+      can_conduct: false,
+      can_preside: true,
+    });
+  });
+
+  it('E2: country picker opens and selecting a country stores the dial code', () => {
+    const { renderer } = render();
+    change(renderer, 'person-editor-full-name', 'Country Person');
+    press(renderer, 'person-editor-country-code');
+
+    // The country FlatList (the one whose rows carry a flag) lists COUNTRY_CODES.
+    const flats = renderer.root.findAll((n) => n.type === 'FlatList');
+    const countryFlat = flats.find(
+      (f) => Array.isArray(f.props.data) && (f.props.data as { flag?: string }[])[0]?.flag
+    )!;
+    const entry = (countryFlat.props.data as { code: string; label: string }[]).find(
+      (c) => c.code === '+1' && c.label.includes('United States')
+    )!;
+    const renderItem = countryFlat.props.renderItem as (info: {
+      item: { code: string; label: string; flag: string };
+    }) => React.ReactElement;
+    let row!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      row = TestRenderer.create(renderItem({ item: { ...entry, flag: 'US' } }));
+    });
+    act(() => {
+      (find(row.root, `person-editor-country-item-${entry.label}`)[0].props.onPress as () => void)();
+    });
+
+    press(renderer, 'person-editor-save');
+    expect(createMock.mock.calls[0][0]).toMatchObject({ country_code: '+1' });
+  });
+
+  it('E4: responsible-for list renders only when the member has dependents', () => {
+    // OTHER points at SELF via responsible_id → SELF is responsible for OTHER.
+    const self = makeMember({ id: 'self', full_name: 'Self Person' });
+    const dependent = makeMember({ id: 'other', full_name: 'Dependent Person', responsible_id: 'self' });
+    MEMBERS = [self, dependent];
+    const { renderer } = render({ member: self });
+    expect(find(renderer.root, 'person-editor-responsible-for').length).toBe(1);
+    const names = renderer.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.children === 'Dependent Person'
+    );
+    expect(names.length).toBeGreaterThan(0);
+  });
+
+  it('E4: responsible-for list is absent when the member has no dependents', () => {
+    const member = makeMember({ id: 'self', full_name: 'Self Person' });
+    const { renderer } = render({ member });
+    expect(find(renderer.root, 'person-editor-responsible-for').length).toBe(0);
+  });
+
+  it('E5: delete button shows only when editing an existing member (not create)', () => {
+    const createView = render();
+    expect(find(createView.renderer.root, 'person-editor-delete').length).toBe(0);
+
+    const member = makeMember({ id: 'self', full_name: 'Self Person' });
+    const editView = render({ member });
+    expect(find(editView.renderer.root, 'person-editor-delete').length).toBe(1);
+  });
+
+  it('E5: delete button hidden without member:write', () => {
+    hasPermissionResult = false;
+    const member = makeMember({ id: 'self', full_name: 'Self Person' });
+    const { renderer } = render({ member });
+    expect(find(renderer.root, 'person-editor-delete').length).toBe(0);
+  });
+
+  it('E5: pressing delete confirms then deletes and closes', () => {
+    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const member = makeMember({ id: 'self', full_name: 'Self Person' });
+    const { renderer, onClose } = render({ member });
+    press(renderer, 'person-editor-delete');
+
+    // Alert was raised with a destructive confirm button; invoke it.
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = alertSpy.mock.calls[0][2] as { style?: string; onPress?: () => void }[];
+    const destructive = buttons.find((b) => b.style === 'destructive')!;
+    act(() => {
+      destructive.onPress?.();
+    });
+
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+    expect(deleteMock.mock.calls[0][0]).toMatchObject({ memberId: 'self', memberName: 'Self Person' });
+    expect(onClose).toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 
   it('defaults an empty country code to +55 on save (P2 #4)', () => {

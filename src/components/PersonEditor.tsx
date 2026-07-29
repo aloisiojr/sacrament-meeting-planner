@@ -17,17 +17,32 @@ import {
   FlatList,
   Pressable,
   Modal,
+  Switch,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { SearchInput } from './SearchInput';
-import { CheckSquareIcon, SquareIcon } from './icons';
+import {
+  CheckSquareIcon,
+  SquareIcon,
+  CrownIcon,
+  UsersIcon,
+  MusicIcon,
+  PianoIcon,
+  BadgeCheckIcon,
+  type IconProps,
+} from './icons';
 import {
   useMembers,
   useCreateMember,
   useUpdateMember,
+  useDeleteMember,
+  getResponsibleForMap,
   filterMembers,
 } from '../hooks/useMembers';
+import { COUNTRY_CODES, getFlagForCode } from '../lib/countryCodes';
 import type { Member } from '../types/database';
 
 // --- Capability field mapping (shared shape with PeoplePicker) ---
@@ -53,6 +68,15 @@ export const CAPABILITY_FIELD: Record<PeopleCapability, keyof Member> = {
   lead_music: 'can_lead_music',
   play_piano: 'can_play_piano',
   be_recognized: 'can_be_recognized',
+};
+
+/** Leading icon for each capability row (E3). */
+const CAPABILITY_ICON: Record<PeopleCapability, React.FC<IconProps>> = {
+  preside: CrownIcon,
+  conduct: UsersIcon,
+  lead_music: MusicIcon,
+  play_piano: PianoIcon,
+  be_recognized: BadgeCheckIcon,
 };
 
 // --- Types ---
@@ -93,9 +117,11 @@ export function PersonEditor({
 }: PersonEditorProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { hasPermission } = useAuth();
 
   const [fullName, setFullName] = useState('');
   const [informalName, setInformalName] = useState('');
+  const [calling, setCalling] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const [phone, setPhone] = useState('');
   const [caps, setCaps] = useState<CapabilityState>(EMPTY_CAPS);
@@ -104,10 +130,13 @@ export function PersonEditor({
   const [error, setError] = useState<string | null>(null);
   const [responsiblePickerVisible, setResponsiblePickerVisible] = useState(false);
   const [responsibleSearch, setResponsibleSearch] = useState('');
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
 
   const { data: allMembers } = useMembers();
   const createMember = useCreateMember();
   const updateMember = useUpdateMember();
+  const deleteMember = useDeleteMember();
 
   // (Re)initialize the form whenever the editor opens or the target member changes.
   useEffect(() => {
@@ -115,6 +144,7 @@ export function PersonEditor({
     if (member) {
       setFullName(member.full_name);
       setInformalName(member.informal_name ?? '');
+      setCalling(member.calling ?? '');
       setCountryCode(member.country_code ?? '');
       setPhone(member.phone ?? '');
       setCaps({
@@ -129,6 +159,7 @@ export function PersonEditor({
     } else {
       setFullName(initialName ?? '');
       setInformalName('');
+      setCalling('');
       setCountryCode('');
       setPhone('');
       setCaps(EMPTY_CAPS);
@@ -138,6 +169,8 @@ export function PersonEditor({
     setError(null);
     setResponsiblePickerVisible(false);
     setResponsibleSearch('');
+    setCountryPickerVisible(false);
+    setCountrySearch('');
   }, [visible, member, initialName]);
 
   const responsibleMember = useMemo(
@@ -151,9 +184,47 @@ export function PersonEditor({
     return responsibleSearch.trim() ? filterMembers(list, responsibleSearch) : list;
   }, [allMembers, member?.id, responsibleSearch]);
 
+  // Read-only list of members this person is responsible for (E4). Only when editing.
+  const responsibleForNames = useMemo(() => {
+    if (!member) return [];
+    return getResponsibleForMap(allMembers ?? []).get(member.id) ?? [];
+  }, [allMembers, member]);
+
+  // Country entries filtered by the picker search (matches label or dial code).
+  const countryCandidates = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+    if (!q) return COUNTRY_CODES;
+    return COUNTRY_CODES.filter(
+      (c) => c.label.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+  }, [countrySearch]);
+
+  const canDelete = !!member && hasPermission('member:write');
+
   const toggleCap = useCallback((cap: PeopleCapability) => {
     setCaps((prev) => ({ ...prev, [cap]: !prev[cap] }));
   }, []);
+
+  const handleDelete = useCallback(() => {
+    if (!member) return;
+    Alert.alert(
+      t('personEditor.deletePerson'),
+      t('personEditor.deletePersonConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('personEditor.deletePerson'),
+          style: 'destructive',
+          onPress: () => {
+            deleteMember.mutate(
+              { memberId: member.id, memberName: member.full_name },
+              { onSuccess: () => onClose() }
+            );
+          },
+        },
+      ]
+    );
+  }, [member, deleteMember, onClose, t]);
 
   const handleSave = useCallback(() => {
     const trimmedName = fullName.trim();
@@ -169,6 +240,7 @@ export function PersonEditor({
     const fields = {
       full_name: trimmedName,
       informal_name: informalName.trim() || null,
+      calling: calling.trim() || null,
       // Default to the app/DB default (+55) rather than persisting an empty country code.
       country_code: countryCode.trim() || '+55',
       phone: phone.trim() || null,
@@ -194,6 +266,7 @@ export function PersonEditor({
   }, [
     fullName,
     informalName,
+    calling,
     countryCode,
     phone,
     caps,
@@ -250,6 +323,9 @@ export function PersonEditor({
             autoCapitalize="words"
           />
 
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {t('personEditor.informalNameLabel')}
+          </Text>
           <TextInput
             testID="person-editor-informal-name"
             style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
@@ -260,20 +336,36 @@ export function PersonEditor({
             autoCapitalize="words"
           />
 
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {t('personEditor.callingLabel')}
+          </Text>
+          <TextInput
+            testID="person-editor-calling"
+            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+            value={calling}
+            onChangeText={setCalling}
+            placeholder={t('personEditor.callingPlaceholder')}
+            placeholderTextColor={colors.placeholder}
+            autoCapitalize="words"
+          />
+
           <View style={styles.phoneRow}>
             <View style={styles.countryCodeCol}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
                 {t('members.countryCode')}
               </Text>
-              <TextInput
+              <Pressable
                 testID="person-editor-country-code"
-                style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                value={countryCode}
-                onChangeText={setCountryCode}
-                placeholder="+1"
-                placeholderTextColor={colors.placeholder}
-                keyboardType="phone-pad"
-              />
+                style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                onPress={() => setCountryPickerVisible(true)}
+              >
+                <Text
+                  style={[styles.selectorText, { color: countryCode ? colors.text : colors.placeholder }]}
+                  numberOfLines={1}
+                >
+                  {countryCode ? `${getFlagForCode(countryCode)} ${countryCode}` : '+1'}
+                </Text>
+              </Pressable>
             </View>
             <View style={styles.phoneCol}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -291,27 +383,26 @@ export function PersonEditor({
             </View>
           </View>
 
-          {/* Capabilities */}
+          {/* Permissions (functions) */}
           <Text style={[styles.sectionHeader, { color: colors.text }]}>
-            {t('personEditor.capabilities')}
+            {t('personEditor.permissions')}
           </Text>
-          {CAPABILITY_ORDER.map((cap) => (
-            <Pressable
-              key={cap}
-              testID={`person-editor-cap-${cap}`}
-              style={styles.toggleRow}
-              onPress={() => toggleCap(cap)}
-            >
-              {caps[cap] ? (
-                <CheckSquareIcon size={22} color={colors.primary} />
-              ) : (
-                <SquareIcon size={22} color={colors.textSecondary} />
-              )}
-              <Text style={[styles.toggleLabel, { color: colors.text }]}>
-                {t(`capabilities.${cap}`)}
-              </Text>
-            </Pressable>
-          ))}
+          {CAPABILITY_ORDER.map((cap) => {
+            const CapIcon = CAPABILITY_ICON[cap];
+            return (
+              <View key={cap} testID={`person-editor-cap-${cap}`} style={styles.capRow}>
+                <CapIcon size={22} color={colors.textSecondary} />
+                <Text style={[styles.capLabel, { color: colors.text }]}>
+                  {t(`capabilities.${cap}`)}
+                </Text>
+                <Switch
+                  testID={`person-editor-cap-switch-${cap}`}
+                  value={caps[cap]}
+                  onValueChange={() => toggleCap(cap)}
+                />
+              </View>
+            );
+          })}
 
           {/* Delegation */}
           <Text style={[styles.sectionHeader, { color: colors.text }]}>
@@ -350,6 +441,36 @@ export function PersonEditor({
                 </Text>
               </Pressable>
             </>
+          ) : null}
+
+          {/* Responsible-for list (read-only, editing an existing member with dependents) */}
+          {responsibleForNames.length > 0 ? (
+            <View testID="person-editor-responsible-for">
+              <Text style={[styles.sectionHeader, { color: colors.text }]}>
+                {t('personEditor.responsibleForList')}
+              </Text>
+              {responsibleForNames.map((name) => (
+                <Text
+                  key={name}
+                  style={[styles.responsibleForItem, { color: colors.textSecondary }]}
+                >
+                  {name}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Destructive delete (editing an existing member with member:write) */}
+          {canDelete ? (
+            <Pressable
+              testID="person-editor-delete"
+              style={[styles.deleteBtn, { borderColor: colors.error }]}
+              onPress={handleDelete}
+            >
+              <Text style={[styles.deleteBtnText, { color: colors.error }]}>
+                {t('personEditor.deletePerson')}
+              </Text>
+            </Pressable>
           ) : null}
         </ScrollView>
       </View>
@@ -396,6 +517,65 @@ export function PersonEditor({
               >
                 <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
                   {item.full_name}
+                </Text>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('common.noResults')}
+                </Text>
+              </View>
+            }
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
+      </Modal>
+
+      {/* Country code picker (searchable) */}
+      <Modal
+        visible={countryPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCountryPickerVisible(false)}
+      >
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <View style={styles.pickerHeader}>
+            <SearchInput
+              testID="person-editor-country-search"
+              style={styles.searchInput}
+              value={countrySearch}
+              onChangeText={setCountrySearch}
+              placeholder={t('personEditor.countrySearch')}
+            />
+            <Pressable
+              testID="person-editor-country-close"
+              onPress={() => setCountryPickerVisible(false)}
+              style={styles.headerBtn}
+            >
+              <Text style={[styles.headerBtnText, { color: colors.primary }]}>
+                {t('common.close')}
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.pickerTitle, { color: colors.text }]}>
+            {t('personEditor.selectCountry')}
+          </Text>
+          <FlatList
+            data={countryCandidates}
+            keyExtractor={(item, index) => `${item.code}-${index}`}
+            renderItem={({ item }) => (
+              <Pressable
+                testID={`person-editor-country-item-${item.label}`}
+                style={[styles.memberItem, { borderBottomColor: colors.divider }]}
+                onPress={() => {
+                  setCountryCode(item.code);
+                  setCountryPickerVisible(false);
+                  setCountrySearch('');
+                }}
+              >
+                <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                  {`${item.flag}  ${item.label}`}
                 </Text>
               </Pressable>
             )}
@@ -489,6 +669,38 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 15,
+  },
+  capRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  capLabel: {
+    flex: 1,
+    fontSize: 15,
+  },
+  responsibleForItem: {
+    fontSize: 15,
+    paddingVertical: 4,
+  },
+  deleteBtn: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  deleteBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  pickerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   selector: {
     height: 44,

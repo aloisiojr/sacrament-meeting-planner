@@ -363,6 +363,151 @@ export const MoreVerticalIcon = ({ size = 24, color = 'currentColor' }: IconProp
   </Svg>
 );
 
+/** Lucide: crown (https://lucide.dev/icons/crown) — preside */
+export const CrownIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M5 21h14"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
+/** Lucide: users (https://lucide.dev/icons/users) — conduct */
+export const UsersIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Circle cx={9} cy={7} r={4} stroke={color} strokeWidth={2} fill="none" />
+    <Path
+      d="M22 21v-2a4 4 0 0 0-3-3.87"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M16 3.13a4 4 0 0 1 0 7.75"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
+/** Lucide: music (https://lucide.dev/icons/music) — lead_music */
+export const MusicIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M9 18V5l12-2v13"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Circle cx={6} cy={18} r={3} stroke={color} strokeWidth={2} fill="none" />
+    <Circle cx={18} cy={16} r={3} stroke={color} strokeWidth={2} fill="none" />
+  </Svg>
+);
+
+/** Lucide: piano (https://lucide.dev/icons/piano) — play_piano */
+export const PianoIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M18.5 8c-1.4 0-2.6-.8-3.2-2A6.87 6.87 0 0 0 2 9v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a1 1 0 0 0-1-1z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M2 14h20"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M6 14v4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M10 14v4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M14 14v4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M18 14v4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
+/** Lucide: badge-check (https://lucide.dev/icons/badge-check) — be_recognized */
+export const BadgeCheckIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="m9 12 2 2 4-4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);
+
 // --- Fill-based brand icon ---
 
 /** Lucide: grip-horizontal (https://lucide.dev/icons/grip-horizontal)

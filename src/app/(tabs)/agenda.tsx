@@ -26,10 +26,12 @@ import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
 import { useSpeeches, useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
-import { useLazyCreateAgenda, isExcludedFromAgenda, useAgendaRange } from '../../hooks/useAgenda';
+import { useLazyCreateAgenda, useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
 import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
-import { buildUnifiedCardData } from '../../lib/unifiedCard';
+import { DateBlock } from '../../components/DateBlock';
+import { AttendanceBlock } from '../../components/AttendanceBlock';
+import { buildUnifiedCardData, isNoSacramentReason } from '../../lib/unifiedCard';
 import { PlayIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
 
@@ -68,6 +70,7 @@ function AgendaTabContent() {
   const { data: allSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const { data: allAgendas } = useAgendaRange(startDate, endDate);
   const lazyCreate = useLazyCreateAgenda();
+  const updateAgendaByDate = useUpdateAgendaByDate();
   const setSundayType = useSetSundayType();
   const removeSundayException = useRemoveSundayException();
   const deleteSpeechesByDate = useDeleteSpeechesByDate();
@@ -275,11 +278,12 @@ function AgendaTabContent() {
           onTypeChange={(d, type, customReason) => setSundayType.mutate({ date: d, reason: type, custom_reason: customReason })}
           onRemoveException={(d) => removeSundayException.mutate(d)}
           onDeleteSpeeches={(d) => deleteSpeechesByDate.mutate({ sundayDate: d })}
+          onSetAttendance={(d, v) => updateAgendaByDate.mutate({ sundayDate: d, updates: { attendance: v } })}
           onFieldFocus={handleFieldFocus}
         />
       );
     },
-    [expandedDate, nextSunday, handleToggle, handleFieldFocus, isOnline, colors, speechMap, agendaMap, managePrayers, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate]
+    [expandedDate, nextSunday, handleToggle, handleFieldFocus, isOnline, colors, speechMap, agendaMap, managePrayers, canEditType, setSundayType, removeSundayException, deleteSpeechesByDate, updateAgendaByDate]
   );
 
   const onScrollToIndexFailed = useCallback(
@@ -356,6 +360,7 @@ interface AgendaSundayCardProps {
   onTypeChange: (date: string, type: SundayExceptionReason, customReason?: string) => void;
   onRemoveException: (date: string) => void;
   onDeleteSpeeches: (date: string) => void;
+  onSetAttendance: (date: string, value: number | null) => void;
   onFieldFocus: (touchY: number) => void;
 }
 
@@ -375,15 +380,26 @@ function AgendaSundayCard({
   onTypeChange,
   onRemoveException,
   onDeleteSpeeches,
+  onSetAttendance,
   onFieldFocus,
 }: AgendaSundayCardProps) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
 
+  const handleSetAttendance = useCallback(
+    (value: number | null) => {
+      onSetAttendance(date, value);
+    },
+    [date, onSetAttendance]
+  );
+
   const currentType = exception?.reason ?? SUNDAY_TYPE_SPEECHES;
-  // No-sacrament Sundays (gen/stake conf, etc.) still expand — but only to the type dropdown,
-  // so the type can be changed; the welcome/hymns AgendaForm + Play don't apply to them.
-  const excluded = !!exception && isExcludedFromAgenda(exception.reason);
+  // No-sacrament Sundays (general/stake/ward conference, "other") still expand — but only to the
+  // type dropdown, so the type can be changed; the welcome/hymns AgendaForm + Play don't apply.
+  // Use the SAME predicate the collapsed card uses so the two never disagree (fixes the crash where
+  // ward_conference/"other" showed a no-sacrament collapsed card but mounted a full AgendaForm).
+  const noSacrament = isNoSacramentReason(exception?.reason ?? null);
 
   const cardData = useMemo(
     () =>
@@ -418,6 +434,81 @@ function AgendaSundayCard({
     onRemoveException(date);
   }, [date, onRemoveException]);
 
+  // When expanded, the collapsed UnifiedSundayCard (roles/counts/name rows) is REPLACED by a compact
+  // header — DateBlock + type dropdown (+ Play, for sacrament meetings) — followed by the AgendaForm.
+  if (isExpanded) {
+    return (
+      <View style={isPast && !isExpanded ? styles.pastDim : undefined}>
+        <View
+          style={[
+            styles.expandedCard,
+            { backgroundColor: colors.card, borderColor: isNext ? colors.primary : colors.border },
+            isNext && { borderWidth: 2 },
+          ]}
+        >
+          {/* Compact header. Tapping the header area (outside the dropdown/Play) collapses (#6). */}
+          <Pressable
+            style={[styles.compactHeader, isPast && !noSacrament && styles.compactHeaderTopAlign]}
+            onPress={onToggle}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.collapse', 'Collapse')}
+            testID={`agenda-header-${date}`}
+          >
+            {/* Left column: DateBlock + (past sacrament meetings) the AttendanceBlock below it.
+                The AttendanceBlock is its own tap target and does not collapse the card. */}
+            <View style={styles.compactDateColumn}>
+              <DateBlock date={date} highlighted={isNext} />
+              {isPast && !noSacrament && (
+                <AttendanceBlock
+                  value={agenda?.attendance ?? null}
+                  onChange={handleSetAttendance}
+                  testID={`agenda-attendance-${date}`}
+                />
+              )}
+            </View>
+            <View style={styles.compactDropdown}>
+              <SundayTypeDropdown
+                currentType={currentType}
+                onSelect={handleTypeSelect}
+                onRevertToSpeeches={handleRevertToSpeeches}
+                disabled={typeDisabled || isOffline}
+                speeches={speeches}
+                date={date}
+                onDeleteSpeeches={onDeleteSpeeches}
+                managePrayers={managePrayers}
+              />
+            </View>
+            {!noSacrament && (
+              <Pressable
+                testID={`agenda-play-${date}`}
+                onPress={() => router.push({ pathname: '/presentation', params: { date } })}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Open presentation"
+                style={[styles.playButton, { backgroundColor: colors.primary }]}
+              >
+                <PlayIcon size={20} color={colors.onPrimary} />
+              </Pressable>
+            )}
+          </Pressable>
+
+          {/* No AgendaForm for no-sacrament Sundays — only the type can be changed. */}
+          {!noSacrament && (
+            <ThemedErrorBoundary>
+              <AgendaForm
+                sundayDate={date}
+                exceptionReason={exception?.reason ?? null}
+                customReason={exception?.custom_reason ?? null}
+                disabled={isOffline}
+                onFieldFocus={onFieldFocus}
+              />
+            </ThemedErrorBoundary>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={isPast && !isExpanded ? styles.pastDim : undefined}>
       <UnifiedSundayCard
@@ -433,54 +524,11 @@ function AgendaSundayCard({
         nameRows={cardData.nameRows}
         onPressStatus={handlePressStatus}
         onPressSpeakers={handlePressSpeakers}
+        isPast={isPast}
+        attendance={agenda?.attendance ?? null}
+        onSetAttendance={handleSetAttendance}
         testID={`agenda-card-${date}`}
       />
-
-      {expandable && isExpanded && (
-        <View
-          style={[
-            styles.expandedCard,
-            { backgroundColor: colors.card, borderColor: isNext ? colors.primary : colors.border },
-            isNext && { borderWidth: 2 },
-          ]}
-        >
-          {!excluded && (
-            <View style={styles.expandedHeader}>
-              <Pressable
-                testID={`agenda-play-${date}`}
-                onPress={() => router.push({ pathname: '/presentation', params: { date } })}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Open presentation"
-                style={[styles.playButton, { backgroundColor: colors.primary }]}
-              >
-                <PlayIcon size={20} color={colors.onPrimary} />
-              </Pressable>
-            </View>
-          )}
-          <SundayTypeDropdown
-            currentType={currentType}
-            onSelect={handleTypeSelect}
-            onRevertToSpeeches={handleRevertToSpeeches}
-            disabled={typeDisabled || isOffline}
-            speeches={speeches}
-            date={date}
-            onDeleteSpeeches={onDeleteSpeeches}
-            managePrayers={managePrayers}
-          />
-          {!excluded && (
-            <ThemedErrorBoundary>
-              <AgendaForm
-                sundayDate={date}
-                exceptionReason={exception?.reason ?? null}
-                customReason={exception?.custom_reason ?? null}
-                disabled={isOffline}
-                onFieldFocus={onFieldFocus}
-              />
-            </ThemedErrorBoundary>
-          )}
-        </View>
-      )}
     </View>
   );
 }
@@ -521,17 +569,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     marginHorizontal: 12,
-    marginTop: -4,
-    marginBottom: 4,
+    marginVertical: 4,
     paddingHorizontal: 12,
     paddingBottom: 12,
     overflow: 'hidden',
   },
-  expandedHeader: {
+  compactHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 8,
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 10,
     paddingBottom: 4,
+  },
+  // Top-align when the AttendanceBlock hangs below the DateBlock so the dropdown stays beside
+  // the DateBlock rather than centered against the taller left column.
+  compactHeaderTopAlign: {
+    alignItems: 'flex-start',
+  },
+  compactDateColumn: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactDropdown: {
+    flex: 1,
   },
   playButton: {
     width: 36,

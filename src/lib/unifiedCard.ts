@@ -34,6 +34,17 @@ const TESTIMONY_REASONS: ReadonlySet<SundayExceptionReason> = new Set([
   'primary_presentation',
 ]);
 
+/**
+ * Whether a Sunday has NO sacrament meeting (general/stake/ward conference, or "other").
+ * These Sundays render only the type dropdown — no welcome/hymns AgendaForm, no Play, no speaker
+ * or prayer block. Shared so the collapsed card, the Home tab and the Agendas tab all agree
+ * (a `speeches`/null reason is a regular Sunday, never no-sacrament).
+ */
+export function isNoSacramentReason(reason: SundayExceptionReason | null): boolean {
+  const r = reason === 'speeches' ? null : reason;
+  return r != null && NO_SACRAMENT_REASONS.has(r);
+}
+
 export interface BuildUnifiedCardDataInput {
   /** The agenda record for the Sunday (null if not yet created). */
   agenda: SundayAgenda | null;

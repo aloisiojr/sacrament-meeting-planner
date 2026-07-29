@@ -1,19 +1,12 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useWardManagePrayers } from '../../hooks/useSpeeches';
 import { ExitConfirmation } from '../../components/ExitConfirmation';
-import { HomeIcon, ClipboardListIcon, MicIcon, SettingsIcon } from '../../components/icons';
+import { HomeIcon, ClipboardListIcon, SettingsIcon } from '../../components/icons';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { managePrayers } = useWardManagePrayers();
-
-  const speechesTabTitle = managePrayers
-    ? t('tabs.speechesAndPrayers')
-    : t('tabs.speeches');
 
   return (
     <>
@@ -50,26 +43,6 @@ export default function TabsLayout() {
           tabBarButtonTestID: "tab-agendas",
           tabBarIcon: ({ color, size }) => (
             <ClipboardListIcon color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="speeches"
-        options={{
-          title: speechesTabTitle,
-          tabBarButtonTestID: "tab-speeches",
-          tabBarIcon: ({ color, size }) => (
-            <MicIcon color={color} size={size} />
-          ),
-          tabBarLabel: ({ color }) => (
-            <Text
-              numberOfLines={2}
-              allowFontScaling={false}
-              adjustsFontSizeToFit={false}
-              style={{ fontSize: 10, textAlign: 'center', color }}
-            >
-              {speechesTabTitle}
-            </Text>
           ),
         }}
       />

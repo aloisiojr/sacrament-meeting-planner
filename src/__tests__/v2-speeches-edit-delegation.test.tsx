@@ -1,12 +1,14 @@
 /**
- * Behavioral test for the Speeches-tab v2.0 wiring (specs/v2-member-management.md, Phase 3a).
+ * Behavioral test for the delegation-snapshot wiring on the full-screen speeches/prayers editor
+ * (specs/v2-unified-cards.md, N2). Migrated from the deleted v2-speeches-delegation.test.tsx when
+ * the old "Discursos e Orações" tab was removed — the same delegation-snapshot behavior now lives
+ * in src/app/speeches/[date].tsx.
  *
- * `react-native` is aliased to a test stub (vitest.config.ts). Heavy children (SundayCard,
- * SpeechSlot, PeoplePicker, TopicSelectorModal) are mocked to lightweight seams so we can drive
- * the assign flow and assert the contact-delegation snapshot passed to useAssignSpeaker.
- *
- * The pure snapshot helper (resolveContactSnapshot) and buildFullPhone stay real — this test
- * verifies the *wiring* in speeches.tsx: responsible lookup + snapshot fields on assignment.
+ * `react-native` is aliased to a test stub (vitest.config.ts). Heavy children (SpeechSlot,
+ * PeoplePicker, TopicSelectorModal) are mocked to lightweight seams so we can drive the assign flow
+ * and assert the contact-delegation snapshot passed to useAssignSpeaker. The pure snapshot helper
+ * (resolveContactSnapshot) and buildFullPhone stay real — this verifies the screen's *wiring*:
+ * responsible lookup + snapshot fields on assignment + prayer picker context.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
@@ -14,12 +16,12 @@ import TestRenderer from 'react-test-renderer';
 import type { Member } from '../types/database';
 
 // Import after mocks are registered.
-import SpeechesTab from '../app/(tabs)/speeches';
+import SpeechesEditScreen from '../app/speeches/[date]';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const EXPAND_DATE = '2026-08-02';
+const DATE = '2026-08-02';
 
 // --- Controlled data ---
 
@@ -73,7 +75,7 @@ function makeSpeech(id: string, position: number) {
   return {
     id,
     ward_id: 'w1',
-    sunday_date: EXPAND_DATE,
+    sunday_date: DATE,
     position,
     member_id: null,
     speaker_name: null,
@@ -92,25 +94,25 @@ function makeSpeech(id: string, position: number) {
   };
 }
 
-const SPEECH_0 = makeSpeech('sp0', 0);
-const SPEECH_1 = makeSpeech('sp1', 1);
-const SPEECH_4 = makeSpeech('sp4', 4);
+const SPEECHES = [0, 1, 2, 3, 4].map((p) => makeSpeech(`sp${p}`, p));
 
 const assignSpeakerMock = vi.fn();
 
 // --- Mocks ---
 
-// Partial mock: keep initReactI18next (used by the real i18n loaded via the hook chains).
+// Partial mock: keep initReactI18next (used by the real i18n loaded via getCurrentLanguage).
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
 vi.mock('../contexts/ThemeContext', () => ({
-  useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f' } }),
-}));
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => true }),
+  useTheme: () => ({
+    colors: {
+      background: '#000', text: '#fff', textSecondary: '#aaa', divider: '#333',
+      primary: '#07f', warning: '#fb0',
+    },
+  }),
 }));
 vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => true }));
 
@@ -119,8 +121,8 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ expandDate: EXPAND_DATE }),
-  useRouter: () => ({ setParams: vi.fn() }),
+  useLocalSearchParams: () => ({ date: DATE }),
+  useRouter: () => ({ back: vi.fn() }),
 }));
 
 vi.mock('../components/ErrorBoundary', () => ({
@@ -128,11 +130,6 @@ vi.mock('../components/ErrorBoundary', () => ({
 }));
 vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 vi.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
-
-// SundayCard mock: render children so the SpeechSlots surface.
-vi.mock('../components/SundayCard', () => ({
-  SundayCard: ({ children }: { children?: React.ReactNode }) => React.createElement('SundayCard', {}, children),
-}));
 
 // SpeechSlot mock: expose a press that opens the speaker selector for its speech.
 vi.mock('../components/SpeechSlot', () => ({
@@ -154,45 +151,28 @@ vi.mock('../components/PeoplePicker', () => ({
 
 vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
 
-vi.mock('../hooks/useSundayList', () => ({
-  useSundayList: () => ({
-    sundays: [EXPAND_DATE],
-    startDate: EXPAND_DATE,
-    endDate: EXPAND_DATE,
-    nextSunday: EXPAND_DATE,
-    loadMoreFuture: vi.fn(),
-    loadMorePast: vi.fn(),
-    hasMoreFuture: false,
-    hasMorePast: false,
-  }),
+vi.mock('../hooks/useAgenda', () => ({
+  useAgenda: () => ({ data: { has_second_speech: true } }),
+  useUpdateAgendaByDate: () => ({ mutate: vi.fn() }),
 }));
 
-vi.mock('../hooks/useAgenda', () => ({
-  useAgendaRange: () => ({ data: [] }),
-  useUpdateAgendaByDate: () => ({ mutate: vi.fn() }),
+vi.mock('../hooks/useSundayTypes', () => ({
+  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: vi.fn() }),
 }));
 
 vi.mock('../hooks/useSpeeches', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: [SPEECH_0, SPEECH_1, SPEECH_4], isError: false, error: null, refetch: vi.fn() }),
+    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: vi.fn() }),
     useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
     useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
     useAssignTopic: () => ({ mutate: vi.fn() }),
     useChangeStatus: () => ({ mutate: vi.fn() }),
     useRemoveAssignment: () => ({ mutate: vi.fn() }),
-    useDeleteSpeechesByDate: () => ({ mutate: vi.fn() }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
-
-vi.mock('../hooks/useSundayTypes', () => ({
-  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: vi.fn() }),
-  useSetSundayType: () => ({ mutate: vi.fn() }),
-  useAutoAssignSundayTypes: () => ({ mutate: vi.fn() }),
-  useRemoveSundayException: () => ({ mutate: vi.fn() }),
-}));
 
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
@@ -201,20 +181,14 @@ vi.mock('../lib/supabase', () => ({ supabase: {} }));
 function render() {
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
-    renderer = TestRenderer.create(React.createElement(SpeechesTab));
+    renderer = TestRenderer.create(React.createElement(SpeechesEditScreen));
   });
   return renderer;
 }
 
-/** Manually render the FlatList's renderItem for the expanded sunday, then press its slot. */
+/** Press the mocked SpeechSlot for a position, opening the speaker/prayer selector. */
 function openSelectorForPosition(renderer: TestRenderer.ReactTestRenderer, position: number) {
-  const flat = renderer.root.findAll((n) => n.type === 'FlatList')[0];
-  const renderItem = flat.props.renderItem as (info: { item: { type: string; date: string; key: string } }) => React.ReactElement;
-  let rowRenderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    rowRenderer = TestRenderer.create(renderItem({ item: { type: 'sunday', date: EXPAND_DATE, key: EXPAND_DATE } }));
-  });
-  const slot = rowRenderer.root.findAll(
+  const slot = renderer.root.findAll(
     (n) => typeof n.type === 'string' && n.props.testID === `open-selector-${position}`
   )[0];
   act(() => {
@@ -227,7 +201,7 @@ beforeEach(() => {
   peoplePickerProps = null;
 });
 
-describe('Speeches tab — v2.0 people picker + delegation snapshot (Phase 3a)', () => {
+describe('Speeches edit screen — delegation snapshot + picker context (N2)', () => {
   it('renders the PeoplePicker and it starts hidden', () => {
     render();
     expect(peoplePickerProps).not.toBeNull();

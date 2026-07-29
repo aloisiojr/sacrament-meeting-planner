@@ -131,8 +131,10 @@ describe('F043 (CR-259): Play Icon Redesign - Theme Color Contract', () => {
     });
 
     it('play button is only shown when card is expanded', () => {
-      // The play button is gated by: expandable && isExpanded
-      expect(agendaSource).toContain('expandable && isExpanded');
+      // v2 compact header: the expanded body (incl. the play button) renders only in the
+      // `if (isExpanded)` branch, and is additionally omitted for no-sacrament Sundays (`!noSacrament`).
+      expect(agendaSource).toContain('if (isExpanded)');
+      expect(agendaSource).toContain('agenda-play-');
     });
   });
 

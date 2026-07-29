@@ -376,7 +376,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(0)?.speaker_name || t('agenda.openingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}
@@ -495,7 +495,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <ReadOnlySpeakerRow
             label={`1\u00BA ${t('speeches.speaker')}`}
             speakerName={getSpeech(1)?.speaker_name ?? ''}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            onNavigate={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })}
             colors={colors}
             disabled={isObserver}
           />
@@ -505,7 +505,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             speakerName={agenda.has_second_speech === false
               ? t('speeches.secondSpeechDisabledPlaceholder')
               : (getSpeech(2)?.speaker_name ?? '')}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            onNavigate={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })}
             colors={colors}
             disabled={isObserver || agenda.has_second_speech === false}
           />
@@ -565,7 +565,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           <ReadOnlySpeakerRow
             label={t('speeches.lastSpeech')}
             speakerName={getSpeech(3)?.speaker_name ?? ''}
-            onNavigate={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })}
+            onNavigate={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })}
             colors={colors}
             disabled={isObserver}
           />
@@ -626,7 +626,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(4)?.speaker_name || t('agenda.closingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/(tabs)/speeches', params: { expandDate: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}

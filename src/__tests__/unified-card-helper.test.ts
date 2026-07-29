@@ -40,6 +40,7 @@ function makeAgenda(over: Partial<SundayAgenda> = {}): SundayAgenda {
     closing_hymn_id: null,
     closing_prayer_member_id: null,
     closing_prayer_name: null,
+    attendance: null,
     created_at: '',
     updated_at: '',
     ...over,

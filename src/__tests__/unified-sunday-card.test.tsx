@@ -220,6 +220,59 @@ describe('UnifiedSundayCard — no-sacrament Sunday (U5)', () => {
     expect(byTestID(root, 'unified-roles').length).toBe(0);
     expect(root.findAll((n) => n.type === 'ChevronRightIcon').length).toBe(1);
   });
+
+  it('makes the WHOLE card (incl. DateBlock) the tap zone → onPressStatus (#3)', () => {
+    const onPressStatus = vi.fn();
+    const { root } = render(
+      baseProps({ exceptionReason: 'general_conference', onPressStatus })
+    );
+    // There is a single pressable, and it is the status zone (no separate speakers zone).
+    const pressables = root.findAll(
+      (n) => typeof n.type === 'string' && typeof n.props.onPress === 'function'
+    );
+    expect(pressables.map((n) => n.props.testID)).toEqual(['unified-status-2026-08-02']);
+    // That single pressable wraps the DateBlock too, so tapping anywhere on the card expands it.
+    press(root, 'unified-status-2026-08-02');
+    expect(onPressStatus).toHaveBeenCalledWith('2026-08-02');
+  });
+});
+
+describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
+  const ATT = 'unified-attendance-2026-08-02';
+
+  it('is hidden by default (no isPast / no callback)', () => {
+    const { root } = render(baseProps());
+    expect(byTestID(root, ATT).length).toBe(0);
+  });
+
+  it('is shown when isPast and onSetAttendance are both provided', () => {
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn() }));
+    expect(byTestID(root, ATT).length).toBe(1);
+  });
+
+  it('is hidden when isPast but no callback', () => {
+    const { root } = render(baseProps({ isPast: true }));
+    expect(byTestID(root, ATT).length).toBe(0);
+  });
+
+  it('is hidden for future Sundays even with a callback', () => {
+    const { root } = render(baseProps({ isPast: false, onSetAttendance: vi.fn() }));
+    expect(byTestID(root, ATT).length).toBe(0);
+  });
+
+  it('is hidden for no-sacrament Sundays even when past', () => {
+    const { root } = render(
+      baseProps({ isPast: true, onSetAttendance: vi.fn(), exceptionReason: 'general_conference' })
+    );
+    expect(byTestID(root, ATT).length).toBe(0);
+  });
+
+  it('tapping the attendance tile does NOT call onPressStatus', () => {
+    const onPressStatus = vi.fn();
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn(), onPressStatus }));
+    press(root, ATT);
+    expect(onPressStatus).not.toHaveBeenCalled();
+  });
 });
 
 describe('UnifiedSundayCard — tap zones + chevron (U7)', () => {

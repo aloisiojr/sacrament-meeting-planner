@@ -454,6 +454,7 @@ export function createMockAgenda(overrides?: Partial<SundayAgenda>): SundayAgend
     closing_hymn_id: null,
     closing_prayer_member_id: null,
     closing_prayer_name: null,
+    attendance: null,
     has_second_speech: true,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',

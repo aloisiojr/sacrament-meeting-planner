@@ -220,6 +220,8 @@ export interface SundayAgenda {
   closing_hymn_id: string | null;
   closing_prayer_member_id: string | null;
   closing_prayer_name: string | null;
+  // v2.0 — sacrament-meeting attendance count (Frequência), recorded on past Sundays. NULL => not recorded.
+  attendance: number | null;
   created_at: string;
   updated_at: string;
 }

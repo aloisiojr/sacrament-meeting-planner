@@ -717,7 +717,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    marginBottom: 8,
   },
   dropdownText: {
     flex: 1,

@@ -1,14 +1,18 @@
 /**
- * Home tab: shows upcoming sundays, pending assignments, and invite management.
- * Shows "Start Sacrament Meeting" button at the top (all roles, all days).
- * Below button: non-expandable agenda preview card for target Sunday.
- * Sections are role-gated:
- * - NextSundaysSection: all roles
- * - NextAssignmentsSection: bishopric only (when next 3 fully assigned)
- * - InviteManagementSection: secretary only
+ * Home tab: shows the next 3 Sundays as unified cards, pending assignments, and invite management.
+ * Layout:
+ * - "Start Sacrament Meeting" (Play) button at the top (all roles, all days) → /presentation.
+ * - ONE highlighted (destaque) UnifiedSundayCard for the next Sunday (the hero).
+ * - "Próximos domingos" section with exactly 2 UnifiedSundayCards (the following two Sundays).
+ * - Role-gated sections below: NextAssignmentsSection (bishopric) + InviteManagementSection
+ *   (secretary), both online-only.
+ *
+ * The unified card is the only collapsed-card type. Home has no inline expand: tapping a card's
+ * status zone navigates to the Agendas tab (expanded on that date); tapping the speakers zone
+ * pushes the speeches edit screen.
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
@@ -16,111 +20,117 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
-import { NextSundaysSection } from '../../components/NextSundaysSection';
+import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
+import { buildUnifiedCardData } from '../../lib/unifiedCard';
 import { NextAssignmentsSection } from '../../components/NextAssignmentsSection';
 import { InviteManagementSection } from '../../components/InviteManagementSection';
-import { getTodaySundayDate } from '../../hooks/usePresentationMode';
-import { useAgenda } from '../../hooks/useAgenda';
-import { useSpeeches } from '../../hooks/useSpeeches';
+import { useAgendaRange } from '../../hooks/useAgenda';
+import { useSpeeches, useWardManagePrayers } from '../../hooks/useSpeeches';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
-import { zeroPadDay, getMonthAbbr } from '../../lib/dateUtils';
-import { getCurrentLanguage } from '../../i18n';
-import { PlayIcon, PencilIcon } from '../../components/icons';
-import type { SundayAgenda } from '../../types/database';
+import { getNextSundays, toISODateString } from '../../lib/dateUtils';
+import { PlayIcon } from '../../components/icons';
+import type { SundayAgenda, Speech, SundayException } from '../../types/database';
+
+const NEXT_SUNDAYS_COUNT = 3;
 
 function HomeTabContent() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
-  const locale = getCurrentLanguage();
   const isOnline = useOnlineStatus();
+  const { managePrayers } = useWardManagePrayers();
 
-  const sundayDate = useMemo(() => getTodaySundayDate(), []);
+  // The next 3 Sundays: [0] = hero (highlighted), [1..2] = "Próximos domingos".
+  const nextSundays = useMemo(() => {
+    const today = new Date();
+    return getNextSundays(today, NEXT_SUNDAYS_COUNT).map(toISODateString);
+  }, []);
 
-  // Fetch data for preview card
-  const { data: agenda } = useAgenda(sundayDate);
-  const { data: speeches } = useSpeeches({ start: sundayDate, end: sundayDate });
-  const { data: exceptions } = useSundayExceptions(sundayDate, sundayDate);
+  const startDate = nextSundays[0] ?? '';
+  const endDate = nextSundays[nextSundays.length - 1] ?? '';
+  const heroDate = nextSundays[0] ?? null;
 
-  // Parse date for dateBlock
-  const [, monthStr, dayStr] = sundayDate.split('-');
-  const dayNum = parseInt(dayStr, 10);
-  const monthNum = parseInt(monthStr, 10);
-  const monthAbbr = getMonthAbbr(monthNum, locale);
-  const dayDisplay = zeroPadDay(dayNum);
+  // Same hooks the Agendas tab / former NextSundaysSection used, across the 3-Sunday range.
+  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
+  const { data: exceptions } = useSundayExceptions(startDate, endDate);
+  const { data: agendas } = useAgendaRange(startDate, endDate);
 
-  // Exception for preview card
-  const exception = exceptions?.[0] ?? null;
-  const exceptionLabel = (exception && exception.reason !== 'speeches')
-    ? t(`sundayExceptions.${exception.reason}`, exception.reason)
-    : null;
-
-  const SPECIAL_MEETING_WITH_STATUS = ['testimony_meeting', 'primary_presentation'];
-  const isSpecialWithStatus = exceptionLabel &&
-    exception?.reason &&
-    SPECIAL_MEETING_WITH_STATUS.includes(exception.reason);
-
-  // Compute status lines for preview card
-  const statusLines = useMemo(() => {
-    const GREEN = '#22c55e';
-
-    const missingRoles: string[] = [];
-    if (!agenda?.presiding_name) missingRoles.push(t('agenda.statusPresiding'));
-    if (!agenda?.conducting_name) missingRoles.push(t('agenda.statusConducting'));
-    if (!agenda?.pianist_name) missingRoles.push(t('agenda.statusPianist'));
-    if (!agenda?.conductor_name) missingRoles.push(t('agenda.statusConductor'));
-
-    if (isSpecialWithStatus) {
-      // Special meeting: prayers + hymns (no speakers)
-      let prayersFilled = 0;
-      for (const s of speeches ?? []) {
-        if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
-      }
-
-      let hymnsFilled = 0;
-      const hymnsTotal = 3;
-      if (agenda?.opening_hymn_id) hymnsFilled++;
-      if (agenda?.sacrament_hymn_id) hymnsFilled++;
-      if (agenda?.closing_hymn_id) hymnsFilled++;
-
-      return { missingRoles, prayersFilled, hymnsFilled, hymnsTotal, speakersFilled: undefined, GREEN };
+  const speechMap = useMemo(() => {
+    const map = new Map<string, Speech[]>();
+    for (const s of speeches ?? []) {
+      const arr = map.get(s.sunday_date) ?? [];
+      arr.push(s);
+      map.set(s.sunday_date, arr);
     }
+    return map;
+  }, [speeches]);
 
-    if (!exceptionLabel) {
-      // Normal speeches meeting
-      // F132: Dynamic speaker count based on has_second_speech
-      const hasSecondSpeech = agenda?.has_second_speech ?? true;
-      const speakersTotal = hasSecondSpeech ? 3 : 2;
-      const positionsToCheck = hasSecondSpeech ? [1, 2, 3] : [1, 3];
-      let speakersFilled = 0;
-      for (const pos of positionsToCheck) {
-        const overrideField = `speaker_${pos}_override` as keyof SundayAgenda;
-        const overrideVal = agenda?.[overrideField] as string | null;
-        const speech = speeches?.find((s) => s.position === pos);
-        if (overrideVal ?? speech?.speaker_name) speakersFilled++;
-      }
+  const agendaMap = useMemo(() => {
+    const map = new Map<string, SundayAgenda>();
+    for (const a of agendas ?? []) map.set(a.sunday_date, a);
+    return map;
+  }, [agendas]);
 
-      let prayersFilled = 0;
-      for (const s of speeches ?? []) {
-        if ((s.position === 0 || s.position === 4) && s.speaker_name) prayersFilled++;
-      }
+  const exceptionMap = useMemo(() => {
+    const map = new Map<string, SundayException>();
+    for (const e of exceptions ?? []) map.set(e.date, e);
+    return map;
+  }, [exceptions]);
 
-      let hymnsFilled = 0;
-      let hymnsTotal = 3;
-      if (agenda?.opening_hymn_id) hymnsFilled++;
-      if (agenda?.sacrament_hymn_id) hymnsFilled++;
-      if (agenda?.closing_hymn_id) hymnsFilled++;
-      if (agenda?.has_intermediate_hymn !== false && !agenda?.has_special_presentation) {
-        hymnsTotal = 4;
-        if (agenda?.intermediate_hymn_id) hymnsFilled++;
-      }
+  // Build each Sunday's UnifiedSundayCard inputs via the shared pure mapper.
+  const cards = useMemo(
+    () =>
+      nextSundays.map((date) => {
+        const exception = exceptionMap.get(date) ?? null;
+        const data = buildUnifiedCardData({
+          agenda: agendaMap.get(date) ?? null,
+          speeches: speechMap.get(date) ?? [],
+          exceptionReason: exception?.reason ?? null,
+          managePrayers,
+        });
+        return { date, exception, data };
+      }),
+    [nextSundays, exceptionMap, agendaMap, speechMap, managePrayers]
+  );
 
-      return { missingRoles, speakersFilled, speakersTotal, prayersFilled, hymnsFilled, hymnsTotal, GREEN };
-    }
+  // Home has no inline expand: status → Agendas tab expanded; speakers → speeches edit screen.
+  const handlePressStatus = useCallback(
+    (date: string) => {
+      router.push({ pathname: '/(tabs)/agenda', params: { expandDate: date } });
+    },
+    [router]
+  );
+  const handlePressSpeakers = useCallback(
+    (date: string) => {
+      router.push({ pathname: '/speeches/[date]', params: { date } });
+    },
+    [router]
+  );
 
-    // Non-expandable exception (Gen Conf, Stake Conf) - no status lines
-    return null;
-  }, [agenda, speeches, exceptionLabel, isSpecialWithStatus, t]);
+  const heroCard = cards[0] ?? null;
+  const upcomingCards = cards.slice(1);
+
+  const renderCard = (
+    entry: { date: string; exception: SundayException | null; data: ReturnType<typeof buildUnifiedCardData> },
+    opts: { highlighted?: boolean; testID: string }
+  ) => (
+    <UnifiedSundayCard
+      key={entry.date}
+      date={entry.date}
+      highlighted={opts.highlighted}
+      exceptionReason={entry.exception?.reason ?? null}
+      customReason={entry.exception?.custom_reason ?? null}
+      roles={entry.data.roles}
+      speakers={entry.data.speakers}
+      prayers={entry.data.prayers}
+      hymns={entry.data.hymns}
+      managePrayers={managePrayers}
+      nameRows={entry.data.nameRows}
+      onPressStatus={handlePressStatus}
+      onPressSpeakers={handlePressSpeakers}
+      testID={opts.testID}
+    />
+  );
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -132,7 +142,7 @@ function HomeTabContent() {
           <Pressable
             testID="home-start-meeting-button"
             style={[styles.meetingButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push({ pathname: '/presentation', params: { date: sundayDate } })}
+            onPress={() => router.push({ pathname: '/presentation', params: { date: heroDate } })}
             accessibilityRole="button"
           >
             <View style={styles.meetingButtonContent}>
@@ -145,105 +155,21 @@ function HomeTabContent() {
             </View>
           </Pressable>
 
-          {/* Agenda Preview Card */}
-          <View
-            style={[
-              styles.previewCard,
-              { backgroundColor: colors.card, borderColor: colors.primary, borderWidth: 2 },
-            ]}
-          >
-            <View style={styles.previewCardHeader}>
-              <View style={[styles.dateBlock, { backgroundColor: colors.surfaceVariant }]}>
-                <Text style={[styles.dateDay, { color: colors.text }]}>{dayDisplay}</Text>
-                <Text style={[styles.dateMonth, { color: colors.textSecondary }]}>
-                  {monthAbbr}
-                </Text>
-              </View>
-
-              <View style={styles.previewCardCenter}>
-                {exceptionLabel && !isSpecialWithStatus && (
-                  <Text
-                    style={[styles.exceptionText, { color: colors.warning }]}
-                    numberOfLines={1}
-                  >
-                    {exceptionLabel}
-                  </Text>
-                )}
-                {isSpecialWithStatus && statusLines && (() => {
-                  return (
-                    <>
-                      {statusLines.missingRoles.length > 0 && (
-                        <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
-                          {`${t('agenda.statusMissing')}${statusLines.missingRoles.join(' | ')}`}
-                        </Text>
-                      )}
-                      <Text
-                        style={[styles.exceptionText, { color: colors.warning }]}
-                        numberOfLines={1}
-                      >
-                        {exceptionLabel}
-                      </Text>
-                      <Text
-                        style={[styles.statusLine, { color: statusLines.prayersFilled === 2 ? statusLines.GREEN : colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {`${t('agenda.statusPrayersLabel')}: ${statusLines.prayersFilled} de ${2}`}
-                      </Text>
-                      <Text
-                        style={[styles.statusLine, { color: statusLines.hymnsFilled === statusLines.hymnsTotal ? statusLines.GREEN : colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {t('agenda.statusHymns', { filled: statusLines.hymnsFilled, total: statusLines.hymnsTotal })}
-                      </Text>
-                    </>
-                  );
-                })()}
-                {!exceptionLabel && statusLines && (() => {
-                  return (
-                    <>
-                      {statusLines.missingRoles.length > 0 && (
-                        <Text style={[styles.statusLine, { color: colors.textSecondary }]} numberOfLines={1}>
-                          {`${t('agenda.statusMissing')}${statusLines.missingRoles.join(' | ')}`}
-                        </Text>
-                      )}
-                      <Text
-                        style={[styles.statusLine, { color: statusLines.speakersFilled === statusLines.speakersTotal ? statusLines.GREEN : colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {t('agenda.statusSpeakers', { filled: statusLines.speakersFilled, total: statusLines.speakersTotal })}
-                      </Text>
-                      <Text
-                        style={[styles.statusLine, { color: statusLines.prayersFilled === 2 ? statusLines.GREEN : colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {t('agenda.statusPrayers', { filled: statusLines.prayersFilled, total: 2 })}
-                      </Text>
-                      <Text
-                        style={[styles.statusLine, { color: statusLines.hymnsFilled === statusLines.hymnsTotal ? statusLines.GREEN : colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {t('agenda.statusHymns', { filled: statusLines.hymnsFilled, total: statusLines.hymnsTotal })}
-                      </Text>
-                    </>
-                  );
-                })()}
-              </View>
-
-              {isOnline && (
-                <Pressable
-                  testID="home-preview-pencil-button"
-                  style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
-                  onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit agenda"
-                >
-                  <PencilIcon size={16} color={colors.text} />
-                </Pressable>
-              )}
-            </View>
-          </View>
+          {/* Hero: the next Sunday, highlighted. */}
+          {heroCard && renderCard(heroCard, { highlighted: true, testID: `home-hero-card-${heroCard.date}` })}
         </View>
-        <NextSundaysSection />
+
+        {upcomingCards.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('home.upcomingSundays')}
+            </Text>
+            {upcomingCards.map((entry) =>
+              renderCard(entry, { testID: `home-upcoming-card-${entry.date}` })
+            )}
+          </View>
+        )}
+
         {isOnline && <NextAssignmentsSection />}
         {isOnline && <InviteManagementSection />}
       </ScrollView>
@@ -265,6 +191,9 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingBottom: 24,
+  },
+  section: {
+    marginTop: 12,
   },
   sectionTitle: {
     fontSize: 20,
@@ -291,58 +220,5 @@ const styles = StyleSheet.create({
   meetingButtonText: {
     fontSize: 17,
     fontWeight: '700',
-  },
-  previewCard: {
-    borderWidth: 1,
-    borderRadius: 8,
-    marginHorizontal: 12,
-    marginVertical: 4,
-    overflow: 'hidden',
-  },
-  previewCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  dateBlock: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dateDay: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  dateMonth: {
-    fontSize: 10,
-    fontWeight: '600',
-    lineHeight: 12,
-    textTransform: 'uppercase',
-  },
-  previewCardCenter: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  exceptionText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  statusLine: {
-    fontSize: 11,
-  },
-  pencilButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pencilText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

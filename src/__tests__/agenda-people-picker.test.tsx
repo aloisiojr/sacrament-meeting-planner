@@ -189,7 +189,7 @@ beforeEach(() => {
     special_presentation_description: null, intermediate_hymn_id: null,
     speaker_1_override: null, speaker_2_override: null, speaker_3_override: null,
     has_second_speech: true, closing_hymn_id: null, closing_prayer_member_id: null,
-    closing_prayer_name: null, created_at: '', updated_at: '',
+    closing_prayer_name: null, attendance: null, created_at: '', updated_at: '',
   };
   MEMBERS = [MEMBER];
   h.lastPickerProps = null;

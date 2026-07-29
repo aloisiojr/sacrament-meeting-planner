@@ -261,6 +261,7 @@ describe('Database Types', () => {
         closing_hymn_id: null,
         closing_prayer_member_id: null,
         closing_prayer_name: null,
+        attendance: null,
         has_second_speech: true,
         has_intermediate_hymn: true,
         speaker_1_override: null,

@@ -118,6 +118,22 @@ function press(root: TestRenderer.TestInstance, testID: string) {
   });
 }
 
+/** Flip a Switch (e.g. the "Ver todos" toggle) via its onValueChange handler. */
+function toggle(root: TestRenderer.TestInstance, testID: string, value: boolean) {
+  const node = find(root, testID)[0];
+  act(() => {
+    (node.props.onValueChange as (v: boolean) => void)(value);
+  });
+}
+
+/** Read the text content of the first host Text node carrying `testID`. */
+function textOf(root: TestRenderer.TestInstance, testID: string): string {
+  const node = find(root, testID)[0];
+  const flatten = (c: unknown): string =>
+    Array.isArray(c) ? c.map(flatten).join('') : typeof c === 'string' ? c : '';
+  return flatten(node.props.children);
+}
+
 function listData(renderer: TestRenderer.ReactTestRenderer): Member[] {
   const flat = renderer.root.findAll((n) => n.type === 'FlatList')[0];
   return (flat.props.data as Member[]) ?? [];
@@ -167,7 +183,7 @@ describe('PeoplePicker', () => {
   it('"ver todos" reveals members lacking the capability', () => {
     const { renderer } = render({ capability: 'preside' });
     expect(ids(renderer)).toEqual(['a']);
-    press(renderer.root, 'people-picker-view-all');
+    toggle(renderer.root, 'people-picker-view-all', true);
     expect(ids(renderer)).toEqual(['a', 'b', 'c']);
   });
 
@@ -200,24 +216,21 @@ describe('PeoplePicker', () => {
     expect(find(renderRow(renderer, MEMBER_B).root, 'people-picker-responsible-b').length).toBe(0);
   });
 
-  it('exposes add + row edit/remove and opens the editor with the member when member:write (AC6)', () => {
+  it('exposes add + row edit and opens the editor with the member when member:write (AC6)', () => {
     const { renderer } = render();
     expect(find(renderer.root, 'people-picker-add').length).toBe(1);
     const row = renderRow(renderer, MEMBER_A);
     expect(find(row.root, 'people-picker-edit-a').length).toBe(1);
-    expect(find(row.root, 'people-picker-delete-a').length).toBe(1);
     // Pressing edit loads the member into the (always-mounted) PersonEditor.
     press(row.root, 'people-picker-edit-a');
     const nameInput = find(renderer.root, 'person-editor-full-name')[0];
     expect(nameInput.props.value).toBe('Alice Preside');
   });
 
-  it('removes a member via confirmation (AC6)', () => {
+  it('never renders a per-row delete (trash) control — deletion lives in the editor (P1)', () => {
     const { renderer } = render();
     const row = renderRow(renderer, MEMBER_A);
-    press(row.root, 'people-picker-delete-a');
-    alertButtons().find((b) => b.style === 'destructive')!.onPress?.();
-    expect(deleteMock).toHaveBeenCalledWith({ memberId: 'a', memberName: 'Alice Preside' });
+    expect(find(row.root, 'people-picker-delete-a').length).toBe(0);
   });
 
   it('is view-only for observers: no add, no row controls, selection disabled (AC6)', () => {
@@ -226,8 +239,111 @@ describe('PeoplePicker', () => {
     expect(find(renderer.root, 'people-picker-add').length).toBe(0);
     const row = renderRow(renderer, MEMBER_A);
     expect(find(row.root, 'people-picker-edit-a').length).toBe(0);
-    expect(find(row.root, 'people-picker-delete-a').length).toBe(0);
     press(row.root, 'people-picker-item-a');
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  // --- Context: title / subtitle / toggle (P2, P6) ---
+
+  it('always shows the fixed picker title (P2)', () => {
+    for (const ctx of [undefined, 'speaker', 'preside', 'be_recognized'] as const) {
+      const { renderer } = render(ctx ? { context: ctx } : {});
+      expect(textOf(renderer.root, 'people-picker-title')).toBe('people.pickerTitle');
+    }
+  });
+
+  it('shows the per-context subtitle matching the given context (P2)', () => {
+    const { renderer } = render({ context: 'preside' });
+    expect(textOf(renderer.root, 'people-picker-subtitle')).toBe('people.subtitles.preside');
+    const rec = render({ context: 'be_recognized' });
+    expect(textOf(rec.renderer.root, 'people-picker-subtitle')).toBe(
+      'people.subtitles.be_recognized'
+    );
+  });
+
+  it('shows the "Ver todos" Switch in capability contexts and hides it in speaker/prayer (P6)', () => {
+    const preside = render({ context: 'preside' });
+    expect(find(preside.renderer.root, 'people-picker-view-all').length).toBe(1);
+    const recognize = render({ context: 'be_recognized' });
+    expect(find(recognize.renderer.root, 'people-picker-view-all').length).toBe(1);
+    for (const ctx of ['speaker', 'opening_prayer', 'closing_prayer'] as const) {
+      const { renderer } = render({ context: ctx });
+      expect(find(renderer.root, 'people-picker-view-all').length).toBe(0);
+      // …but the subtitle still shows.
+      expect(textOf(renderer.root, 'people-picker-subtitle')).toBe(`people.subtitles.${ctx}`);
+    }
+  });
+
+  // --- Context: per-row secondary line (P3, P4, P5, P5b) ---
+
+  it('shows the informal name in parentheses after the full name (P3)', () => {
+    MEMBERS = [makeMember({ id: 'x', full_name: 'João Vasconcelos', informal_name: 'João' })];
+    const { renderer } = render({ context: 'speaker' });
+    const row = renderRow(renderer, MEMBERS[0]);
+    const nameNode = find(row.root, 'people-picker-item-x')[0];
+    const text = JSON.stringify(nameNode.props.children);
+    expect(text).toContain('João Vasconcelos');
+    expect(text).toContain('(João)');
+  });
+
+  it('speaker context: 2nd line shows speech count + responsible, no functions (P4)', () => {
+    const { renderer } = render({ context: 'speaker' });
+    const row = renderRow(renderer, MEMBER_A); // speechCount a=2, responsible for c
+    expect(find(row.root, 'people-picker-responsible-a').length).toBe(1);
+    expect(find(row.root, 'people-picker-calling-a').length).toBe(0);
+    const text = JSON.stringify(row.toJSON());
+    expect(text).toContain('members.speechCount');
+    expect(text).not.toContain('capabilitiesShort');
+  });
+
+  it('preside context: name only — no speech count, responsible, functions or calling (P5)', () => {
+    const { renderer } = render({ context: 'preside' });
+    const row = renderRow(renderer, MEMBER_A);
+    expect(find(row.root, 'people-picker-responsible-a').length).toBe(0);
+    expect(find(row.root, 'people-picker-calling-a').length).toBe(0);
+    const text = JSON.stringify(row.toJSON());
+    expect(text).not.toContain('members.speechCount');
+    expect(text).not.toContain('capabilitiesShort');
+  });
+
+  it('be_recognized context: 2nd line shows calling + functions (P5b)', () => {
+    MEMBERS = [
+      makeMember({
+        id: 'r',
+        full_name: 'Ricardo Almeida',
+        calling: 'Bispo',
+        can_preside: true,
+        can_be_recognized: true,
+      }),
+    ];
+    const { renderer } = render({ context: 'be_recognized' });
+    const row = renderRow(renderer, MEMBERS[0]);
+    expect(textOf(row.root, 'people-picker-calling-r')).toBe('Bispo');
+    const text = JSON.stringify(row.toJSON());
+    expect(text).toContain('capabilitiesShort');
+  });
+
+  // --- Multi-select keep-selected (P7) ---
+
+  it('multiSelect: keeps a selected member visible when the search filters it out (P7)', () => {
+    // Search "Alice" would drop Bob, but Bob is selected → he stays in the list.
+    const { renderer } = render({ multiSelect: true, selectedIds: ['b'] });
+    act(() => {
+      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+        'Alice'
+      );
+    });
+    expect(ids(renderer)).toContain('b');
+    expect(ids(renderer)).toContain('a');
+  });
+
+  it('single-select: does NOT force a non-matching member into the list (P7 scope)', () => {
+    const { renderer } = render({ selectedIds: ['b'] });
+    act(() => {
+      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+        'Alice'
+      );
+    });
+    expect(ids(renderer)).not.toContain('b');
   });
 });

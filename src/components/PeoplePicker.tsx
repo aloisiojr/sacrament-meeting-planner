@@ -1,14 +1,19 @@
 /**
  * PeoplePicker (v2.0 unified people model): one picker for speakers, prayers and every actor role.
  *
- * The single, unified picker for all people selection. Behavior (see specs/v2-member-management.md):
- *  - `capability` context: when set, defaults to listing only members with that flag, plus a
- *    "ver todos" toggle that lists everyone. Undefined = speaker/prayer (everyone).
- *  - Grant-on-select: picking (via "ver todos") a member lacking the required capability shows a
+ * The single, unified picker for all people selection. Behavior (see specs/v2-people-refinements.md):
+ *  - `context` maps to an effective capability (via CONTEXT_CAPABILITY): speaker/prayers → none
+ *    (lists everyone); the actor roles → the matching capability. `capability` is kept as a
+ *    back-compat fallback for callers that have not yet migrated to `context`.
+ *  - Capability contexts default to listing only members with that flag, plus a "Ver todos" Switch
+ *    that lists everyone. Non-capability contexts list everyone with no toggle.
+ *  - Grant-on-select: picking (via "Ver todos") a member lacking the required capability shows a
  *    confirmation; on confirm the capability is granted (useUpdateMember) then the member selected.
- *  - Each row: name (+ informal), speech-count badge, capability indicators, and
- *    "Responsável por <name(s)>" when the member is a responsible_id for others.
- *  - Per-row edit / remove (member:write) open PersonEditor / delete; an "add person" entry.
+ *  - Header: a fixed title ("Selecionar Pessoa") plus a per-context subtitle.
+ *  - Row secondary line varies by context: speaker/prayers → speech count + "Responsável por…";
+ *    preside/conduct/lead_music/play_piano → none; be_recognized → calling + functions.
+ *  - Per-row edit (member:write) opens PersonEditor; deletion now lives in PersonEditor (no per-row
+ *    trash). An "add person" entry creates a new member.
  *  - Selecting is gated by agenda:write / speech:assign; observers are view-only.
  */
 
@@ -20,17 +25,17 @@ import {
   FlatList,
   Pressable,
   Modal,
+  Switch,
   Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SearchInput } from './SearchInput';
-import { CheckSquareIcon, SquareIcon, PencilIcon, TrashIcon } from './icons';
+import { CheckSquareIcon, SquareIcon, PencilIcon } from './icons';
 import {
   useMembers,
   useUpdateMember,
-  useDeleteMember,
   getResponsibleForMap,
   filterMembers,
 } from '../hooks/useMembers';
@@ -42,9 +47,37 @@ export type { PeopleCapability };
 
 // --- Types ---
 
+/** The selection context each call site opens the picker in (P2). */
+export type PickerContext =
+  | 'speaker'
+  | 'opening_prayer'
+  | 'closing_prayer'
+  | 'preside'
+  | 'conduct'
+  | 'lead_music'
+  | 'play_piano'
+  | 'be_recognized';
+
+/**
+ * Maps a picker context to its effective capability. Speaker/prayer contexts have no capability
+ * (list everyone, no toggle); the actor-role contexts map to the matching capability.
+ */
+export const CONTEXT_CAPABILITY: Record<PickerContext, PeopleCapability | null> = {
+  speaker: null,
+  opening_prayer: null,
+  closing_prayer: null,
+  preside: 'preside',
+  conduct: 'conduct',
+  lead_music: 'lead_music',
+  play_piano: 'play_piano',
+  be_recognized: 'be_recognized',
+};
+
 export interface PeoplePickerProps {
   visible: boolean;
-  /** Capability context; undefined = speaker/prayer (lists everyone). */
+  /** Selection context; drives title/subtitle and the effective capability. */
+  context?: PickerContext;
+  /** Back-compat capability context (fallback when `context` is not passed). */
   capability?: PeopleCapability;
   /** Multi-select mode (recognition). */
   multiSelect?: boolean;
@@ -56,6 +89,7 @@ export interface PeoplePickerProps {
 
 export function PeoplePicker({
   visible,
+  context,
   capability,
   multiSelect = false,
   selectedIds,
@@ -74,12 +108,27 @@ export function PeoplePicker({
   const { data: allMembers } = useMembers();
   const { data: speechCounts } = useSpeechCounts();
   const updateMember = useUpdateMember();
-  const deleteMember = useDeleteMember();
 
   const canManage = hasPermission('member:write');
   const canSelect = hasPermission('agenda:write') || hasPermission('speech:assign');
 
-  const capabilityField = capability ? CAPABILITY_FIELD[capability] : null;
+  // Effective capability: context takes precedence, `capability` is the back-compat fallback.
+  const effectiveCapability: PeopleCapability | null = context
+    ? CONTEXT_CAPABILITY[context]
+    : capability ?? null;
+  const capabilityField = effectiveCapability ? CAPABILITY_FIELD[effectiveCapability] : null;
+
+  // Secondary-line mode per context (P4/P5/P5b). Undefined context falls back to the speaker rules.
+  const secondaryMode: 'speech' | 'none' | 'recognized' =
+    context === 'be_recognized'
+      ? 'recognized'
+      : context === 'preside' ||
+        context === 'conduct' ||
+        context === 'lead_music' ||
+        context === 'play_piano'
+      ? 'none'
+      : 'speech';
+
   const selectedSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
 
   const responsibleForMap = useMemo(
@@ -87,15 +136,22 @@ export function PeoplePicker({
     [allMembers]
   );
 
-  // Default to the capability-filtered list; "ver todos" (showAll) or no capability lists everyone.
+  // Default to the capability-filtered list; "Ver todos" (showAll) or no capability lists everyone.
+  // P7: in multiSelect with a non-empty search, already-selected members stay in the list even when
+  // they don't match the filter (union of filtered results + selected).
   const rows = useMemo(() => {
     const list = allMembers ?? [];
     const scoped =
       capabilityField && !showAll
         ? list.filter((m) => m[capabilityField] === true)
         : list;
-    return search.trim() ? filterMembers(scoped, search) : scoped;
-  }, [allMembers, capabilityField, showAll, search]);
+    if (!search.trim()) return scoped;
+    const filtered = filterMembers(scoped, search);
+    if (!multiSelect) return filtered;
+    const filteredIds = new Set(filtered.map((m) => m.id));
+    const keepSelected = list.filter((m) => selectedSet.has(m.id) && !filteredIds.has(m.id));
+    return [...filtered, ...keepSelected];
+  }, [allMembers, capabilityField, showAll, search, multiSelect, selectedSet]);
 
   const resetTransient = useCallback(() => {
     setSearch('');
@@ -126,7 +182,7 @@ export function PeoplePicker({
           t('people.grantConfirmTitle'),
           t('people.grantConfirmMessage', {
             name: member.full_name,
-            capability: capability ? t(`capabilities.${capability}`) : '',
+            capability: effectiveCapability ? t(`capabilities.${effectiveCapability}`) : '',
           }),
           [
             { text: t('common.cancel'), style: 'cancel' },
@@ -147,22 +203,7 @@ export function PeoplePicker({
       }
       commitSelect(member);
     },
-    [canSelect, capabilityField, capability, t, updateMember, commitSelect]
-  );
-
-  const handleDelete = useCallback(
-    (member: Member) => {
-      Alert.alert(t('common.delete'), t('members.deleteConfirm'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () =>
-            deleteMember.mutate({ memberId: member.id, memberName: member.full_name }),
-        },
-      ]);
-    },
-    [t, deleteMember]
+    [canSelect, capabilityField, effectiveCapability, t, updateMember, commitSelect]
   );
 
   const openEditor = useCallback((member: Member | null) => {
@@ -206,25 +247,47 @@ export function PeoplePicker({
                 {item.full_name}
                 {item.informal_name && item.informal_name !== item.full_name ? (
                   <Text style={[styles.informal, { color: colors.textSecondary }]}>
-                    {'  '}
-                    {item.informal_name}
+                    {` (${item.informal_name})`}
                   </Text>
                 ) : null}
               </Text>
-              {count > 0 ? (
-                <Text style={[styles.meta, { color: colors.textSecondary }]}>
-                  {t('members.speechCount', { count })}
-                </Text>
+
+              {/* P4: speaker/prayer — speech count (>0) + "Responsável por…", no functions. */}
+              {secondaryMode === 'speech' ? (
+                <>
+                  {count > 0 ? (
+                    <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                      {t('members.speechCount', { count })}
+                    </Text>
+                  ) : null}
+                  {responsibleFor && responsibleFor.length > 0 ? (
+                    <Text
+                      style={[styles.meta, { color: colors.textSecondary }]}
+                      testID={`people-picker-responsible-${item.id}`}
+                    >
+                      {t('people.responsibleFor', { names: responsibleFor.join(', ') })}
+                    </Text>
+                  ) : null}
+                </>
               ) : null}
-              {activeCaps.length > 0 ? (
-                <Text style={[styles.meta, { color: colors.textTertiary }]}>
-                  {activeCaps.map((cap) => t(`capabilitiesShort.${cap}`)).join(' · ')}
-                </Text>
-              ) : null}
-              {responsibleFor && responsibleFor.length > 0 ? (
-                <Text style={[styles.meta, { color: colors.textSecondary }]} testID={`people-picker-responsible-${item.id}`}>
-                  {t('people.responsibleFor', { names: responsibleFor.join(', ') })}
-                </Text>
+
+              {/* P5b: be_recognized — calling (when set) + functions. */}
+              {secondaryMode === 'recognized' ? (
+                <>
+                  {item.calling ? (
+                    <Text
+                      style={[styles.meta, { color: colors.textSecondary }]}
+                      testID={`people-picker-calling-${item.id}`}
+                    >
+                      {item.calling}
+                    </Text>
+                  ) : null}
+                  {activeCaps.length > 0 ? (
+                    <Text style={[styles.meta, { color: colors.textTertiary }]}>
+                      {activeCaps.map((cap) => t(`capabilitiesShort.${cap}`)).join(' · ')}
+                    </Text>
+                  ) : null}
+                </>
               ) : null}
             </View>
           </Pressable>
@@ -237,13 +300,6 @@ export function PeoplePicker({
               >
                 <PencilIcon size={18} color={colors.textSecondary} />
               </Pressable>
-              <Pressable
-                testID={`people-picker-delete-${item.id}`}
-                hitSlop={12}
-                onPress={() => handleDelete(item)}
-              >
-                <TrashIcon size={18} color={colors.error} />
-              </Pressable>
             </View>
           ) : null}
         </View>
@@ -253,13 +309,13 @@ export function PeoplePicker({
       selectedSet,
       speechCounts,
       responsibleForMap,
+      secondaryMode,
       colors,
       canSelect,
       canManage,
       multiSelect,
       t,
       handleSelect,
-      handleDelete,
       openEditor,
     ]
   );
@@ -282,23 +338,43 @@ export function PeoplePicker({
           </Pressable>
         </View>
 
-        {/* "Ver todos" toggle (capability context only) */}
-        {capabilityField ? (
-          <Pressable
-            testID="people-picker-view-all"
-            style={styles.viewAllRow}
-            onPress={() => setShowAll((v) => !v)}
-          >
-            {showAll ? (
-              <CheckSquareIcon size={18} color={colors.primary} />
-            ) : (
-              <SquareIcon size={18} color={colors.textSecondary} />
-            )}
-            <Text style={[styles.viewAllText, { color: colors.primary }]}>
-              {t('people.viewAll')}
+        {/* P2: fixed title + per-context subtitle; P6: "Ver todos" Switch in capability contexts. */}
+        <View style={styles.titleBlock}>
+          <Text testID="people-picker-title" style={[styles.title, { color: colors.text }]}>
+            {t('people.pickerTitle')}
+          </Text>
+          {effectiveCapability ? (
+            <View style={styles.subtitleRow}>
+              {context ? (
+                <Text
+                  testID="people-picker-subtitle"
+                  style={[styles.subtitle, { color: colors.textSecondary }]}
+                >
+                  {t(`people.subtitles.${context}`)}
+                </Text>
+              ) : (
+                <View style={styles.subtitleSpacer} />
+              )}
+              <View style={styles.viewAllControl}>
+                <Text style={[styles.viewAllText, { color: colors.text }]}>
+                  {t('people.viewAll')}
+                </Text>
+                <Switch
+                  testID="people-picker-view-all"
+                  value={showAll}
+                  onValueChange={setShowAll}
+                />
+              </View>
+            </View>
+          ) : context ? (
+            <Text
+              testID="people-picker-subtitle"
+              style={[styles.subtitle, { color: colors.textSecondary }]}
+            >
+              {t(`people.subtitles.${context}`)}
             </Text>
-          </Pressable>
-        ) : null}
+          ) : null}
+        </View>
 
         {/* Add person */}
         {canManage ? (
@@ -368,12 +444,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  viewAllRow: {
+  titleBlock: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  subtitle: {
+    flex: 1,
+    fontSize: 14,
+  },
+  subtitleSpacer: {
+    flex: 1,
+  },
+  viewAllControl: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
   },
   viewAllText: {
     fontSize: 14,

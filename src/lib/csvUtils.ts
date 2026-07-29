@@ -28,8 +28,11 @@ export interface CsvMember {
 export type CsvErrorCode =
   | 'EMPTY_FILE'
   | 'INVALID_HEADER'
-  | 'INSUFFICIENT_COLUMNS'
+  | 'TOO_MANY_COLUMNS'
   | 'NAME_REQUIRED'
+  | 'INVALID_BOOL'
+  | 'INVALID_PHONE'
+  | 'RESPONSIBLE_NOT_FOUND'
   | 'NO_DATA';
 
 export interface CsvHeaders {
@@ -58,27 +61,45 @@ export const CSV_DEFAULT_HEADERS: CsvHeaders = {
   calling: 'Chamado',
 };
 
-/** Minimum columns required for a valid row: Nome, Nome Informal, Telefone Completo. */
-const MIN_COLUMNS = 3;
+/** The 10 columns of the full-dump CSV, in order. A valid header must have all of them. */
+const KNOWN_COLUMN_COUNT = 10;
 
-/** Values (case-insensitive, trimmed) that parse to a `true` capability flag. */
-const TRUE_VALUES = new Set(['true', '1', 'sim', 'yes', 'y', 's', 'x', 'verdadeiro', 'v']);
+/** Values (case- and accent-insensitive, trimmed) that parse to a `true` capability flag. */
+const TRUE_VALUES = new Set(['x', 'sim', 'yes', 'si']);
 
-/** Parse a CSV cell into a boolean capability flag. Anything not truthy is false. */
+/** Valid full phone: optional leading '+' then 8–15 digits (matches what generateCsv emits). */
+const PHONE_REGEX = /^\+?\d{8,15}$/;
+
+/**
+ * Normalize a name for case- and accent-insensitive comparison (Responsável ↔ Nome).
+ * Local to this module by design — do NOT import search helpers from hooks here.
+ */
+function normalizeName(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Parse a CSV cell into a boolean capability flag. Only the accent/case-insensitive tokens
+ * `x`, `sim`, `yes`, `si` are true; empty and anything else are false.
+ */
 export function parseCsvBool(value: string | undefined): boolean {
-  return TRUE_VALUES.has((value ?? '').trim().toLowerCase());
+  return TRUE_VALUES.has(normalizeName(value ?? ''));
 }
 
 /** Serialize a boolean capability flag for CSV export (round-trips through parseCsvBool). */
 function formatCsvBool(value: boolean | undefined): string {
-  return value ? 'true' : 'false';
+  return value ? 'X' : '';
 }
 
 export interface CsvValidationError {
   line: number;
-  field: string;
-  message: string;
-  code?: CsvErrorCode;
+  column: string;
+  code: CsvErrorCode;
+  value?: string;
 }
 
 export interface CsvParseResult {
@@ -87,79 +108,117 @@ export interface CsvParseResult {
   errors: CsvValidationError[];
 }
 
+/** Bool capability columns, by index, in the fixed 10-column layout. */
+const BOOL_COLUMN_INDICES = [3, 4, 5, 6, 7] as const;
+
 /**
- * Parse a CSV string into an array of CsvMember (full dump).
- * Requires at least 3 columns: Name, Informal Name, Phone. Capability columns
- * (preside/conduct/lead music/piano/recognize) and the Responsável column are optional and
- * default to false / empty when absent, so 3-column legacy files still import.
- * Phone format: +xxyyyyyyyy (country code + number).
+ * Parse a CSV string into an array of CsvMember (full dump), STRICTLY and round-trip-safe.
+ *
+ * Validation collects ALL errors (never stops early) and returns `success: false` if any is
+ * found; the returned `members` is empty on failure. Rules:
+ * - Header must carry all 10 known columns (fewer -> INVALID_HEADER); an empty file -> EMPTY_FILE.
+ * - Rows with MORE columns than the header -> TOO_MANY_COLUMNS; FEWER are padded with '' (tolerant
+ *   of spreadsheets dropping trailing empty cells).
+ * - `Nome` (col 0) is required. Blank `Nome Informal` defaults to the first word of `Nome`.
+ * - `Telefone` (col 2) is optional; if present must match /^\+?\d{8,15}$/ (kept verbatim).
+ * - Bool cols (3..7): empty -> false; the accent/case-insensitive tokens `x`/`sim`/`yes`/`si` ->
+ *   true; anything else -> INVALID_BOOL (and treated as false).
+ * - `Responsavel` (col 8) is optional; if present must match some row's `Nome` (accent/case
+ *   insensitive) -- duplicates resolve to the first later, not an error.
+ * - `Chamado` (col 9) is free text.
+ *
+ * Every value `generateCsv` emits passes these rules (round-trip guarantee).
  */
 export function parseCsv(csvContent: string): CsvParseResult {
   const errors: CsvValidationError[] = [];
-  const members: CsvMember[] = [];
 
   // Strip UTF-8 BOM if present (common in Excel-exported CSVs)
   const cleanContent = csvContent.replace(/^\uFEFF/, '').trim();
 
   if (!cleanContent) {
-    errors.push({ line: 0, field: 'file', message: 'Empty CSV file', code: 'EMPTY_FILE' });
+    errors.push({ line: 0, column: 'file', code: 'EMPTY_FILE' });
     return { success: false, members: [], errors };
   }
 
   const lines = cleanContent.split(/\r?\n/);
 
-  // Validate header
-  const header = lines[0].trim();
-  const headerParts = header.split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+  // Validate header: must carry all 10 known columns.
+  const headerParts = parseCsvLine(lines[0].trim()).map((h) => h.trim().replace(/^"|"$/g, ''));
+  const expectedCols = headerParts.length;
 
-  if (headerParts.length < MIN_COLUMNS) {
-    errors.push({ line: 1, field: 'header', message: 'CSV must have at least 3 columns: Nome, Nome Informal, Telefone Completo', code: 'INVALID_HEADER' });
+  if (expectedCols < KNOWN_COLUMN_COUNT) {
+    errors.push({ line: 1, column: 'header', code: 'INVALID_HEADER' });
     return { success: false, members: [], errors };
   }
 
-  // Parse data rows
+  const colName = (index: number): string => headerParts[index] ?? String(index);
+
+  // First pass: split rows, flag over-wide rows, pad short rows, and collect all Nomes across the
+  // whole file (needed to resolve Responsavel references, incl. forward references).
+  const rows: { line: number; parts: string[] }[] = [];
+  const knownNames = new Set<string>();
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
     const parts = parseCsvLine(line);
 
-    if (parts.length < MIN_COLUMNS) {
-      errors.push({ line: i + 1, field: 'format', message: 'Row must have at least 3 columns', code: 'INSUFFICIENT_COLUMNS' });
+    if (parts.length > expectedCols) {
+      errors.push({ line: i + 1, column: 'formato', code: 'TOO_MANY_COLUMNS' });
       continue;
     }
+    while (parts.length < expectedCols) parts.push('');
 
+    const name = parts[0].trim();
+    if (name) knownNames.add(normalizeName(name));
+    rows.push({ line: i + 1, parts });
+  }
+
+  // Second pass: validate each row and build members (discarded if the file has ANY error).
+  const members: CsvMember[] = [];
+
+  for (const { line, parts } of rows) {
     const fullName = parts[0].trim();
-    let informalName = (parts[1] ?? '').trim();
-    let fullPhone = (parts[2] ?? '').trim();
+    let informalName = parts[1].trim();
+    const fullPhone = parts[2].trim();
 
-    // Validate name
     if (!fullName) {
-      errors.push({ line: i + 1, field: 'Nome', message: 'Name is required', code: 'NAME_REQUIRED' });
-      continue;
+      errors.push({ line, column: colName(0), code: 'NAME_REQUIRED' });
     }
-
-    // Default informal_name to first word of full_name
     if (!informalName) {
-      informalName = fullName.split(' ')[0];
+      informalName = fullName.split(' ')[0] ?? '';
     }
 
-    // Sanitize phone: if it contains non-digit/non-plus chars, treat as empty
-    if (fullPhone && !/^[+\d]*$/.test(fullPhone)) {
-      fullPhone = '';
+    if (fullPhone && !PHONE_REGEX.test(fullPhone)) {
+      errors.push({ line, column: colName(2), code: 'INVALID_PHONE', value: fullPhone });
+    }
+
+    const boolValues = BOOL_COLUMN_INDICES.map((idx) => {
+      const raw = parts[idx].trim();
+      const token = normalizeName(raw);
+      if (token === '') return false;
+      if (TRUE_VALUES.has(token)) return true;
+      errors.push({ line, column: colName(idx), code: 'INVALID_BOOL', value: raw });
+      return false;
+    });
+
+    const responsibleName = parts[8].trim();
+    if (responsibleName && !knownNames.has(normalizeName(responsibleName))) {
+      errors.push({ line, column: colName(8), code: 'RESPONSIBLE_NOT_FOUND', value: responsibleName });
     }
 
     members.push({
       full_name: fullName,
       informal_name: informalName,
       phone: fullPhone,
-      can_preside: parseCsvBool(parts[3]),
-      can_conduct: parseCsvBool(parts[4]),
-      can_lead_music: parseCsvBool(parts[5]),
-      can_play_piano: parseCsvBool(parts[6]),
-      can_be_recognized: parseCsvBool(parts[7]),
-      responsible_name: (parts[8] ?? '').trim(),
-      calling: (parts[9] ?? '').trim(),
+      can_preside: boolValues[0],
+      can_conduct: boolValues[1],
+      can_lead_music: boolValues[2],
+      can_play_piano: boolValues[3],
+      can_be_recognized: boolValues[4],
+      responsible_name: responsibleName,
+      calling: parts[9].trim(),
     });
   }
 
@@ -168,7 +227,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
   }
 
   if (members.length === 0) {
-    errors.push({ line: 0, field: 'data', message: 'No valid data rows found', code: 'NO_DATA' });
+    errors.push({ line: 0, column: 'data', code: 'NO_DATA' });
     return { success: false, members: [], errors };
   }
 
@@ -216,6 +275,44 @@ export interface CsvExportMember {
   can_be_recognized?: boolean;
   responsible_name?: string | null;
   calling?: string | null;
+}
+
+/**
+ * Clearly-marked example rows exported when the ward has no members yet, so the user learns the
+ * format — localized to the ward/app language (names, callings and phone country code). Each set is
+ * self-consistent: `parseCsv(generateCsv(getExampleMembers(lang)))` succeeds, and the second row
+ * references the first via `Responsável` to illustrate delegation.
+ */
+export const EXAMPLE_MEMBERS_BY_LANG: Record<string, CsvExportMember[]> = {
+  'pt-BR': [
+    { full_name: 'Maria Exemplo', informal_name: '', country_code: '+55', phone: '11999990001',
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: true,
+      can_be_recognized: false, responsible_name: '', calling: 'Ex.: Presidente da Primária' },
+    { full_name: 'Lucas Exemplo', informal_name: '', country_code: '+55', phone: null,
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+      can_be_recognized: false, responsible_name: 'Maria Exemplo', calling: '' },
+  ],
+  'en-US': [
+    { full_name: 'Mary Example', informal_name: '', country_code: '+1', phone: '5551234567',
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: true,
+      can_be_recognized: false, responsible_name: '', calling: 'e.g. Primary President' },
+    { full_name: 'Luke Example', informal_name: '', country_code: '+1', phone: null,
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+      can_be_recognized: false, responsible_name: 'Mary Example', calling: '' },
+  ],
+  'es-LA': [
+    { full_name: 'María Ejemplo', informal_name: '', country_code: '+52', phone: '5512345678',
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: true,
+      can_be_recognized: false, responsible_name: '', calling: 'Ej.: Presidenta de la Primaria' },
+    { full_name: 'Lucas Ejemplo', informal_name: '', country_code: '+52', phone: null,
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+      can_be_recognized: false, responsible_name: 'María Ejemplo', calling: '' },
+  ],
+};
+
+/** Example rows for the given language (falls back to pt-BR). */
+export function getExampleMembers(language?: string): CsvExportMember[] {
+  return EXAMPLE_MEMBERS_BY_LANG[language ?? ''] ?? EXAMPLE_MEMBERS_BY_LANG['pt-BR'];
 }
 
 /**

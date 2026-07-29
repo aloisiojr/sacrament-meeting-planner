@@ -363,7 +363,7 @@ export function PersonEditor({
                   style={[styles.selectorText, { color: countryCode ? colors.text : colors.placeholder }]}
                   numberOfLines={1}
                 >
-                  {countryCode ? `${getFlagForCode(countryCode)} ${countryCode}` : '+1'}
+                  {countryCode ? `${getFlagForCode(countryCode)} ${countryCode}` : '+55'}
                 </Text>
               </Pressable>
             </View>

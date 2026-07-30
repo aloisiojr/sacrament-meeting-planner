@@ -37,6 +37,17 @@ export function orderDesignations(items: Designation[]): Designation[] {
 
 type Translate = (key: string) => string;
 
+// The localized placeholder tokens per language (used by the templates editor + hint).
+const TOKENS_BY_LANG: Record<string, Record<'name' | 'calling' | 'office' | 'ward', string>> = {
+  'pt-BR': { name: '{nome}', calling: '{chamado}', office: '{oficio}', ward: '{ala}' },
+  'en-US': { name: '{name}', calling: '{calling}', office: '{office}', ward: '{ward}' },
+  'es-LA': { name: '{nombre}', calling: '{llamamiento}', office: '{oficio}', ward: '{barrio}' },
+};
+
+export function designationTokens(lang: string): Record<'name' | 'calling' | 'office' | 'ward', string> {
+  return TOKENS_BY_LANG[lang] ?? TOKENS_BY_LANG['en-US'];
+}
+
 export function designationTypeLabel(type: DesignationType, t: Translate): string {
   return t(`agenda.designations.type.${type}`);
 }

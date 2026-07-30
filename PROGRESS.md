@@ -24,7 +24,16 @@
     - Step 3 ✅ `useWardName`; flagged/ordered Play bullet list; icon + modal wiring in presentation.tsx.
     - Order: release→sustain→priesthood→new_member. Grouping deferred (too custom). 2002 tests green.
     - **Next: verify-change (Spec 2), then GATE 3.**
-  - Spec 3 (Settings template editor, per-ward Ward columns) still to come.
+  - **Spec 2 verified (APPROVED)** — client-only, no deploy.
+  - Post-Spec-2 polish (committed): dim non-selected type/office options; highlight person/calling
+    fields when filled; interstitial title → "Assuntos de Ala".
+  - **Spec 3 (`specs/v2-designations-templates.md`) build COMPLETE** — configurable templates:
+    - Step 1 ✅ migration 042 (4 nullable `wards.designation_template_*`, additive/ADR 003) + Ward
+      type + `settings:designations` perm (bishopric+secretary); perm-count tests 26→27.
+    - Step 2 ✅ `useWardDesignationTemplates` + override applied in the Play interstitial.
+    - Step 3 ✅ Settings "Ward Business Templates" editor (prefill override/default, auto-save,
+      restore-default, token hint) + index entry gated by the perm. 2013 tests green.
+    - **Next: verify-change (Spec 3), then GATE 3.** Migration 042 is ADDITIVE — apply to staging.
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

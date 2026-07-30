@@ -275,6 +275,27 @@ describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
   });
 });
 
+describe('UnifiedSundayCard — hideStatusBlock (Home upcoming cards)', () => {
+  it('hides Block 1 (status) but keeps Block 2 (speakers) when hideStatusBlock', () => {
+    const { root } = render(
+      baseProps({ hideStatusBlock: true, nameRows: [{ key: 's1', kind: 'speaker', name: 'Alice', status: 'assigned_confirmed' }] })
+    );
+    expect(byTestID(root, 'unified-status-2026-08-02').length).toBe(0);
+    expect(byTestID(root, 'unified-speakers-2026-08-02').length).toBe(1);
+  });
+
+  it('shows Block 1 by default (hero / Agendas cards)', () => {
+    const { root } = render(baseProps());
+    expect(byTestID(root, 'unified-status-2026-08-02').length).toBe(1);
+  });
+
+  it('does not affect the no-sacrament layout (reason still shown)', () => {
+    const { root } = render(baseProps({ exceptionReason: 'stake_conference', hideStatusBlock: true }));
+    // No-sacrament card keeps its single status/reason zone.
+    expect(byTestID(root, 'unified-status-2026-08-02').length).toBe(1);
+  });
+});
+
 describe('UnifiedSundayCard — tap zones + chevron (U7)', () => {
   it('calls onPressStatus when the status zone is tapped', () => {
     const onPressStatus = vi.fn();

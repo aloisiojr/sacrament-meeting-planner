@@ -112,12 +112,13 @@ function HomeTabContent() {
 
   const renderCard = (
     entry: { date: string; exception: SundayException | null; data: ReturnType<typeof buildUnifiedCardData> },
-    opts: { highlighted?: boolean; testID: string }
+    opts: { highlighted?: boolean; hideStatusBlock?: boolean; testID: string }
   ) => (
     <UnifiedSundayCard
       key={entry.date}
       date={entry.date}
       highlighted={opts.highlighted}
+      hideStatusBlock={opts.hideStatusBlock}
       exceptionReason={entry.exception?.reason ?? null}
       customReason={entry.exception?.custom_reason ?? null}
       roles={entry.data.roles}
@@ -165,7 +166,7 @@ function HomeTabContent() {
               {t('home.upcomingSundays')}
             </Text>
             {upcomingCards.map((entry) =>
-              renderCard(entry, { testID: `home-upcoming-card-${entry.date}` })
+              renderCard(entry, { hideStatusBlock: true, testID: `home-upcoming-card-${entry.date}` })
             )}
           </View>
         )}

@@ -75,6 +75,8 @@ export interface UnifiedSundayCardProps {
   attendance?: number | null;
   /** When provided (and isPast), an AttendanceBlock is shown under the DateBlock. */
   onSetAttendance?: (v: number | null) => void;
+  /** Hide Block 1 (status/roles) — used for the Home "próximos domingos" cards (regular layout only). */
+  hideStatusBlock?: boolean;
   /** Optional testID for E2E targeting. */
   testID?: string;
 }
@@ -95,6 +97,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
   isPast = false,
   attendance = null,
   onSetAttendance,
+  hideStatusBlock = false,
   testID,
 }: UnifiedSundayCardProps) {
   const { colors } = useTheme();
@@ -260,21 +263,23 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
 
         {/* Right column: status lines + name rows stacked tightly together. */}
         <View style={styles.rightColumn}>
-          <Pressable
-            style={styles.statusRow}
-            onPress={() => onPressStatus(date)}
-            accessibilityRole="button"
-            accessibilityLabel={t('agenda.title')}
-            testID={`unified-status-${date}`}
-          >
-            <View style={styles.statusColumn}>
-            {statusInner}
-            </View>
-            {/* Expansion indicator — part of the status tap zone (opens the agenda). */}
-            <View style={styles.chevron}>
-              <ChevronRightIcon size={20} color={colors.textSecondary} />
-            </View>
-          </Pressable>
+          {!hideStatusBlock && (
+            <Pressable
+              style={styles.statusRow}
+              onPress={() => onPressStatus(date)}
+              accessibilityRole="button"
+              accessibilityLabel={t('agenda.title')}
+              testID={`unified-status-${date}`}
+            >
+              <View style={styles.statusColumn}>
+              {statusInner}
+              </View>
+              {/* Expansion indicator — part of the status tap zone (opens the agenda). */}
+              <View style={styles.chevron}>
+                <ChevronRightIcon size={20} color={colors.textSecondary} />
+              </View>
+            </Pressable>
+          )}
 
           {showBlock2 && (
             <Pressable

@@ -172,6 +172,9 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     expect(upcoming.length).toBe(2);
     expect(upcoming.map((c) => c.props.date).sort()).toEqual([D2, D3]);
     expect(upcoming.every((c) => c.props.highlighted !== true)).toBe(true);
+    // Item 1: the 2 upcoming cards hide the status/roles block; the hero does not.
+    expect(upcoming.every((c) => c.props.hideStatusBlock === true)).toBe(true);
+    expect(hero[0].props.hideStatusBlock).toBeFalsy();
   });
 
   it('tapping a card speakers zone pushes the speeches edit route', () => {

@@ -32,7 +32,7 @@ import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
 import { DateBlock } from '../../components/DateBlock';
 import { AttendanceBlock } from '../../components/AttendanceBlock';
 import { buildUnifiedCardData, isNoSacramentReason } from '../../lib/unifiedCard';
-import { PlayIcon } from '../../components/icons';
+import { PlayIcon, ChevronUpIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
 
 // --- Types ---
@@ -446,17 +446,18 @@ function AgendaSundayCard({
             isNext && { borderWidth: 2 },
           ]}
         >
-          {/* Compact header. Tapping the header area (outside the dropdown/Play) collapses (#6). */}
+          {/* Compact header. DateBlock (+ attendance beside it) left; Play "Iniciar" + collapse
+              chevron right. Tapping the header (or the chevron) collapses (#6). */}
           <Pressable
-            style={[styles.compactHeader, isPast && !noSacrament && styles.compactHeaderTopAlign]}
+            style={styles.compactHeader}
             onPress={onToggle}
             accessibilityRole="button"
             accessibilityLabel={t('common.collapse', 'Collapse')}
             testID={`agenda-header-${date}`}
           >
-            {/* Left column: DateBlock + (past sacrament meetings) the AttendanceBlock below it.
+            {/* Left: DateBlock + (past sacrament meetings) the AttendanceBlock beside it.
                 The AttendanceBlock is its own tap target and does not collapse the card. */}
-            <View style={styles.compactDateColumn}>
+            <View style={styles.compactDateRow}>
               <DateBlock date={date} highlighted={isNext} />
               {isPast && !noSacrament && (
                 <AttendanceBlock
@@ -466,18 +467,7 @@ function AgendaSundayCard({
                 />
               )}
             </View>
-            <View style={styles.compactDropdown}>
-              <SundayTypeDropdown
-                currentType={currentType}
-                onSelect={handleTypeSelect}
-                onRevertToSpeeches={handleRevertToSpeeches}
-                disabled={typeDisabled || isOffline}
-                speeches={speeches}
-                date={date}
-                onDeleteSpeeches={onDeleteSpeeches}
-                managePrayers={managePrayers}
-              />
-            </View>
+            <View style={styles.compactSpacer} />
             {!noSacrament && (
               <Pressable
                 testID={`agenda-play-${date}`}
@@ -487,10 +477,40 @@ function AgendaSundayCard({
                 accessibilityLabel="Open presentation"
                 style={[styles.playButton, { backgroundColor: colors.primary }]}
               >
-                <PlayIcon size={20} color={colors.onPrimary} />
+                <PlayIcon size={16} color={colors.onPrimary} />
+                <Text style={[styles.playText, { color: colors.onPrimary }]}>{t('agenda.start')}</Text>
               </Pressable>
             )}
+            <Pressable
+              testID={`agenda-collapse-${date}`}
+              onPress={onToggle}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.collapse', 'Collapse')}
+              style={styles.collapseButton}
+            >
+              <ChevronUpIcon size={22} color={colors.textSecondary} />
+            </Pressable>
           </Pressable>
+
+          {/* First section: Tipo de Domingo (all Sundays, incl. no-sacrament). */}
+          <View style={styles.typeSectionHeader}>
+            <Text style={[styles.typeSectionTitle, { color: colors.primary }]}>
+              {t('agenda.sundayTypeLabel')}
+            </Text>
+          </View>
+          <View style={styles.typeSectionBody}>
+            <SundayTypeDropdown
+              currentType={currentType}
+              onSelect={handleTypeSelect}
+              onRevertToSpeeches={handleRevertToSpeeches}
+              disabled={typeDisabled || isOffline}
+              speeches={speeches}
+              date={date}
+              onDeleteSpeeches={onDeleteSpeeches}
+              managePrayers={managePrayers}
+            />
+          </View>
 
           {/* No AgendaForm for no-sacrament Sundays — only the type can be changed. */}
           {!noSacrament && (
@@ -581,23 +601,45 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 4,
   },
-  // Top-align when the AttendanceBlock hangs below the DateBlock so the dropdown stays beside
-  // the DateBlock rather than centered against the taller left column.
-  compactHeaderTopAlign: {
-    alignItems: 'flex-start',
-  },
-  compactDateColumn: {
+  compactDateRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 10,
   },
-  compactDropdown: {
+  compactSpacer: {
     flex: 1,
   },
   playButton: {
-    width: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     height: 36,
+    paddingHorizontal: 12,
     borderRadius: 8,
+  },
+  playText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  collapseButton: {
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  typeSectionHeader: {
+    paddingVertical: 8,
+    marginTop: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'transparent',
+  },
+  typeSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  typeSectionBody: {
+    paddingTop: 8,
+    paddingBottom: 4,
   },
 });

@@ -97,7 +97,7 @@ vi.mock('../components/AgendaForm', () => ({
 vi.mock('../components/SundayCard', () => ({
   SundayTypeDropdown: () => React.createElement('SundayTypeDropdown', { testID: 'mock-type-dropdown' }),
 }));
-vi.mock('../components/icons', () => ({ PlayIcon: () => null }));
+vi.mock('../components/icons', () => ({ PlayIcon: () => null, ChevronUpIcon: () => null }));
 
 // UnifiedSundayCard seam: render a host node carrying every prop for inspection + tap invocation.
 vi.mock('../components/UnifiedSundayCard', () => ({
@@ -246,16 +246,24 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     expect(byTestID(root, 'mock-agenda-form').length).toBe(0);
   });
 
-  it('when expanded, shows a compact header (DateBlock + type dropdown + play) and hides the collapsed card', () => {
+  it('when expanded: header has DateBlock + Play + collapse chevron; type dropdown in its own section', () => {
     const { root } = render();
     act(() => {
       (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(DATE);
     });
-    // Compact header: DateBlock + type dropdown + play; the collapsed roles/counts card is gone.
+    // Header: DateBlock + Play "Iniciar" + a collapse chevron. Collapsed roles/counts card is gone.
     expect(root.findAll((n) => n.type === 'DateBlock').length).toBe(1);
-    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
     expect(byTestID(root, `agenda-play-${DATE}`).length).toBe(1);
+    expect(byTestID(root, `agenda-collapse-${DATE}`).length).toBe(1);
+    // Type dropdown moved out of the header into the "Tipo de Domingo" section (still rendered).
+    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
     expect(unifiedCards(root).length).toBe(0);
+
+    // Tapping the collapse chevron collapses back to the collapsed card.
+    act(() => {
+      (byTestID(root, `agenda-collapse-${DATE}`)[0].props.onPress as () => void)();
+    });
+    expect(unifiedCards(root).length).toBe(1);
   });
 
   it('a no-sacrament expanded card renders the type dropdown but no AgendaForm or Play', () => {

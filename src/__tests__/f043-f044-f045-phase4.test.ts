@@ -65,9 +65,9 @@ describe('F043 (CR-259): Play Icon Redesign - Theme Color Contract', () => {
   describe('AC-043-01/02/03: Play button source code structure', () => {
     const agendaSource = readSource('src/app/(tabs)/agenda.tsx');
 
-    it('play button has width: 36 and height: 36', () => {
-      expect(agendaSource).toContain('width: 36');
-      expect(agendaSource).toContain('height: 36');
+    it('play button is a pill with the "Iniciar" text (t(agenda.start))', () => {
+      // v2 card-layout: the play control is now icon + "Iniciar" text, not a 36×36 icon-only square.
+      expect(agendaSource).toContain("t('agenda.start')");
     });
 
     it('play button has borderRadius: 8', () => {
@@ -82,12 +82,7 @@ describe('F043 (CR-259): Play Icon Redesign - Theme Color Contract', () => {
       expect(agendaSource).toContain('color={colors.onPrimary}');
     });
 
-    it('PlayIcon uses size 20', () => {
-      expect(agendaSource).toContain('size={20}');
-    });
-
-    it('play button has justifyContent center and alignItems center', () => {
-      expect(agendaSource).toContain("justifyContent: 'center'");
+    it('play button lays out as a row with centered items', () => {
       expect(agendaSource).toContain("alignItems: 'center'");
     });
 
@@ -122,12 +117,11 @@ describe('F043 (CR-259): Play Icon Redesign - Theme Color Contract', () => {
   describe('AC-043-03: Play button retained after unified-card refactor', () => {
     const agendaSource = readSource('src/app/(tabs)/agenda.tsx');
 
-    it('play button is still present; the collapsed chevron moved to UnifiedSundayCard', () => {
-      // v2 unified cards (phase 4): the collapsed header (incl. the expand chevron) now lives in
-      // UnifiedSundayCard, so agenda.tsx no longer renders ChevronUpIcon. The play button remains
-      // in the expanded body.
+    it('play button is present in the expanded header alongside a collapse chevron', () => {
+      // v2 card-layout: the expanded header now has the Play control plus a ChevronUpIcon collapse
+      // control on the right. (The collapsed card still uses UnifiedSundayCard's own chevron.)
       expect(agendaSource).toContain('PlayIcon');
-      expect(agendaSource).not.toContain('ChevronUpIcon');
+      expect(agendaSource).toContain('ChevronUpIcon');
     });
 
     it('play button is only shown when card is expanded', () => {

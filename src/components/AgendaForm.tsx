@@ -30,6 +30,7 @@ import { resolveCallingForName } from '../hooks/usePresentationMode';
 import { getCurrentLanguage } from '../i18n';
 import { DebouncedTextInput } from './DebouncedTextInput';
 import { EditableListField, parseItems, joinItems } from './EditableListField';
+import { DesignationListField } from './DesignationListField';
 import { PeoplePicker, type PeopleCapability } from './PeoplePicker';
 import { SearchInput } from './SearchInput';
 import { XIcon, PencilIcon } from './icons';
@@ -409,12 +410,25 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       <SectionHeader title={t('agenda.sectionSacrament')} colors={colors} />
 
       <FieldRow label={t('agenda.wardBusiness')} colors={colors}>
-        <EditableListField
-          value={agenda.sustaining_releasing ?? null}
-          onSave={(text) => updateField('sustaining_releasing', text)}
+        <DesignationListField
+          value={agenda.designations ?? []}
+          placeholder={t('agenda.designations.addLabel')}
           disabled={isObserver}
-          placeholder={t('agenda.addWardBusiness')}
-          onFieldFocus={onFieldFocus}
+          onItemPress={(index) =>
+            router.push({
+              pathname: '/designations/[date]',
+              params: { date: sundayDate, index: String(index) },
+            })
+          }
+          onAddPress={() =>
+            router.push({ pathname: '/designations/[date]', params: { date: sundayDate } })
+          }
+          onRemove={(index) =>
+            updateField(
+              'designations',
+              (agenda.designations ?? []).filter((_, i) => i !== index)
+            )
+          }
         />
       </FieldRow>
 

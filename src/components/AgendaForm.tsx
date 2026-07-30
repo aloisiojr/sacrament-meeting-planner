@@ -33,6 +33,8 @@ import { EditableListField, parseItems, joinItems } from './EditableListField';
 import { DesignationListField } from './DesignationListField';
 import { PeoplePicker, type PeopleCapability } from './PeoplePicker';
 import { SearchInput } from './SearchInput';
+import { HymnScrubberRail, HYMN_RAIL_WIDTH } from './HymnScrubberRail';
+import { buildHymnAnchors, maxHymnNumber, minHymnNumber, firstIndexAtOrAbove } from '../lib/hymnScrubber';
 import { XIcon, PencilIcon } from './icons';
 import { resolveContactSnapshot } from '../lib/contact';
 import { buildFullPhone } from '../lib/phone';
@@ -874,6 +876,7 @@ function ToggleField({
 // --- Inline Selector Modals ---
 
 const HYMN_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.67);
+const HYMN_ITEM_HEIGHT = 44;
 
 function HymnSelectorModal({
   visible,
@@ -889,11 +892,26 @@ function HymnSelectorModal({
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  const listRef = useRef<FlatList<Hymn>>(null);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return hymns;
     return filterHymns(hymns, search);
   }, [hymns, search]);
+
+  // Rail is hidden while searching (positions no longer map to numbers) and for short lists.
+  const anchors = useMemo(
+    () => (search.trim() ? [] : buildHymnAnchors(minHymnNumber(hymns), maxHymnNumber(hymns))),
+    [hymns, search]
+  );
+
+  const scrubToAnchor = useCallback(
+    (anchor: number) => {
+      const index = firstIndexAtOrAbove(hymns, anchor);
+      listRef.current?.scrollToOffset({ offset: index * HYMN_ITEM_HEIGHT, animated: false });
+    },
+    [hymns]
+  );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -922,30 +940,45 @@ function HymnSelectorModal({
             </Pressable>
           </View>
 
-          <FlatList
-            data={filtered}
-            initialNumToRender={filtered.length}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.modalItem}
-                onPress={() => {
-                  onSelect(item);
-                  setSearch('');
-                }}
-              >
-                <Text style={[styles.modalItemText, { color: colors.text }]}>
-                  {formatHymnDisplay(item)}
+          <View style={styles.hymnListWrap}>
+            <FlatList
+              ref={listRef}
+              style={styles.hymnList}
+              data={filtered}
+              initialNumToRender={filtered.length}
+              keyExtractor={(item) => item.id}
+              getItemLayout={(_, index) => ({
+                length: HYMN_ITEM_HEIGHT,
+                offset: HYMN_ITEM_HEIGHT * index,
+                index,
+              })}
+              contentContainerStyle={
+                anchors.length > 0 ? { paddingRight: HYMN_RAIL_WIDTH + 4 } : undefined
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.modalItem}
+                  onPress={() => {
+                    onSelect(item);
+                    setSearch('');
+                  }}
+                >
+                  <Text style={[styles.modalItemText, { color: colors.text }]} numberOfLines={1}>
+                    {formatHymnDisplay(item)}
+                  </Text>
+                </Pressable>
+              )}
+              ListEmptyComponent={
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('common.noResults')}
                 </Text>
-              </Pressable>
+              }
+              keyboardShouldPersistTaps="handled"
+            />
+            {anchors.length > 0 && (
+              <HymnScrubberRail anchors={anchors} colors={colors} onScrubToAnchor={scrubToAnchor} />
             )}
-            ListEmptyComponent={
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('common.noResults')}
-              </Text>
-            }
-            keyboardShouldPersistTaps="handled"
-          />
+          </View>
         </View>
       </Pressable>
     </Modal>
@@ -1051,9 +1084,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  hymnListWrap: {
+    flex: 1,
+    position: 'relative',
+  },
+  hymnList: {
+    flex: 1,
+  },
   modalItem: {
+    height: HYMN_ITEM_HEIGHT,
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
   },
   modalItemText: {
     fontSize: 15,

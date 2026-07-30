@@ -57,11 +57,17 @@ export const Dimensions = {
 
 export const Alert = { alert: (..._args: unknown[]) => {} };
 
+// Test stub: expose the config as `panHandlers` so tests can invoke the named callbacks
+// (onPanResponderGrant/Move/Release, etc.) directly on the host element's props.
+export const PanResponder = {
+  create: (config: Record<string, unknown>) => ({ panHandlers: { ...config } }),
+};
+
 const ReactNativeStub = {
   View, Text, TextInput, TouchableOpacity, TouchableHighlight,
   TouchableWithoutFeedback, Pressable, ScrollView, FlatList, SectionList,
   ActivityIndicator, KeyboardAvoidingView, Modal, Switch, Image, SafeAreaView,
-  RefreshControl, StyleSheet, Platform, Dimensions, Alert,
+  RefreshControl, StyleSheet, Platform, Dimensions, Alert, PanResponder,
 };
 
 export default ReactNativeStub;

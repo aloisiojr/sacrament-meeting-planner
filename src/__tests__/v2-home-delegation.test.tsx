@@ -163,6 +163,7 @@ vi.mock('../hooks/useSundayTypes', () => ({
   useSetSundayType: () => ({ mutate: vi.fn() }),
   useRemoveSundayException: () => ({ mutate: vi.fn() }),
 }));
+vi.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
 
 // speechUtils: force "next 3 fully assigned" + a controlled pending sunday so the section renders.
 vi.mock('../lib/speechUtils', () => ({

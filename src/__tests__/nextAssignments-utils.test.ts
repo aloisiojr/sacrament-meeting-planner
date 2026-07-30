@@ -207,3 +207,41 @@ describe('findNextPendingSunday', () => {
     expect(result?.date).toBe('2026-03-29');
   });
 });
+
+describe('has_second_speech handling (P1 #3)', () => {
+  const posOnly13 = [
+    { position: 1, status: 'assigned_confirmed' as const },
+    { position: 3, status: 'assigned_confirmed' as const },
+  ];
+
+  it('areNext3FullyAssigned does NOT require position 2 when has_second_speech is false', () => {
+    const next3 = [
+      makeEntry('2026-03-01', posOnly13),
+      makeEntry('2026-03-08', posOnly13),
+      makeEntry('2026-03-15', posOnly13),
+    ];
+    const map = new Map([
+      ['2026-03-01', false],
+      ['2026-03-08', false],
+      ['2026-03-15', false],
+    ]);
+    expect(areNext3FullyAssigned(next3, map)).toBe(true);
+  });
+
+  it('areNext3FullyAssigned still requires position 2 by default / when has_second_speech is true', () => {
+    const next3 = [makeEntry('2026-03-01', posOnly13)];
+    expect(areNext3FullyAssigned(next3)).toBe(false);
+    expect(areNext3FullyAssigned(next3, new Map([['2026-03-01', true]]))).toBe(false);
+  });
+
+  it('findNextPendingSunday skips position 2 when has_second_speech is false', () => {
+    const entries = [
+      makeEntry('2026-04-05', []), // index 0 (ignored by findNextPendingSunday)
+      makeEntry('2026-04-12', []), // 1
+      makeEntry('2026-04-19', []), // 2
+      makeEntry('2026-04-26', posOnly13), // 3 — pos 2 missing
+    ];
+    expect(findNextPendingSunday(entries, new Map([['2026-04-26', false]]))).toBeNull();
+    expect(findNextPendingSunday(entries)?.date).toBe('2026-04-26');
+  });
+});

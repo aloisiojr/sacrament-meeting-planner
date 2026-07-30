@@ -32,6 +32,7 @@ import {
   groupSpeechesBySunday,
 } from '../hooks/useSpeeches';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException } from '../hooks/useSundayTypes';
+import { useAgendaRange } from '../hooks/useAgenda';
 import { getNextSundays, toISODateString } from '../lib/dateUtils';
 import { areNext3FullyAssigned, findNextPendingSunday } from '../lib/speechUtils';
 import type {
@@ -68,6 +69,7 @@ export function NextAssignmentsSection() {
 
   const { data: speeches, isError: speechesError, error: speechesErr, refetch: refetchSpeeches } = useSpeeches({ start: startDate, end: endDate });
   const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
+  const { data: agendas } = useAgendaRange(startDate, endDate);
 
   // v2.0: members are needed to resolve the contact-delegation snapshot at assignment time.
   const { data: members } = useMembers();
@@ -85,9 +87,17 @@ export function NextAssignmentsSection() {
     [speeches, nextSundays, exceptions]
   );
 
+  // date → has_second_speech, so a Sunday with the 2nd speech disabled doesn't require position 2
+  // (otherwise the widget would be permanently hidden for those wards).
+  const secondSpeechByDate = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const a of agendas ?? []) map.set(a.sunday_date, a.has_second_speech);
+    return map;
+  }, [agendas]);
+
   const next3 = allEntries.slice(0, 3);
-  const allAssigned = areNext3FullyAssigned(next3);
-  const pendingEntry = findNextPendingSunday(allEntries);
+  const allAssigned = areNext3FullyAssigned(next3, secondSpeechByDate);
+  const pendingEntry = findNextPendingSunday(allEntries, secondSpeechByDate);
 
   const handleToggle = useCallback(() => {
     if (!expanded && pendingEntry) {

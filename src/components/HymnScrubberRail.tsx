@@ -1,31 +1,31 @@
 /**
- * HymnScrubberRail: vertical fast-scroll rail for the hymn picker.
+ * HymnScrubberRail: vertical fast-scroll rail for the hymn picker (iOS section-index style).
  *
- * Anchor numbers (data-driven, e.g. 1,10,…,200,1000,…) run down the right edge. Each anchor is a
- * Pressable, so a TAP jumps to it exactly (no coordinate math). A press-DRAG scrubs live and shows
- * a preview bubble to the left of the rail. See specs/v2-selectors-and-testimony.md.
+ * A compact, vertically-centered column of anchor numbers (1,10,…,200,1000,…) on the right edge.
+ * A SINGLE PanResponder owns the whole strip and claims the gesture on touch START, so both a tap
+ * and a press-drag work: the touch's screen Y is mapped to the nearest anchor (over the numbers'
+ * centered band), the list scrolls, and a preview bubble shows the target. Owning the gesture from
+ * the start is what makes dragging work — per-anchor Pressables let the initial press win and the
+ * drag was ignored. See specs/v2-selectors-and-testimony.md.
  *
- * Uses core PanResponder (works inside a RN Modal and on react-native-web). The PanResponder claims
- * the gesture only on MOVE, so per-anchor taps still fire; drag maps `pageY − railTop` (measured) to
- * an anchor, fixing the earlier bug where locationY was relative to the tapped number, not the rail.
+ * Core PanResponder (not gesture-handler) so it works inside a RN Modal and on react-native-web.
  */
 import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  Pressable,
   StyleSheet,
   PanResponder,
   type GestureResponderEvent,
-  type PanResponderGestureState,
   type LayoutChangeEvent,
 } from 'react-native';
 import type { ThemeColors } from '../contexts/ThemeContext';
 import { anchorForFraction } from '../lib/hymnScrubber';
 
-export const HYMN_RAIL_WIDTH = 34;
+export const HYMN_RAIL_WIDTH = 28;
+/** Height of each anchor number — kept small so the numbers sit close together. */
+export const HYMN_RAIL_ROW_H = 15;
 const BUBBLE_SIZE = 48;
-const DRAG_THRESHOLD = 4;
 
 export interface HymnScrubberRailProps {
   /** Anchor numbers to display, e.g. [1, 10, 20, …]. Empty → renders nothing. */
@@ -46,10 +46,12 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
   scrubAtRef.current = useCallback(
     (pageY: number) => {
       const { top, height } = geom.current;
-      const localY = pageY - top;
-      const value = anchorForFraction(anchors, localY / (height || 1));
+      // The numbers are centered in the strip, so map over their band, not the full height.
+      const bandHeight = Math.max(1, anchors.length * HYMN_RAIL_ROW_H);
+      const bandTop = top + (height - bandHeight) / 2;
+      const value = anchorForFraction(anchors, (pageY - bandTop) / bandHeight);
       if (value == null) return;
-      setBubble({ y: Math.max(0, Math.min(height, localY)), value });
+      setBubble({ y: Math.max(0, Math.min(height, pageY - top)), value });
       onScrubToAnchor(value);
     },
     [anchors, onScrubToAnchor]
@@ -71,9 +73,9 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
 
   const pan = useRef(
     PanResponder.create({
-      // Per-anchor Pressables handle taps; only claim the gesture once the finger actually drags.
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_e, g: PanResponderGestureState) => Math.abs(g.dy) > DRAG_THRESHOLD,
+      // Own the whole strip from the first touch so a drag is never mistaken for a tap.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (e: GestureResponderEvent) => {
         refreshTop();
         scrubAtRef.current(e.nativeEvent.pageY);
@@ -95,17 +97,13 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
       {...pan.panHandlers}
     >
       {anchors.map((n) => (
-        <Pressable
+        <Text
           key={n}
-          testID={`hymn-anchor-${n}`}
-          onPress={() => onScrubToAnchor(n)}
-          hitSlop={4}
-          style={styles.anchorHit}
+          style={[styles.anchorText, { color: colors.primary }]}
+          allowFontScaling={false}
         >
-          <Text style={[styles.anchorText, { color: colors.primary }]} allowFontScaling={false}>
-            {n}
-          </Text>
-        </Pressable>
+          {n}
+        </Text>
       ))}
 
       {bubble && (
@@ -129,16 +127,13 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  anchorHit: {
+    // Cluster the numbers tightly, centered vertically (not spread across the whole height).
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 1,
   },
   anchorText: {
+    height: HYMN_RAIL_ROW_H,
+    lineHeight: HYMN_RAIL_ROW_H,
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',

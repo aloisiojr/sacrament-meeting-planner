@@ -7,6 +7,13 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
+  Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
+  - Step 1 ✅ committed: `Designation` types + `designations[]` on SundayAgenda (sustaining_releasing
+    kept until step 5) + `src/lib/designations.ts` (`formatDesignationLines`) + fixtures. 1968 tests green.
+  - Step 2 ⏳ next: edit screen `src/app/designations/[date].tsx` (type→person→fields, calling prompt).
+  - Steps 3-5: `DesignationListField` component → wire AgendaForm → remove old column + migration 041.
+  - Specs 2 (Play interstitial + verbatim read-texts) and 3 (Settings templates) come after.
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

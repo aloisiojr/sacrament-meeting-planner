@@ -34,11 +34,14 @@ export function DebouncedTextInput({
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
   useEffect(() => { savedValueRef.current = value; }, [value]);
 
-  // Sync local value when external value changes (e.g., from server),
-  // but only when the input is NOT focused (to prevent flickering during typing)
+  // Sync local value when external value changes (e.g., from server/realtime),
+  // but only when the input is NOT focused (to prevent flickering during typing).
+  // Also advance latestValueRef so a later blur/unmount flush doesn't revert the newer
+  // external value back to the stale one (concurrent-edit data loss).
   useEffect(() => {
     if (!isFocusedRef.current) {
       setLocalValue(value);
+      latestValueRef.current = value;
     }
   }, [value]);
 

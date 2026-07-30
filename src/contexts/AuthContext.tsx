@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { hasPermission as checkPermission } from '../lib/permissions';
 import { changeLanguage, getCurrentLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
@@ -70,6 +71,7 @@ function extractUserName(user: User | null): string {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [wardLanguage, setWardLanguage] = useState<string>('en-US');
@@ -92,6 +94,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // On sign-out (explicit, self-delete, or server-revoked session) drop the query cache so
+      // the next user on this device — even in the same ward — can't see the prior user's data.
+      if (_event === 'SIGNED_OUT') {
+        queryClient.clear();
+      }
       setSession(newSession);
       setLoading(false);
     });
@@ -99,6 +106,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.unsubscribe();
     };
+    // queryClient from useQueryClient is stable; the listener should be set up once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // App language from user_metadata, ward language stored separately

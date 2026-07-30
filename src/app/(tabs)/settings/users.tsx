@@ -93,7 +93,8 @@ export default function UserManagementScreen() {
     queryKey: userManagementKeys.users,
     queryFn: async (): Promise<WardUser[]> => {
       const result = await callEdgeFunction('list-users', {});
-      return result.users ?? [];
+      // Guard against a null/empty body: `result.users` on null would throw a TypeError.
+      return result?.users ?? [];
     },
     enabled: !!session,
   });
@@ -127,18 +128,18 @@ export default function UserManagementScreen() {
     }) => {
       return callEdgeFunction('update-user-role', { targetUserId, newRole });
     },
-    onSuccess: (data) => {
-      if (data.isLastBishopric) {
-        Alert.alert(t('common.success'), t('users.lastBishopricWarning'));
-      } else {
-        Alert.alert(t('common.success'), t('users.roleChangeSuccess'));
-      }
+    onSuccess: () => {
+      // The edge function returns { success, previousRole, newRole } — there is no
+      // isLastBishopric flag; that case is a blocked 403 handled in onError below.
+      Alert.alert(t('common.success'), t('users.roleChangeSuccess'));
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
     },
     onError: (err: any) => {
       const msg = err?.message || err?.context?.body?.error;
       if (msg === 'cannot_change_own_role') {
         Alert.alert(t('common.error'), t('users.cannotChangeOwnRole'));
+      } else if (msg === 'cannot_demote_last_bishopric') {
+        Alert.alert(t('common.error'), t('users.lastBishopricWarning'));
       } else {
         Alert.alert(t('common.error'), t('users.roleChangeFailed'));
       }

@@ -928,7 +928,6 @@ function HymnSelectorModal({
         <View style={styles.hymnSearchRow}>
           <SearchInput
             testID="hymn-selector-search-input"
-            style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
             placeholder={t('common.search')}
@@ -1086,14 +1085,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 15,
   },
   speakerReadRow: {
     flexDirection: 'row',

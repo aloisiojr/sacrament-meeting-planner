@@ -317,17 +317,17 @@ describe('F061: invite/[token].tsx error i18n (STEP-05)', () => {
 
   // AC-061-2: Known codes preserved
   it('token_expired still maps to auth.inviteExpired', () => {
-    expect(inviteSource).toContain("data?.error === 'token_expired'");
+    expect(inviteSource).toContain("errorCode === 'token_expired'");
     expect(inviteSource).toContain("t('auth.inviteExpired')");
   });
 
   it('token_used still maps to auth.inviteUsed', () => {
-    expect(inviteSource).toContain("data?.error === 'token_used'");
+    expect(inviteSource).toContain("errorCode === 'token_used'");
     expect(inviteSource).toContain("t('auth.inviteUsed')");
   });
 
   it('token_invalid still maps to auth.inviteInvalid', () => {
-    expect(inviteSource).toContain("data?.error === 'token_invalid'");
+    expect(inviteSource).toContain("errorCode === 'token_invalid'");
     expect(inviteSource).toContain("t('auth.inviteInvalid')");
   });
 

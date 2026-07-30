@@ -295,9 +295,23 @@ export default function UserManagementScreen() {
   const currentUserId = currentUser?.id;
   // Gate by permission, not role: without settings:users a user only manages their own account.
   const canManageUsers = hasPermission('settings:users');
+
+  // Observers can't list the ward (list-users denies them), but this screen is their self-service
+  // (edit own name / delete own account). If the list fails and they can't manage users, fall back
+  // to a synthetic card built from the current session so the screen still works.
+  const selfFallback: WardUser[] = currentUser
+    ? [{
+        id: currentUser.id,
+        email: currentUser.email ?? '',
+        role: (currentUser.app_metadata?.role as string) ?? 'observer',
+        full_name: (currentUser.app_metadata?.full_name as string) ?? userName ?? '',
+        created_at: currentUser.created_at ?? '',
+      }]
+    : [];
+  const effectiveUsers = !canManageUsers && usersError ? selfFallback : users;
   const displayedUsers = canManageUsers
-    ? users
-    : users.filter((u) => u.id === currentUserId);
+    ? effectiveUsers
+    : effectiveUsers.filter((u) => u.id === currentUserId);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -330,7 +344,7 @@ export default function UserManagementScreen() {
           </View>
         )}
 
-        {usersError && (
+        {usersError && canManageUsers && (
           <View style={styles.centered}>
             <Text style={[styles.errorText, { color: colors.error }]}>
               {t('users.loadError')}

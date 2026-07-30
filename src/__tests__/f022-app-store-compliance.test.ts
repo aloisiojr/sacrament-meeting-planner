@@ -316,7 +316,7 @@ describe('CR-290: Account self-deletion', () => {
       // Gated by permission (settings:users), not role. Without it → filter to self.
       expect(content).toContain('canManageUsers');
       expect(content).toContain('displayedUsers');
-      expect(content).toMatch(/canManageUsers\s*\?\s*users\s*:\s*users\.filter/);
+      expect(content).toMatch(/canManageUsers\s*\?\s*effectiveUsers\s*:\s*effectiveUsers\.filter/);
     });
 
     // AC-290-6: Invite button hidden for observer
@@ -368,7 +368,7 @@ describe('CR-290: Account self-deletion', () => {
     it('EC-022-03: observer only sees self card (cannot delete others)', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
       // Without settings:users, displayedUsers is filtered to self.
-      expect(content).toMatch(/users\.filter\(\(?u\)?\s*=>\s*u\.id\s*===\s*currentUserId\)/);
+      expect(content).toMatch(/\.filter\(\(?u\)?\s*=>\s*u\.id\s*===\s*currentUserId\)/);
     });
 
     // Existing admin delete flow preserved for non-self

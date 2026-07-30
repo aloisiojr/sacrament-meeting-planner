@@ -104,6 +104,7 @@ export default function WhatsAppTemplateScreen() {
       title={t('settings.whatsappTemplate')}
       tabs={tabs}
       saveMode="raw"
+      autoCapitalize="none"
       onSave={(key, value) => save.mutate({ column: COLUMN[key], value, key })}
     />
   );

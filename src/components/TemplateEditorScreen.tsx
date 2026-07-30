@@ -37,25 +37,48 @@ export interface TemplateEditorScreenProps {
   onSave: (key: string, value: string | null) => void;
   /** 'raw' saves the text as typed; 'collapse' saves null when blank or equal to the default. */
   saveMode?: 'raw' | 'collapse';
+  /** Editor auto-capitalization (default 'sentences'; WhatsApp uses 'none' for tokened templates). */
+  autoCapitalize?: 'none' | 'sentences';
 }
 
 const SAVE_DEBOUNCE_MS = 800;
 
-export function TemplateEditorScreen({ title, tabs, onSave, saveMode = 'raw' }: TemplateEditorScreenProps) {
+export function TemplateEditorScreen({
+  title,
+  tabs,
+  onSave,
+  saveMode = 'raw',
+  autoCapitalize = 'sentences',
+}: TemplateEditorScreenProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
 
   const [activeKey, setActiveKey] = useState<string>(tabs[0]?.key ?? '');
   const [edits, setEdits] = useState<Record<string, string>>({});
+  // Keys just reset to default: shown as the default, but NOT persisted again on flush.
+  const [restored, setRestored] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
 
+  const clearRestored = useCallback((key: string) => {
+    setRestored((r) => {
+      if (!r.has(key)) return r;
+      const n = new Set(r);
+      n.delete(key);
+      return n;
+    });
+  }, []);
+
   const displayValue = useCallback(
-    (tab: TemplateTab) => (tab.key in edits ? edits[tab.key] : tab.value ?? tab.defaultText),
-    [edits]
+    (tab: TemplateTab) => {
+      if (tab.key in edits) return edits[tab.key];
+      if (restored.has(tab.key)) return tab.defaultText;
+      return tab.value ?? tab.defaultText;
+    },
+    [edits, restored]
   );
   const currentText = activeTab ? displayValue(activeTab) : '';
 
@@ -92,9 +115,10 @@ export function TemplateEditorScreen({ title, tabs, onSave, saveMode = 'raw' }: 
   const handleChange = useCallback(
     (text: string) => {
       setEdits((e) => ({ ...e, [activeKey]: text }));
+      clearRestored(activeKey);
       schedule(activeKey);
     },
-    [activeKey, schedule]
+    [activeKey, clearRestored, schedule]
   );
 
   const handleInsert = useCallback(
@@ -104,11 +128,12 @@ export function TemplateEditorScreen({ title, tabs, onSave, saveMode = 'raw' }: 
       const after = currentText.slice(pos);
       const next = before + token + after;
       setEdits((e) => ({ ...e, [activeKey]: next }));
+      clearRestored(activeKey);
       schedule(activeKey);
       const np = pos + token.length;
       setSelection({ start: np, end: np });
     },
-    [selection, currentText, activeKey, schedule]
+    [selection, currentText, activeKey, clearRestored, schedule]
   );
 
   const handleRestore = useCallback(() => {
@@ -117,8 +142,15 @@ export function TemplateEditorScreen({ title, tabs, onSave, saveMode = 'raw' }: 
       clearTimeout(timers.current[activeKey]);
       delete timers.current[activeKey];
     }
-    // Optimistically show the default; persist the cleared override.
-    setEdits((e) => ({ ...e, [activeKey]: activeTab.defaultText }));
+    // Drop any pending edit and mark restored (shows the default) — it must NOT be re-saved on the
+    // next flush, or raw mode would persist the default text instead of the cleared NULL.
+    setEdits((e) => {
+      if (!(activeKey in e)) return e;
+      const n = { ...e };
+      delete n[activeKey];
+      return n;
+    });
+    setRestored((r) => new Set(r).add(activeKey));
     onSave(activeKey, null);
   }, [activeTab, activeKey, onSave]);
 
@@ -216,7 +248,8 @@ export function TemplateEditorScreen({ title, tabs, onSave, saveMode = 'raw' }: 
           onBlur={() => flush(activeKey)}
           multiline
           textAlignVertical="top"
-          autoCapitalize="sentences"
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
         />
 
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>

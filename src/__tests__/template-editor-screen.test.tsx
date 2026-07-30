@@ -110,6 +110,22 @@ describe('TemplateEditorScreen', () => {
     expect(editorValue(r)).toBe('DEFAULT A');
   });
 
+  it('raw mode: restore then switch tab does NOT re-save the default text (only null)', () => {
+    const { r, onSave } = render({ saveMode: 'raw' });
+    press(r, 'template-restore'); // tab a
+    press(r, 'template-tab-b'); // flush on switch must not re-persist the default
+    const aCalls = onSave.mock.calls.filter((c) => c[0] === 'a');
+    expect(aCalls).toEqual([['a', null]]); // exactly one call, with null
+  });
+
+  it('raw mode: after restore, typing new text saves that text (restored flag cleared)', () => {
+    const { r, onSave } = render({ saveMode: 'raw' });
+    press(r, 'template-restore');
+    act(() => (node(r, 'template-editor').props.onChangeText as (t: string) => void)('typed again'));
+    act(() => (node(r, 'template-editor').props.onBlur as () => void)());
+    expect(onSave.mock.calls.filter((c) => c[0] === 'a')).toEqual([['a', null], ['a', 'typed again']]);
+  });
+
   it('renders a live preview with sample data substituted', () => {
     const { r } = render();
     press(r, 'template-tab-b'); // "DEFAULT B {name}" -> "DEFAULT B Maria"

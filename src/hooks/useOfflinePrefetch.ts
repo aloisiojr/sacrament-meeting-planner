@@ -46,12 +46,17 @@ export function useOfflinePrefetch(isOnline: boolean): void {
   const prevOnlineRef = useRef(false);
 
   useEffect(() => {
-    // Only prefetch on offline->online transition or first mount when online
-    const wasOffline = !prevOnlineRef.current;
-    prevOnlineRef.current = isOnline;
-
-    if (!isOnline || !wardId) return;
-    if (!wasOffline && isOnline) return; // was already online, skip
+    // Prefetch once when we first become online-with-a-ward, and again on each offline->online
+    // transition. Crucially, do NOT record "online" until we've passed the wardId gate — otherwise a
+    // normal online cold start (ward resolves a tick after mount) is misread as "already online" and
+    // never prefetches.
+    if (!isOnline) {
+      prevOnlineRef.current = false;
+      return;
+    }
+    if (!wardId) return;
+    if (prevOnlineRef.current) return; // already prefetched while online
+    prevOnlineRef.current = true;
 
     const sundays = getNext3Sundays();
     const first = sundays[0];

@@ -201,4 +201,39 @@ describe('F048: useOfflinePrefetch Integration', () => {
       expect(prefetchSpy).not.toHaveBeenCalled();
     });
   });
+
+  // The real cold-start path: app launches online but the ward resolves a tick after mount.
+  // (Before the fix, prevOnlineRef was set true on the wardId-null pass, so this never prefetched.)
+  describe('EC-048-03: Online cold start (ward resolves after mount)', () => {
+    it('prefetches once the wardId resolves while online', () => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
+      });
+      const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+      let ward: string | null = null;
+
+      function TestComponent() {
+        useOfflinePrefetch(true);
+        return null;
+      }
+      function Wrapper() {
+        return React.createElement(
+          QueryClientProvider, { client: queryClient },
+          React.createElement(
+            AuthContext.Provider,
+            { value: createMockAuthContext({ wardId: ward as any }) },
+            React.createElement(TestComponent)
+          )
+        );
+      }
+
+      let renderer!: TestRenderer.ReactTestRenderer;
+      act(() => { renderer = TestRenderer.create(React.createElement(Wrapper)); });
+      expect(prefetchSpy).not.toHaveBeenCalled(); // online, but no ward yet
+
+      ward = 'ward-1';
+      act(() => { renderer.update(React.createElement(Wrapper)); });
+      expect(prefetchSpy).toHaveBeenCalledTimes(4); // ward resolved → prefetch fires
+    });
+  });
 });

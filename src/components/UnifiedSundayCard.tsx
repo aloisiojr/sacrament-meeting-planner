@@ -246,7 +246,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
           </View>
         </Pressable>
       ) : (
-      <View style={styles.mainRow}>
+      <View style={[styles.mainRow, hideStatusBlock && styles.mainRowCentered]}>
         {/* Left column: DateBlock + optional AttendanceBlock (its own tap target, outside the
             status/speakers zones), spanning the status lines AND the name rows so those stay
             tightly stacked regardless of the AttendanceBlock's height (bug fix). */}
@@ -356,6 +356,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  // When the status block is hidden (Home upcoming cards), only the names block remains — center it
+  // vertically against the DateBlock instead of top-aligning.
+  mainRowCentered: {
+    alignItems: 'center',
   },
   rightColumn: {
     flex: 1,

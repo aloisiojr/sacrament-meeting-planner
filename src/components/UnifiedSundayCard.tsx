@@ -111,9 +111,10 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
   // Sundays — and only when the parent wired a persist callback.
   const showAttendance = isPast && !isNoSacrament && !!onSetAttendance;
 
-  // Block 2 is shown for regular Sundays, and for testimony Sundays only when prayers are managed.
-  // It is always omitted for no-sacrament Sundays (U5).
-  const showBlock2 = !isNoSacrament && (!isTestimony || managePrayers);
+  // Block 2 (names) shows for regular Sundays; for testimony Sundays it shows when prayers are
+  // managed OR when the status block is hidden (Home upcoming cards need it to carry the testimony
+  // label, since Block 1 is absent there). Always omitted for no-sacrament Sundays (U5).
+  const showBlock2 = !isNoSacrament && (!isTestimony || managePrayers || hideStatusBlock);
 
   const reasonLabel = reason
     ? reason === 'other' && customReason
@@ -129,6 +130,33 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
   ];
 
   const allUnassigned = nameRows.every((r) => !r.name);
+
+  // A single name row (StatusLED + name / prayer prefix). Blank name => gray dot with no text.
+  const renderNameRow = (row: UnifiedNameRow) => (
+    <View key={row.key} style={styles.nameRow} testID={`unified-name-row-${row.key}`}>
+      <StatusLED status={row.status} size={12} />
+      <Text
+        style={[
+          styles.nameText,
+          { color: colors.textSecondary },
+          row.kind === 'prayer' && row.name ? { fontStyle: 'italic' } : null,
+        ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {row.name ? (row.kind === 'prayer' ? `${t('prayers.prayerPrefix')} ${row.name}` : row.name) : ' '}
+      </Text>
+    </View>
+  );
+
+  // The yellow "Reunião de testemunho" line for the names block (Home upcoming cards only).
+  const testimonyLine = (
+    <View style={styles.nameRow} testID="unified-block2-testimony">
+      <Text style={[styles.nameText, { color: colors.warning, fontStyle: 'italic' }]} numberOfLines={1}>
+        {reasonLabel}
+      </Text>
+    </View>
+  );
 
   // Block-1 status lines (roles + counts), shared by the regular and no-sacrament layouts so the
   // no-sacrament card can make its whole Block 1 — DateBlock included — the single tap zone (#3).
@@ -290,34 +318,21 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
               testID={`unified-speakers-${date}`}
             >
               <View style={styles.block2Names}>
-                {allUnassigned ? (
+                {isTestimony ? (
+                  <>
+                    {managePrayers && nameRows[0] && renderNameRow(nameRows[0])}
+                    {hideStatusBlock && testimonyLine}
+                    {managePrayers && nameRows[1] && renderNameRow(nameRows[1])}
+                  </>
+                ) : allUnassigned ? (
                   <View style={styles.nameRow} testID="unified-empty-row">
                     <StatusLED status="not_assigned" size={12} />
                     <Text style={[styles.nameText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
-                      {t('agenda.noAssignments')}
+                      {t(managePrayers ? 'agenda.noAssignments' : 'agenda.noSpeakers')}
                     </Text>
                   </View>
                 ) : (
-                  nameRows.map((row) => (
-                    <View key={row.key} style={styles.nameRow} testID={`unified-name-row-${row.key}`}>
-                      <StatusLED status={row.status} size={12} />
-                      <Text
-                        style={[
-                          styles.nameText,
-                          { color: colors.textSecondary },
-                          row.kind === 'prayer' && row.name ? { fontStyle: 'italic' } : null,
-                        ]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {row.name
-                          ? row.kind === 'prayer'
-                            ? `${t('prayers.prayerPrefix')} ${row.name}`
-                            : row.name
-                          : ' '}
-                      </Text>
-                    </View>
-                  ))
+                  nameRows.map((row) => renderNameRow(row))
                 )}
               </View>
               {/* Expansion indicator for the speakers tap zone (3). */}

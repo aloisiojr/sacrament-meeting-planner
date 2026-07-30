@@ -1,18 +1,22 @@
-# Collapsed card fixes — centering + label (Spec of items 1-2; item 3 PAUSED)
+# Collapsed card fixes — centering, label, names-block logic (items 1-3)
+
+## Status
+- Items 1 (centering) + 2 (label) — **DONE & committed**.
+- Item 3 (names-block logic) — **this build**, with corrected scope: the testimony display in the
+  names block is **only** for the Home "próximos domingos" collapsed cards (`hideStatusBlock`), so it
+  never duplicates the testimony label the status block still shows on hero/Agendas. Block 1 is NOT
+  changed (AC9 dropped).
 
 ## Problem / intent
-Two small fixes to the collapsed Sunday cards: (1) vertically center the names block on the Home
-"próximos domingos" cards (top-aligned looks off now that the status block is hidden); (2) rename the
-Home section label. UI only — no schema.
-
-**Item 3 (names-block "no one assigned" / testimony logic) is PAUSED** by the user: applying it to all
-collapsed cards would duplicate the testimony label (which still lives in the status block on
-hero/Agendas). The ACs are kept below (AC3–AC9) for when it resumes, but are OUT of this build.
+Fix the names block's "no one assigned" / testimony display. The empty-message wording + partial rows
+apply to the names block on ALL collapsed cards; the testimony line in the names block is Home-upcoming
+only.
 
 ## In scope / Out of scope
-- **In:** item 1 (AC1 centering) + item 2 (AC2 label).
-- **Out (for now):** item 3 (AC3–AC9, PAUSED); no-sacrament layout; expanded agenda card; hymn
-  scrubber (separate spec); the "Outros" type-input bug (separate fix).
+- **In (item 3):** names-block empty message (speaker-specific vs generic by managePrayers); partial
+  rows (blanks = gray dot, no text); testimony display in the names block ONLY when `hideStatusBlock`.
+- **Out:** Block 1 (status block) unchanged; no-sacrament layout; expanded agenda card; hymn scrubber;
+  the "Outros" type-input bug (separate fixes).
 
 ## Baseline (evidence)
 - `src/components/UnifiedSundayCard.tsx`: `mainRow` (styles ~354) `alignItems:'flex-start'` top-aligns
@@ -33,8 +37,9 @@ hero/Agendas). The ACs are kept below (AC3–AC9) for when it resumes, but are O
   centered against the DateBlock (not top-aligned).
 - **AC2:** The Home upcoming-section label SHALL read "Designações dos Próximos Domingos" (updated in
   pt-BR/en-US/es-LA).
-- **AC3:** The names block SHALL render for ALL sacrament Sundays — regular AND testimony —
-  regardless of `managePrayers` (no-sacrament Sundays unchanged: names block omitted).
+- **AC3:** The names block SHALL render for regular sacrament Sundays regardless of `managePrayers`;
+  for testimony meetings it SHALL additionally render when `hideStatusBlock` is set (Home upcoming).
+  No-sacrament Sundays unchanged: names block omitted.
 - **AC4:** WHILE `managePrayers` is OFF, IF a regular Sunday has no assigned speakers, THEN the names
   block SHALL show "Não há discursantes designados" (new speaker-specific message).
 - **AC5:** WHILE `managePrayers` is ON, IF a regular Sunday has no assignments, THEN the names block
@@ -42,17 +47,17 @@ hero/Agendas). The ACs are kept below (AC3–AC9) for when it resumes, but are O
 - **AC6:** WHEN a regular Sunday has ≥1 assignment, the names block SHALL show the rows (3 speaker
   rows when prayers off; 5 rows = open-prayer + 3 speakers + close-prayer when prayers on); each
   unassigned row a gray StatusLED with no name text.
-- **AC7:** WHILE `managePrayers` is OFF, WHEN the Sunday is a testimony meeting, the names block SHALL
-  show a single "Reunião de testemunho" line in the yellow/warning style (same as conference reasons).
-- **AC8:** WHILE `managePrayers` is ON, WHEN the Sunday is a testimony meeting, the names block SHALL
-  show 3 lines: opening-prayer row (StatusLED + name if any), a yellow "Reunião de testemunho" line,
-  then the closing-prayer row.
-- **AC9:** To avoid duplication, the status block (Block 1) SHALL NOT show the testimony label anymore
-  (it now lives in the names block); Block 1 keeps its role line + speaker/prayer/hymn counts.
+- **AC7:** WHILE `managePrayers` is OFF AND `hideStatusBlock` is set (Home upcoming card), WHEN the
+  Sunday is a testimony meeting, the names block SHALL show a single "Reunião de testemunho" line in
+  the yellow/warning style (same as conference reasons).
+- **AC8:** WHILE `managePrayers` is ON AND `hideStatusBlock` is set (Home upcoming card), WHEN the
+  Sunday is a testimony meeting, the names block SHALL show 3 lines: opening-prayer row (StatusLED +
+  name if any), a yellow "Reunião de testemunho" line, then the closing-prayer row.
+- **AC9:** Block 1 (status block) is UNCHANGED — the names-block testimony display is gated to
+  `hideStatusBlock`, so it never duplicates the status block's testimony label (shown on hero/Agendas).
 
 ## Open questions
-- None. (Resolved at gate: item 3 applies to all collapsed cards; testimony label relocates from the
-  status block to the names block to avoid duplication — confirm at GATE 1.)
+- None. (Testimony-in-names-block scoped to Home upcoming cards — no duplication; Block 1 untouched.)
 
 ## Notes
 - **i18n:** add `agenda.noSpeakers` ("Não há discursantes designados" / "No speakers assigned" /

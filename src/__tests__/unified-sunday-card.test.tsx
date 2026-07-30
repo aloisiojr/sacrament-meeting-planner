@@ -203,6 +203,68 @@ describe('UnifiedSundayCard — testimony meeting (U6)', () => {
   });
 });
 
+describe('UnifiedSundayCard — names-block empty message + testimony (item 3)', () => {
+  const speakerRows = (over: Partial<UnifiedNameRow>[] = []): UnifiedNameRow[] =>
+    [1, 2, 3].map((n, i) => ({ key: `speaker-${n}`, kind: 'speaker', status: 'not_assigned', name: null, ...(over[i] ?? {}) }));
+  const fiveRows: UnifiedNameRow[] = [
+    { key: 'prayer-0', kind: 'prayer', status: 'not_assigned', name: null },
+    ...speakerRows(),
+    { key: 'prayer-4', kind: 'prayer', status: 'not_assigned', name: null },
+  ];
+  const testimonyPrayers: UnifiedNameRow[] = [
+    { key: 'prayer-0', kind: 'prayer', status: 'assigned_confirmed', name: 'Opener' },
+    { key: 'prayer-4', kind: 'prayer', status: 'not_assigned', name: null },
+  ];
+  function textOf(root: Node, testID: string): string {
+    const node = byTestID(root, testID)[0];
+    const text = node.findAll((n) => n.type === 'Text')[0];
+    return String(text.props.children);
+  }
+
+  it('regular + prayers off + all unassigned → noSpeakers message (AC4)', () => {
+    const { root } = render(baseProps({ managePrayers: false, nameRows: speakerRows() }));
+    expect(textOf(root, 'unified-empty-row')).toBe('agenda.noSpeakers');
+  });
+
+  it('regular + prayers on + all unassigned → generic noAssignments message (AC5)', () => {
+    const { root } = render(baseProps({ managePrayers: true, nameRows: fiveRows }));
+    expect(textOf(root, 'unified-empty-row')).toBe('agenda.noAssignments');
+  });
+
+  it('regular + at least one assigned → rows, no empty message (AC6)', () => {
+    const { root } = render(baseProps({ nameRows: speakerRows([{ name: 'Alice', status: 'assigned_confirmed' }]) }));
+    expect(byTestID(root, 'unified-empty-row').length).toBe(0);
+    expect(byTestID(root, 'unified-name-row-speaker-1').length).toBe(1);
+  });
+
+  it('testimony + prayers off + hideStatusBlock → single yellow testimony line (AC7)', () => {
+    const { root } = render(
+      baseProps({ exceptionReason: 'testimony_meeting', managePrayers: false, hideStatusBlock: true, nameRows: [] })
+    );
+    const line = byTestID(root, 'unified-block2-testimony')[0];
+    expect(line).toBeDefined();
+    const text = line.findAll((n) => n.type === 'Text')[0];
+    expect(flattenStyle(text.props.style).color).toBe(WARNING);
+  });
+
+  it('testimony + prayers on + hideStatusBlock → prayer / testimony / prayer (AC8)', () => {
+    const { root } = render(
+      baseProps({ exceptionReason: 'testimony_meeting', managePrayers: true, hideStatusBlock: true, nameRows: testimonyPrayers })
+    );
+    expect(byTestID(root, 'unified-name-row-prayer-0').length).toBe(1);
+    expect(byTestID(root, 'unified-block2-testimony').length).toBe(1);
+    expect(byTestID(root, 'unified-name-row-prayer-4').length).toBe(1);
+  });
+
+  it('testimony + NOT hideStatusBlock → no testimony line in the names block (AC9)', () => {
+    const { root } = render(
+      baseProps({ exceptionReason: 'testimony_meeting', managePrayers: true, nameRows: testimonyPrayers })
+    );
+    expect(byTestID(root, 'unified-block2-testimony').length).toBe(0);
+    expect(byTestID(root, 'unified-name-row-prayer-0').length).toBe(1);
+  });
+});
+
 describe('UnifiedSundayCard — no-sacrament Sunday (U5)', () => {
   it('shows only the yellow reason and omits Block 2 and counts', () => {
     const { root } = render(

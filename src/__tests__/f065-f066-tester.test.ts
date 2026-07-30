@@ -149,12 +149,12 @@ describe('F066 Part A: Secretary permissions', () => {
     expect(hasPermission('secretary', 'home:next_assignments')).toBe(true);
   });
 
-  it('secretary permission count is 27 (AC-066-04)', () => {
-    expect(getPermissions('secretary').length).toBe(27);
+  it('secretary permission count is 26 (AC-066-04)', () => {
+    expect(getPermissions('secretary').length).toBe(26);
   });
 
-  it('bishopric permissions unchanged at 27 (AC-066-05)', () => {
-    expect(getPermissions('bishopric').length).toBe(27);
+  it('bishopric permissions unchanged at 26 (AC-066-05)', () => {
+    expect(getPermissions('bishopric').length).toBe(26);
   });
 
   it('observer permissions unchanged at 3 (AC-066-06)', () => {
@@ -167,8 +167,8 @@ describe('F066 Part A: Secretary permissions', () => {
     expect(hasPermission('observer', 'home:next_assignments')).toBe(false);
   });
 
-  it('ALL_PERMISSIONS includes all 27 defined permissions', () => {
-    expect(ALL_PERMISSIONS.length).toBe(27);
+  it('ALL_PERMISSIONS includes all 26 defined permissions', () => {
+    expect(ALL_PERMISSIONS.length).toBe(26);
     expect(ALL_PERMISSIONS).toContain('speech:assign');
     expect(ALL_PERMISSIONS).toContain('speech:unassign');
     expect(ALL_PERMISSIONS).toContain('home:next_assignments');

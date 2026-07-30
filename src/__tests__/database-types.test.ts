@@ -39,7 +39,7 @@ describe('Database Types', () => {
   });
 
   describe('Permission type', () => {
-    it('should define exactly 27 permissions', () => {
+    it('should define exactly 26 permissions', () => {
       const permissions: Permission[] = [
         'speech:assign',
         'speech:unassign',
@@ -50,7 +50,6 @@ describe('Database Types', () => {
         'member:write',
         'member:import',
         'topic:write',
-        'collection:toggle',
         'sunday_type:write',
         'settings:access',
         'settings:language',
@@ -69,7 +68,7 @@ describe('Database Types', () => {
         'invitation:create',
         'history:read',
       ];
-      expect(permissions).toHaveLength(27);
+      expect(permissions).toHaveLength(26);
     });
   });
 

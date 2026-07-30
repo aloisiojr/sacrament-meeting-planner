@@ -17,7 +17,6 @@ export type Permission =
   | 'member:write'
   | 'member:import'
   | 'topic:write'
-  | 'collection:toggle'
   | 'sunday_type:write'
   | 'settings:access'
   | 'settings:language'
@@ -141,13 +140,6 @@ export interface GeneralTopic {
   collection_id: string;
   title: string;
   link: string | null;
-}
-
-export interface WardCollectionConfig {
-  id: string;
-  ward_id: string;
-  collection_id: string;
-  active: boolean;
 }
 
 export interface SundayException {

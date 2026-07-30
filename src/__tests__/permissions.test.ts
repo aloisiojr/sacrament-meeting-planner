@@ -21,7 +21,6 @@ const EXPECTED_MATRIX: Record<Permission, Record<Role, boolean>> = {
   'member:write': { bishopric: true, secretary: true, observer: false },
   'member:import': { bishopric: true, secretary: true, observer: false },
   'topic:write': { bishopric: true, secretary: true, observer: false },
-  'collection:toggle': { bishopric: true, secretary: true, observer: false },
   'sunday_type:write': { bishopric: true, secretary: true, observer: false },
   'settings:access': { bishopric: true, secretary: true, observer: false },
   'settings:language': { bishopric: true, secretary: true, observer: false },
@@ -66,7 +65,6 @@ describe('Permissions', () => {
         'member:write',
         'member:import',
         'topic:write',
-        'collection:toggle',
         'sunday_type:write',
         'settings:access',
         'settings:language',
@@ -124,14 +122,14 @@ describe('Permissions', () => {
   });
 
   describe('getPermissions', () => {
-    it('should return 27 permissions for Bishopric', () => {
+    it('should return 26 permissions for Bishopric', () => {
       const perms = getPermissions('bishopric');
-      expect(perms.length).toBe(27);
+      expect(perms.length).toBe(26);
     });
 
-    it('should return 27 permissions for Secretary', () => {
+    it('should return 26 permissions for Secretary', () => {
       const perms = getPermissions('secretary');
-      expect(perms.length).toBe(27);
+      expect(perms.length).toBe(26);
     });
 
     it('should return 3 permissions for Observer', () => {
@@ -149,8 +147,8 @@ describe('Permissions', () => {
   });
 
   describe('ALL_PERMISSIONS', () => {
-    it('should have exactly 27 permissions', () => {
-      expect(ALL_PERMISSIONS.length).toBe(27);
+    it('should have exactly 26 permissions', () => {
+      expect(ALL_PERMISSIONS.length).toBe(26);
     });
 
     it('should have no duplicates', () => {

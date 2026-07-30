@@ -83,7 +83,6 @@ describe('Permission matrix integration', () => {
         'member:write',
         'member:import',
         'topic:write',
-        'collection:toggle',
         'sunday_type:write',
         'settings:access',
         'settings:language',

@@ -44,8 +44,8 @@ describe('F041 (CR-253): Permission Model Rework', () => {
       expect(hasPermission('bishopric', 'speech:change_status')).toBe(true);
     });
 
-    it('bishopric has 27 total permissions', () => {
-      expect(getPermissions('bishopric')).toHaveLength(27);
+    it('bishopric has 26 total permissions', () => {
+      expect(getPermissions('bishopric')).toHaveLength(26);
     });
   });
 
@@ -197,8 +197,8 @@ describe('F041 (CR-253): Permission Model Rework', () => {
 
   // --- BR009: Permission matrix completeness ---
   describe('BR009: Permission matrix updated', () => {
-    it('ALL_PERMISSIONS has 27 entries', () => {
-      expect(ALL_PERMISSIONS).toHaveLength(27);
+    it('ALL_PERMISSIONS has 26 entries', () => {
+      expect(ALL_PERMISSIONS).toHaveLength(26);
     });
 
     it('ALL_PERMISSIONS includes prayer:assign and prayer:unassign', () => {
@@ -206,8 +206,8 @@ describe('F041 (CR-253): Permission Model Rework', () => {
       expect(ALL_PERMISSIONS).toContain('prayer:unassign');
     });
 
-    it('secretary has 27 permissions (CR-276: +3 speech:assign, speech:unassign, home:next_assignments)', () => {
-      expect(getPermissions('secretary')).toHaveLength(27);
+    it('secretary has 26 permissions (CR-276: +3 speech:assign, speech:unassign, home:next_assignments)', () => {
+      expect(getPermissions('secretary')).toHaveLength(26);
     });
 
     it('secretary HAS speech:unassign (CR-276)', () => {

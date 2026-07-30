@@ -11,7 +11,7 @@
  * - gave_up: dark wine (#7F1D1D) solid
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -61,33 +61,29 @@ export function StatusLED({
   disabled = false,
 }: StatusLEDProps) {
   const fadeOpacity = useSharedValue(1);
-  const reducedMotionRef = useRef(false);
+  // State (not a ref) so the animation effect re-runs once the async check resolves — a ref
+  // read at mount was still false and the animation played even with reduce-motion enabled.
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   // Check for reduced motion preference
   useEffect(() => {
     const listener = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
-      (isReduced) => {
-        reducedMotionRef.current = isReduced;
-        if (isReduced) {
-          cancelAnimation(fadeOpacity);
-          fadeOpacity.value = 1;
-        }
-      }
+      (isReduced) => setReducedMotion(isReduced)
     );
 
     AccessibilityInfo.isReduceMotionEnabled().then((isReduced) => {
-      reducedMotionRef.current = isReduced;
+      setReducedMotion(isReduced);
     });
 
     return () => {
       listener.remove();
     };
-  }, [fadeOpacity]);
+  }, []);
 
   // Animate fading for assigned_not_invited status
   useEffect(() => {
-    if (status === 'assigned_not_invited' && !reducedMotionRef.current) {
+    if (status === 'assigned_not_invited' && !reducedMotion) {
       fadeOpacity.value = withRepeat(
         withSequence(
           withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
@@ -104,7 +100,7 @@ export function StatusLED({
     return () => {
       cancelAnimation(fadeOpacity);
     };
-  }, [status, fadeOpacity]);
+  }, [status, reducedMotion, fadeOpacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeOpacity.value,

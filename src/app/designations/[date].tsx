@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { formatFullDate } from '../../lib/dateUtils';
@@ -39,6 +40,7 @@ import type {
 function DesignationEditContent() {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { hasPermission } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string; index?: string }>();
   const date = params.date ?? '';
@@ -65,7 +67,9 @@ function DesignationEditContent() {
   );
 
   const isCallingType = type === 'sustain' || type === 'release';
-  const canSave = !!type && personName.trim().length > 0;
+  // Gate saving by permission (defense-in-depth): an observer deep-linking here must not be
+  // able to write the agenda. RLS is the real enforcement (P0-1); this hides the affordance.
+  const canSave = hasPermission('agenda:write') && !!type && personName.trim().length > 0;
 
   const handleSelectType = useCallback((next: DesignationType) => {
     setType(next);

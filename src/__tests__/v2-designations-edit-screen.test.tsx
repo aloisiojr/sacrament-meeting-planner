@@ -61,6 +61,9 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}));
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
 }));

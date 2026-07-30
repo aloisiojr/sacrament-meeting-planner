@@ -476,11 +476,13 @@ async function getTargetTokens(
     roles.push('bishopric');
   }
 
-  // Single query filtering by role in SQL (ADR-030: no getUserById loop)
+  // Single query filtering by role in SQL (ADR-030: no getUserById loop).
+  // notifications_enabled honors the per-user master opt-out (migration 046).
   const { data: tokens } = await supabase
     .from('device_push_tokens')
     .select('expo_push_token, user_id')
     .eq('ward_id', wardId)
+    .eq('notifications_enabled', true)
     .in('role', roles);
 
   return (tokens as PushToken[] | null) ?? [];

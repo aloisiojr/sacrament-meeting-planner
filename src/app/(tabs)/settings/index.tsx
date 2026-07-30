@@ -327,6 +327,14 @@ export default function SettingsScreen() {
             colors={colors}
             testID="settings-app-language-button"
           />
+          {hasPermission('push:receive') && (
+            <SettingsItem
+              label={t('settings.notifications')}
+              onPress={() => router.push('/(tabs)/settings/notifications')}
+              colors={colors}
+              testID="settings-notifications-button"
+            />
+          )}
           <SettingsItem
             label={t('settings.theme')}
             onPress={() => router.push('/(tabs)/settings/theme')}

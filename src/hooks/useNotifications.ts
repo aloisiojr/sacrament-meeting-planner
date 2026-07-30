@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -119,6 +120,56 @@ export function useRegisterPushToken(isOnline: boolean): void {
       cancelled = true;
     };
   }, [user, role, wardId, isOnline, hasPermission]);
+}
+
+// --- Notification Preference (master opt-out) ---
+
+const notificationPrefKey = (userId: string | undefined) => ['notificationsEnabled', userId];
+
+/**
+ * Read the current user's master push opt-out. Enabled unless every one of the user's device
+ * tokens is disabled; treated as enabled when there are no tokens yet (default state).
+ */
+export function useNotificationsEnabled(): { enabled: boolean; isLoading: boolean } {
+  const { user } = useAuth();
+
+  const { data, isLoading } = useQuery({
+    queryKey: notificationPrefKey(user?.id),
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase
+        .from('device_push_tokens')
+        .select('notifications_enabled')
+        .eq('user_id', user!.id);
+      if (error) throw error;
+      if (!data || data.length === 0) return true; // no devices yet → default on
+      return data.some((t) => t.notifications_enabled);
+    },
+    enabled: !!user,
+  });
+
+  return { enabled: data ?? true, isLoading };
+}
+
+/**
+ * Toggle the master push opt-out across all of the user's device tokens. process-notifications
+ * only sends to tokens with notifications_enabled = true (migration 046).
+ */
+export function useSetNotificationsEnabled() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from('device_push_tokens')
+        .update({ notifications_enabled: enabled })
+        .eq('user_id', user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationPrefKey(user?.id) });
+    },
+  });
 }
 
 // --- Notification Handler ---

@@ -101,6 +101,20 @@ describe('Ward Business Templates screen (step 3)', () => {
     expect(state.mutate).toHaveBeenCalledWith({ type: 'sustain', value: null });
   });
 
+  it('blurring an untouched field does not save (no default freeze)', () => {
+    state.overrides = { sustain: 'custom' };
+    const r = render();
+    act(() => (node(r, 'designation-template-input-release').props.onBlur as () => void)());
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it('typing text equal to the localized default collapses to null on blur', () => {
+    const r = render();
+    act(() => (node(r, 'designation-template-input-sustain').props.onChangeText as (t: string) => void)('DEFAULT sustain {name}'));
+    act(() => (node(r, 'designation-template-input-sustain').props.onBlur as () => void)());
+    expect(state.mutate).toHaveBeenCalledWith({ type: 'sustain', value: null });
+  });
+
   it('restore default clears the override (null) and resets the field (AC6)', () => {
     state.overrides = { new_member: 'custom nm' };
     const r = render();

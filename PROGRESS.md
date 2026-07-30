@@ -16,9 +16,15 @@
   - Step 5 ✅ removed `sustaining_releasing` (type + Play builder + fixtures); migration
     `041_designations.sql` (add `designations jsonb`, drop old column). Obsolete f067/f068/f071
     free-text tests converted to `designations` (3 vacuous f067 tests removed). 1984 tests green.
-  - **Spec 1 build COMPLETE — next: verify-change (fresh-context adversarial), then GATE 3.**
-  - Migration 041 is BREAKING: apply to staging first; prod only at v2 cutover (ADR 001/002).
-  - Specs 2 (Play interstitial + verbatim read-texts) and 3 (Settings templates) come after.
+  - **Spec 1 COMPLETE + verified (APPROVED).** Migration 041 applied to STAGING (designations jsonb
+    added, sustaining_releasing dropped). Prod only at v2 cutover (ADR 001/002).
+  - **Spec 2 (`specs/v2-designations-play.md`) build COMPLETE** — Play interstitial:
+    - Step 1 ✅ `buildDesignationReadText` + verbatim templates (3 locales) + `orderDesignations`.
+    - Step 2 ✅ `DesignationReadModal` (clone of SacramentPrayerModal) + canonical ordering.
+    - Step 3 ✅ `useWardName`; flagged/ordered Play bullet list; icon + modal wiring in presentation.tsx.
+    - Order: release→sustain→priesthood→new_member. Grouping deferred (too custom). 2002 tests green.
+    - **Next: verify-change (Spec 2), then GATE 3.**
+  - Spec 3 (Settings template editor, per-ward Ward columns) still to come.
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

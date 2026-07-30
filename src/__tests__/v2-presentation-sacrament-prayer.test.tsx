@@ -48,7 +48,10 @@ vi.mock('expo-blur', () => ({
     React.createElement('BlurView', p, p.children),
 }));
 
-vi.mock('../hooks/useWard', () => ({ useWardName: () => 'Test Ward' }));
+vi.mock('../hooks/useWard', () => ({
+  useWardName: () => 'Test Ward',
+  useWardDesignationTemplates: () => ({}),
+}));
 
 vi.mock('../components/icons', () => ({
   PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),

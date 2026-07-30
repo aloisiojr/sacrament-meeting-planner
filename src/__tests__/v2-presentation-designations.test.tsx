@@ -17,7 +17,10 @@ const { act } = TestRenderer;
 
 const DATE = '2026-08-02';
 
-const state = vi.hoisted(() => ({ designations: [] as Designation[] }));
+const state = vi.hoisted(() => ({
+  designations: [] as Designation[],
+  templates: {} as Record<string, string | null>,
+}));
 
 function tLookup(key: string, fallback?: string): string {
   const parts = key.split('.');
@@ -48,7 +51,10 @@ vi.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
     React.createElement('BlurView', p, p.children),
 }));
-vi.mock('../hooks/useWard', () => ({ useWardName: () => 'Jardim' }));
+vi.mock('../hooks/useWard', () => ({
+  useWardName: () => 'Jardim',
+  useWardDesignationTemplates: () => state.templates,
+}));
 vi.mock('../components/icons', () => ({
   PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),
   XIcon: (p: Record<string, unknown>) => React.createElement('XIcon', p),
@@ -127,6 +133,7 @@ beforeEach(() => {
   state.designations = [
     { type: 'sustain', person_name: 'John Doe', member_id: 'm1', calling: 'Elders Quorum President', office: null },
   ];
+  state.templates = {};
   vi.clearAllMocks();
 });
 
@@ -144,6 +151,16 @@ describe('Designations interstitial (Play)', () => {
     act(() => { press(r, 'designations-read-icon-button'); });
     expect(findByTestID(r, 'designation-read-panel').length).toBeGreaterThan(0);
     expect(allText(r)).toContain('John Doe has been called as Elders Quorum President');
+  });
+
+  it('uses the ward override template when set (AC7)', () => {
+    state.templates = { sustain: 'CUSTOM: {name} → {calling}.' };
+    const r = render();
+    act(() => { expandCard(r, 1); });
+    act(() => { press(r, 'designations-read-icon-button'); });
+    const text = allText(r);
+    expect(text).toContain('CUSTOM: John Doe → Elders Quorum President.');
+    expect(text).not.toContain('has been called as');
   });
 
   it('shows no icon when there are no designations (AC8)', () => {

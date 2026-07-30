@@ -27,6 +27,8 @@ export interface DesignationReadModalProps {
   onClose: () => void;
   designations: Designation[];
   wardName?: string;
+  /** Per-type ward overrides; a non-blank value replaces the built-in default for that type. */
+  templates?: Partial<Record<Designation['type'], string | null>>;
   /** Font sizes from the Play screen so the read text tracks the user's chosen size. */
   fontSizes?: { label: number; value: number };
 }
@@ -36,6 +38,7 @@ export function DesignationReadModal({
   onClose,
   designations,
   wardName,
+  templates,
   fontSizes,
 }: DesignationReadModalProps) {
   const { t } = useTranslation();
@@ -90,16 +93,20 @@ export function DesignationReadModal({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator
           >
-            {orderDesignations(designations).map((item, idx) => (
-              <View key={idx} style={idx > 0 ? styles.itemSpacing : undefined} testID={`designation-read-item-${idx}`}>
-                <Text style={[styles.itemLabel, { color: colors.textSecondary, fontSize: labelSize }]}>
-                  {formatDesignationSummary(item, t)}
-                </Text>
-                <Text style={[styles.itemText, { color: colors.text, fontSize: textSize, lineHeight: textSize * 1.5 }]}>
-                  {buildDesignationReadText(item, { wardName }, t)}
-                </Text>
-              </View>
-            ))}
+            {orderDesignations(designations).map((item, idx) => {
+              const override = templates?.[item.type];
+              const template = override && override.trim() ? override : undefined;
+              return (
+                <View key={idx} style={idx > 0 ? styles.itemSpacing : undefined} testID={`designation-read-item-${idx}`}>
+                  <Text style={[styles.itemLabel, { color: colors.textSecondary, fontSize: labelSize }]}>
+                    {formatDesignationSummary(item, t)}
+                  </Text>
+                  <Text style={[styles.itemText, { color: colors.text, fontSize: textSize, lineHeight: textSize * 1.5 }]}>
+                    {buildDesignationReadText(item, { wardName, template }, t)}
+                  </Text>
+                </View>
+              );
+            })}
           </ScrollView>
         </View>
       </View>

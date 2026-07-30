@@ -25,7 +25,7 @@ import {
 import { AccordionCard } from '../components/AccordionCard';
 import { SacramentPrayerModal } from '../components/SacramentPrayerModal';
 import { DesignationReadModal } from '../components/DesignationReadModal';
-import { useWardName } from '../hooks/useWard';
+import { useWardName, useWardDesignationTemplates } from '../hooks/useWard';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import { PencilIcon, XIcon, ScrollTextIcon } from '../components/icons';
@@ -52,6 +52,7 @@ export default function PresentationScreen() {
   const openDesignationsModal = useCallback(() => setDesignationsModalVisible(true), []);
   const closeDesignationsModal = useCallback(() => setDesignationsModalVisible(false), []);
   const wardName = useWardName();
+  const designationTemplates = useWardDesignationTemplates();
 
   const sundayDate = params.date ?? getTodaySundayDate();
   const dateLabel = useMemo(
@@ -167,6 +168,7 @@ export default function PresentationScreen() {
         onClose={closeDesignationsModal}
         designations={agenda?.designations ?? []}
         wardName={wardName ?? undefined}
+        templates={designationTemplates}
         fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
       />
     </SafeAreaView>

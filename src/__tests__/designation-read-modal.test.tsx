@@ -97,6 +97,19 @@ describe('DesignationReadModal (step 2)', () => {
     expect(iSustain).toBeLessThan(iNew);
   });
 
+  it('uses a non-blank ward override template instead of the default', () => {
+    const { renderer } = render({ templates: { sustain: 'OVERRIDE {name} / {calling}' } });
+    const texts = allText(renderer);
+    expect(texts).toContain('OVERRIDE João Silva / Presidente EQ');
+    expect(texts.some((s) => s.startsWith('APOIO'))).toBe(false);
+  });
+
+  it('falls back to the default when the override is blank', () => {
+    const { renderer } = render({ templates: { sustain: '   ' } });
+    const texts = allText(renderer);
+    expect(texts).toContain('APOIO João Silva como Presidente EQ.');
+  });
+
   it('closes via the X button', () => {
     const { renderer, onClose } = render();
     act(() => (nodes(renderer, 'designation-read-close-button')[0].props.onPress as () => void)());

@@ -52,6 +52,16 @@ describe('resolveTemplate', () => {
 
     expect(result).toBe('Pedro Caridade');
   });
+
+  it('preserves intentional line breaks in multi-line templates (P2)', () => {
+    const template = 'Olá {nome},\n\nSeu discurso é em {data}.\nTema: {titulo}';
+    const result = resolveTemplate(template, {
+      speakerName: 'Ana',
+      date: '10 ABR',
+      topic: 'Fé',
+    });
+    expect(result).toBe('Olá Ana,\n\nSeu discurso é em 10 ABR.\nTema: Fé');
+  });
 });
 
 describe('buildWhatsAppUrl', () => {

@@ -167,8 +167,13 @@ export function resolveTemplate(template: string, vars: WhatsAppVariables): stri
   result = result.replace(/\{colecao\}/g, vars.collection ?? '');
   result = result.replace(/\{titulo\}/g, vars.topic);
   result = result.replace(/\{link\}/g, vars.link ?? '');
-  // Clean up extra whitespace from empty placeholders
-  result = result.replace(/\s{2,}/g, ' ').trim();
+  // Clean up whitespace left by empty placeholders WITHOUT flattening intentional line breaks:
+  // collapse runs of spaces/tabs, drop trailing spaces per line, and cap blank-line runs.
+  result = result
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   return result;
 }
 

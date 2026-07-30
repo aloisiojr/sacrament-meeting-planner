@@ -87,8 +87,8 @@ export function buildNotificationText(
         body: 'Ainda há oradores para serem designados para o próximo domingo!',
       }),
       weekly_confirmation: () => ({
-        title: 'Lembrete de Discurso',
-        body: 'Ainda há oradores para serem designados para o próximo domingo!',
+        title: 'Lembrete de Confirmação',
+        body: 'Ainda há oradores não confirmados para o próximo domingo. Faça o acompanhamento!',
       }),
       speaker_confirmed: (d) => {
         const prayerLabel = getPrayerLabel(d.position ?? 1, language);
@@ -153,8 +153,8 @@ export function buildNotificationText(
         body: 'There are still speakers to be assigned for next Sunday!',
       }),
       weekly_confirmation: () => ({
-        title: 'Speech Reminder',
-        body: 'There are still speakers to be assigned for next Sunday!',
+        title: 'Confirmation Reminder',
+        body: 'Some speakers for next Sunday are still unconfirmed. Follow up with them!',
       }),
       speaker_confirmed: (d) => {
         const prayerLabel = getPrayerLabel(d.position ?? 1, language);
@@ -219,8 +219,8 @@ export function buildNotificationText(
         body: '¡Aún hay oradores por asignar para el próximo domingo!',
       }),
       weekly_confirmation: () => ({
-        title: 'Recordatorio de Discurso',
-        body: '¡Aún hay oradores por asignar para el próximo domingo!',
+        title: 'Recordatorio de Confirmación',
+        body: 'Aún hay oradores sin confirmar para el próximo domingo. ¡Haz el seguimiento!',
       }),
       speaker_confirmed: (d) => {
         const prayerLabel = getPrayerLabel(d.position ?? 1, language);

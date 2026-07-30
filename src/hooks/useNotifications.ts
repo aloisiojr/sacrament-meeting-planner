@@ -36,11 +36,15 @@ Notifications.setNotificationHandler({
  */
 export function useRegisterPushToken(isOnline: boolean): void {
   const { user, role, wardId, hasPermission } = useAuth();
-  const hasRegistered = useRef(false);
+  // Remember which identity we last registered for, so an in-session ward/role switch
+  // re-registers the token (a single boolean would leave the token's ward_id stale).
+  const registeredKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Gate by permission, not role: observers lack push:receive and don't register.
-    if (!user || !wardId || !hasPermission('push:receive') || hasRegistered.current) return;
+    if (!user || !wardId || !hasPermission('push:receive')) return;
+    const registrationKey = `${user.id}:${wardId}:${role}`;
+    if (registeredKeyRef.current === registrationKey) return;
     if (!isOnline) return; // Defer to next app opening with connection
 
     const userId = user.id;
@@ -102,7 +106,7 @@ export function useRegisterPushToken(isOnline: boolean): void {
         if (error) {
           console.warn('Failed to register push token:', error.message);
         } else {
-          hasRegistered.current = true;
+          registeredKeyRef.current = registrationKey;
         }
       } catch (err) {
         console.warn('Push token registration error:', err);

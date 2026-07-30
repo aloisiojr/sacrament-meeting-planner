@@ -107,6 +107,12 @@ describe('buildNotificationText', () => {
       expect(result.title).toBeTruthy();
       expect(result.body).toBeTruthy();
     });
+
+    it.each(languages)('confirmation text differs from assignment text in %s (P2)', (lang) => {
+      const confirmation = buildNotificationText('weekly_confirmation', lang, {});
+      const assignment = buildNotificationText('weekly_assignment', lang, {});
+      expect(confirmation.body).not.toBe(assignment.body);
+    });
   });
 
   describe('speaker_confirmed (Case 4)', () => {

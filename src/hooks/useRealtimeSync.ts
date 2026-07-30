@@ -112,7 +112,13 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
           stopPolling();
           // Immediate refetch on subscribe/reconnect
           invalidateAll();
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        } else if (
+          status === 'CLOSED' ||
+          status === 'CHANNEL_ERROR' ||
+          status === 'TIMED_OUT'
+        ) {
+          // TIMED_OUT (flaky link) previously left the socket marked connected with no
+          // polling fallback → stale data. Treat it like a disconnect.
           setWebSocketConnected(false);
           // Fall back to polling
           if (isOnline) {

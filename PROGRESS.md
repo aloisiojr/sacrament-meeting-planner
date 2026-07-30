@@ -43,6 +43,16 @@
     `TemplateEditorScreen`** (tabs + chips + preview + restore-default + autosave; saveMode
     raw|collapse). Fixed verify P1 (raw restore persists NULL, not default text). 2023 tests green;
     client-only (no migration).
+- **Card layout + Topics overhaul (both verified APPROVED, on `v2.0`):**
+  - `specs/v2-card-layout.md` — Home upcoming cards hide the status block; expanded agenda header
+    restructured (DateBlock+attendance | Play "Iniciar" | collapse chevron) + "Tipo de Domingo"
+    section for all Sundays. Client-only.
+  - `specs/v2-topics-overhaul.md` (+ADR 004) — removed Settings "Temas" + collection-visibility;
+    all libraries always available, ordered by parsed month/year (custom→evergreen→conferences desc);
+    rebuilt TopicSelectorModal (PeoplePicker-style: search title+library, add, inline edit title+link,
+    delete-on-clear dialog); removed `collection:toggle` (perms 27→26); migration **043** drops
+    `ward_collection_config` (APPLIED to staging). Verify caught + fixed dangling table refs in
+    settings ward-language mutation + realtime sync. ~1933 tests green.
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

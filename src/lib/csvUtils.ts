@@ -145,7 +145,8 @@ export function parseCsv(csvContent: string): CsvParseResult {
     return { success: false, members: [], errors };
   }
 
-  const lines = cleanContent.split(/\r?\n/);
+  // Split on record boundaries, honoring quoted fields that contain newlines (round-trip safe).
+  const lines = splitCsvRecords(cleanContent);
 
   // Validate header: must carry all 10 known columns.
   const headerParts = parseCsvLine(lines[0].trim()).map((h) => h.trim().replace(/^"|"$/g, ''));
@@ -186,7 +187,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
     }
     while (parts.length < expectedCols) parts.push('');
 
-    const name = parts[0].trim();
+    const name = unguardFormula(parts[0].trim());
     if (name) knownNames.add(normalizeName(name));
     rows.push({ line: i + 1, parts });
   }
@@ -195,8 +196,8 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const members: CsvMember[] = [];
 
   for (const { line, parts } of rows) {
-    const fullName = parts[0].trim();
-    let informalName = parts[1].trim();
+    const fullName = unguardFormula(parts[0].trim());
+    let informalName = unguardFormula(parts[1].trim());
     const fullPhone = parts[2].trim();
 
     if (!fullName) {
@@ -219,7 +220,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
       return false;
     });
 
-    const responsibleName = parts[8].trim();
+    const responsibleName = unguardFormula(parts[8].trim());
     if (responsibleName && !knownNames.has(normalizeName(responsibleName))) {
       errors.push({ line, column: colName(8), code: 'RESPONSIBLE_NOT_FOUND', value: responsibleName });
     }
@@ -234,7 +235,7 @@ export function parseCsv(csvContent: string): CsvParseResult {
       can_play_piano: boolValues[3],
       can_be_recognized: boolValues[4],
       responsible_name: responsibleName,
-      calling: parts[9].trim(),
+      calling: unguardFormula(parts[9].trim()),
     });
   }
 
@@ -372,11 +373,57 @@ export function generateCsv(members: CsvExportMember[], headers?: CsvHeaders): s
 }
 
 /**
- * Escape a CSV field if it contains special characters.
+ * Neutralize CSV/Excel formula injection: a field beginning with = + - @ (or a leading tab/CR)
+ * is executed as a formula by spreadsheet apps. Prefix it with a single quote. `unguardFormula`
+ * (used on import) strips it back off, so the export→import round-trip stays lossless.
+ */
+function guardFormula(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/** Reverse `guardFormula` on import so a guarded value re-imports to its original text. */
+export function unguardFormula(value: string): string {
+  return /^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value;
+}
+
+/**
+ * Split CSV content into records, treating a newline INSIDE a quoted field as part of the field
+ * (not a record boundary). A plain `split(/\r?\n/)` breaks quoted multi-line values (e.g. a calling
+ * with a line break) across rows, so a valid export failed to re-import.
+ */
+export function splitCsvRecords(content: string): string[] {
+  const records: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    if (char === '"') {
+      if (inQuotes && content[i + 1] === '"') {
+        current += '""';
+        i++; // keep the doubled quote intact for parseCsvLine
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && content[i + 1] === '\n') i++; // treat \r\n as one boundary
+      records.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  records.push(current);
+  return records;
+}
+
+/**
+ * Escape a CSV field if it contains special characters. Also guards against formula injection.
  */
 function escapeCsvField(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const guarded = guardFormula(value);
+  if (guarded.includes(',') || guarded.includes('"') || guarded.includes('\n')) {
+    return `"${guarded.replace(/"/g, '""')}"`;
   }
-  return value;
+  return guarded;
 }

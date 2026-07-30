@@ -518,3 +518,44 @@ describe('splitPhoneNumber', () => {
     expect(result).toEqual({ countryCode: '+55', phone: '5511999999999' });
   });
 });
+
+describe('CSV formula-injection guard (P2)', () => {
+  const member = (over: Partial<CsvExportMember>): CsvExportMember => ({
+    full_name: 'Ok Person', informal_name: '', country_code: '+55', phone: null,
+    can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+    can_be_recognized: false, responsible_name: '', calling: '', ...over,
+  });
+
+  it('prefixes a formula-leading field with a single quote on export', () => {
+    const csv = generateCsv([member({ full_name: '=HYPERLINK("http://evil")', calling: '@cmd' })]);
+    expect(csv).toContain("'=HYPERLINK");
+    expect(csv).toContain("'@cmd");
+  });
+
+  it('round-trips a guarded value back to its original text on import', () => {
+    const original = member({ full_name: '=SUM(A1)', calling: '-danger' });
+    const result = parseCsv(generateCsv([original]));
+    expect(result.success).toBe(true);
+    expect(result.members[0].full_name).toBe('=SUM(A1)');
+    expect(result.members[0].calling).toBe('-danger');
+  });
+
+  it('leaves a legitimate leading apostrophe untouched', () => {
+    const result = parseCsv(generateCsv([member({ full_name: "O'Brien" })]));
+    expect(result.members[0].full_name).toBe("O'Brien");
+  });
+});
+
+describe('CSV multi-line round-trip (P2)', () => {
+  it('re-imports a value that contains an embedded newline', () => {
+    const original: CsvExportMember = {
+      full_name: 'Multi Line', informal_name: 'Multi', country_code: '+55', phone: '11999990000',
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+      can_be_recognized: false, responsible_name: '', calling: 'Line one\nLine two',
+    };
+    const result = parseCsv(generateCsv([original]));
+    expect(result.success).toBe(true);
+    expect(result.members).toHaveLength(1);
+    expect(result.members[0].calling).toBe('Line one\nLine two');
+  });
+});

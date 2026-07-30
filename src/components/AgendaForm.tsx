@@ -911,7 +911,7 @@ function HymnSelectorModal({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={[styles.hymnScreen, { backgroundColor: colors.background }]}>
         {/* Top bar: Cancel (left) + centered title (mirrors the other selectors). */}
         <View style={[styles.hymnTopBar, { borderBottomColor: colors.divider }]}>
@@ -1065,6 +1065,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
+    gap: 12,
   },
   hymnListWrap: {
     flex: 1,
@@ -1088,6 +1089,11 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 15,
   },
   speakerReadRow: {
     flexDirection: 'row',

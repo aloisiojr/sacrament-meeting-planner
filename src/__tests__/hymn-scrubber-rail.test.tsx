@@ -61,11 +61,17 @@ describe('HymnScrubberRail', () => {
     expect(tree.toJSON()).toBeNull();
   });
 
-  it('owns the gesture from the start so a drag is never mistaken for a tap (AC3.4)', () => {
+  it('owns the gesture from the start and never yields it mid-drag (AC3.4)', () => {
     const { tree } = render([1, 10, 20, 30, 40]);
     const r = rail(tree);
+    // Claim on start + capture so we win over the FlatList underneath.
     expect(r.props.onStartShouldSetPanResponder()).toBe(true);
+    expect(r.props.onStartShouldSetPanResponderCapture()).toBe(true);
     expect(r.props.onMoveShouldSetPanResponder()).toBe(true);
+    expect(r.props.onMoveShouldSetPanResponderCapture()).toBe(true);
+    // Do NOT let the list's ScrollView steal the responder once dragging (this was the bug).
+    expect(r.props.onPanResponderTerminationRequest()).toBe(false);
+    expect(r.props.onShouldBlockNativeResponder()).toBe(true);
   });
 
   it('maps the touch position to the right anchor for both tap and drag (AC3.3/AC3.4)', () => {

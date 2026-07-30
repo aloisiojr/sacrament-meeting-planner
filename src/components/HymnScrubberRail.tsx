@@ -73,9 +73,16 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
 
   const pan = useRef(
     PanResponder.create({
-      // Own the whole strip from the first touch so a drag is never mistaken for a tap.
+      // Own the whole strip from the first touch — including the capture phase — so we win the
+      // gesture over the FlatList underneath, and NEVER yield it mid-drag. Without
+      // onPanResponderTerminationRequest:false the list's native ScrollView steals the responder
+      // the moment the finger moves, so the tap registers but the drag is ignored.
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: (e: GestureResponderEvent) => {
         refreshTop();
         scrubAtRef.current(e.nativeEvent.pageY);

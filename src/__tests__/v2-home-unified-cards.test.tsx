@@ -101,7 +101,7 @@ function makeAgenda(date: string, over: Partial<SundayAgenda> = {}): SundayAgend
     presiding_name: null, conducting_name: null, recognized_names: null,
     welcome_new_families: null, announcements: null, pianist_name: null, conductor_name: null,
     opening_hymn_id: null, opening_prayer_member_id: null, opening_prayer_name: null,
-    sustaining_releasing: null, designations: [], has_baby_blessing: false, baby_blessing_names: null,
+    designations: [], has_baby_blessing: false, baby_blessing_names: null,
     has_baptism_confirmation: false, baptism_confirmation_names: null, has_stake_announcements: false,
     sacrament_hymn_id: null, has_special_presentation: false, has_intermediate_hymn: true,
     special_presentation_description: null, intermediate_hymn_id: null,

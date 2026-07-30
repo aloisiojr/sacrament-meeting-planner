@@ -44,3 +44,9 @@ export function formatDesignationLines(
 
   return detail ? { line1, line2: detail } : { line1 };
 }
+
+/** Single-line form ("[Name] — [Type] — [detail]") for compact contexts (e.g. Play bullet list). */
+export function formatDesignationSummary(item: Designation, t: Translate): string {
+  const { line1, line2 } = formatDesignationLines(item, t);
+  return line2 ? `${line1} — ${line2}` : line1;
+}

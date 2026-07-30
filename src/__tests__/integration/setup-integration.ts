@@ -437,7 +437,6 @@ export function createMockAgenda(overrides?: Partial<SundayAgenda>): SundayAgend
     opening_hymn_id: null,
     opening_prayer_member_id: null,
     opening_prayer_name: null,
-    sustaining_releasing: null,
     designations: [],
     has_baby_blessing: false,
     baby_blessing_names: null,

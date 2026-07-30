@@ -362,23 +362,9 @@ describe('F068 S015-02: AgendaForm -> EditableListField for welcome/sustaining',
     expect(updateField).toHaveBeenCalledWith('welcome_new_families', null);
   });
 
-  it('AgendaForm uses EditableListField for sustaining_releasing', () => {
-    const agenda = { sustaining_releasing: 'Joao - EQ\nMaria - Primaria' } as any;
-    expect(agenda.sustaining_releasing ?? null).toBe('Joao - EQ\nMaria - Primaria');
-  });
-
-  it('sustaining_releasing EditableListField has placeholder t(agenda.addWardBusiness)', () => {
-    expect((ptBR as any).agenda.addWardBusiness).toBe('Adicionar apoio ou desobrigação');
-    expect((enUS as any).agenda.addWardBusiness).toBe('Add sustaining or release');
-    expect((esLA as any).agenda.addWardBusiness).toBe('Agregar apoyo o relevo');
-  });
-
-  it('sustaining_releasing onSave calls updateField(sustaining_releasing, ...)', () => {
-    const updateField = vi.fn();
-    const onSave = (text: string | null) => updateField('sustaining_releasing', text);
-    onSave('Joao - EQ');
-    expect(updateField).toHaveBeenCalledWith('sustaining_releasing', 'Joao - EQ');
-  });
+  // Removed in v2-designations step 5: the free-text `sustaining_releasing` field was replaced by
+  // the structured `designations` list (DesignationListField + /designations edit screen). Its
+  // presentation coverage now lives in the "bullet_list for designations" test below.
 
   it('recognized_names now uses EditableListField + PeoplePicker (CR-283, v2.0)', () => {
     // recognized_names uses EditableListField with onItemPress/onAddPress
@@ -751,8 +737,13 @@ describe('F068 S015-05: bullet_list for welcome/sustaining in presentation', () 
     expect(welcomeField!.value).toBe('Familia A\nFamilia B');
   });
 
-  it("buildPresentationCards uses 'bullet_list' for sustaining_releasing", () => {
-    const agenda = makeAgenda({ sustaining_releasing: 'Joao - EQ\nMaria - Primaria' });
+  it("buildPresentationCards uses 'bullet_list' for designations", () => {
+    const agenda = makeAgenda({
+      designations: [
+        { type: 'sustain', person_name: 'Joao', member_id: null, calling: 'EQ', office: null },
+        { type: 'release', person_name: 'Maria', member_id: null, calling: 'Primaria', office: null },
+      ],
+    });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     const designationsCard = cards[1];
     const sustainingField = designationsCard.fields.find(
@@ -760,7 +751,8 @@ describe('F068 S015-05: bullet_list for welcome/sustaining in presentation', () 
     );
     expect(sustainingField).toBeDefined();
     expect(sustainingField!.type).toBe('bullet_list');
-    expect(sustainingField!.value).toBe('Joao - EQ\nMaria - Primaria');
+    expect(sustainingField!.value).toContain('Joao');
+    expect(sustainingField!.value).toContain('Maria');
   });
 });
 

@@ -57,7 +57,7 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     speaker_3_override: null,
     created_at: '2026-03-08T00:00:00Z',
     updated_at: '2026-03-08T00:00:00Z',
-    sustaining_releasing: null,
+    designations: [],
     opening_prayer_member_id: null,
     opening_prayer_name: null,
     closing_prayer_member_id: null,

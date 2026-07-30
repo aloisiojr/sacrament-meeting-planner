@@ -213,8 +213,7 @@ export interface SundayAgenda {
   opening_prayer_member_id: string | null;
   opening_prayer_name: string | null;
   // Designations & Sacrament
-  sustaining_releasing: string | null; // deprecated — replaced by `designations` (removed in step 5)
-  designations: Designation[]; // v2.0 — structured supports/releases
+  designations: Designation[]; // v2.0 — structured supports/releases (replaced free-text sustaining_releasing)
   has_baby_blessing: boolean;
   baby_blessing_names: string | null;
   has_baptism_confirmation: boolean;

@@ -95,7 +95,7 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     speaker_3_override: null,
     created_at: '2026-03-08T00:00:00Z',
     updated_at: '2026-03-08T00:00:00Z',
-    sustaining_releasing: null,
+    designations: [],
     ...overrides,
   } as SundayAgenda;
 }
@@ -291,8 +291,13 @@ describe('F068 Tester: presentation bullet_list for welcome/sustaining (AC-068-1
     expect(field!.type).toBe('bullet_list');
   });
 
-  it('sustaining_releasing renders as bullet_list in buildPresentationCards', () => {
-    const agenda = makeAgenda({ sustaining_releasing: 'Apoio: Joao\nDesobrigacao: Maria' });
+  it('designations render as bullet_list in buildPresentationCards', () => {
+    const agenda = makeAgenda({
+      designations: [
+        { type: 'sustain', person_name: 'Joao', member_id: null, calling: 'EQ', office: null },
+        { type: 'release', person_name: 'Maria', member_id: null, calling: 'RS', office: null },
+      ],
+    });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     const designationsCard = cards[1];
     const field = designationsCard.fields.find((f) => f.label === 'agenda.wardBusiness');
@@ -313,7 +318,9 @@ describe('F068 Tester: presentation bullet_list for welcome/sustaining (AC-068-1
     const agenda = makeAgenda({
       welcome_new_families: 'Fam A',
       announcements: 'Ann 1',
-      sustaining_releasing: 'Sust 1',
+      designations: [
+        { type: 'sustain', person_name: 'Sust 1', member_id: null, calling: 'EQ', office: null },
+      ],
     });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     // Welcome card has welcome_new_families and announcements
@@ -544,8 +551,13 @@ describe('F070 Tester: zebra striping applies to all bullet_list fields (AC-070-
     expect(field!.type).toBe('bullet_list');
   });
 
-  it('sustaining_releasing field type is bullet_list (eligible for zebra)', () => {
-    const agenda = makeAgenda({ sustaining_releasing: 'Sust 1\nSust 2' });
+  it('designations field type is bullet_list (eligible for zebra)', () => {
+    const agenda = makeAgenda({
+      designations: [
+        { type: 'sustain', person_name: 'Sust 1', member_id: null, calling: 'EQ', office: null },
+        { type: 'sustain', person_name: 'Sust 2', member_id: null, calling: 'RS', office: null },
+      ],
+    });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     const field = cards[1].fields.find((f) => f.label === 'agenda.wardBusiness');
     expect(field!.type).toBe('bullet_list');
@@ -842,8 +854,8 @@ describe('F070 Tester EC-070-01: Empty bullet_list placeholder', () => {
     expect(field).toBeUndefined();
   });
 
-  it('null sustaining_releasing is omitted from presentation cards', () => {
-    const agenda = makeAgenda({ sustaining_releasing: null });
+  it('empty designations is omitted from presentation cards', () => {
+    const agenda = makeAgenda({ designations: [] });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
     const designationsCard = cards[1];
     const field = designationsCard.fields.find((f) => f.label === 'agenda.wardBusiness');

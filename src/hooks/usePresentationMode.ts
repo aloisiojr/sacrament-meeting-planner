@@ -12,6 +12,7 @@ import { useHymns, useSacramentalHymns, formatHymnDisplay } from './useHymns';
 import { useMembers, normalizeForSearch } from './useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { toISODateString } from '../lib/dateUtils';
+import { formatDesignationSummary } from '../lib/designations';
 import type { SundayAgenda, Speech, SundayException, Hymn, Member } from '../types/database';
 
 // --- Types ---
@@ -156,10 +157,10 @@ export function buildPresentationCards(
 
   // Card 2: Designations & Sacrament
   const designationFields: PresentationField[] = [];
-  if (agenda?.sustaining_releasing) {
+  if (agenda?.designations && agenda.designations.length > 0) {
     designationFields.push({
       label: t('agenda.wardBusiness'),
-      value: agenda.sustaining_releasing,
+      value: agenda.designations.map((d) => formatDesignationSummary(d, t)).join('\n'),
       type: 'bullet_list',
     });
   }

@@ -9,10 +9,15 @@
 ## Now
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
-  - Step 1 ✅ committed: `Designation` types + `designations[]` on SundayAgenda (sustaining_releasing
-    kept until step 5) + `src/lib/designations.ts` (`formatDesignationLines`) + fixtures. 1968 tests green.
-  - Step 2 ⏳ next: edit screen `src/app/designations/[date].tsx` (type→person→fields, calling prompt).
-  - Steps 3-5: `DesignationListField` component → wire AgendaForm → remove old column + migration 041.
+  - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).
+  - Step 2 ✅ edit screen `src/app/designations/[date].tsx` (type→person→fields, calling prompt) + i18n.
+  - Step 3 ✅ `DesignationListField` display component.
+  - Step 4 ✅ wired into AgendaForm (replaces free-text wardBusiness field).
+  - Step 5 ✅ removed `sustaining_releasing` (type + Play builder + fixtures); migration
+    `041_designations.sql` (add `designations jsonb`, drop old column). Obsolete f067/f068/f071
+    free-text tests converted to `designations` (3 vacuous f067 tests removed). 1984 tests green.
+  - **Spec 1 build COMPLETE — next: verify-change (fresh-context adversarial), then GATE 3.**
+  - Migration 041 is BREAKING: apply to staging first; prod only at v2 cutover (ADR 001/002).
   - Specs 2 (Play interstitial + verbatim read-texts) and 3 (Settings templates) come after.
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed

@@ -107,7 +107,7 @@ function makeAgenda(overrides: Partial<SundayAgenda> = {}): SundayAgenda {
     speaker_3_override: null,
     created_at: '2026-03-08T00:00:00Z',
     updated_at: '2026-03-08T00:00:00Z',
-    sustaining_releasing: null,
+    designations: [],
     opening_prayer_member_id: null,
     opening_prayer_name: null,
     closing_prayer_member_id: null,
@@ -974,7 +974,9 @@ describe('CR-283 Tester: all bullet_list fields in presentation', () => {
       recognized_names: 'Alice\nBob',
       welcome_new_families: 'Familia Silva',
       announcements: 'Anuncio 1\nAnuncio 2',
-      sustaining_releasing: 'Apoio 1',
+      designations: [
+        { type: 'sustain', person_name: 'Apoio 1', member_id: null, calling: 'EQ', office: null },
+      ],
     });
     const cards = buildPresentationCards(agenda, [], null, noopHymnLookup, tFn);
 

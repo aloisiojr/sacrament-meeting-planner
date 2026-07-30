@@ -336,5 +336,24 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
         updates: { attendance: 120 },
       });
     });
+
+    it('shows the AttendanceBlock in the expanded header for a past sacrament Sunday (AC7)', () => {
+      const { root } = render();
+      act(() => {
+        (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(PAST);
+      });
+      expect(byTestID(root, `agenda-attendance-${PAST}`).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('the expanded-header Play control navigates to /presentation (AC10)', () => {
+    const { root } = render();
+    act(() => {
+      (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(DATE);
+    });
+    act(() => {
+      (byTestID(root, `agenda-play-${DATE}`)[0].props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: DATE } });
   });
 });

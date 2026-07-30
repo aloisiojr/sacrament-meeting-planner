@@ -12,7 +12,6 @@ import {
   SUPPORTED_LANGUAGES,
   LANGUAGE_LABELS,
   getCurrentLanguage,
-  toDbLocale,
 } from '../../../i18n';
 import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
@@ -101,38 +100,8 @@ export default function SettingsScreen() {
         .eq('id', wardId);
       if (wardError) throw wardError;
 
-      // 2. Deactivate all collections from the OLD language
-      const { data: oldCollections } = await supabase
-        .from('general_collections')
-        .select('id')
-        .eq('language', toDbLocale(oldLanguage));
-
-      if (oldCollections && oldCollections.length > 0) {
-        const oldCollectionIds = oldCollections.map((c) => c.id);
-        await supabase
-          .from('ward_collection_config')
-          .update({ active: false })
-          .eq('ward_id', wardId)
-          .in('collection_id', oldCollectionIds);
-      }
-
-      // 3. Activate new language collections (active by default for built-in collections)
-      const { data: newCollections } = await supabase
-        .from('general_collections')
-        .select('id')
-        .eq('language', toDbLocale(newLanguage));
-
-      if (newCollections && newCollections.length > 0) {
-        const upsertRows = newCollections.map((col) => ({
-          ward_id: wardId,
-          collection_id: col.id,
-          active: true,
-        }));
-        await supabase
-          .from('ward_collection_config')
-          .upsert(upsertRows, { onConflict: 'ward_id,collection_id' });
-      }
-
+      // Collections are always available in v2 (no per-ward visibility), so switching language
+      // no longer toggles ward_collection_config; the topic list just refetches for the new locale.
       return newLanguage;
     },
     onSuccess: (_data, newLanguage) => {

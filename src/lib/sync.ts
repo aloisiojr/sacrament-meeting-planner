@@ -15,7 +15,6 @@ import { agendaKeys } from '../hooks/useAgenda';
 export type SyncedTable =
   | 'members'
   | 'ward_topics'
-  | 'ward_collection_config'
   | 'sunday_exceptions'
   | 'speeches'
   | 'sunday_agendas';
@@ -28,7 +27,6 @@ export type SyncedTable =
 export const SYNCED_TABLES: readonly SyncedTable[] = [
   'members',
   'ward_topics',
-  'ward_collection_config',
   'sunday_exceptions',
   'speeches',
   'sunday_agendas',
@@ -41,7 +39,6 @@ export const SYNCED_TABLES: readonly SyncedTable[] = [
 export const TABLE_TO_QUERY_KEYS: Record<SyncedTable, readonly (readonly string[])[]> = {
   members: [memberKeys.all],
   ward_topics: [topicKeys.all],
-  ward_collection_config: [topicKeys.all],
   sunday_exceptions: [sundayTypeKeys.all],
   speeches: [speechKeys.all, speechCountKeys.all],
   sunday_agendas: [agendaKeys.all],

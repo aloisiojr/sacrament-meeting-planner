@@ -67,11 +67,10 @@ vi.mock('react-i18next', () => ({
 // ==========================================================================
 
 describe('Sync configuration integration', () => {
-  it('SYNCED_TABLES contains all 6 tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(6);
+  it('SYNCED_TABLES contains all 5 tables', () => {
+    expect(SYNCED_TABLES).toHaveLength(5);
     expect(SYNCED_TABLES).toContain('members');
     expect(SYNCED_TABLES).toContain('ward_topics');
-    expect(SYNCED_TABLES).toContain('ward_collection_config');
     expect(SYNCED_TABLES).toContain('sunday_exceptions');
     expect(SYNCED_TABLES).toContain('speeches');
     expect(SYNCED_TABLES).toContain('sunday_agendas');
@@ -91,7 +90,6 @@ describe('Sync configuration integration', () => {
     expect(getQueryKeysForTable('sunday_agendas')).toEqual([['agendas']]);
     expect(getQueryKeysForTable('sunday_exceptions')).toEqual([['sundayTypes']]);
     expect(getQueryKeysForTable('ward_topics')).toEqual([['topics']]);
-    expect(getQueryKeysForTable('ward_collection_config')).toEqual([['topics']]);
   });
 
   it('getQueryKeysForTable returns empty for unknown table', () => {

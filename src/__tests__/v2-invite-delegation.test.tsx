@@ -53,7 +53,7 @@ const WARD = {
 };
 
 let SPEECHES: Speech[] = [];
-const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve());
+const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
 const changeStatusMock = vi.fn();
 
 // --- Mocks ---

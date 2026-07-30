@@ -258,10 +258,15 @@ export function PersonEditor({
       onClose();
     };
 
+    // Surface save failures instead of leaving the modal open with no feedback.
+    const onError = () => {
+      setError(t('personEditor.saveFailed'));
+    };
+
     if (member) {
-      updateMember.mutate({ id: member.id, ...fields }, { onSuccess });
+      updateMember.mutate({ id: member.id, ...fields }, { onSuccess, onError });
     } else {
-      createMember.mutate(fields, { onSuccess });
+      createMember.mutate(fields, { onSuccess, onError });
     }
   }, [
     fullName,

@@ -17,17 +17,20 @@ export type { WhatsAppVariables } from './whatsappUtils';
 
 /**
  * Open WhatsApp via deep link.
- * Shows error alert if WhatsApp is not installed.
+ * Shows error alert if WhatsApp is not installed. Returns true only when WhatsApp
+ * actually opened, so callers can avoid marking an invite "sent" when it wasn't.
  */
-export async function openWhatsApp(url: string): Promise<void> {
+export async function openWhatsApp(url: string): Promise<boolean> {
   try {
     const canOpen = await Linking.canOpenURL(url);
     if (canOpen) {
       await Linking.openURL(url);
-    } else {
-      Alert.alert('WhatsApp', i18n.t('errors.whatsappNotInstalled'));
+      return true;
     }
+    Alert.alert('WhatsApp', i18n.t('errors.whatsappNotInstalled'));
+    return false;
   } catch {
     Alert.alert('WhatsApp', i18n.t('errors.whatsappFailed'));
+    return false;
   }
 }

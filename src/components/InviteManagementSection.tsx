@@ -192,11 +192,15 @@ export function InviteManagementSection() {
       if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
       const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-      await openWhatsApp(url);
-      changeStatus.mutate({
-        speechId: speech.id,
-        status: 'assigned_invited',
-      });
+      // Only flip to "invited" if WhatsApp actually opened — otherwise the invite
+      // was never sent and the status would lie.
+      const opened = await openWhatsApp(url);
+      if (opened) {
+        changeStatus.mutate({
+          speechId: speech.id,
+          status: 'assigned_invited',
+        });
+      }
     },
     [changeStatus, locale, ward, resolveResponsibleName]
   );

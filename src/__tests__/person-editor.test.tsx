@@ -41,10 +41,11 @@ const SELF = makeMember({ id: 'self', full_name: 'Self Person' });
 const OTHER = makeMember({ id: 'other', full_name: 'Other Person' });
 let MEMBERS: Member[] = [];
 
-const createMock = vi.fn((_input: unknown, opts?: { onSuccess?: (m: Member) => void }) =>
+type MutateOpts = { onSuccess?: (m: Member) => void; onError?: (e: unknown) => void };
+const createMock = vi.fn((_input: unknown, opts?: MutateOpts) =>
   opts?.onSuccess?.(makeMember({ id: 'new', full_name: 'Created' }))
 );
-const updateMock = vi.fn((_input: unknown, opts?: { onSuccess?: (m: Member) => void }) =>
+const updateMock = vi.fn((_input: unknown, opts?: MutateOpts) =>
   opts?.onSuccess?.(SELF)
 );
 const deleteMock = vi.fn((_input: unknown, opts?: { onSuccess?: (name: string) => void }) =>
@@ -161,6 +162,20 @@ describe('PersonEditor', () => {
     });
     expect(onSaved).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows an error and keeps the modal open when saving fails (P1 #7)', () => {
+    // Drive the mutation's onError instead of onSuccess.
+    createMock.mockImplementationOnce((_input: unknown, opts?: MutateOpts) =>
+      opts?.onError?.(new Error('insert failed'))
+    );
+    const { renderer, onClose } = render();
+    change(renderer, 'person-editor-full-name', 'New Person');
+    press(renderer, 'person-editor-save');
+
+    const errorNode = node(renderer, 'person-editor-error');
+    expect(errorNode.props.children).toBe('personEditor.saveFailed');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('E1: shows a visible label above the informal-name field', () => {

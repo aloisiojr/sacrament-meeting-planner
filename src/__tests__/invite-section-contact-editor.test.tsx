@@ -51,7 +51,7 @@ const WARD = {
 };
 
 let SPEECHES: Speech[] = [];
-const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve());
+const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
 const changeStatusMock = vi.fn();
 
 // Capture PersonEditor props so the test can drive onSaved / inspect visibility + member.
@@ -205,6 +205,19 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
     expect(alertSpy).not.toHaveBeenCalled();
     expect(openWhatsAppMock).toHaveBeenCalledTimes(1);
     expect(changeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
+    alertSpy.mockRestore();
+  });
+
+  it('does NOT mark invited when WhatsApp fails to open', async () => {
+    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    // openWhatsApp reports it could not open (not installed / launch failed).
+    openWhatsAppMock.mockImplementationOnce(() => Promise.resolve(false));
+    SPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
+    const renderer = render();
+    await pressSend(renderer);
+
+    expect(openWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(changeStatusMock).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,8 +30,22 @@ export default function ResetPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  // Mirror sessionReady for the timeout closure below (avoids a stale-capture read).
+  const sessionReadyRef = useRef(false);
+  useEffect(() => {
+    sessionReadyRef.current = sessionReady;
+  }, [sessionReady]);
 
   useEffect(() => {
+    // Safety net: never spin forever. If no recovery session is established within the
+    // window (no token, no PASSWORD_RECOVERY event, no existing session), surface an error
+    // and an escape route instead of an infinite spinner.
+    const timeoutId = setTimeout(() => {
+      if (!sessionReadyRef.current) {
+        setError((prev) => prev ?? t('auth.resetExpired'));
+      }
+    }, 8000);
+
     // New: Handle deep link token (primary path)
     if (token && type === 'recovery') {
       supabase.auth.verifyOtp({
@@ -44,7 +58,7 @@ export default function ResetPasswordScreen() {
           setSessionReady(true);
         }
       });
-      return; // Skip onAuthStateChange listener when token is present
+      return () => clearTimeout(timeoutId); // Skip onAuthStateChange listener when token is present
     }
 
     // Existing: Listen for PASSWORD_RECOVERY event (fallback path)
@@ -64,6 +78,7 @@ export default function ResetPasswordScreen() {
     });
 
     return () => {
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
     // `t` is only used inside async callbacks; excluding it avoids re-subscribing
@@ -112,6 +127,40 @@ export default function ResetPasswordScreen() {
   };
 
   if (!sessionReady) {
+    // Recovery link invalid/expired or verification timed out: show the reason and an
+    // escape to login instead of a spinner that never resolves.
+    if (error) {
+      return (
+        <View
+          style={[
+            styles.container,
+            styles.centered,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View style={styles.formContainer}>
+            <View
+              style={[
+                styles.errorContainer,
+                { backgroundColor: colors.errorContainer },
+              ]}
+            >
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {error}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.backToLoginLink}
+              onPress={handleBackToLogin}
+            >
+              <Text style={[styles.backToLoginText, { color: colors.primary }]}>
+                {t('auth.backToLogin')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
     return (
       <View
         style={[

@@ -50,3 +50,24 @@ export function formatDesignationSummary(item: Designation, t: Translate): strin
   const { line1, line2 } = formatDesignationLines(item, t);
   return line2 ? `${line1} — ${line2}` : line1;
 }
+
+/**
+ * The full verbatim text to READ for a designation (Play interstitial). Resolves the template
+ * (an explicit `template` override — future ward-level config — else the built-in per-locale
+ * default `agenda.designations.readText.<type>`) and substitutes the four canonical tokens.
+ * Everything else in the template is kept verbatim (incl. literal stage directions).
+ */
+export function buildDesignationReadText(
+  item: Designation,
+  opts: { wardName?: string; template?: string },
+  t: Translate
+): string {
+  const template = opts.template ?? t(`agenda.designations.readText.${item.type}`);
+  const office = item.office ? priesthoodOfficeLabel(item.office, t) : '';
+  const sub = (s: string, token: string, value: string) => s.split(token).join(value);
+  let out = sub(template, '{name}', item.person_name);
+  out = sub(out, '{calling}', item.calling ?? '');
+  out = sub(out, '{office}', office);
+  out = sub(out, '{ward}', opts.wardName ?? '');
+  return out;
+}

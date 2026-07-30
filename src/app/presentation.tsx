@@ -52,7 +52,7 @@ export default function PresentationScreen() {
   const openDesignationsModal = useCallback(() => setDesignationsModalVisible(true), []);
   const closeDesignationsModal = useCallback(() => setDesignationsModalVisible(false), []);
   const wardName = useWardName();
-  const designationTemplates = useWardDesignationTemplates();
+  const { templates: designationTemplates } = useWardDesignationTemplates();
 
   const sundayDate = params.date ?? getTodaySundayDate();
   const dateLabel = useMemo(

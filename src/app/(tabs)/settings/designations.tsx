@@ -22,7 +22,7 @@ function DesignationTemplatesContent() {
   const { colors } = useTheme();
   const router = useRouter();
 
-  const overrides = useWardDesignationTemplates();
+  const { templates: overrides, isLoaded } = useWardDesignationTemplates();
   const update = useUpdateWardDesignationTemplate();
 
   const defaultFor = useCallback(
@@ -36,11 +36,18 @@ function DesignationTemplatesContent() {
     priesthood: '',
     new_member: '',
   });
+  const [edited, setEdited] = useState<Record<DesignationType, boolean>>({
+    release: false,
+    sustain: false,
+    priesthood: false,
+    new_member: false,
+  });
   const [initialized, setInitialized] = useState(false);
 
-  // Initialize each field from the override (if any) or the localized default, once.
+  // Initialize each field from the override (if any) or the localized default — only once the
+  // query has resolved, so a saved override isn't overwritten by the default on a cold cache.
   useEffect(() => {
-    if (initialized) return;
+    if (initialized || !isLoaded) return;
     setValues({
       release: overrides.release ?? defaultFor('release'),
       sustain: overrides.sustain ?? defaultFor('sustain'),
@@ -48,20 +55,29 @@ function DesignationTemplatesContent() {
       new_member: overrides.new_member ?? defaultFor('new_member'),
     });
     setInitialized(true);
-  }, [initialized, overrides, defaultFor]);
+  }, [initialized, isLoaded, overrides, defaultFor]);
+
+  const handleChange = useCallback((type: DesignationType, text: string) => {
+    setValues((v) => ({ ...v, [type]: text }));
+    setEdited((e) => (e[type] ? e : { ...e, [type]: true }));
+  }, []);
 
   const handleBlur = useCallback(
     (type: DesignationType) => {
+      if (!edited[type]) return; // only persist fields the user actually touched
       const text = values[type];
-      // Blank => clear the override (revert to default); otherwise save the custom text.
-      update.mutate({ type, value: text.trim() ? text : null });
+      // Blank or unchanged-from-default => clear the override (use the localized default);
+      // otherwise save the custom text.
+      const value = text.trim() && text !== defaultFor(type) ? text : null;
+      update.mutate({ type, value });
     },
-    [values, update]
+    [edited, values, defaultFor, update]
   );
 
   const handleRestore = useCallback(
     (type: DesignationType) => {
       setValues((v) => ({ ...v, [type]: defaultFor(type) }));
+      setEdited((e) => ({ ...e, [type]: false }));
       update.mutate({ type, value: null });
     },
     [defaultFor, update]
@@ -103,7 +119,7 @@ function DesignationTemplatesContent() {
               testID={`designation-template-input-${type}`}
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
               value={values[type]}
-              onChangeText={(text) => setValues((v) => ({ ...v, [type]: text }))}
+              onChangeText={(text) => handleChange(type, text)}
               onBlur={() => handleBlur(type)}
               multiline
             />

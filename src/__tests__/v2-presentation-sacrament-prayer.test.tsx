@@ -50,7 +50,7 @@ vi.mock('expo-blur', () => ({
 
 vi.mock('../hooks/useWard', () => ({
   useWardName: () => 'Test Ward',
-  useWardDesignationTemplates: () => ({}),
+  useWardDesignationTemplates: () => ({ templates: {}, isLoaded: true }),
 }));
 
 vi.mock('../components/icons', () => ({

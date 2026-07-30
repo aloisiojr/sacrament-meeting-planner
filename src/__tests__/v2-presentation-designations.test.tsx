@@ -53,7 +53,7 @@ vi.mock('expo-blur', () => ({
 }));
 vi.mock('../hooks/useWard', () => ({
   useWardName: () => 'Jardim',
-  useWardDesignationTemplates: () => state.templates,
+  useWardDesignationTemplates: () => ({ templates: state.templates, isLoaded: true }),
 }));
 vi.mock('../components/icons', () => ({
   PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),

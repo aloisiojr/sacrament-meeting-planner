@@ -13,6 +13,7 @@ const { act } = TestRenderer;
 
 const state = vi.hoisted(() => ({
   overrides: {} as Record<string, string | null>,
+  isLoaded: true,
   mutate: vi.fn(),
 }));
 
@@ -40,7 +41,7 @@ vi.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', border: '#333' } }),
 }));
 vi.mock('../hooks/useWard', () => ({
-  useWardDesignationTemplates: () => state.overrides,
+  useWardDesignationTemplates: () => ({ templates: state.overrides, isLoaded: state.isLoaded }),
   useUpdateWardDesignationTemplate: () => ({ mutate: state.mutate }),
 }));
 
@@ -57,6 +58,7 @@ function node(renderer: TestRenderer.ReactTestRenderer, testID: string) {
 
 beforeEach(() => {
   state.overrides = {};
+  state.isLoaded = true;
   state.mutate = vi.fn();
 });
 
@@ -66,6 +68,22 @@ describe('Ward Business Templates screen (step 3)', () => {
     const r = render();
     expect(node(r, 'designation-template-input-sustain').props.value).toBe('MY CUSTOM sustain');
     expect(node(r, 'designation-template-input-release').props.value).toBe('DEFAULT release {name}');
+  });
+
+  it('does NOT prefill (stays empty) until the query has resolved — no default overwrite (P1)', () => {
+    state.isLoaded = false;
+    state.overrides = { sustain: 'MY CUSTOM sustain' };
+    const r = render();
+    // Init is gated on isLoaded, so the field is not yet populated (and won't clobber the override).
+    expect(node(r, 'designation-template-input-sustain').props.value).toBe('');
+  });
+
+  it('shows the placeholder-token hint (AC8)', () => {
+    const r = render();
+    const texts = r.root
+      .findAll((n) => n.type === 'Text')
+      .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
+    expect(texts).toContain('Marcadores: {name}');
   });
 
   it('editing a field and blurring saves the override (AC5)', () => {

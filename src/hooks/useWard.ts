@@ -40,10 +40,13 @@ export type DesignationTemplates = Partial<Record<DesignationType, string | null
  * Per-ward designation read-text overrides (NULL/blank => built-in localized default). Used by the
  * Play interstitial and the Settings editor; both share the query key so an edit refreshes Play.
  */
-export function useWardDesignationTemplates(): DesignationTemplates {
+export function useWardDesignationTemplates(): {
+  templates: DesignationTemplates;
+  isLoaded: boolean;
+} {
   const { wardId } = useAuth();
 
-  const { data } = useQuery({
+  const { data, isSuccess } = useQuery({
     queryKey: ['ward', wardId, 'designationTemplates'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -64,7 +67,7 @@ export function useWardDesignationTemplates(): DesignationTemplates {
     enabled: !!wardId,
   });
 
-  return data ?? {};
+  return { templates: data ?? {}, isLoaded: isSuccess };
 }
 
 /**

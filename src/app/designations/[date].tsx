@@ -218,7 +218,11 @@ function DesignationEditContent() {
             <Pressable
               testID="designation-person-selector"
               onPress={() => setPickerVisible(true)}
-              style={[styles.selectorField, { borderColor: colors.border }]}
+              style={[
+                styles.selectorField,
+                { borderColor: personName ? colors.primary : colors.border },
+                !!personName && { backgroundColor: colors.surfaceVariant },
+              ]}
             >
               <Text
                 style={[
@@ -241,7 +245,11 @@ function DesignationEditContent() {
             </Text>
             <TextInput
               testID="designation-calling-input"
-              style={[styles.textInput, { color: colors.text, borderColor: colors.border }]}
+              style={[
+                styles.textInput,
+                { color: colors.text, borderColor: calling.trim() ? colors.primary : colors.border },
+                !!calling.trim() && { backgroundColor: colors.surfaceVariant },
+              ]}
               value={calling}
               onChangeText={setCalling}
               placeholder={t('agenda.designations.callingPlaceholder')}

@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
 import { toDbLocale } from '../i18n';
+import { compareActiveTopics } from '../lib/topics';
 import type {
   WardTopic,
   GeneralCollection,
@@ -329,85 +330,57 @@ export async function checkCollectionFutureSpeeches(
 // --- Active Topics (combined ward + general) ---
 
 /**
- * Fetch all active topics: ward topics + topics from active general collections.
- * Returns TopicWithCollection[] sorted alphabetically by "Collection : Title".
+ * Fetch every selectable topic: ward (custom) topics + ALL built-in library topics for the ward
+ * language. No collection-visibility filter (removed in v2). Ordered for the picker via
+ * compareActiveTopics: ward first, then evergreen libraries, then conferences newest-first.
  */
 export function useActiveTopics() {
-  const { wardId } = useAuth();
+  const { wardId, wardLanguage } = useAuth();
   const { t } = useTranslation();
+  const dbLocale = toDbLocale(wardLanguage ?? 'en-US');
 
   return useQuery({
-    queryKey: topicKeys.activeTopics(wardId),
+    queryKey: [...topicKeys.activeTopics(wardId), dbLocale] as const,
     queryFn: async (): Promise<TopicWithCollection[]> => {
       const results: TopicWithCollection[] = [];
 
-      // Round 1: ward_topics and ward_collection_config in parallel (ADR-033)
-      const [wardTopicsResult, activeConfigsResult] = await Promise.all([
-        supabase
-          .from('ward_topics')
-          .select('*')
-          .eq('ward_id', wardId),
-        supabase
-          .from('ward_collection_config')
-          .select('collection_id')
-          .eq('ward_id', wardId)
-          .eq('active', true),
+      // Ward topics + all general collections for the language, in parallel.
+      const [wardTopicsResult, collectionsResult] = await Promise.all([
+        supabase.from('ward_topics').select('*').eq('ward_id', wardId),
+        supabase.from('general_collections').select('*').eq('language', dbLocale),
       ]);
 
       if (wardTopicsResult.error) throw wardTopicsResult.error;
-      if (activeConfigsResult.error) throw activeConfigsResult.error;
+      if (collectionsResult.error) throw collectionsResult.error;
 
       const wardTopicLabel = t('topics.customTopics');
-      (wardTopicsResult.data ?? []).forEach((t) => {
-        results.push({
-          id: t.id,
-          title: t.title,
-          link: t.link,
-          collection: wardTopicLabel,
-          type: 'ward',
-        });
+      (wardTopicsResult.data ?? []).forEach((wt) => {
+        results.push({ id: wt.id, title: wt.title, link: wt.link, collection: wardTopicLabel, type: 'ward' });
       });
 
-      const activeCollectionIds = (activeConfigsResult.data ?? []).map((c) => c.collection_id);
-
-      if (activeCollectionIds.length > 0) {
-        // Round 2: general_collections and general_topics in parallel (ADR-033)
-        const [collectionsResult, generalTopicsResult] = await Promise.all([
-          supabase
-            .from('general_collections')
-            .select('*')
-            .in('id', activeCollectionIds),
-          supabase
-            .from('general_topics')
-            .select('*')
-            .in('collection_id', activeCollectionIds),
-        ]);
-
-        if (collectionsResult.error) throw collectionsResult.error;
-        if (generalTopicsResult.error) throw generalTopicsResult.error;
+      const collectionIds = (collectionsResult.data ?? []).map((c) => c.id);
+      if (collectionIds.length > 0) {
+        const { data: generalTopics, error: gtErr } = await supabase
+          .from('general_topics')
+          .select('*')
+          .in('collection_id', collectionIds);
+        if (gtErr) throw gtErr;
 
         const collectionMap = new Map<string, string>();
         (collectionsResult.data ?? []).forEach((c) => collectionMap.set(c.id, c.name));
 
-        (generalTopicsResult.data ?? []).forEach((t: GeneralTopic) => {
-          const collectionName = collectionMap.get(t.collection_id) ?? '';
+        (generalTopics ?? []).forEach((gt: GeneralTopic) => {
           results.push({
-            id: t.id,
-            title: t.title,
-            link: t.link,
-            collection: collectionName,
+            id: gt.id,
+            title: gt.title,
+            link: gt.link,
+            collection: collectionMap.get(gt.collection_id) ?? '',
             type: 'general',
           });
         });
       }
 
-      // Sort by "Collection : Title" concatenated string
-      results.sort((a, b) => {
-        const aKey = `${a.collection} : ${a.title}`;
-        const bKey = `${b.collection} : ${b.title}`;
-        return aKey.localeCompare(bKey, undefined, { sensitivity: 'base' });
-      });
-
+      results.sort(compareActiveTopics);
       return results;
     },
     enabled: !!wardId,

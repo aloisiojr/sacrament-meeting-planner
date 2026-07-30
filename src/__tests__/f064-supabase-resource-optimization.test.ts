@@ -494,7 +494,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
     return chain;
   }
 
-  it('AC-064-11: Round 1 runs ward_topics and ward_collection_config in parallel', async () => {
+  it('AC-064-11: Round 1 runs ward_topics and general_collections in parallel', async () => {
     const callOrder: string[] = [];
 
     mockFrom.mockImplementation((table: string) => {
@@ -505,7 +505,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
           error: null,
         });
       }
-      if (table === 'ward_collection_config') {
+      if (table === 'general_collections') {
         return createMockChain({ data: [], error: null });
       }
       return createMockChain({ data: null, error: null });
@@ -522,9 +522,10 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       expect(result.current.data).toBeDefined();
     });
 
-    // Both queries were made (proving Round 1 was executed)
+    // v2: no ward_collection_config; Round 1 = ward_topics + all general_collections.
     expect(callOrder).toContain('ward_topics');
-    expect(callOrder).toContain('ward_collection_config');
+    expect(callOrder).toContain('general_collections');
+    expect(callOrder).not.toContain('ward_collection_config');
   });
 
   it('AC-064-12: Round 2 runs general_collections and general_topics in parallel when active collections exist', async () => {
@@ -573,7 +574,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
     expect(callOrder).toContain('general_topics');
   });
 
-  it('EC-064-07: Round 2 skipped when no active collections', async () => {
+  it('EC-064-07: general_topics skipped when there are no collections for the language', async () => {
     const callOrder: string[] = [];
 
     mockFrom.mockImplementation((table: string) => {
@@ -584,8 +585,8 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
           error: null,
         });
       }
-      if (table === 'ward_collection_config') {
-        return createMockChain({ data: [], error: null }); // No active collections
+      if (table === 'general_collections') {
+        return createMockChain({ data: [], error: null }); // no libraries for this language
       }
       return createMockChain({ data: null, error: null });
     });
@@ -601,12 +602,12 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       expect(result.current.data).toBeDefined();
     });
 
-    // Round 2 should NOT be called
-    expect(callOrder).not.toContain('general_collections');
+    // Collections are always queried; general_topics is only fetched when collections exist.
+    expect(callOrder).toContain('general_collections');
     expect(callOrder).not.toContain('general_topics');
   });
 
-  it('AC-064-13: result set includes ward topics + general topics sorted by collection:title', async () => {
+  it('AC-064-13: result set includes ward topics (first) + general topics, per compareActiveTopics', async () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === 'ward_topics') {
         return createMockChain({
@@ -651,13 +652,13 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
     });
 
     const data = result.current.data!;
-    // AAA Collection : Beta Topic sorts before topics.wardTopics : Alpha Topic / Zebra Topic
-    expect(data[0].title).toBe('Beta Topic');
-    expect(data[0].type).toBe('general');
-    expect(data[1].title).toBe('Alpha Topic');
+    // v2 order: ward (custom) topics first, title-sorted, then general library topics.
+    expect(data[0].title).toBe('Alpha Topic');
+    expect(data[0].type).toBe('ward');
+    expect(data[1].title).toBe('Zebra Topic');
     expect(data[1].type).toBe('ward');
-    expect(data[2].title).toBe('Zebra Topic');
-    expect(data[2].type).toBe('ward');
+    expect(data[2].title).toBe('Beta Topic');
+    expect(data[2].type).toBe('general');
   });
 });
 

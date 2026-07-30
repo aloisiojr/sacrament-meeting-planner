@@ -39,7 +39,7 @@ describe('Database Types', () => {
   });
 
   describe('Permission type', () => {
-    it('should define exactly 26 permissions', () => {
+    it('should define exactly 27 permissions', () => {
       const permissions: Permission[] = [
         'speech:assign',
         'speech:unassign',
@@ -55,6 +55,7 @@ describe('Database Types', () => {
         'settings:access',
         'settings:language',
         'settings:whatsapp',
+        'settings:designations',
         'settings:timezone',
         'settings:users',
         'invite:manage',
@@ -68,7 +69,7 @@ describe('Database Types', () => {
         'invitation:create',
         'history:read',
       ];
-      expect(permissions).toHaveLength(26);
+      expect(permissions).toHaveLength(27);
     });
   });
 
@@ -146,6 +147,10 @@ describe('Database Types', () => {
         whatsapp_template_opening_prayer: null,
         whatsapp_template_closing_prayer: null,
         whatsapp_template_delegation_wrapper: null,
+        designation_template_sustain: null,
+        designation_template_release: null,
+        designation_template_priesthood: null,
+        designation_template_new_member: null,
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       };

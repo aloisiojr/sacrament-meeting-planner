@@ -22,6 +22,7 @@ export type Permission =
   | 'settings:access'
   | 'settings:language'
   | 'settings:whatsapp'
+  | 'settings:designations'
   | 'settings:timezone'
   | 'settings:users'
   | 'invite:manage'
@@ -88,6 +89,11 @@ export interface Ward {
   whatsapp_template_closing_prayer: string | null;
   // v2.0 — ward-level WhatsApp delegation wrapper (NULL => locale default).
   whatsapp_template_delegation_wrapper: string | null;
+  // v2.0 — per-ward designation read-text overrides (NULL/blank => locale default). See ADR 003.
+  designation_template_sustain: string | null;
+  designation_template_release: string | null;
+  designation_template_priesthood: string | null;
+  designation_template_new_member: string | null;
   created_at: string;
   updated_at: string;
 }

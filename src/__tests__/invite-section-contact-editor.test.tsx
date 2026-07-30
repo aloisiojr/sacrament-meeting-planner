@@ -44,6 +44,10 @@ const WARD = {
   whatsapp_template_speech_1: null, whatsapp_template_speech_2: null, whatsapp_template_speech_3: null,
   whatsapp_template_opening_prayer: null, whatsapp_template_closing_prayer: null,
   whatsapp_template_delegation_wrapper: null,
+  designation_template_sustain: null,
+  designation_template_release: null,
+  designation_template_priesthood: null,
+  designation_template_new_member: null,
 };
 
 let SPEECHES: Speech[] = [];

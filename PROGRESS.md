@@ -33,7 +33,10 @@
     - Step 2 ✅ `useWardDesignationTemplates` + override applied in the Play interstitial.
     - Step 3 ✅ Settings "Ward Business Templates" editor (prefill override/default, auto-save,
       restore-default, token hint) + index entry gated by the perm. 2013 tests green.
-    - **Next: verify-change (Spec 3), then GATE 3.** Migration 042 is ADDITIVE — apply to staging.
+    - **Spec 3 verified (APPROVED)** after a fix round (P1 prefill race + P2 blur-overwrite fixed;
+      AC8 hint test added). Migration 042 APPLIED to STAGING (4 designation_template_* columns).
+  - **v2 Supports & Releases feature COMPLETE across all 3 specs** (entry + Play interstitial +
+    Settings templates). 2017 tests green. Nothing merged to main; prod at v2 cutover (ADR 001).
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

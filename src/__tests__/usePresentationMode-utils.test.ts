@@ -153,6 +153,22 @@ describe('buildPresentationCards', () => {
     expect(cards).toHaveLength(3);
   });
 
+  it('orders the designations bullet list release → sustain → new_member (AC9)', () => {
+    const agenda = makeAgenda({
+      designations: [
+        { type: 'new_member', person_name: 'Newton', member_id: null, calling: null, office: null },
+        { type: 'sustain', person_name: 'Sam', member_id: null, calling: 'EQ', office: null },
+        { type: 'release', person_name: 'Rex', member_id: null, calling: 'RS', office: null },
+      ],
+    });
+    const cards = buildPresentationCards(agenda, [], null, mockHymnLookup, mockT);
+    const field = cards[1].fields.find((f) => f.label === 'agenda.wardBusiness');
+    expect(field).toBeDefined();
+    const value = field!.value;
+    expect(value.indexOf('Rex')).toBeLessThan(value.indexOf('Sam'));
+    expect(value.indexOf('Sam')).toBeLessThan(value.indexOf('Newton'));
+  });
+
   it('includes speaker names in normal meeting cards', () => {
     const agenda = makeAgenda();
     const speeches = [makeSpeech(1), makeSpeech(2), makeSpeech(3)];

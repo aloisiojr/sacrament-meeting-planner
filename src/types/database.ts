@@ -182,6 +182,21 @@ export interface Hymn {
   is_sacramental: boolean;
 }
 
+// --- Supports & Releases (Apoios e Desobrigações) ---
+
+// v2.0 — structured designation entry stored on the agenda (replaces the old free-text
+// `sustaining_releasing`). All human-readable values are plain-text SNAPSHOTS, never FKs.
+export type DesignationType = 'sustain' | 'release' | 'priesthood' | 'new_member';
+export type PriesthoodOffice = 'deacon' | 'teacher' | 'priest';
+
+export interface Designation {
+  type: DesignationType;
+  person_name: string; // snapshot
+  member_id: string | null; // link (nullable) — enables the optional calling update
+  calling: string | null; // snapshot, for sustain/release
+  office: PriesthoodOffice | null; // for priesthood
+}
+
 export interface SundayAgenda {
   id: string;
   ward_id: string;
@@ -198,7 +213,8 @@ export interface SundayAgenda {
   opening_prayer_member_id: string | null;
   opening_prayer_name: string | null;
   // Designations & Sacrament
-  sustaining_releasing: string | null;
+  sustaining_releasing: string | null; // deprecated — replaced by `designations` (removed in step 5)
+  designations: Designation[]; // v2.0 — structured supports/releases
   has_baby_blessing: boolean;
   baby_blessing_names: string | null;
   has_baptism_confirmation: boolean;

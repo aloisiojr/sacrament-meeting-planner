@@ -12,7 +12,7 @@ import { useHymns, useSacramentalHymns, formatHymnDisplay } from './useHymns';
 import { useMembers, normalizeForSearch } from './useMembers';
 import { getCurrentLanguage } from '../i18n';
 import { toISODateString } from '../lib/dateUtils';
-import { formatDesignationSummary } from '../lib/designations';
+import { formatDesignationSummary, orderDesignations } from '../lib/designations';
 import type { SundayAgenda, Speech, SundayException, Hymn, Member } from '../types/database';
 
 // --- Types ---
@@ -28,6 +28,8 @@ export interface PresentationField {
   type: 'text' | 'hymn' | 'multiline' | 'bullet_list';
   /** When true, this field shows a "text to read" icon opening the sacrament-prayer interstitial. */
   sacramentPrayer?: boolean;
+  /** When true, this field shows a "text to read" icon opening the designations interstitial. */
+  readText?: boolean;
 }
 
 export interface PresentationData {
@@ -160,8 +162,11 @@ export function buildPresentationCards(
   if (agenda?.designations && agenda.designations.length > 0) {
     designationFields.push({
       label: t('agenda.wardBusiness'),
-      value: agenda.designations.map((d) => formatDesignationSummary(d, t)).join('\n'),
+      value: orderDesignations(agenda.designations)
+        .map((d) => formatDesignationSummary(d, t))
+        .join('\n'),
       type: 'bullet_list',
+      readText: true,
     });
   }
   if (agenda?.has_baby_blessing && agenda?.baby_blessing_names) {

@@ -1,21 +1,24 @@
 /**
- * Behavioral tests for the Play/presentation sacrament-prayer interstitial (specs/v2-unified-cards.md
- * P2/P3). `react-native` is aliased to a test stub (vitest.config.ts); reanimated, icons, theme,
- * router and safe-area are mocked to lightweight seams. `react-i18next` is mocked with a real
- * dot-path lookup into the en-US locale JSON so we can assert the VERBATIM prayer strings.
+ * Behavioral tests for the Play/presentation designations interstitial (specs/v2-designations-play.md).
+ * `react-native` is aliased to a stub; reanimated, expo-blur, icons, theme, router, safe-area and the
+ * ward-name hook are mocked. `react-i18next` uses a real dot-path lookup into en-US so the VERBATIM
+ * read-text (with tokens substituted) can be asserted. The presentation data hook is stubbed so we
+ * can drive the designations list.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import enUS from '../i18n/locales/en-US.json';
 import PresentationScreen from '../app/presentation';
+import type { Designation } from '../types/database';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DATE = '2026-08-02';
 
-// dot-path lookup into the real locale JSON → exact translated strings.
+const state = vi.hoisted(() => ({ designations: [] as Designation[] }));
+
 function tLookup(key: string, fallback?: string): string {
   const parts = key.split('.');
   let cur: unknown = enUS;
@@ -32,7 +35,6 @@ function tLookup(key: string, fallback?: string): string {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, f?: string) => tLookup(k, f) }),
 }));
-
 vi.mock('react-native-reanimated', () => ({
   default: {
     View: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
@@ -42,14 +44,11 @@ vi.mock('react-native-reanimated', () => ({
   SlideOutUp: {},
   LinearTransition: { duration: () => ({}) },
 }));
-
 vi.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
     React.createElement('BlurView', p, p.children),
 }));
-
-vi.mock('../hooks/useWard', () => ({ useWardName: () => 'Test Ward' }));
-
+vi.mock('../hooks/useWard', () => ({ useWardName: () => 'Jardim' }));
 vi.mock('../components/icons', () => ({
   PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),
   XIcon: (p: Record<string, unknown>) => React.createElement('XIcon', p),
@@ -57,7 +56,6 @@ vi.mock('../components/icons', () => ({
   ChevronDownIcon: (p: Record<string, unknown>) => React.createElement('ChevronDownIcon', p),
   ChevronUpIcon: (p: Record<string, unknown>) => React.createElement('ChevronUpIcon', p),
 }));
-
 vi.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
@@ -67,26 +65,20 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-
 vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: (p: { children?: React.ReactNode }) =>
-    React.createElement('SafeAreaView', {}, p.children),
+  SafeAreaView: (p: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, p.children),
 }));
-
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useLocalSearchParams: () => ({ date: DATE }),
 }));
-
 vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
-
-// Partial mock: keep buildPresentationCards / getTodaySundayDate real, stub the data hook.
 vi.mock('../hooks/usePresentationMode', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     usePresentationData: () => ({
-      agenda: { sacrament_hymn_id: null, has_second_speech: true },
+      agenda: { sacrament_hymn_id: null, has_second_speech: true, designations: state.designations },
       speeches: [],
       exception: null,
       isSpecial: false,
@@ -105,100 +97,59 @@ function render() {
   });
   return renderer;
 }
-
-// Collect all string leaves in the rendered tree, concatenated per Text node.
 function allText(renderer: TestRenderer.ReactTestRenderer): string {
   const out: string[] = [];
   const walk = (node: unknown): void => {
-    if (typeof node === 'string') {
-      out.push(node);
-    } else if (Array.isArray(node)) {
-      node.forEach(walk);
-    } else if (node && typeof node === 'object' && 'children' in (node as Record<string, unknown>)) {
+    if (typeof node === 'string') out.push(node);
+    else if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object' && 'children' in (node as Record<string, unknown>))
       walk((node as { children: unknown }).children);
-    }
   };
   walk(renderer.toJSON() as unknown);
   return out.join('|');
 }
-
 function findByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string) {
   return renderer.root.findAll((n) => n.props?.testID === testID);
 }
-
 function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
-  const target = findByTestID(renderer, testID)[0];
-  (target.props.onPress as () => void)();
+  (findByTestID(renderer, testID)[0].props.onPress as () => void)();
 }
-
-// AccordionCard renders only the expanded card's body. The Sacrament Hymn field lives in the
-// second card (Designations & Sacrament), so expand it before asserting on its content.
 function expandCard(renderer: TestRenderer.ReactTestRenderer, index: number): void {
-  // The RN stub renders each primitive as a function component wrapping a same-named host element,
-  // so every header appears twice; keep only the component instances (non-string type) to index.
   const headers = renderer.root.findAll(
     (n) =>
       typeof n.type !== 'string' &&
-      typeof (n.props?.accessibilityState as { expanded?: boolean } | undefined)?.expanded ===
-        'boolean'
+      typeof (n.props?.accessibilityState as { expanded?: boolean } | undefined)?.expanded === 'boolean'
   );
   (headers[index].props.onPress as () => void)();
 }
 
 beforeEach(() => {
+  state.designations = [
+    { type: 'sustain', person_name: 'John Doe', member_id: 'm1', calling: 'Elders Quorum President', office: null },
+  ];
   vi.clearAllMocks();
 });
 
-describe('Sacrament-prayer interstitial (P2/P3)', () => {
-  it('renders the "text to read" icon on the Sacrament Hymn row', () => {
+describe('Designations interstitial (Play)', () => {
+  it('renders the "text to read" icon when there are designations (AC1), hidden until tapped', () => {
     const r = render();
     act(() => { expandCard(r, 1); });
-    const buttons = findByTestID(r, 'sacrament-prayer-icon-button');
-    // Doubled by the RN stub (component + host); at least one is present.
-    expect(buttons.length).toBeGreaterThan(0);
-    // The interstitial is not shown until the icon is tapped.
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
+    expect(findByTestID(r, 'designations-read-icon-button').length).toBeGreaterThan(0);
+    expect(findByTestID(r, 'designation-read-panel').length).toBe(0);
   });
 
-  it('tapping the icon shows the interstitial with the exact bread + water prayers', () => {
+  it('tapping the icon opens the interstitial with the substituted verbatim text (AC2/AC3)', () => {
     const r = render();
     act(() => { expandCard(r, 1); });
-    act(() => {
-      press(r, 'sacrament-prayer-icon-button');
-    });
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
-
-    const text = allText(r);
-    expect(text).toContain(enUS.presentation.sacramentPrayerBread);
-    expect(text).toContain(enUS.presentation.sacramentPrayerWater);
-    expect(text).toContain(enUS.presentation.sacramentPrayerTitle);
-    expect(text).toContain(enUS.presentation.sacramentPrayerBreadLabel);
-    expect(text).toContain(enUS.presentation.sacramentPrayerWaterLabel);
+    act(() => { press(r, 'designations-read-icon-button'); });
+    expect(findByTestID(r, 'designation-read-panel').length).toBeGreaterThan(0);
+    expect(allText(r)).toContain('John Doe has been called as Elders Quorum President');
   });
 
-  it('closing via the X button hides the interstitial', () => {
+  it('shows no icon when there are no designations (AC8)', () => {
+    state.designations = [];
     const r = render();
     act(() => { expandCard(r, 1); });
-    act(() => {
-      press(r, 'sacrament-prayer-icon-button');
-    });
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
-    act(() => {
-      press(r, 'sacrament-prayer-close-button');
-    });
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
-  });
-
-  it('tapping the backdrop (outside the panel) hides the interstitial', () => {
-    const r = render();
-    act(() => { expandCard(r, 1); });
-    act(() => {
-      press(r, 'sacrament-prayer-icon-button');
-    });
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
-    act(() => {
-      press(r, 'sacrament-prayer-backdrop');
-    });
-    expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
+    expect(findByTestID(r, 'designations-read-icon-button').length).toBe(0);
   });
 });

@@ -24,6 +24,8 @@ import {
 } from '../hooks/usePresentationMode';
 import { AccordionCard } from '../components/AccordionCard';
 import { SacramentPrayerModal } from '../components/SacramentPrayerModal';
+import { DesignationReadModal } from '../components/DesignationReadModal';
+import { useWardName } from '../hooks/useWard';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import { PencilIcon, XIcon, ScrollTextIcon } from '../components/icons';
@@ -43,9 +45,13 @@ export default function PresentationScreen() {
   const [fontSizeMode, setFontSizeMode] = useState<'normal' | 'large'>('normal');
   const fontSizes = FONT_SIZES[fontSizeMode];
   const [prayerModalVisible, setPrayerModalVisible] = useState(false);
+  const [designationsModalVisible, setDesignationsModalVisible] = useState(false);
 
   const openPrayerModal = useCallback(() => setPrayerModalVisible(true), []);
   const closePrayerModal = useCallback(() => setPrayerModalVisible(false), []);
+  const openDesignationsModal = useCallback(() => setDesignationsModalVisible(true), []);
+  const closeDesignationsModal = useCallback(() => setDesignationsModalVisible(false), []);
+  const wardName = useWardName();
 
   const sundayDate = params.date ?? getTodaySundayDate();
   const dateLabel = useMemo(
@@ -84,12 +90,13 @@ export default function PresentationScreen() {
                 colors={colors}
                 fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
                 onPrayerPress={openPrayerModal}
+                onDesignationsPress={openDesignationsModal}
               />
             ))}
           </View>
         ),
       })),
-    [cards, colors, fontSizes, openPrayerModal]
+    [cards, colors, fontSizes, openPrayerModal, openDesignationsModal]
   );
 
   return (
@@ -154,6 +161,14 @@ export default function PresentationScreen() {
         onClose={closePrayerModal}
         fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
       />
+
+      <DesignationReadModal
+        visible={designationsModalVisible}
+        onClose={closeDesignationsModal}
+        designations={agenda?.designations ?? []}
+        wardName={wardName ?? undefined}
+        fontSizes={{ label: fontSizes.fieldLabel, value: fontSizes.fieldValue }}
+      />
     </SafeAreaView>
   );
 }
@@ -165,11 +180,13 @@ function PresentationFieldRow({
   colors,
   fontSizes,
   onPrayerPress,
+  onDesignationsPress,
 }: {
   field: PresentationField;
   colors: ThemeColors;
   fontSizes?: { label: number; value: number };
   onPrayerPress?: () => void;
+  onDesignationsPress?: () => void;
 }) {
   if (field.type === 'bullet_list') {
     const bulletItems = (field.value || '')
@@ -191,9 +208,27 @@ function PresentationFieldRow({
 
     return (
       <View style={styles.fieldRow}>
-        <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
-          {field.label}
-        </Text>
+        {field.readText ? (
+          // Label row with the "text to read" icon (mirrors the sacrament-prayer row).
+          <View style={styles.bulletHeaderRow}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+              {field.label}
+            </Text>
+            <Pressable
+              testID="designations-read-icon-button"
+              style={[styles.prayerIconButton, { backgroundColor: colors.surfaceVariant }]}
+              onPress={onDesignationsPress}
+              accessibilityRole="button"
+              accessibilityLabel={field.label}
+            >
+              <ScrollTextIcon size={20} color={colors.text} />
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary, fontSize: fontSizes?.label ?? 12 }]}>
+            {field.label}
+          </Text>
+        )}
         {bulletItems.map((item: string, idx: number) => (
           <Text
             key={idx}
@@ -321,6 +356,11 @@ const styles = StyleSheet.create({
   prayerFieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  bulletHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   prayerFieldTextColumn: {
     flex: 1,

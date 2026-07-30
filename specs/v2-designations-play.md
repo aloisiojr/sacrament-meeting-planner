@@ -65,8 +65,11 @@ locale defaults here; making them editable in Settings is **Spec 3**.
   consistently; pt new_member "desejam"; en priesthood "ordained a"; es priesthood drops "de".
 
 ## Notes
-- **Placeholders:** canonical tokens `{name}` `{calling}` `{office}` `{ward}` (your decision). All
-  other brackets (stage directions, "[his or her]") stay literal.
+- **Placeholders:** shown/typed in the app language (refinement): pt `{nome}/{chamado}/{oficio}/{ala}`,
+  es `{nombre}/{llamamiento}/{oficio}/{barrio}`, en `{name}/{calling}/{office}/{ward}`. The default
+  templates + Settings hint use the display-language tokens; the substitution helper accepts every
+  locale's aliases so a ward override stays substitutable across languages. All other brackets
+  (stage directions, "[his or her]") stay literal.
 - **Permissions:** Play is view-only; no new permission.
 - **i18n:** add the read-text templates to pt-BR, en-US, es-LA (Appendix A).
 - **Offline:** pure client render from the already-loaded agenda + ward name; no new network on tap.

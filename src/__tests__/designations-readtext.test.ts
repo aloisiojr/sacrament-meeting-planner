@@ -58,6 +58,21 @@ describe('buildDesignationReadText', () => {
     expect(out).toBe('Apoiamos João Silva como EQ.');
   });
 
+  it('substitutes localized token aliases (pt {nome}/{chamado}, es {nombre}, {ala}/{barrio})', () => {
+    const sustainPt: Designation = { ...base, type: 'sustain', calling: 'EQ' };
+    expect(
+      buildDesignationReadText(sustainPt, { template: '{nome} como {chamado}' }, t)
+    ).toBe('João Silva como EQ');
+
+    const nm: Designation = { ...base, type: 'new_member', person_name: 'Ana' };
+    expect(
+      buildDesignationReadText(nm, { wardName: 'Jardim', template: '{nombre} da {ala} / {barrio}' }, t)
+    ).toBe('Ana da Jardim / Jardim');
+
+    const pr: Designation = { ...base, type: 'priesthood', office: 'deacon' };
+    expect(buildDesignationReadText(pr, { template: 'ordenado {oficio}' }, t)).toBe('ordenado Diácono');
+  });
+
   it('leaves no token unresolved and preserves literal brackets', () => {
     const item: Designation = { ...base, type: 'sustain', calling: 'EQ' };
     const out = buildDesignationReadText(item, {}, t);

@@ -78,17 +78,34 @@ export function formatDesignationSummary(item: Designation, t: Translate): strin
  * default `agenda.designations.readText.<type>`) and substitutes the four canonical tokens.
  * Everything else in the template is kept verbatim (incl. literal stage directions).
  */
+// Placeholder tokens are shown/typed in the app language, so each field accepts its localized
+// aliases across the 3 supported locales. Substitution replaces any of them, which also keeps a
+// ward override readable even if the display language later differs from the one it was typed in.
+const TOKEN_ALIASES: Record<'name' | 'calling' | 'office' | 'ward', readonly string[]> = {
+  name: ['name', 'nome', 'nombre'],
+  calling: ['calling', 'chamado', 'llamamiento'],
+  office: ['office', 'oficio'],
+  ward: ['ward', 'ala', 'barrio'],
+};
+
 export function buildDesignationReadText(
   item: Designation,
   opts: { wardName?: string; template?: string },
   t: Translate
 ): string {
   const template = opts.template ?? t(`agenda.designations.readText.${item.type}`);
-  const office = item.office ? priesthoodOfficeLabel(item.office, t) : '';
-  const sub = (s: string, token: string, value: string) => s.split(token).join(value);
-  let out = sub(template, '{name}', item.person_name);
-  out = sub(out, '{calling}', item.calling ?? '');
-  out = sub(out, '{office}', office);
-  out = sub(out, '{ward}', opts.wardName ?? '');
+  const values: Record<'name' | 'calling' | 'office' | 'ward', string> = {
+    name: item.person_name,
+    calling: item.calling ?? '',
+    office: item.office ? priesthoodOfficeLabel(item.office, t) : '',
+    ward: opts.wardName ?? '',
+  };
+
+  let out = template;
+  for (const field of ['name', 'calling', 'office', 'ward'] as const) {
+    for (const alias of TOKEN_ALIASES[field]) {
+      out = out.split(`{${alias}}`).join(values[field]);
+    }
+  }
   return out;
 }

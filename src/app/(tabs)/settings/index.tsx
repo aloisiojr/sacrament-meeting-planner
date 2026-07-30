@@ -18,7 +18,7 @@ import type { SupportedLanguage } from '../../../i18n';
 import { topicKeys } from '../../../hooks/useTopics';
 import { useWardManagePrayers, wardKeys } from '../../../hooks/useSpeeches';
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
-import { ChevronRightIcon, CheckIcon } from '../../../components/icons';
+import { ChevronRightIcon, ChevronDownIcon, CheckIcon } from '../../../components/icons';
 
 interface SettingsItemProps {
   label: string;
@@ -56,6 +56,7 @@ export default function SettingsScreen() {
   const queryClient = useQueryClient();
   const [appLanguageModalVisible, setAppLanguageModalVisible] = useState(false);
   const [wardLanguageModalVisible, setWardLanguageModalVisible] = useState(false);
+  const [textTemplatesExpanded, setTextTemplatesExpanded] = useState(false);
 
   const isObserver = role === 'observer';
   const currentAppLanguage = getCurrentLanguage();
@@ -248,20 +249,47 @@ export default function SettingsScreen() {
                   colors={colors}
                 />
               )}
-              {hasPermission('settings:whatsapp') && (
-                <SettingsItem
-                  label={t('settings.whatsappTemplate')}
-                  onPress={() => router.push('/(tabs)/settings/whatsapp')}
-                  colors={colors}
-                />
-              )}
-              {hasPermission('settings:designations') && (
-                <SettingsItem
-                  label={t('settings.designationsTemplate')}
-                  onPress={() => router.push('/(tabs)/settings/designations')}
-                  colors={colors}
-                  testID="settings-designations-item"
-                />
+              {(hasPermission('settings:whatsapp') || hasPermission('settings:designations')) && (
+                <>
+                  <Pressable
+                    style={[styles.item, { borderBottomColor: colors.divider }]}
+                    onPress={() => setTextTemplatesExpanded((v) => !v)}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: textTemplatesExpanded }}
+                    testID="settings-text-templates-group"
+                  >
+                    <Text style={[styles.itemText, { color: colors.text }]}>
+                      {t('settings.textTemplates')}
+                    </Text>
+                    <View style={styles.itemRight}>
+                      {textTemplatesExpanded ? (
+                        <ChevronDownIcon size={18} color={colors.textSecondary} />
+                      ) : (
+                        <ChevronRightIcon size={18} color={colors.textSecondary} />
+                      )}
+                    </View>
+                  </Pressable>
+                  {textTemplatesExpanded && hasPermission('settings:whatsapp') && (
+                    <View style={styles.subItem}>
+                      <SettingsItem
+                        label={t('settings.whatsappTemplate')}
+                        onPress={() => router.push('/(tabs)/settings/whatsapp')}
+                        colors={colors}
+                        testID="settings-whatsapp-item"
+                      />
+                    </View>
+                  )}
+                  {textTemplatesExpanded && hasPermission('settings:designations') && (
+                    <View style={styles.subItem}>
+                      <SettingsItem
+                        label={t('settings.designationsTemplate')}
+                        onPress={() => router.push('/(tabs)/settings/designations')}
+                        colors={colors}
+                        testID="settings-designations-item"
+                      />
+                    </View>
+                  )}
+                </>
               )}
               {hasPermission('settings:language') && (
                 <Pressable
@@ -464,6 +492,9 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
+  },
+  subItem: {
+    paddingLeft: 16,
   },
   itemRight: {
     flexDirection: 'row',

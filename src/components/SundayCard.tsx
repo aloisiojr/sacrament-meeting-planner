@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
   Alert,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -298,7 +299,11 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View
+            style={[styles.modalContent, { backgroundColor: colors.card }]}
+            onStartShouldSetResponder={() => true}
+            {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+          >
             <FlatList
               data={SUNDAY_TYPE_OPTIONS as unknown as SundayTypeOption[]}
               keyExtractor={(item) => item}
@@ -340,6 +345,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
           <View
             style={[styles.otherModalContent, { backgroundColor: colors.card }]}
             onStartShouldSetResponder={() => true}
+            {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
           >
             <Text style={[styles.otherModalTitle, { color: colors.text }]}>
               {t('sundayExceptions.other')}

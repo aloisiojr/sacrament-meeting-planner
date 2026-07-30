@@ -189,6 +189,12 @@ export default function SettingsScreen() {
               {t('settings.wardSettingsGroup')}
             </Text>
             <View style={[styles.section, { backgroundColor: colors.card }]}>
+              <SettingsItem
+                label={t('settings.wardInfo')}
+                onPress={() => router.push('/(tabs)/settings/ward')}
+                colors={colors}
+                testID="settings-ward-button"
+              />
               {hasPermission('member:read') && (
                 <SettingsItem
                   label={t('settings.members')}

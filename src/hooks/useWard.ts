@@ -34,6 +34,55 @@ export function useWardName(): string | null {
   return data ?? null;
 }
 
+export interface WardInfo {
+  name: string;
+  stake_name: string;
+}
+
+/**
+ * Fetch the current ward's editable identity (ward name + stake name). Shares the ['ward', wardId]
+ * key namespace so an edit via useUpdateWardInfo refreshes useWardName too.
+ */
+export function useWardInfo() {
+  const { wardId } = useAuth();
+
+  return useQuery({
+    queryKey: ['ward', wardId, 'info'],
+    queryFn: async (): Promise<WardInfo> => {
+      const { data, error } = await supabase
+        .from('wards')
+        .select('name, stake_name')
+        .eq('id', wardId)
+        .single();
+      if (error) throw error;
+      return { name: data?.name ?? '', stake_name: data?.stake_name ?? '' };
+    },
+    enabled: !!wardId,
+  });
+}
+
+/**
+ * Update the ward name and/or stake name. RLS gates this on can_write() + own ward (migration 044).
+ */
+export function useUpdateWardInfo() {
+  const { wardId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: Partial<WardInfo>) => {
+      const { error } = await supabase
+        .from('wards')
+        .update(input)
+        .eq('id', wardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // Refresh every ['ward', wardId, ...] query (name, info) so Home + Settings reflect the change.
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+    },
+  });
+}
+
 export type DesignationTemplates = Partial<Record<DesignationType, string | null>>;
 
 /**

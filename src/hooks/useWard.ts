@@ -2,10 +2,17 @@
  * Ward-level lookups. `useWardName` fetches the current ward's display name (used e.g. to fill the
  * {ward} token in designation read-texts). Cached via React Query like the other ward hooks.
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { DesignationType } from '../types/database';
+
+const DESIGNATION_TEMPLATE_COLUMN: Record<DesignationType, string> = {
+  sustain: 'designation_template_sustain',
+  release: 'designation_template_release',
+  priesthood: 'designation_template_priesthood',
+  new_member: 'designation_template_new_member',
+};
 
 export function useWardName(): string | null {
   const { wardId } = useAuth();
@@ -58,4 +65,28 @@ export function useWardDesignationTemplates(): DesignationTemplates {
   });
 
   return data ?? {};
+}
+
+/**
+ * Save (or clear, with value=null) a per-ward designation template override. Invalidates both the
+ * templates query (Play) and the general ward query so edits are reflected immediately.
+ */
+export function useUpdateWardDesignationTemplate() {
+  const { wardId } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ type, value }: { type: DesignationType; value: string | null }) => {
+      const column = DESIGNATION_TEMPLATE_COLUMN[type];
+      const { error } = await supabase
+        .from('wards')
+        .update({ [column]: value })
+        .eq('id', wardId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId, 'designationTemplates'] });
+      queryClient.invalidateQueries({ queryKey: ['ward', wardId] });
+    },
+  });
 }

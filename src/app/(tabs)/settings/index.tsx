@@ -255,6 +255,14 @@ export default function SettingsScreen() {
                   colors={colors}
                 />
               )}
+              {hasPermission('settings:designations') && (
+                <SettingsItem
+                  label={t('settings.designationsTemplate')}
+                  onPress={() => router.push('/(tabs)/settings/designations')}
+                  colors={colors}
+                  testID="settings-designations-item"
+                />
+              )}
               {hasPermission('settings:language') && (
                 <Pressable
                   style={[styles.item, { borderBottomColor: colors.divider }]}

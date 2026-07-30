@@ -175,28 +175,43 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
+        {/* Top bar: Cancel (left) + centered title (mirrors PeoplePicker). */}
+        <View style={[styles.topBar, { borderBottomColor: colors.divider }]}>
+          <Pressable testID="topic-selector-close-button" onPress={handleClose} style={styles.topBarBtn}>
+            <Text style={[styles.topBarBtnText, { color: colors.primary }]}>{t('common.cancel')}</Text>
+          </Pressable>
+          <Text
+            testID="topic-selector-title"
+            style={[styles.title, { color: colors.text }]}
+            numberOfLines={1}
+          >
+            {t('topics.pickerTitle')}
+          </Text>
+          <View style={styles.topBarBtn} />
+        </View>
+
+        {/* Search + "+ Adicionar" button (topic:write only). */}
+        <View style={styles.searchRow}>
           <SearchInput
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder={t('speeches.selectTopic')}
+            placeholder={t('common.search')}
             autoFocus
             testID="topic-selector-search-input"
           />
           {canManage && (
             <Pressable
-              style={[styles.addButton, { backgroundColor: colors.surfaceVariant }]}
+              style={[styles.addBtn, { backgroundColor: colors.primary }]}
               onPress={startAdd}
+              hitSlop={8}
               accessibilityLabel={t('topics.addTopic')}
               testID="topic-add-button"
             >
-              <PlusIcon size={20} color={colors.primary} />
+              <PlusIcon size={18} color={colors.onPrimary} />
+              <Text style={[styles.addBtnText, { color: colors.onPrimary }]}>{t('topics.add')}</Text>
             </Pressable>
           )}
-          <Pressable style={styles.closeButton} onPress={handleClose} testID="topic-selector-close-button">
-            <Text style={[styles.closeText, { color: colors.primary }]}>{t('common.close')}</Text>
-          </Pressable>
         </View>
 
         <FlatList
@@ -242,17 +257,35 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60 },
-  header: {
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  topBarBtn: { paddingVertical: 8, minWidth: 72 },
+  topBarBtnText: { fontSize: 16 },
+  title: { flex: 1, fontSize: 19, fontWeight: '600', textAlign: 'center' },
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 20,
     gap: 12,
   },
   searchInput: { flex: 1, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontSize: 15 },
-  addButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  closeButton: { paddingVertical: 8 },
-  closeText: { fontSize: 16, fontWeight: '500' },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 40,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  addBtnText: { fontSize: 14, fontWeight: '600' },
   topicItem: {
     flexDirection: 'row',
     alignItems: 'center',

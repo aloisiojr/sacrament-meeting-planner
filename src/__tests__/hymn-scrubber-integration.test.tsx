@@ -149,12 +149,15 @@ describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
     expect(railOf(r)).toBeTruthy();
   });
 
-  it('scrolls to the first hymn >= the touched anchor using fixed row height (AC2)', () => {
+  it('tapping an anchor scrolls to the first hymn >= it, using fixed row height (AC2/AC3)', () => {
     const r = renderAndOpenHymnModal();
-    const rail = railOf(r);
-    act(() => rail.props.onLayout({ nativeEvent: { layout: { height: 100 } } }));
-    // Bottom of the rail -> top anchor (180) -> clamp to last hymn (index 2) -> offset 2*44.
-    act(() => rail.props.onPanResponderGrant({ nativeEvent: { locationY: 100 } }));
+    // hymns 1/50/174 → decades {0,50,170} → anchors [1,50,170].
+    const anchor = r.root.findAll(
+      (n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-anchor-170'
+    )[0] as any;
+    expect(anchor).toBeTruthy();
+    act(() => anchor.props.onPress());
+    // first hymn >= 170 is 174 at index 2 → offset 2*44.
     expect(H.scrollToOffset).toHaveBeenLastCalledWith({ offset: 88, animated: false });
   });
 

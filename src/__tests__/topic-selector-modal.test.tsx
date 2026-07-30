@@ -160,4 +160,25 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     expect(nodes(r, 'topic-add-button').length).toBe(0);
     expect(nodes(r, 'topic-edit-w1').length).toBe(0);
   });
+
+  // item 1 — header consistent with the people selector: Cancel + title, then search + "+ Adicionar".
+  it('renders a Cancel button, a centered title, and the add button (item1 AC1.1/AC1.2)', () => {
+    const { r } = render();
+    expect(nodes(r, 'topic-selector-close-button').length).toBe(1); // Cancel (left)
+    const title = nodes(r, 'topic-selector-title')[0];
+    expect(String(title.props.children)).toBe('topics.pickerTitle');
+    expect(nodes(r, 'topic-add-button').length).toBe(1); // "+ Adicionar" (topic:write)
+  });
+
+  it('Cancel calls onClose (item1 AC1.3)', () => {
+    const onClose = vi.fn();
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      r = TestRenderer.create(
+        React.createElement(TopicSelectorModal, { visible: true, onSelect: vi.fn(), onClose })
+      );
+    });
+    act(() => (nodes(r, 'topic-selector-close-button')[0].props.onPress as () => void)());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

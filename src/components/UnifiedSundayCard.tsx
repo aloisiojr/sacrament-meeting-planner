@@ -319,11 +319,36 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
             >
               <View style={styles.block2Names}>
                 {isTestimony ? (
-                  <>
-                    {managePrayers && nameRows[0] && renderNameRow(nameRows[0])}
-                    {hideStatusBlock && testimonyLine}
-                    {managePrayers && nameRows[1] && renderNameRow(nameRows[1])}
-                  </>
+                  hideStatusBlock ? (
+                    // Home "próximos domingos" testimony card: label first, then prayers (or an
+                    // empty-prayers row when none are assigned) — only when prayers are managed.
+                    <>
+                      {testimonyLine}
+                      {managePrayers &&
+                        (allUnassigned ? (
+                          <View style={styles.nameRow} testID="unified-prayers-empty">
+                            <StatusLED status="not_assigned" size={12} />
+                            <Text
+                              style={[styles.nameText, { color: colors.textSecondary, fontStyle: 'italic' }]}
+                              numberOfLines={1}
+                            >
+                              {t('agenda.noPrayersInvited')}
+                            </Text>
+                          </View>
+                        ) : (
+                          <>
+                            {nameRows[0] && renderNameRow(nameRows[0])}
+                            {nameRows[1] && renderNameRow(nameRows[1])}
+                          </>
+                        ))}
+                    </>
+                  ) : (
+                    // Meetings-tab testimony card: prayer rows only (testimony label lives in Block 1).
+                    <>
+                      {managePrayers && nameRows[0] && renderNameRow(nameRows[0])}
+                      {managePrayers && nameRows[1] && renderNameRow(nameRows[1])}
+                    </>
+                  )
                 ) : allUnassigned ? (
                   <View style={styles.nameRow} testID="unified-empty-row">
                     <StatusLED status="not_assigned" size={12} />

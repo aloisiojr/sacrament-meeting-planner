@@ -15,8 +15,6 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
-  Dimensions,
-  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -34,7 +32,7 @@ import { DesignationListField } from './DesignationListField';
 import { PeoplePicker, type PeopleCapability } from './PeoplePicker';
 import { SearchInput } from './SearchInput';
 import { HymnScrubberRail, HYMN_RAIL_WIDTH } from './HymnScrubberRail';
-import { buildHymnAnchors, maxHymnNumber, minHymnNumber, firstIndexAtOrAbove } from '../lib/hymnScrubber';
+import { buildHymnAnchors, firstIndexAtOrAbove } from '../lib/hymnScrubber';
 import { XIcon, PencilIcon } from './icons';
 import { resolveContactSnapshot } from '../lib/contact';
 import { buildFullPhone } from '../lib/phone';
@@ -875,7 +873,6 @@ function ToggleField({
 
 // --- Inline Selector Modals ---
 
-const HYMN_SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.67);
 const HYMN_ITEM_HEIGHT = 44;
 
 function HymnSelectorModal({
@@ -901,7 +898,7 @@ function HymnSelectorModal({
 
   // Rail is hidden while searching (positions no longer map to numbers) and for short lists.
   const anchors = useMemo(
-    () => (search.trim() ? [] : buildHymnAnchors(minHymnNumber(hymns), maxHymnNumber(hymns))),
+    () => (search.trim() ? [] : buildHymnAnchors(hymns.map((h) => h.number))),
     [hymns, search]
   );
 
@@ -914,33 +911,31 @@ function HymnSelectorModal({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.bottomSheetOverlay} onPress={onClose}>
-        <View
-          style={[styles.bottomSheet, { backgroundColor: colors.card }]}
-          onStartShouldSetResponder={() => true}
-          {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
-        >
-          {/* Handle bar */}
-          <View style={styles.sheetHandleBar}>
-            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-          </View>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={[styles.hymnScreen, { backgroundColor: colors.background }]}>
+        {/* Top bar: Cancel (left) + centered title (mirrors the other selectors). */}
+        <View style={[styles.hymnTopBar, { borderBottomColor: colors.divider }]}>
+          <Pressable testID="hymn-selector-close-button" onPress={onClose} style={styles.hymnTopBarBtn}>
+            <Text style={[styles.hymnTopBarText, { color: colors.primary }]}>{t('common.cancel')}</Text>
+          </Pressable>
+          <Text style={[styles.hymnTitle, { color: colors.text }]} numberOfLines={1}>
+            {t('agenda.hymnPickerTitle')}
+          </Text>
+          <View style={styles.hymnTopBarBtn} />
+        </View>
 
-          {/* Search */}
-          <View style={styles.sheetSearchRow}>
-            <SearchInput
-              testID="hymn-selector-search-input"
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder={t('common.search')}
-            />
-            <Pressable testID="hymn-selector-close-button" onPress={onClose} style={styles.sheetCloseBtn}>
-              <Text style={[styles.sheetCloseText, { color: colors.primary }]}>{t('common.close')}</Text>
-            </Pressable>
-          </View>
+        {/* Search */}
+        <View style={styles.hymnSearchRow}>
+          <SearchInput
+            testID="hymn-selector-search-input"
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('common.search')}
+          />
+        </View>
 
-          <View style={styles.hymnListWrap}>
+        <View style={styles.hymnListWrap}>
             <FlatList
               ref={listRef}
               style={styles.hymnList}
@@ -980,7 +975,6 @@ function HymnSelectorModal({
             )}
           </View>
         </View>
-      </Pressable>
     </Modal>
   );
 }
@@ -1050,39 +1044,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
-  bottomSheetOverlay: {
+  hymnScreen: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
+    paddingTop: 60,
   },
-  bottomSheet: {
-    height: HYMN_SHEET_HEIGHT,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden',
-  },
-  sheetHandleBar: {
+  hymnTopBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  sheetSearchRow: {
+  hymnTopBarBtn: { paddingVertical: 8, minWidth: 72 },
+  hymnTopBarText: { fontSize: 16 },
+  hymnTitle: { flex: 1, fontSize: 19, fontWeight: '600', textAlign: 'center' },
+  hymnSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 12,
-  },
-  sheetCloseBtn: {
-    paddingVertical: 8,
-  },
-  sheetCloseText: {
-    fontSize: 16,
-    fontWeight: '500',
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   hymnListWrap: {
     flex: 1,

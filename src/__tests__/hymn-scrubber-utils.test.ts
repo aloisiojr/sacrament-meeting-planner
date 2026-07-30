@@ -1,14 +1,9 @@
 /**
- * Unit tests for the hymn scrubber pure helpers (specs/v2-hymn-scrubber.md).
+ * Unit tests for the hymn scrubber pure helpers
+ * (specs/v2-hymn-scrubber.md, specs/v2-selectors-and-testimony.md).
  */
 import { describe, it, expect } from 'vitest';
-import {
-  buildHymnAnchors,
-  maxHymnNumber,
-  minHymnNumber,
-  firstIndexAtOrAbove,
-  anchorForFraction,
-} from '../lib/hymnScrubber';
+import { buildHymnAnchors, firstIndexAtOrAbove, anchorForFraction } from '../lib/hymnScrubber';
 import type { Hymn } from '../types/database';
 
 const hymn = (number: number): Hymn => ({
@@ -20,78 +15,45 @@ const hymn = (number: number): Hymn => ({
 });
 
 describe('buildHymnAnchors', () => {
-  it('returns [1, 10, 20, …, ceil(max/10)*10] for a full hymnal starting at 1 (AC1)', () => {
-    expect(buildHymnAnchors(1, 174)).toEqual([1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]);
+  it('returns one anchor per populated decade, decade 0 shown as 1, sorted (AC3.2)', () => {
+    expect(buildHymnAnchors([3, 15, 25])).toEqual([1, 10, 20]);
   });
 
-  it('rounds the cap up to the next 10', () => {
-    expect(buildHymnAnchors(1, 191)).toEqual([1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200]);
+  it('skips empty decades across a 204→1001 gap (the reported bug)', () => {
+    // decades: 180,190,200,1000,1010 — nothing in 210..990.
+    expect(buildHymnAnchors([184, 192, 200, 1001, 1010])).toEqual([180, 190, 200, 1000, 1010]);
   });
 
-  it('spans the actual range for a high-numbered subset (sacramental ~169–196) (D1)', () => {
-    expect(buildHymnAnchors(169, 196)).toEqual([160, 170, 180, 190, 200]);
+  it('dedupes and sorts regardless of input order', () => {
+    expect(buildHymnAnchors([25, 24, 11, 10, 5])).toEqual([1, 10, 20]);
   });
 
-  it('starts at the low decade for a mid-range subset', () => {
-    expect(buildHymnAnchors(22, 50)).toEqual([20, 30, 40, 50]);
+  it('returns [] with fewer than 3 populated decades (AC3.5)', () => {
+    expect(buildHymnAnchors([3, 15])).toEqual([]); // decades 0,10
+    expect(buildHymnAnchors([100, 105])).toEqual([]); // decade 100 only
+    expect(buildHymnAnchors([])).toEqual([]);
   });
 
-  it('keeps the leading "1" when the list starts below 10', () => {
-    expect(buildHymnAnchors(3, 40)).toEqual([1, 10, 20, 30, 40]);
-  });
-
-  it('includes exactly [1,10,20] at the minimum threshold (max = 20, min near 1)', () => {
-    expect(buildHymnAnchors(1, 20)).toEqual([1, 10, 20]);
-  });
-
-  it('returns [] when the list is too short to warrant a rail (max < 20) (AC6)', () => {
-    expect(buildHymnAnchors(1, 19)).toEqual([]);
-    expect(buildHymnAnchors(1, 7)).toEqual([]);
-    expect(buildHymnAnchors(0, 0)).toEqual([]);
-  });
-
-  it('tolerates non-finite input', () => {
-    expect(buildHymnAnchors(1, NaN)).toEqual([]);
-    expect(buildHymnAnchors(NaN, 174)).toEqual([1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]);
-  });
-});
-
-describe('minHymnNumber', () => {
-  it('returns the smallest number', () => {
-    expect(minHymnNumber([hymn(169), hymn(196), hymn(180)])).toBe(169);
-  });
-  it('returns 0 for empty', () => {
-    expect(minHymnNumber([])).toBe(0);
-  });
-});
-
-describe('maxHymnNumber', () => {
-  it('returns the largest number', () => {
-    expect(maxHymnNumber([hymn(3), hymn(50), hymn(174)])).toBe(174);
-  });
-  it('is defensive against unsorted input', () => {
-    expect(maxHymnNumber([hymn(174), hymn(3), hymn(50)])).toBe(174);
-  });
-  it('returns 0 for empty', () => {
-    expect(maxHymnNumber([])).toBe(0);
+  it('ignores non-finite numbers', () => {
+    expect(buildHymnAnchors([NaN, 10, 20, 30])).toEqual([10, 20, 30]);
   });
 });
 
 describe('firstIndexAtOrAbove', () => {
   const hymns = [hymn(1), hymn(5), hymn(22), hymn(30), hymn(174)];
 
-  it('finds the first hymn at or above the anchor (AC2)', () => {
+  it('finds the first hymn at or above the anchor (AC3.3)', () => {
     expect(firstIndexAtOrAbove(hymns, 1)).toBe(0);
     expect(firstIndexAtOrAbove(hymns, 20)).toBe(2); // 22 is first >= 20
     expect(firstIndexAtOrAbove(hymns, 30)).toBe(3);
   });
 
-  it('handles gaps / renumbering (first >= N, not exact match) (D4)', () => {
+  it('handles gaps (first >= N, not exact match)', () => {
     expect(firstIndexAtOrAbove(hymns, 6)).toBe(2); // no 6..21, first >= 6 is 22
   });
 
   it('clamps to the last index when the anchor is past the last hymn', () => {
-    expect(firstIndexAtOrAbove(hymns, 180)).toBe(4);
+    expect(firstIndexAtOrAbove(hymns, 1000)).toBe(4);
   });
 
   it('returns 0 for empty', () => {
@@ -102,14 +64,13 @@ describe('firstIndexAtOrAbove', () => {
 describe('anchorForFraction', () => {
   const anchors = [1, 10, 20, 30, 40]; // 5 anchors
 
-  it('maps the top of the rail to the first anchor and the bottom to the last (AC3)', () => {
+  it('maps the top of the rail to the first anchor and the bottom to the last (AC3.4)', () => {
     expect(anchorForFraction(anchors, 0)).toBe(1);
     expect(anchorForFraction(anchors, 1)).toBe(40);
   });
 
-  it('snaps to the nearest anchor', () => {
+  it('snaps to the nearest anchor by position', () => {
     expect(anchorForFraction(anchors, 0.5)).toBe(20); // middle
-    expect(anchorForFraction(anchors, 0.24)).toBe(10); // ~index 0.96 -> 1
   });
 
   it('clamps out-of-range fractions', () => {

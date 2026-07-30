@@ -247,13 +247,41 @@ describe('UnifiedSundayCard — names-block empty message + testimony (item 3)',
     expect(flattenStyle(text.props.style).color).toBe(WARNING);
   });
 
-  it('testimony + prayers on + hideStatusBlock → prayer / testimony / prayer (AC8)', () => {
+  const testimonyNoPrayers: UnifiedNameRow[] = [
+    { key: 'prayer-0', kind: 'prayer', status: 'not_assigned', name: null },
+    { key: 'prayer-4', kind: 'prayer', status: 'not_assigned', name: null },
+  ];
+
+  it('testimony + prayers on + hideStatusBlock + no prayers → label first, then noPrayersInvited row (item2 AC2.1)', () => {
+    const { root } = render(
+      baseProps({ exceptionReason: 'testimony_meeting', managePrayers: true, hideStatusBlock: true, nameRows: testimonyNoPrayers })
+    );
+    // testimony label present, empty-prayers row present, and NO prayer name rows.
+    expect(byTestID(root, 'unified-block2-testimony').length).toBe(1);
+    expect(textOf(root, 'unified-prayers-empty')).toBe('agenda.noPrayersInvited');
+    expect(byTestID(root, 'unified-name-row-prayer-0').length).toBe(0);
+    expect(byTestID(root, 'unified-name-row-prayer-4').length).toBe(0);
+    // label comes first (tree order): testimony precedes the empty-prayers row.
+    const order = root.findAll(
+      (n) => typeof n.type === 'string' &&
+        (n.props.testID === 'unified-block2-testimony' || n.props.testID === 'unified-prayers-empty')
+    );
+    expect(order[0].props.testID).toBe('unified-block2-testimony');
+  });
+
+  it('testimony + prayers on + hideStatusBlock + ≥1 prayer → label first, then the two prayer rows (item2 AC2.2)', () => {
     const { root } = render(
       baseProps({ exceptionReason: 'testimony_meeting', managePrayers: true, hideStatusBlock: true, nameRows: testimonyPrayers })
     );
+    expect(byTestID(root, 'unified-prayers-empty').length).toBe(0);
     expect(byTestID(root, 'unified-name-row-prayer-0').length).toBe(1);
-    expect(byTestID(root, 'unified-block2-testimony').length).toBe(1);
     expect(byTestID(root, 'unified-name-row-prayer-4').length).toBe(1);
+    // testimony label comes before the prayer rows.
+    const order = root.findAll(
+      (n) => typeof n.type === 'string' &&
+        (n.props.testID === 'unified-block2-testimony' || n.props.testID === 'unified-name-row-prayer-0')
+    );
+    expect(order[0].props.testID).toBe('unified-block2-testimony');
   });
 
   it('testimony + NOT hideStatusBlock → no testimony line in the names block (AC9)', () => {

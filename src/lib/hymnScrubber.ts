@@ -1,57 +1,30 @@
 /**
  * Pure helpers for the hymn number scrubber (fast-scroll rail).
- * See specs/v2-hymn-scrubber.md.
+ * See specs/v2-hymn-scrubber.md and specs/v2-selectors-and-testimony.md.
  */
 import type { Hymn } from '../types/database';
 
 /**
- * Build the rail's anchor numbers, spanning the list's actual range so the whole rail is useful
- * for any list (the full hymnal AND curated subsets like the sacramental hymns, ~169–196):
- * decade anchors from `floor(minNumber/10)*10` up to `ceil(maxNumber/10)*10`, with a leading `1`
- * when the list starts near the beginning (`minNumber < 10`).
+ * Build the rail's anchor numbers from the hymn numbers actually present: one anchor per populated
+ * decade (`floor(number/10)*10`, with decade 0 rendered as `1`), sorted ascending. Empty decades are
+ * skipped, so a catalog with a 204→1001 gap yields `[…,190,200,1000,1010,…]` instead of ~90 dead
+ * anchors between them.
  *
- * Examples: `(1, 174) → [1,10,…,180]`; `(169, 196) → [160,170,180,190,200]`; `(22, 50) → [20,30,40,50]`.
- *
- * Returns `[]` when the list is too short to warrant a rail (`maxNumber < 20`) — the caller hides
- * the rail on an empty result. (AC1, AC6)
+ * Returns `[]` when there are fewer than 3 populated decades (too short to warrant a rail). (AC3.2/AC3.5)
  */
-export function buildHymnAnchors(minNumber: number, maxNumber: number): number[] {
-  if (!Number.isFinite(maxNumber) || maxNumber < 20) return [];
-  const high = Math.ceil(maxNumber / 10) * 10;
-  const lowDecade = Number.isFinite(minNumber) ? Math.floor(minNumber / 10) * 10 : 0;
-  const anchors: number[] = [];
-  let start: number;
-  if (lowDecade <= 0) {
-    anchors.push(1); // list starts near the beginning → keep the "1" anchor
-    start = 10;
-  } else {
-    start = lowDecade;
+export function buildHymnAnchors(numbers: number[]): number[] {
+  const decades = new Set<number>();
+  for (const n of numbers) {
+    if (Number.isFinite(n)) decades.add(Math.floor(n / 10) * 10);
   }
-  for (let n = start; n <= high; n += 10) anchors.push(n);
-  return anchors;
-}
-
-/**
- * Largest hymn `number` in a list already sorted ascending by number (0 if empty).
- */
-export function maxHymnNumber(hymns: Hymn[]): number {
-  if (hymns.length === 0) return 0;
-  // Sorted ascending by number, but be defensive against unsorted input.
-  return hymns.reduce((max, h) => (h.number > max ? h.number : max), hymns[0].number);
-}
-
-/**
- * Smallest hymn `number` in a list already sorted ascending by number (0 if empty).
- */
-export function minHymnNumber(hymns: Hymn[]): number {
-  if (hymns.length === 0) return 0;
-  return hymns.reduce((min, h) => (h.number < min ? h.number : min), hymns[0].number);
+  if (decades.size < 3) return [];
+  return [...decades].sort((a, b) => a - b).map((d) => (d === 0 ? 1 : d));
 }
 
 /**
  * Index of the first hymn whose `number >= n`, for a list sorted ascending by number.
  * When no hymn reaches `n` (e.g. tapping an anchor past the last hymn), clamps to the last
- * index so the rail still scrolls to the end. Returns 0 for an empty list. (AC2, D4)
+ * index so the rail still scrolls to the end. Returns 0 for an empty list. (AC3.3)
  */
 export function firstIndexAtOrAbove(hymns: Hymn[], n: number): number {
   if (hymns.length === 0) return 0;
@@ -63,7 +36,7 @@ export function firstIndexAtOrAbove(hymns: Hymn[], n: number): number {
 
 /**
  * Given a vertical drag fraction (0 = top of rail, 1 = bottom), return the nearest anchor value.
- * Used to snap the finger position to the 10s anchors during a scrub. (AC3)
+ * Anchors are laid out at equal vertical spacing, so snapping is by position index. (AC3.4)
  */
 export function anchorForFraction(anchors: number[], fraction: number): number | null {
   if (anchors.length === 0) return null;

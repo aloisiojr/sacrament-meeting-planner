@@ -14,6 +14,27 @@ export const DESIGNATION_TYPES: readonly DesignationType[] = [
 
 export const PRIESTHOOD_OFFICES: readonly PriesthoodOffice[] = ['deacon', 'teacher', 'priest'];
 
+// Canonical meeting order for reading/presenting designations: releases, then sustainings, then
+// priesthood advancements, then new members. (Entry order is preserved within each type.)
+export const DESIGNATION_TYPE_ORDER: readonly DesignationType[] = [
+  'release',
+  'sustain',
+  'priesthood',
+  'new_member',
+];
+
+/** A new array ordered by DESIGNATION_TYPE_ORDER, stable within each type. */
+export function orderDesignations(items: Designation[]): Designation[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const ta = DESIGNATION_TYPE_ORDER.indexOf(a.item.type);
+      const tb = DESIGNATION_TYPE_ORDER.indexOf(b.item.type);
+      return ta !== tb ? ta - tb : a.index - b.index;
+    })
+    .map((x) => x.item);
+}
+
 type Translate = (key: string) => string;
 
 export function designationTypeLabel(type: DesignationType, t: Translate): string {

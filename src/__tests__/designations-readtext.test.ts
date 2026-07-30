@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDesignationReadText } from '../lib/designations';
+import { buildDesignationReadText, orderDesignations } from '../lib/designations';
 import type { Designation } from '../types/database';
 
 // Mirrors the shape of the real i18n default templates + office labels.
@@ -63,5 +63,32 @@ describe('buildDesignationReadText', () => {
     const out = buildDesignationReadText(item, {}, t);
     expect(out).not.toMatch(/\{(name|calling|office|ward)\}/);
     expect(out).toContain('[Pausa Breve]');
+  });
+});
+
+describe('orderDesignations', () => {
+  it('orders by release → sustain → priesthood → new_member, stable within type', () => {
+    const mk = (type: Designation['type'], name: string): Designation =>
+      ({ ...base, type, person_name: name });
+    const input = [
+      mk('new_member', 'N1'),
+      mk('sustain', 'S1'),
+      mk('release', 'R1'),
+      mk('priesthood', 'P1'),
+      mk('sustain', 'S2'),
+      mk('release', 'R2'),
+    ];
+    expect(orderDesignations(input).map((d) => d.person_name)).toEqual([
+      'R1', 'R2', 'S1', 'S2', 'P1', 'N1',
+    ]);
+  });
+
+  it('does not mutate the input array', () => {
+    const input: Designation[] = [
+      { ...base, type: 'new_member', person_name: 'N1' },
+      { ...base, type: 'release', person_name: 'R1' },
+    ];
+    orderDesignations(input);
+    expect(input.map((d) => d.person_name)).toEqual(['N1', 'R1']);
   });
 });

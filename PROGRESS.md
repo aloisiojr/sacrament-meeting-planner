@@ -36,7 +36,13 @@
     - **Spec 3 verified (APPROVED)** after a fix round (P1 prefill race + P2 blur-overwrite fixed;
       AC8 hint test added). Migration 042 APPLIED to STAGING (4 designation_template_* columns).
   - **v2 Supports & Releases feature COMPLETE across all 3 specs** (entry + Play interstitial +
-    Settings templates). 2017 tests green. Nothing merged to main; prod at v2 cutover (ADR 001).
+    Settings templates). Nothing merged to main; prod at v2 cutover (ADR 001).
+  - **Post-refinements (committed, verified APPROVED):** localized placeholder tokens
+    ({nome}/{chamado}/…) with all-locale-alias substitution; Settings "Modelos de Textos"
+    expandable group; **unified WhatsApp + Ward Business screens onto a shared
+    `TemplateEditorScreen`** (tabs + chips + preview + restore-default + autosave; saveMode
+    raw|collapse). Fixed verify P1 (raw restore persists NULL, not default text). 2023 tests green;
+    client-only (no migration).
 - Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
 - Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
   (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).

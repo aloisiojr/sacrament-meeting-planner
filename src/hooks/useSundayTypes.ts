@@ -3,11 +3,12 @@
  * Implements F007 sunday exception logic with auto-assignment rules.
  */
 
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
-import { parseLocalDate } from '../lib/dateUtils';
+import { parseLocalDate, toISODateString } from '../lib/dateUtils';
 import type { SundayException, SundayExceptionReason } from '../types/database';
 
 // --- Query Keys ---
@@ -161,6 +162,37 @@ export function useAutoAssignSundayTypes() {
       queryClient.invalidateQueries({ queryKey: sundayTypeKeys.all });
     },
   });
+}
+
+/**
+ * Wire auto-assignment: for the given sundays, persist the auto-computed type (1st-Sunday
+ * testimony, Apr/Oct general conference, else speeches) for any TODAY-or-future date that has no
+ * exception row yet. Past dates are left untouched (never rewrite history), and manually-set types
+ * are never overwritten (useAutoAssignSundayTypes only fills missing dates).
+ *
+ * `enabled` should require online + sunday_type:write — a reader/offline client can't persist.
+ * A per-date "attempted" set prevents re-firing the mutation in a loop while it settles.
+ */
+export function useAutoAssignMissingSundayTypes(
+  sundays: string[],
+  exceptions: SundayException[] | undefined,
+  enabled: boolean
+): void {
+  const autoAssign = useAutoAssignSundayTypes();
+  const attemptedRef = useRef<Set<string>>(new Set());
+  const mutate = autoAssign.mutate;
+
+  useEffect(() => {
+    if (!enabled || sundays.length === 0 || exceptions === undefined) return;
+    const today = toISODateString(new Date());
+    const existing = new Set(exceptions.map((e) => e.date));
+    const missing = sundays.filter(
+      (d) => d >= today && !existing.has(d) && !attemptedRef.current.has(d)
+    );
+    if (missing.length === 0) return;
+    missing.forEach((d) => attemptedRef.current.add(d));
+    mutate(missing);
+  }, [sundays, exceptions, enabled, mutate]);
 }
 
 /**

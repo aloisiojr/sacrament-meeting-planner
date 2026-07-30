@@ -126,6 +126,7 @@ vi.mock('../hooks/useSundayTypes', () => ({
   useSundayExceptions: () => ({ data: state.exceptions, isError: false, error: null, refetch: vi.fn() }),
   useSetSundayType: () => ({ mutate: vi.fn() }),
   useRemoveSundayException: () => ({ mutate: vi.fn() }),
+  useAutoAssignMissingSundayTypes: () => {},
 }));
 vi.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: state.speeches }),

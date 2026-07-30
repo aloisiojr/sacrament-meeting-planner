@@ -23,6 +23,7 @@ import {
   SUNDAY_TYPE_SPEECHES,
   SUNDAY_TYPE_OPTIONS,
   useAutoAssignSundayTypes,
+  useAutoAssignMissingSundayTypes,
   useSundayExceptions,
   useRemoveSundayException,
 } from '../../hooks/useSundayTypes';
@@ -268,6 +269,58 @@ describe('useAutoAssignSundayTypes integration', () => {
       const count = await result.current.mutateAsync([]);
       expect(count).toBe(0);
     });
+  });
+});
+
+describe('useAutoAssignMissingSundayTypes (wiring)', () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient = createTestQueryClient();
+  });
+
+  it('persists only TODAY-or-future missing dates (skips the past)', async () => {
+    let insertedEntries: Array<{ date: string; reason: string }> | null = null;
+    let call = 0;
+    mockedSupabase.from.mockImplementation(() => {
+      call++;
+      const response = call === 1 ? { data: [], error: null } : { data: null, error: null };
+      const resolved = Promise.resolve(response);
+      const chain: any = new Proxy({}, {
+        get(_t, p: string) {
+          if (p === 'then') return resolved.then.bind(resolved);
+          if (p === 'catch') return resolved.catch.bind(resolved);
+          if (p === 'finally') return resolved.finally.bind(resolved);
+          if (p === 'insert') return (entries: Array<{ date: string; reason: string }>) => {
+            insertedEntries = entries;
+            return chain;
+          };
+          return () => chain;
+        },
+      });
+      return chain;
+    });
+
+    const wrapper = createWrapper(undefined, queryClient);
+    renderHook(
+      () => useAutoAssignMissingSundayTypes(['2020-01-05', '2099-01-04'], [], true),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(insertedEntries).not.toBeNull());
+    const dates = insertedEntries!.map((e) => e.date);
+    expect(dates).toContain('2099-01-04');
+    expect(dates).not.toContain('2020-01-05');
+  });
+
+  it('is a no-op when disabled (offline / no permission)', () => {
+    const wrapper = createWrapper(undefined, queryClient);
+    renderHook(
+      () => useAutoAssignMissingSundayTypes(['2099-01-04'], [], false),
+      { wrapper }
+    );
+    expect(mockedSupabase.from).not.toHaveBeenCalled();
   });
 });
 

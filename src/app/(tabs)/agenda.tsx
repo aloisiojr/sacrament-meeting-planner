@@ -24,7 +24,7 @@ import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
-import { useSundayExceptions, useSetSundayType, useRemoveSundayException, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
+import { useSundayExceptions, useSetSundayType, useRemoveSundayException, useAutoAssignMissingSundayTypes, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
 import { useSpeeches, useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
 import { useLazyCreateAgenda, useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
 import { AgendaForm } from '../../components/AgendaForm';
@@ -78,6 +78,10 @@ function AgendaTabContent() {
   const { hasPermission } = useAuth();
   const isOnline = useOnlineStatus();
   const canEditType = hasPermission('sunday_type:write');
+
+  // Auto-assign the default meeting type (1st-Sunday testimony, Apr/Oct conference, else speeches)
+  // for upcoming Sundays that have no explicit exception yet — only for online editors.
+  useAutoAssignMissingSundayTypes(sundays, exceptions, isOnline && canEditType);
 
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 

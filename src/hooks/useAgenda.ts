@@ -111,7 +111,21 @@ export function useLazyCreateAgenda() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Another device created this agenda between our check and insert (UNIQUE
+        // ward_id,sunday_date violation) — fetch and return the winning row instead of failing.
+        if (error.code === '23505') {
+          const { data: raced, error: reselectError } = await supabase
+            .from('sunday_agendas')
+            .select('*')
+            .eq('ward_id', wardId)
+            .eq('sunday_date', sundayDate)
+            .single();
+          if (reselectError) throw reselectError;
+          return raced;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: (_data, sundayDate) => {

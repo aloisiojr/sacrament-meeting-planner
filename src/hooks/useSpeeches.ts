@@ -225,9 +225,12 @@ export function useLazyCreateSpeeches() {
         status: 'not_assigned' as SpeechStatus,
       }));
 
+      // Upsert (ignore duplicates) instead of a plain insert so a concurrent create from another
+      // device doesn't hit the UNIQUE (ward_id,sunday_date,position) constraint. Rows are pure
+      // defaults, so ignoring an existing one is safe (nothing to overwrite).
       const { data, error } = await supabase
         .from('speeches')
-        .insert(records)
+        .upsert(records, { onConflict: 'ward_id,sunday_date,position', ignoreDuplicates: true })
         .select();
 
       if (error) throw error;
@@ -336,14 +339,21 @@ export function useChangeStatus() {
         throw new Error(`Invalid status transition: ${current.status} -> ${input.status}`);
       }
 
+      // Guard the write on the status we validated (.eq('status', current.status)): if another
+      // device changed it between our read and write, 0 rows update and we surface a retry instead
+      // of silently applying a transition we never validated.
       const { data, error } = await supabase
         .from('speeches')
         .update({ status: input.status })
         .eq('id', input.speechId)
+        .eq('status', current.status)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error('Speech status changed concurrently; please retry.');
+      }
       return data;
     },
     onSuccess: (data) => {

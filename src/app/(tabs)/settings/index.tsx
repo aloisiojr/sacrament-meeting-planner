@@ -52,7 +52,7 @@ const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, c
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, wardId, wardLanguage, role, signOut, updateAppLanguage, setWardLanguage, user, userName } = useAuth();
+  const { hasPermission, wardId, wardLanguage, signOut, updateAppLanguage, setWardLanguage, user, userName } = useAuth();
   const isOnline = useOnlineStatus();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,7 +60,7 @@ export default function SettingsScreen() {
   const [wardLanguageModalVisible, setWardLanguageModalVisible] = useState(false);
   const [textTemplatesExpanded, setTextTemplatesExpanded] = useState(false);
 
-  const isObserver = role === 'observer';
+  const canManageWardSettings = hasPermission('settings:access');
   const currentAppLanguage = getCurrentLanguage();
 
   const { managePrayers } = useWardManagePrayers();
@@ -182,8 +182,8 @@ export default function SettingsScreen() {
           {t('settings.title')}
         </Text>
 
-        {/* Group 1: Ward Settings (non-Observer only) */}
-        {!isObserver && (
+        {/* Group 1: Ward Settings (requires settings:access — not observers) */}
+        {canManageWardSettings && (
           <>
             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
               {t('settings.wardSettingsGroup')}
@@ -197,7 +197,7 @@ export default function SettingsScreen() {
                   testID="settings-members-button"
                 />
               )}
-              {!isObserver && (
+              {canManageWardSettings && (
                 <View style={[styles.item, { borderBottomColor: colors.divider }]}>
                   <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={[styles.itemText, { color: colors.text }]}>

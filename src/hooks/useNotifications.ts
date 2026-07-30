@@ -35,11 +35,12 @@ Notifications.setNotificationHandler({
  * Deferred to next app opening if offline.
  */
 export function useRegisterPushToken(isOnline: boolean): void {
-  const { user, role, wardId } = useAuth();
+  const { user, role, wardId, hasPermission } = useAuth();
   const hasRegistered = useRef(false);
 
   useEffect(() => {
-    if (!user || !wardId || role === 'observer' || hasRegistered.current) return;
+    // Gate by permission, not role: observers lack push:receive and don't register.
+    if (!user || !wardId || !hasPermission('push:receive') || hasRegistered.current) return;
     if (!isOnline) return; // Defer to next app opening with connection
 
     const userId = user.id;
@@ -113,7 +114,7 @@ export function useRegisterPushToken(isOnline: boolean): void {
     return () => {
       cancelled = true;
     };
-  }, [user, role, wardId, isOnline]);
+  }, [user, role, wardId, isOnline, hasPermission]);
 }
 
 // --- Notification Handler ---

@@ -71,7 +71,7 @@ export default function UserManagementScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
-  const { user: currentUser, session, userName } = useAuth();
+  const { user: currentUser, session, userName, hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -293,10 +293,11 @@ export default function UserManagementScreen() {
   );
 
   const currentUserId = currentUser?.id;
-  const isObserver = currentUser?.app_metadata?.role === 'observer';
-  const displayedUsers = isObserver
-    ? users.filter((u) => u.id === currentUserId)
-    : users;
+  // Gate by permission, not role: without settings:users a user only manages their own account.
+  const canManageUsers = hasPermission('settings:users');
+  const displayedUsers = canManageUsers
+    ? users
+    : users.filter((u) => u.id === currentUserId);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -310,7 +311,7 @@ export default function UserManagementScreen() {
           <Text style={[styles.title, { color: colors.text }]}>
             {t('users.title')}
           </Text>
-          {!isObserver && (
+          {canManageUsers && (
             <Pressable
               style={[styles.inviteButton, { backgroundColor: colors.primary }]}
               onPress={openInviteModal}

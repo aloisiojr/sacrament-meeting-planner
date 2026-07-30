@@ -313,16 +313,16 @@ describe('CR-290: Account self-deletion', () => {
     // AC-290-6: Observer filtering — displayedUsers filtered to self only
     it('AC-290-6: observer sees only their own card (displayedUsers filter)', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
-      expect(content).toContain('isObserver');
+      // Gated by permission (settings:users), not role. Without it → filter to self.
+      expect(content).toContain('canManageUsers');
       expect(content).toContain('displayedUsers');
-      // Observer filter: users.filter(u => u.id === currentUserId)
-      expect(content).toMatch(/isObserver\s*\?\s*users\.filter/);
+      expect(content).toMatch(/canManageUsers\s*\?\s*users\s*:\s*users\.filter/);
     });
 
     // AC-290-6: Invite button hidden for observer
     it('AC-290-6: invite button hidden for observer', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
-      expect(content).toContain('{!isObserver && (');
+      expect(content).toContain('{canManageUsers && (');
     });
 
     // AC-290-7: Role selector hidden on self card (for all roles)
@@ -367,8 +367,8 @@ describe('CR-290: Account self-deletion', () => {
     // EC-022-03: Observer cannot delete others (no other cards shown)
     it('EC-022-03: observer only sees self card (cannot delete others)', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
-      // displayedUsers is filtered for observers
-      expect(content).toMatch(/isObserver\s*\?\s*users\.filter\(\(?u\)?\s*=>\s*u\.id\s*===\s*currentUserId\)/);
+      // Without settings:users, displayedUsers is filtered to self.
+      expect(content).toMatch(/users\.filter\(\(?u\)?\s*=>\s*u\.id\s*===\s*currentUserId\)/);
     });
 
     // Existing admin delete flow preserved for non-self
@@ -379,9 +379,9 @@ describe('CR-290: Account self-deletion', () => {
     });
 
     // Observer detection uses app_metadata.role
-    it('observer detection uses app_metadata.role', () => {
+    it('user management gated by settings:users permission (not role)', () => {
       content = fs.readFileSync(usersPath, 'utf-8');
-      expect(content).toContain("app_metadata?.role === 'observer'");
+      expect(content).toContain("hasPermission('settings:users')");
     });
 
     // displayedUsers used in rendering

@@ -92,15 +92,15 @@ export const SpeechSlot = React.memo(function SpeechSlot({
 }: SpeechSlotProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { hasPermission, role } = useAuth();
+  const { hasPermission } = useAuth();
 
   const [statusModalVisible, setStatusModalVisible] = useState(false);
 
   const canAssign = hasPermission(isPrayer ? 'prayer:assign' : 'speech:assign') && !disabled;
   const canUnassign = hasPermission(isPrayer ? 'prayer:unassign' : 'speech:unassign') && !disabled;
   const canChangeStatus = hasPermission('speech:change_status') && !disabled;
-  const isObserver = role === 'observer' || disabled;
-  const isBispado = (role === 'bishopric' || role === 'secretary') && !disabled;
+  // Toggling the second speech is an agenda edit — gate by permission, not role.
+  const canToggleSecondSpeech = hasPermission('agenda:write') && !disabled;
 
   // F118: For position 2, check if toggle is enabled (only when not a prayer slot)
   const isPos2Disabled = position === 2 && !isPrayer && isSecondSpeechEnabled === false;
@@ -187,7 +187,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
               testID="speech-slot-2-toggle"
               value={isSecondSpeechEnabled !== false}
               onValueChange={onToggleSecondSpeech}
-              disabled={!isBispado}
+              disabled={!canToggleSecondSpeech}
               trackColor={{ false: colors.divider, true: colors.primary }}
               style={styles.toggle}
             />
@@ -197,7 +197,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           <Pressable
             style={styles.statusSection}
             onPress={handleStatusPress}
-            disabled={isObserver || status === 'not_assigned'}
+            disabled={!canChangeStatus || status === 'not_assigned'}
             testID={`speech-slot-${position}-status-button`}
           >
             <Text style={[styles.statusText, { color: colors.textSecondary }]}>
@@ -207,7 +207,7 @@ export const SpeechSlot = React.memo(function SpeechSlot({
               status={status}
               size={16}
               onPress={handleStatusPress}
-              disabled={isObserver || status === 'not_assigned'}
+              disabled={!canChangeStatus || status === 'not_assigned'}
             />
           </Pressable>
         )}

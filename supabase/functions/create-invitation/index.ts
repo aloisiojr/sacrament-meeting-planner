@@ -116,6 +116,19 @@ Deno.serve(async (req) => {
     // Generate a unique token
     const invitationToken = crypto.randomUUID();
 
+    // Auto-revoke this ward's expired, unused invitations (best-effort DB hygiene). There is no
+    // invite-management UI, so this lazy sweep on each new invite keeps dead tokens from lingering.
+    // A scheduled sweep (migration 045 revoke_expired_invitations) covers wards with no new invites.
+    const { error: revokeError } = await supabaseAdmin
+      .from('invitations')
+      .delete()
+      .eq('ward_id', wardId)
+      .is('used_at', null)
+      .lt('expires_at', new Date().toISOString());
+    if (revokeError) {
+      console.warn(`[create-invitation] auto-revoke sweep failed: ${revokeError.message}`);
+    }
+
     // Calculate expiry (30 days from now)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);

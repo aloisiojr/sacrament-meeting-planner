@@ -26,6 +26,7 @@ import { NextAssignmentsSection } from '../../components/NextAssignmentsSection'
 import { InviteManagementSection } from '../../components/InviteManagementSection';
 import { useAgendaRange } from '../../hooks/useAgenda';
 import { useSpeeches, useWardManagePrayers } from '../../hooks/useSpeeches';
+import { useWardName } from '../../hooks/useWard';
 import { useSundayExceptions } from '../../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../../lib/dateUtils';
 import { PlayIcon } from '../../components/icons';
@@ -39,6 +40,7 @@ function HomeTabContent() {
   const router = useRouter();
   const isOnline = useOnlineStatus();
   const { managePrayers } = useWardManagePrayers();
+  const wardName = useWardName();
 
   // The next 3 Sundays: [0] = hero (highlighted), [1..2] = "Próximos domingos".
   const nextSundays = useMemo(() => {
@@ -137,8 +139,10 @@ function HomeTabContent() {
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('home.meetingAgendaTitle')}
+          <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">
+            {wardName
+              ? `${t('home.meetingAgendaTitle')} - ${wardName}`
+              : t('home.meetingAgendaTitle')}
           </Text>
           <Pressable
             testID="home-start-meeting-button"

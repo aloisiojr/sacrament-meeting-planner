@@ -19,6 +19,7 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -44,6 +45,10 @@ import { useMembers, memberKeys } from '../../../hooks/useMembers';
 // Sentinel thrown by the import mutation when the CSV fails validation, so the error handler can
 // tell parse failures (shown in the in-screen panel) apart from RPC/network failures.
 const CSV_PARSE_ERROR = 'csv/parse';
+
+// Hosted step-by-step guide (AI prompt that merges the ward PDF + this CSV). GitHub-Pages URL —
+// update if the site's public base changes.
+const IMPORT_GUIDE_URL = 'https://aloisiojr.github.io/sacrament-meeting-planner/public/import-members.html';
 
 type TFn = ReturnType<typeof useTranslation>['t'];
 
@@ -312,6 +317,20 @@ export default function MembersScreen() {
               <Text style={[styles.stepDesc, { color: colors.textSecondary }]} testID="members-step2-note">
                 {t('members.step2Desc')}
               </Text>
+              <Text style={[styles.stepDesc, { color: colors.textSecondary, marginBottom: 4 }]}>
+                {t('members.step2GuideText')}
+              </Text>
+              <Pressable
+                onPress={() => Linking.openURL(IMPORT_GUIDE_URL)}
+                accessibilityRole="link"
+                accessibilityLabel={t('members.step2GuideLink')}
+                hitSlop={8}
+                testID="members-guide-link"
+              >
+                <Text style={[styles.guideLink, { color: colors.primary }]}>
+                  {t('members.step2GuideLink')}
+                </Text>
+              </Pressable>
             </View>
 
             {/* Step 3: import the file */}
@@ -412,6 +431,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12,
+  },
+  guideLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   csvButton: {
     paddingVertical: 12,

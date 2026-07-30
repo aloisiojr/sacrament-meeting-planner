@@ -29,6 +29,7 @@ const state = vi.hoisted(() => ({
   agendas: [] as SundayAgenda[],
   managePrayers: false,
   online: true,
+  wardName: 'Ala Modelo' as string | null,
 }));
 
 const routerPush = vi.hoisted(() => vi.fn());
@@ -92,6 +93,9 @@ vi.mock('../hooks/useSundayTypes', () => ({
 vi.mock('../hooks/useAgenda', () => ({
   useAgendaRange: () => ({ data: state.agendas }),
 }));
+vi.mock('../hooks/useWard', () => ({
+  useWardName: () => state.wardName,
+}));
 
 // --- Test data ---
 
@@ -145,6 +149,7 @@ beforeEach(() => {
   state.agendas = [makeAgenda(D1, { presiding_name: 'Bishop' })];
   state.managePrayers = false;
   state.online = true;
+  state.wardName = 'Ala Modelo';
   routerPush.mockClear();
 });
 
@@ -175,6 +180,17 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     // Item 1: the 2 upcoming cards hide the status/roles block; the hero does not.
     expect(upcoming.every((c) => c.props.hideStatusBlock === true)).toBe(true);
     expect(hero[0].props.hideStatusBlock).toBeFalsy();
+  });
+
+  it('appends the ward name to the agenda title, and shows the bare title when unknown', () => {
+    let r = render();
+    let title = byTestID(r.root, 'home-agenda-title')[0];
+    expect(title.props.children).toBe('home.meetingAgendaTitle - Ala Modelo');
+
+    state.wardName = null;
+    r = render();
+    title = byTestID(r.root, 'home-agenda-title')[0];
+    expect(title.props.children).toBe('home.meetingAgendaTitle');
   });
 
   it('tapping a card speakers zone pushes the speeches edit route', () => {

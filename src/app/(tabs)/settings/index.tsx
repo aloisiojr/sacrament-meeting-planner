@@ -242,13 +242,6 @@ export default function SettingsScreen() {
                   />
                 </View>
               )}
-              {hasPermission('topic:write') && (
-                <SettingsItem
-                  label={t('settings.topics')}
-                  onPress={() => router.push('/(tabs)/settings/topics')}
-                  colors={colors}
-                />
-              )}
               {(hasPermission('settings:whatsapp') || hasPermission('settings:designations')) && (
                 <>
                   <Pressable

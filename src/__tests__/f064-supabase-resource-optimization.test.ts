@@ -20,7 +20,7 @@ import {
   createWrapper,
 } from './integration/setup-integration';
 import { POLLING_INTERVAL_MS, SYNCED_TABLES, TABLE_TO_QUERY_KEYS, getQueryKeysForTable } from '../lib/sync';
-import { FIXED_COLLECTION_ORDER, topicKeys } from '../hooks/useTopics';
+import { topicKeys } from '../hooks/useTopics';
 
 // --- Module mocks ---
 
@@ -684,199 +684,6 @@ describe('F064-S6: POLLING_INTERVAL_MS', () => {
   });
 });
 
-// =============================================================================
-// S7: useToggleCollection UPSERT (AC-064-16, AC-064-17)
-// =============================================================================
-
-describe('F064-S7: useToggleCollection UPSERT', () => {
-  beforeEach(() => {
-    mockFrom.mockReset();
-  });
-
-  it('AC-064-16: useToggleCollection calls upsert with onConflict', async () => {
-    let upsertCalledWith: any = null;
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'ward_collection_config') {
-        return {
-          upsert: (data: any, opts: any) => {
-            upsertCalledWith = { data, opts };
-            return Promise.resolve({ error: null });
-          },
-          // Also handle select/eq for any potential reads
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        };
-      }
-      // Default chain for invalidation queries
-      const resolvedPromise = Promise.resolve({ data: null, error: null });
-      const chain: any = new Proxy({}, {
-        get(_target, prop: string) {
-          if (prop === 'then') return resolvedPromise.then.bind(resolvedPromise);
-          if (prop === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
-          if (prop === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
-          return (..._args: any[]) => chain;
-        },
-      });
-      return chain;
-    });
-
-    const { useToggleCollection } = await import('../hooks/useTopics');
-    const queryClient = createTestQueryClient();
-
-    const { result } = renderHook(() => useToggleCollection(), {
-      wrapper: createWrapper(undefined, queryClient),
-    });
-
-    // Call the mutation
-    await result.current.mutateAsync({
-      collectionId: 'col-1',
-      collectionName: 'Test',
-      active: true,
-    });
-
-    expect(upsertCalledWith).not.toBeNull();
-    expect(upsertCalledWith.data).toEqual(
-      expect.objectContaining({
-        ward_id: 'ward-1',
-        collection_id: 'col-1',
-        active: true,
-      })
-    );
-    expect(upsertCalledWith.opts).toEqual(
-      expect.objectContaining({
-        onConflict: 'ward_id,collection_id',
-      })
-    );
-  });
-
-  it('AC-064-17: toggle ON a collection (active: true)', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'ward_collection_config') {
-        return {
-          upsert: vi.fn().mockResolvedValue({ error: null }),
-        };
-      }
-      const resolvedPromise = Promise.resolve({ data: null, error: null });
-      const chain: any = new Proxy({}, {
-        get(_target, prop: string) {
-          if (prop === 'then') return resolvedPromise.then.bind(resolvedPromise);
-          if (prop === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
-          if (prop === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
-          return (..._args: any[]) => chain;
-        },
-      });
-      return chain;
-    });
-
-    const { useToggleCollection } = await import('../hooks/useTopics');
-    const queryClient = createTestQueryClient();
-
-    const { result } = renderHook(() => useToggleCollection(), {
-      wrapper: createWrapper(undefined, queryClient),
-    });
-
-    const mutationResult = await result.current.mutateAsync({
-      collectionId: 'col-1',
-      collectionName: 'Test Collection',
-      active: true,
-    });
-
-    expect(mutationResult.active).toBe(true);
-    expect(mutationResult.collectionName).toBe('Test Collection');
-  });
-
-  it('AC-064-17: toggle OFF a collection (active: false)', async () => {
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'ward_collection_config') {
-        return {
-          upsert: vi.fn().mockResolvedValue({ error: null }),
-        };
-      }
-      const resolvedPromise = Promise.resolve({ data: null, error: null });
-      const chain: any = new Proxy({}, {
-        get(_target, prop: string) {
-          if (prop === 'then') return resolvedPromise.then.bind(resolvedPromise);
-          if (prop === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
-          if (prop === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
-          return (..._args: any[]) => chain;
-        },
-      });
-      return chain;
-    });
-
-    const { useToggleCollection } = await import('../hooks/useTopics');
-    const queryClient = createTestQueryClient();
-
-    const { result } = renderHook(() => useToggleCollection(), {
-      wrapper: createWrapper(undefined, queryClient),
-    });
-
-    const mutationResult = await result.current.mutateAsync({
-      collectionId: 'col-2',
-      collectionName: 'Another Collection',
-      active: false,
-    });
-
-    expect(mutationResult.active).toBe(false);
-    expect(mutationResult.collectionName).toBe('Another Collection');
-  });
-
-  it('EC-064-08: upsert handles both new config (INSERT) and existing config (UPDATE)', async () => {
-    // The UPSERT with onConflict handles both cases transparently.
-    // When ward_id,collection_id exists → UPDATE active field
-    // When ward_id,collection_id doesn't exist → INSERT new row
-    const upsertCalls: any[] = [];
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'ward_collection_config') {
-        return {
-          upsert: (data: any, opts: any) => {
-            upsertCalls.push({ data, opts });
-            return Promise.resolve({ error: null });
-          },
-        };
-      }
-      const resolvedPromise = Promise.resolve({ data: null, error: null });
-      const chain: any = new Proxy({}, {
-        get(_target, prop: string) {
-          if (prop === 'then') return resolvedPromise.then.bind(resolvedPromise);
-          if (prop === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
-          if (prop === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
-          return (..._args: any[]) => chain;
-        },
-      });
-      return chain;
-    });
-
-    const { useToggleCollection } = await import('../hooks/useTopics');
-    const queryClient = createTestQueryClient();
-
-    const { result } = renderHook(() => useToggleCollection(), {
-      wrapper: createWrapper(undefined, queryClient),
-    });
-
-    // Toggle on (new config row)
-    await result.current.mutateAsync({
-      collectionId: 'col-new',
-      active: true,
-    });
-
-    // Toggle off (existing config row - same upsert call pattern)
-    await result.current.mutateAsync({
-      collectionId: 'col-new',
-      active: false,
-    });
-
-    expect(upsertCalls).toHaveLength(2);
-    // Both use same onConflict pattern
-    expect(upsertCalls[0].opts.onConflict).toBe('ward_id,collection_id');
-    expect(upsertCalls[1].opts.onConflict).toBe('ward_id,collection_id');
-    // First is active: true, second is active: false
-    expect(upsertCalls[0].data.active).toBe(true);
-    expect(upsertCalls[1].data.active).toBe(false);
-  });
-});
 
 // =============================================================================
 // S2: Migration 029 verification (AC-064-05)
@@ -903,10 +710,6 @@ describe('F064-S2: Migration 029 device_push_tokens role column', () => {
 // =============================================================================
 
 describe('F064 cross-feature: all optimizations backward-compatible', () => {
-  it('FIXED_COLLECTION_ORDER exported from useTopics with 6 entries', () => {
-    expect(Object.keys(FIXED_COLLECTION_ORDER)).toHaveLength(6);
-  });
-
   it('SYNCED_TABLES still has 6 tables', () => {
     expect(SYNCED_TABLES).toHaveLength(6);
   });

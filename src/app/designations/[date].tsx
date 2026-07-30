@@ -189,6 +189,8 @@ function DesignationEditContent() {
         </Text>
         {DESIGNATION_TYPES.map((opt) => {
           const selected = type === opt;
+          // Once a choice is made, the non-selected options recede (dimmed) so they don't compete.
+          const dimmed = type !== null && !selected;
           return (
             <Pressable
               key={opt}
@@ -196,11 +198,11 @@ function DesignationEditContent() {
               onPress={() => handleSelectType(opt)}
               style={[
                 styles.optionRow,
-                { borderColor: selected ? colors.primary : colors.border },
+                { borderColor: selected ? colors.primary : dimmed ? colors.divider : colors.border },
                 selected && { backgroundColor: colors.surfaceVariant },
               ]}
             >
-              <Text style={[styles.optionText, { color: colors.text }]}>
+              <Text style={[styles.optionText, { color: dimmed ? colors.textTertiary : colors.text }]}>
                 {t(`agenda.designations.typeOption.${opt}`)}
               </Text>
             </Pressable>
@@ -256,6 +258,7 @@ function DesignationEditContent() {
             </Text>
             {PRIESTHOOD_OFFICES.map((opt) => {
               const selected = office === opt;
+              const dimmed = office !== null && !selected;
               return (
                 <Pressable
                   key={opt}
@@ -263,11 +266,11 @@ function DesignationEditContent() {
                   onPress={() => setOffice(opt)}
                   style={[
                     styles.optionRow,
-                    { borderColor: selected ? colors.primary : colors.border },
+                    { borderColor: selected ? colors.primary : dimmed ? colors.divider : colors.border },
                     selected && { backgroundColor: colors.surfaceVariant },
                   ]}
                 >
-                  <Text style={[styles.optionText, { color: colors.text }]}>
+                  <Text style={[styles.optionText, { color: dimmed ? colors.textTertiary : colors.text }]}>
                     {priesthoodOfficeLabel(opt, t)}
                   </Text>
                 </Pressable>

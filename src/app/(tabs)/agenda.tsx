@@ -463,6 +463,7 @@ function AgendaSundayCard({
                 <AttendanceBlock
                   value={agenda?.attendance ?? null}
                   onChange={handleSetAttendance}
+                  disabled={isOffline}
                   testID={`agenda-attendance-${date}`}
                 />
               )}
@@ -547,6 +548,7 @@ function AgendaSundayCard({
         isPast={isPast}
         attendance={agenda?.attendance ?? null}
         onSetAttendance={handleSetAttendance}
+        attendanceDisabled={isOffline}
         testID={`agenda-card-${date}`}
       />
     </View>

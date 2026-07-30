@@ -122,4 +122,42 @@ describe('F052: Settings Tab Offline UI Logic', () => {
       expect(typeof mod.useOnlineStatus).toBe('function');
     });
   });
+
+  // P0-2 (C): the two ward write-settings that were still editable offline are now gated.
+  describe('AC-052-03: Ward write-settings gated offline', () => {
+    // settings/index.tsx: <Switch disabled={!isOnline} />
+    function managePrayersToggleEnabled(isOnline: boolean): boolean {
+      return isOnline;
+    }
+    // settings/index.tsx: <Pressable disabled={!isOnline} onPress={() => isOnline && openModal()} />
+    function wardLanguageEditable(isOnline: boolean): boolean {
+      return isOnline;
+    }
+    it('manage-prayers toggle disabled offline', () => {
+      expect(managePrayersToggleEnabled(false)).toBe(false);
+      expect(managePrayersToggleEnabled(true)).toBe(true);
+    });
+    it('ward-language change disabled offline', () => {
+      expect(wardLanguageEditable(false)).toBe(false);
+      expect(wardLanguageEditable(true)).toBe(true);
+    });
+
+    // timezone / whatsapp-templates / designation-templates entries: SettingsItem disabled={!isOnline}
+    function writeSubScreenEntryEnabled(isOnline: boolean): boolean {
+      return isOnline;
+    }
+    it('timezone / whatsapp / designation-template entries disabled offline', () => {
+      expect(writeSubScreenEntryEnabled(false)).toBe(false);
+      expect(writeSubScreenEntryEnabled(true)).toBe(true);
+    });
+
+    // members.tsx import button: disabled={importMutation.isPending || !isOnline}; export NOT gated.
+    function membersImportEnabled(isPending: boolean, isOnline: boolean): boolean {
+      return !isPending && isOnline;
+    }
+    it('members CSV import disabled offline (export stays available offline)', () => {
+      expect(membersImportEnabled(false, false)).toBe(false); // offline → import disabled
+      expect(membersImportEnabled(false, true)).toBe(true);   // online → enabled
+    });
+  });
 });

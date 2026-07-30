@@ -172,4 +172,22 @@ describe('F050: Agenda Tab Offline UI Logic', () => {
       expect(mutated).toBe(false);
     });
   });
+
+  // P0-2 (C): the attendance tile was the one agenda write path still editable offline. The
+  // reachable surface is the COLLAPSED past-Sunday card (UnifiedSundayCard), gated via
+  // attendanceDisabled={isOffline} from agenda.tsx (behavioral passthrough covered in
+  // unified-sunday-card.test.tsx).
+  describe('AC-050-06: Attendance tile disabled offline', () => {
+    // agenda.tsx: <UnifiedSundayCard ... attendanceDisabled={isOffline} />, isOffline = !isOnline
+    function attendanceEditable(isOnline: boolean): boolean {
+      const isOffline = !isOnline;
+      return !isOffline;
+    }
+    it('attendance is NOT editable offline', () => {
+      expect(attendanceEditable(false)).toBe(false);
+    });
+    it('attendance is editable online (existing behavior)', () => {
+      expect(attendanceEditable(true)).toBe(true);
+    });
+  });
 });

@@ -25,13 +25,16 @@ interface SettingsItemProps {
   onPress: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
   testID?: string;
+  /** When true, the item is greyed out and non-interactive (e.g. write screens while offline). */
+  disabled?: boolean;
 }
 
-const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, colors, testID }: SettingsItemProps) {
+const SettingsItem = React.memo(function SettingsItem({ label, value, onPress, colors, testID, disabled = false }: SettingsItemProps) {
   return (
     <Pressable
-      style={[styles.item, { borderBottomColor: colors.divider }]}
-      onPress={onPress}
+      style={[styles.item, { borderBottomColor: colors.divider }, disabled && { opacity: 0.5 }]}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityRole="button"
       testID={testID}
     >
@@ -207,6 +210,7 @@ export default function SettingsScreen() {
                   <Switch
                     value={managePrayers}
                     onValueChange={(val) => toggleManagePrayersMutation.mutate(val)}
+                    disabled={!isOnline}
                     trackColor={{ false: colors.divider, true: colors.primary }}
                   />
                 </View>
@@ -237,6 +241,7 @@ export default function SettingsScreen() {
                         label={t('settings.whatsappTemplate')}
                         onPress={() => router.push('/(tabs)/settings/whatsapp')}
                         colors={colors}
+                        disabled={!isOnline}
                         testID="settings-whatsapp-item"
                       />
                     </View>
@@ -247,6 +252,7 @@ export default function SettingsScreen() {
                         label={t('settings.designationsTemplate')}
                         onPress={() => router.push('/(tabs)/settings/designations')}
                         colors={colors}
+                        disabled={!isOnline}
                         testID="settings-designations-item"
                       />
                     </View>
@@ -255,8 +261,9 @@ export default function SettingsScreen() {
               )}
               {hasPermission('settings:language') && (
                 <Pressable
-                  style={[styles.item, { borderBottomColor: colors.divider }]}
-                  onPress={() => setWardLanguageModalVisible(true)}
+                  style={[styles.item, { borderBottomColor: colors.divider }, !isOnline && { opacity: 0.5 }]}
+                  onPress={() => isOnline && setWardLanguageModalVisible(true)}
+                  disabled={!isOnline}
                   accessibilityRole="button"
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
@@ -280,6 +287,7 @@ export default function SettingsScreen() {
                   label={t('settings.timezone')}
                   onPress={() => router.push('/(tabs)/settings/timezone')}
                   colors={colors}
+                  disabled={!isOnline}
                 />
               )}
             </View>

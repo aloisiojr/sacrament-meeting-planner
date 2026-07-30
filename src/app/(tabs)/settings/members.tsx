@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
 import {
@@ -73,6 +74,7 @@ export default function MembersScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { hasPermission, wardId, user, userName } = useAuth();
+  const isOnline = useOnlineStatus();
   const queryClient = useQueryClient();
 
   const { data: members, isLoading } = useMembers();
@@ -345,9 +347,9 @@ export default function MembersScreen() {
               </View>
 
               <Pressable
-                style={[styles.csvButton, { borderColor: colors.primary }]}
+                style={[styles.csvButton, { borderColor: colors.primary }, !isOnline && { opacity: 0.5 }]}
                 onPress={handleImport}
-                disabled={importMutation.isPending}
+                disabled={importMutation.isPending || !isOnline}
                 accessibilityRole="button"
                 accessibilityLabel={t('members.importCsv')}
                 testID="members-import-button"

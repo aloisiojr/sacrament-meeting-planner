@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { UnifiedSundayCard, type UnifiedSundayCardProps, type UnifiedNameRow } from '../components/UnifiedSundayCard';
+import { AttendanceBlock } from '../components/AttendanceBlock';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -338,6 +339,20 @@ describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
   it('is shown when isPast and onSetAttendance are both provided', () => {
     const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn() }));
     expect(byTestID(root, ATT).length).toBe(1);
+  });
+
+  // P0-2 (C): offline, the collapsed past-Sunday card must not allow attendance edits.
+  it('passes attendanceDisabled through to the AttendanceBlock (read-only offline)', () => {
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn(), attendanceDisabled: true }));
+    const block = root.findAll((n) => n.type === AttendanceBlock)[0];
+    expect(block).toBeDefined();
+    expect(block.props.disabled).toBe(true);
+  });
+
+  it('attendance tile is editable when not disabled (online)', () => {
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn() }));
+    const block = root.findAll((n) => n.type === AttendanceBlock)[0];
+    expect(block.props.disabled).toBe(false);
   });
 
   it('is hidden when isPast but no callback', () => {

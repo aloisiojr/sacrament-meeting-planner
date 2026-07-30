@@ -75,6 +75,8 @@ export interface UnifiedSundayCardProps {
   attendance?: number | null;
   /** When provided (and isPast), an AttendanceBlock is shown under the DateBlock. */
   onSetAttendance?: (v: number | null) => void;
+  /** Render the attendance tile read-only (e.g. offline) — value still visible, no edits. */
+  attendanceDisabled?: boolean;
   /** Hide Block 1 (status/roles) — used for the Home "próximos domingos" cards (regular layout only). */
   hideStatusBlock?: boolean;
   /** Optional testID for E2E targeting. */
@@ -97,6 +99,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
   isPast = false,
   attendance = null,
   onSetAttendance,
+  attendanceDisabled = false,
   hideStatusBlock = false,
   testID,
 }: UnifiedSundayCardProps) {
@@ -284,6 +287,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
             <AttendanceBlock
               value={attendance}
               onChange={onSetAttendance}
+              disabled={attendanceDisabled}
               testID={`unified-attendance-${date}`}
             />
           )}

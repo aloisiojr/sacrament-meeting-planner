@@ -24,6 +24,28 @@ interface InvitationData {
   language?: string;
 }
 
+/**
+ * Extract the server error code from a functions.invoke result. supabase-js v2 returns non-2xx as
+ * { data: null, error } with the JSON body on error.context (a Response) — NOT in `data` — so the
+ * token_invalid/used/expired codes were previously unreachable. Falls back to data.error for 2xx.
+ */
+export async function extractInviteError(response: {
+  data: { error?: string } | null;
+  error: unknown;
+}): Promise<string | undefined> {
+  if (response.data?.error) return response.data.error;
+  const ctx = (response.error as { context?: unknown } | null)?.context;
+  if (ctx instanceof Response) {
+    try {
+      const body = await ctx.json();
+      return body?.error;
+    } catch {
+      // Couldn't parse the error body — fall through to a generic message.
+    }
+  }
+  return undefined;
+}
+
 export default function InviteRegistrationScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -57,12 +79,13 @@ export default function InviteRegistrationScreen() {
       });
 
       const data = response.data;
+      const errorCode = await extractInviteError(response);
 
-      if (data?.error === 'token_invalid') {
+      if (errorCode === 'token_invalid') {
         setError(t('auth.inviteInvalid'));
-      } else if (data?.error === 'token_used') {
+      } else if (errorCode === 'token_used') {
         setError(t('auth.inviteUsed'));
-      } else if (data?.error === 'token_expired') {
+      } else if (errorCode === 'token_expired') {
         setError(t('auth.inviteExpired'));
       } else if (data?.invitation) {
         if (data.invitation.language) {
@@ -104,23 +127,24 @@ export default function InviteRegistrationScreen() {
       });
 
       const data = response.data;
+      const errorCode = await extractInviteError(response);
 
-      if (data?.error === 'token_expired') {
+      if (errorCode === 'token_expired') {
         setError(t('auth.inviteExpired'));
         return;
       }
 
-      if (data?.error === 'token_used') {
+      if (errorCode === 'token_used') {
         setError(t('auth.inviteUsed'));
         return;
       }
 
-      if (data?.error === 'token_invalid') {
+      if (errorCode === 'token_invalid') {
         setError(t('auth.inviteInvalid'));
         return;
       }
 
-      if (data?.error) {
+      if (errorCode || response.error) {
         setError(t('auth.registrationFailed'));
         return;
       }
@@ -132,6 +156,10 @@ export default function InviteRegistrationScreen() {
           refresh_token: data.session.refresh_token,
         });
         // Navigation handled by auth state change in root layout
+      } else {
+        // 2xx but no session: don't strand the user on a filled form with no feedback.
+        setError(t('auth.registrationFailed'));
+        return;
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

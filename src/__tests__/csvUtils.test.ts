@@ -66,6 +66,21 @@ describe('parseCsv', () => {
     expect(result.errors[0].code).toBe('INVALID_HEADER');
   });
 
+  it('rejects an unrelated 10+ column spreadsheet (anchor-header guard, prevents roster wipe)', () => {
+    // A random ≥10-col sheet: col 0 is not a Name header and col 2 is not a Phone header.
+    const csv = 'Produto,Qtd,Preço,A,B,C,D,E,F,G\nCafé,2,10,,,,,,,';
+    const result = parseCsv(csv);
+    expect(result.success).toBe(false);
+    expect(result.errors[0].code).toBe('INVALID_HEADER');
+  });
+
+  it('accepts localized export headers (en-US / es-LA)', () => {
+    const en = 'Name,Informal Name,Full Phone,Presides,Conducts,Leads Music,Piano,Can Be Recognized,Responsible,calling';
+    const es = 'Nombre,Nombre Informal,Teléfono Completo,Preside,Dirige,Dirige la Música,Piano,Puede Ser Reconocido,Responsable,llamamiento';
+    expect(parseCsv(`${en}\nJoao Silva,Joao,+5511999999999,,,,,,,`).success).toBe(true);
+    expect(parseCsv(`${es}\nJoao Silva,Joao,+5511999999999,,,,,,,`).success).toBe(true);
+  });
+
   it('handles UTF-8 BOM prefix', () => {
     const csv = `\uFEFF${FULL_HEADER}\nJoao Silva,Joao,+5511999999999,X,,,,,`;
     const result = parseCsv(csv);

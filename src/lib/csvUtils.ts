@@ -67,6 +67,11 @@ const KNOWN_COLUMN_COUNT = 10;
 /** Values (case- and accent-insensitive, trimmed) that parse to a `true` capability flag. */
 const TRUE_VALUES = new Set(['x', 'sim', 'yes', 'si']);
 
+/** Accepted col-0 (Name) headers — pt/en/es exports + the pt-BR default (normalizeName-normalized). */
+const NAME_HEADERS = new Set(['nome', 'name', 'nombre']);
+/** Accepted col-2 (Full Phone) headers — pt/en/es exports + the pt-BR default. */
+const PHONE_HEADERS = new Set(['telefone completo', 'full phone', 'telefono completo']);
+
 /** Valid full phone: optional leading '+' then 8–15 digits (matches what generateCsv emits). */
 const PHONE_REGEX = /^\+?\d{8,15}$/;
 
@@ -147,6 +152,17 @@ export function parseCsv(csvContent: string): CsvParseResult {
   const expectedCols = headerParts.length;
 
   if (expectedCols < KNOWN_COLUMN_COUNT) {
+    errors.push({ line: 1, column: 'header', code: 'INVALID_HEADER' });
+    return { success: false, members: [], errors };
+  }
+
+  // Import is destructive (DELETE-ALL + INSERT) and positional, so a wrong ≥10-column spreadsheet
+  // would silently replace the roster with mismapped data. Guard with anchor columns: col 0 must be
+  // the Name header and col 2 the Full-Phone header, in ANY supported locale (pt/en/es) or the
+  // pt-BR default that the export/AI-guide emit. Middle-column wording may drift; anchors won't.
+  const nameHeader = normalizeName(headerParts[0]);
+  const phoneHeader = normalizeName(headerParts[2]);
+  if (!NAME_HEADERS.has(nameHeader) || !PHONE_HEADERS.has(phoneHeader)) {
     errors.push({ line: 1, column: 'header', code: 'INVALID_HEADER' });
     return { success: false, members: [], errors };
   }

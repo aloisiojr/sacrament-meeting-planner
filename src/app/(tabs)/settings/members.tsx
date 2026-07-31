@@ -41,6 +41,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useMembers, memberKeys } from '../../../hooks/useMembers';
+import { PdfImportModal } from '../../../components/PdfImportModal';
 
 // Sentinel thrown by the import mutation when the CSV fails validation, so the error handler can
 // tell parse failures (shown in the in-screen panel) apart from RPC/network failures.
@@ -78,6 +79,7 @@ export default function MembersScreen() {
 
   // Detailed CSV validation errors shown in the in-screen red panel (empty = hidden).
   const [importErrors, setImportErrors] = useState<CsvValidationError[]>([]);
+  const [pdfImportVisible, setPdfImportVisible] = useState(false);
 
   // Export guard to prevent double-tap
   const exportingRef = useRef(false);
@@ -289,6 +291,24 @@ export default function MembersScreen() {
 
         {canImport ? (
           <>
+            {/* Recommended: import from the LCR member-list PDF (on-device, no CSV needed). */}
+            <View style={styles.step}>
+              <Text style={[styles.stepTitle, { color: colors.text }]}>{t('pdfImport.sectionTitle')}</Text>
+              <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>{t('pdfImport.sectionDesc')}</Text>
+              <Pressable
+                style={[styles.csvButton, { borderColor: colors.primary }, !isOnline && { opacity: 0.5 }]}
+                onPress={() => setPdfImportVisible(true)}
+                disabled={!isOnline}
+                accessibilityRole="button"
+                accessibilityLabel={t('pdfImport.sectionTitle')}
+                testID="members-pdf-import-button"
+              >
+                <Text style={[styles.csvButtonText, { color: colors.primary }]}>{t('pdfImport.pick')}</Text>
+              </Pressable>
+            </View>
+            <PdfImportModal visible={pdfImportVisible} onClose={() => setPdfImportVisible(false)} />
+
+            {/* Or import via CSV (advanced) */}
             {/* Step 1: download the current list */}
             <View style={styles.step}>
               <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step1Title')}</Text>

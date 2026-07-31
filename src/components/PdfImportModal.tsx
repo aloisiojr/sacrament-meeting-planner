@@ -114,6 +114,7 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
             blanks={blanks}
             countWarning={countWarning}
             countryCode={countryCode}
+            areaCode={areaCode}
             applying={apply.isPending}
             onCancel={onClose}
             onApply={onApply}

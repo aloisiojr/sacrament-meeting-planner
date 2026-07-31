@@ -52,6 +52,7 @@ function render(onApply: ReturnType<typeof vi.fn>, blanks: { name: string; membe
         plan,
         blanks,
         countryCode: '+55',
+        areaCode: '',
         onCancel: vi.fn(),
         onApply: onApply as unknown as (a: MemberImportApply) => void,
       })
@@ -89,17 +90,21 @@ describe('PdfImportReview wizard', () => {
     });
   });
 
-  it('step 1: a manually typed phone for a NEW blank member fills its insert', () => {
+  it('step 1: a manually entered phone (pencil dialog) for a NEW blank member fills its insert', () => {
     const r = render(onApply, [{ name: 'New Two' }]); // steps: blanks, conflicts, removals
-    typeText(r, 'pdf-blank-input-0', '11 98888-7777');
+    press(r, 'pdf-blank-edit-0'); // open dialog (cc pre-filled +55)
+    typeText(r, 'pdf-blank-phone', '11 98888-7777');
+    press(r, 'pdf-blank-save');
     finish(r, 3);
     const inserts = onApply.mock.calls[0][0].inserts;
     expect(inserts).toContainEqual({ name: 'New Two', phone: '+5511988887777' });
   });
 
-  it('step 1: a manually typed phone for an EXISTING blank member adds a phone update', () => {
+  it('step 1: a manually entered phone for an EXISTING blank member adds a phone update', () => {
     const r = render(onApply, [{ name: 'Existing Blank', memberId: 'm-x' }]);
-    typeText(r, 'pdf-blank-input-0', '+55 11 97777-0000');
+    press(r, 'pdf-blank-edit-0');
+    typeText(r, 'pdf-blank-phone', '11 97777-0000'); // country code stays in its own field (+55)
+    press(r, 'pdf-blank-save');
     finish(r, 3);
     expect(onApply.mock.calls[0][0].phoneUpdates).toContainEqual({ id: 'm-x', phone: '+5511977770000' });
   });

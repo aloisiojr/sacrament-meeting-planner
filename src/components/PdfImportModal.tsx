@@ -16,8 +16,9 @@ import { useApplyMemberImport } from '../hooks/useApplyMemberImport';
 import { parseLcrText, lcrNameToFirstLast } from '../lib/lcrPdfParser';
 import { repairPhones } from '../lib/lcrPhoneRepair';
 import { buildMergePlan, type MergePlan, type ParsedMember } from '../lib/memberMergePlan';
+import { normalizeName } from '../lib/csvUtils';
 import { PdfTextExtractor } from './PdfTextExtractor';
-import { PdfImportReview } from './PdfImportReview';
+import { PdfImportReview, type BlankPhoneEntry } from './PdfImportReview';
 
 export interface PdfImportModalProps {
   visible: boolean;
@@ -35,7 +36,7 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
 
   const [step, setStep] = useState<'extracting' | 'review'>('extracting');
   const [plan, setPlan] = useState<MergePlan | null>(null);
-  const [unrepaired, setUnrepaired] = useState<string[]>([]);
+  const [blanks, setBlanks] = useState<BlankPhoneEntry[]>([]);
   const [countWarning, setCountWarning] = useState<{ expected: number; parsed: number } | null>(null);
 
   // Reset to extraction whenever a new PDF is opened.
@@ -43,7 +44,7 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
     if (visible && base64) {
       setStep('extracting');
       setPlan(null);
-      setUnrepaired([]);
+      setBlanks([]);
       setCountWarning(null);
     }
   }, [visible, base64]);
@@ -55,7 +56,10 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
       const { resolved, unrepaired: unrep } = repairPhones(named, { countryCode, areaCode });
       const parsed: ParsedMember[] = resolved.map((r) => ({ name: r.name, phone: r.phone, age: r.age }));
       setPlan(buildMergePlan(parsed, members));
-      setUnrepaired(unrep);
+      // Blank/unparsed phones → step 1. Tag each with its DB id when it already exists (so a manually
+      // entered phone updates the right member instead of only new inserts).
+      const byName = new Map(members.map((m) => [normalizeName(m.full_name), m.id]));
+      setBlanks(unrep.map((name) => ({ name, memberId: byName.get(normalizeName(name)) })));
       setCountWarning(
         expectedCount != null && expectedCount !== records.length
           ? { expected: expectedCount, parsed: records.length }
@@ -107,8 +111,9 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
         {step === 'review' && plan && (
           <PdfImportReview
             plan={plan}
-            unrepaired={unrepaired}
+            blanks={blanks}
             countWarning={countWarning}
+            countryCode={countryCode}
             applying={apply.isPending}
             onCancel={onClose}
             onApply={onApply}

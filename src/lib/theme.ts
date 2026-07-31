@@ -82,14 +82,14 @@ export const lightColors: ThemeColors = {
   errorContainer: '#FEE2E2',
   success: '#16A34A',
   warning: '#D97706',
-  successText: '#166534',       // green-800, 4.9:1 on white / 4.6:1 on hero (AA text)
-  warningText: '#B45309',       // amber-700, 5.3:1 on white (AA text)
+  successText: '#166534',       // green-800, 7.1:1 white / 5.8:1 on hero #DBEAFE (AA text)
+  warningText: '#92400E',       // amber-800, 7.5:1 white / 6.0:1 on hero (AA text on both)
   status: {
-    not_assigned: '#6B7280',          // 4.5:1 on white
-    assigned_not_invited: '#EA580C',  // 3.8:1 on white
-    assigned_invited: '#A16207',      // 5.3:1 on white (yellow is illegible bright on white)
-    assigned_confirmed: '#15803D',    // 4.6:1 on white
-    gave_up: '#7F1D1D',               // 13:1 on white
+    not_assigned: '#6B7280',          // ≥3.7:1 on white & hero
+    assigned_not_invited: '#C2410C',  // orange-700, ≥4.4:1 on white & hero (was #EA580C: 2.9 on hero)
+    assigned_invited: '#A16207',      // ≥4.2:1 (yellow is illegible bright on white)
+    assigned_confirmed: '#15803D',    // ≥3.6:1 on white & hero
+    gave_up: '#7F1D1D',               // very high
   },
 
   border: '#94A3B8',            // Slate-400 (bluish border)

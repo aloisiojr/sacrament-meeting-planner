@@ -39,16 +39,24 @@ describe('ThemeContext - Color Palettes', () => {
       }
     });
 
-    it('status dots meet ≥3:1 on the white card (H2)', () => {
-      for (const [k, v] of Object.entries(lightColors.status)) {
-        const ratio = contrastRatio(v, lightColors.card);
-        expect(ratio, `status.${k} on card: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+    // The highlighted hero card uses primaryContainer as its background, so status dots + success/
+    // warning text must clear their thresholds on BOTH the white card and the hero (H1/H2/H3).
+    const lightSurfaces = [lightColors.card, lightColors.primaryContainer];
+
+    it('status dots meet ≥3:1 on the white card AND the hero (H2)', () => {
+      for (const bg of lightSurfaces) {
+        for (const [k, v] of Object.entries(lightColors.status)) {
+          const ratio = contrastRatio(v, bg);
+          expect(ratio, `status.${k} on ${bg}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+        }
       }
     });
 
-    it('successText / warningText meet AA (4.5:1) as text on the white card (H1/H3)', () => {
-      expect(contrastRatio(lightColors.successText, lightColors.card)).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(lightColors.warningText, lightColors.card)).toBeGreaterThanOrEqual(4.5);
+    it('successText / warningText meet AA (4.5:1) as text on the white card AND the hero (H1/H3)', () => {
+      for (const bg of lightSurfaces) {
+        expect(contrastRatio(lightColors.successText, bg), `successText on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(lightColors.warningText, bg), `warningText on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
     });
 
     it('should have WCAG AA contrast for text on background (4.5:1)', () => {

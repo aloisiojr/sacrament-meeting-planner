@@ -133,7 +133,7 @@ describe('CR-282 S016-02: DraggableFlatList drag control', () => {
 
 describe('CR-283 S016-03: i18n key agenda.addPresence', () => {
   it('i18n key agenda.addPresence exists in pt-BR', () => {
-    expect((ptBR as any).agenda.addPresence).toBe('Reconhecer nova presenca');
+    expect((ptBR as any).agenda.addPresence).toBe('Reconhecer nova presença');
   });
 
   it('i18n key agenda.addPresence exists in en-US', () => {

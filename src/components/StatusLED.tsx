@@ -28,6 +28,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import type { SpeechStatus } from '../types/database';
+import { useTheme } from '../contexts/ThemeContext';
 
 // --- Types ---
 
@@ -60,6 +61,8 @@ export function StatusLED({
   onPress,
   disabled = false,
 }: StatusLEDProps) {
+  const { colors } = useTheme();
+  const dotColor = colors.status?.[status] ?? STATUS_COLORS[status];
   const fadeOpacity = useSharedValue(1);
   // State (not a ref) so the animation effect re-runs once the async check resolves — a ref
   // read at mount was still false and the animation played even with reduce-motion enabled.
@@ -122,7 +125,7 @@ export function StatusLED({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: STATUS_COLORS[status],
+          backgroundColor: dotColor,
         },
         animatedStyle,
       ]}

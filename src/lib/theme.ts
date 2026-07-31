@@ -1,5 +1,7 @@
 // --- Types ---
 
+import type { SpeechStatus } from '../types/database';
+
 export type ThemeMode = 'automatic' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
@@ -27,6 +29,11 @@ export interface ThemeColors {
   errorContainer: string;
   success: string;
   warning: string;
+  /** Success/warning tuned for use as TEXT (AA on light backgrounds); success/warning stay for fills. */
+  successText: string;
+  warningText: string;
+  /** Speech-status indicator colors, tuned per theme for ≥3:1 as dots/LEDs. Single source of truth. */
+  status: Record<SpeechStatus, string>;
 
   // Borders & Dividers
   border: string;
@@ -75,6 +82,15 @@ export const lightColors: ThemeColors = {
   errorContainer: '#FEE2E2',
   success: '#16A34A',
   warning: '#D97706',
+  successText: '#166534',       // green-800, 7.1:1 white / 5.8:1 on hero #DBEAFE (AA text)
+  warningText: '#92400E',       // amber-800, 7.5:1 white / 6.0:1 on hero (AA text on both)
+  status: {
+    not_assigned: '#6B7280',          // ≥3.7:1 on white & hero
+    assigned_not_invited: '#C2410C',  // orange-700, ≥4.4:1 on white & hero (was #EA580C: 2.9 on hero)
+    assigned_invited: '#A16207',      // ≥4.2:1 (yellow is illegible bright on white)
+    assigned_confirmed: '#15803D',    // ≥3.6:1 on white & hero
+    gave_up: '#7F1D1D',               // very high
+  },
 
   border: '#94A3B8',            // Slate-400 (bluish border)
   divider: '#CBD5E1',           // Slate-300 (bluish divider)
@@ -84,7 +100,7 @@ export const lightColors: ThemeColors = {
 
   inputBackground: '#F8FAFC',   // Slate-50
   inputBorder: '#94A3B8',       // Slate-400 (matches border)
-  placeholder: '#94A3B8',       // Slate-400 (bluish placeholder)
+  placeholder: '#64748B',       // Slate-500 (~4.6:1 on inputBackground; was #94A3B8 at 2.45:1)
 };
 
 export const darkColors: ThemeColors = {
@@ -107,6 +123,15 @@ export const darkColors: ThemeColors = {
   errorContainer: '#451A1A',
   success: '#4ADE80',
   warning: '#FBBF24',
+  successText: '#4ADE80',       // already high-contrast on dark surfaces
+  warningText: '#FBBF24',
+  status: {
+    not_assigned: '#9CA3AF',
+    assigned_not_invited: '#F97316',
+    assigned_invited: '#EAB308',
+    assigned_confirmed: '#22C55E',
+    gave_up: '#F87171',               // was #7F1D1D → 1.46:1 (invisible) on dark; now legible
+  },
 
   border: '#475569',
   divider: '#334155',

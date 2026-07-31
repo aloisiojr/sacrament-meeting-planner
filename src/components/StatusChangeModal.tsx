@@ -84,7 +84,7 @@ export function StatusChangeModal({
             <View
               style={[
                 styles.indicator,
-                { backgroundColor: STATUS_INDICATOR_COLORS[currentStatus] },
+                { backgroundColor: colors.status?.[currentStatus] ?? STATUS_INDICATOR_COLORS[currentStatus] },
               ]}
               testID="status-modal-current"
             />
@@ -105,7 +105,7 @@ export function StatusChangeModal({
                 <View
                   style={[
                     styles.indicator,
-                    { backgroundColor: STATUS_INDICATOR_COLORS[item] },
+                    { backgroundColor: colors.status?.[item] ?? STATUS_INDICATOR_COLORS[item] },
                   ]}
                 />
                 <Text style={[styles.optionLabel, { color: colors.text }]}>
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   content: {
-    borderRadius: 12,
+    borderRadius: 14,
     width: '100%',
     maxWidth: 320,
     paddingTop: 16,

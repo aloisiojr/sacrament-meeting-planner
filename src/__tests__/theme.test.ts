@@ -34,7 +34,28 @@ describe('ThemeContext - Color Palettes', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(lightColors)) {
-        expect(value, `lightColors.${key} is not a valid hex`).toMatch(hexRegex);
+        const vals = typeof value === 'string' ? [value] : Object.values(value);
+        for (const v of vals) expect(v, `lightColors.${key} is not a valid hex`).toMatch(hexRegex);
+      }
+    });
+
+    // The highlighted hero card uses primaryContainer as its background, so status dots + success/
+    // warning text must clear their thresholds on BOTH the white card and the hero (H1/H2/H3).
+    const lightSurfaces = [lightColors.card, lightColors.primaryContainer];
+
+    it('status dots meet ≥3:1 on the white card AND the hero (H2)', () => {
+      for (const bg of lightSurfaces) {
+        for (const [k, v] of Object.entries(lightColors.status)) {
+          const ratio = contrastRatio(v, bg);
+          expect(ratio, `status.${k} on ${bg}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+        }
+      }
+    });
+
+    it('successText / warningText meet AA (4.5:1) as text on the white card AND the hero (H1/H3)', () => {
+      for (const bg of lightSurfaces) {
+        expect(contrastRatio(lightColors.successText, bg), `successText on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(lightColors.warningText, bg), `warningText on ${bg}`).toBeGreaterThanOrEqual(4.5);
       }
     });
 
@@ -63,7 +84,15 @@ describe('ThemeContext - Color Palettes', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(darkColors)) {
-        expect(value, `darkColors.${key} is not a valid hex`).toMatch(hexRegex);
+        const vals = typeof value === 'string' ? [value] : Object.values(value);
+        for (const v of vals) expect(v, `darkColors.${key} is not a valid hex`).toMatch(hexRegex);
+      }
+    });
+
+    it('status dots meet ≥3:1 on the dark card (incl. gave_up, H2)', () => {
+      for (const [k, v] of Object.entries(darkColors.status)) {
+        const ratio = contrastRatio(v, darkColors.card);
+        expect(ratio, `status.${k} on card: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
       }
     });
 

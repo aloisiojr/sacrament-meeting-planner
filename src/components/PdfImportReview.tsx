@@ -133,7 +133,7 @@ export function PdfImportReview({
     <View style={styles.container}>
       {/* Top bar: Cancelar (left) + centered title. */}
       <View style={styles.topBar}>
-        <Pressable onPress={handleCancel} disabled={applying} hitSlop={8} testID="pdf-cancel">
+        <Pressable onPress={handleCancel} disabled={applying} hitSlop={12} testID="pdf-cancel">
           <Text style={[styles.topAction, { color: colors.primary }]}>{t('common.cancel')}</Text>
         </Pressable>
         <Text style={[styles.topTitle, { color: colors.text }]} numberOfLines={1}>{t('pdfImport.reviewTitle')}</Text>
@@ -177,6 +177,7 @@ export function PdfImportReview({
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.pdfShort')}</Text>
             <Switch
               testID="pdf-conflict-master"
+              accessibilityLabel={`${t('pdfImport.pdfShort')} / ${t('pdfImport.appShort')}`}
               value={allApp}
               onValueChange={setAllApp}
               trackColor={{ false: colors.primary, true: colors.primary }}
@@ -194,6 +195,7 @@ export function PdfImportReview({
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.selectAll')}</Text>
             <Switch
               testID="pdf-remove-master"
+              accessibilityLabel={t('pdfImport.selectAll')}
               value={allRemove}
               onValueChange={setAllRemove}
               trackColor={{ false: colors.divider, true: colors.error }}
@@ -217,7 +219,13 @@ export function PdfImportReview({
                   {manualEntry[b.name].phone}
                 </Text>
               )}
-              <Pressable onPress={() => openEditor(b.name)} hitSlop={8} testID={`pdf-blank-edit-${i}`}>
+              <Pressable
+                onPress={() => openEditor(b.name)}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('common.edit')} ${b.name}`}
+                testID={`pdf-blank-edit-${i}`}
+              >
                 <PencilIcon size={18} color={colors.primary} />
               </Pressable>
             </View>
@@ -231,6 +239,7 @@ export function PdfImportReview({
                 <Text style={[styles.phoneText, { color: colors.textSecondary }]} numberOfLines={1}>{c.pdfPhone}</Text>
                 <Switch
                   testID={`pdf-conflict-toggle-${c.member.id}`}
+                  accessibilityLabel={c.member.full_name}
                   value={useApp[c.member.id] !== false}
                   onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
                   trackColor={{ false: colors.primary, true: colors.primary }}
@@ -247,6 +256,7 @@ export function PdfImportReview({
               <Text style={[styles.name, { color: colors.text, flex: 1 }]} numberOfLines={1}>{m.full_name}</Text>
               <Switch
                 testID={`pdf-remove-${m.id}`}
+                accessibilityLabel={m.full_name}
                 value={!!toRemove[m.id]}
                 onValueChange={(v) => setToRemove((s) => ({ ...s, [m.id]: v }))}
                 trackColor={{ false: colors.divider, true: colors.error }}
@@ -278,7 +288,7 @@ export function PdfImportReview({
               <View style={styles.ccField}>
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('pdfImport.countryCode')}</Text>
                 <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.background }]}
                   value={draftCc}
                   onChangeText={setDraftCc}
                   keyboardType="phone-pad"
@@ -288,7 +298,7 @@ export function PdfImportReview({
               <View style={styles.phoneFieldWrap}>
                 <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('pdfImport.phonePlaceholder')}</Text>
                 <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.background }]}
                   value={draftPhone}
                   onChangeText={setDraftPhone}
                   keyboardType="phone-pad"
@@ -316,7 +326,7 @@ export function PdfImportReview({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  topAction: { fontSize: 16, width: 72 },
+  topAction: { fontSize: 16, width: 72, paddingVertical: 10 },
   topTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   topSpacer: { width: 72 },
   info: { paddingHorizontal: 16, paddingBottom: 10 },
@@ -353,7 +363,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  btn: { paddingVertical: 10, paddingHorizontal: 8, minWidth: 88 },
+  btn: { paddingVertical: 10, paddingHorizontal: 8, minWidth: 88, minHeight: 44, justifyContent: 'center' },
   btnText: { fontSize: 16 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   dialog: { width: '100%', maxWidth: 420, borderRadius: 14, padding: 20 },

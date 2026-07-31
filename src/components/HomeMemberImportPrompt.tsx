@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useMembers } from '../hooks/useMembers';
+import { XIcon } from './icons';
 
 const dismissKey = (wardId: string) => `pdf-import-prompt-dismissed:${wardId}`;
 
@@ -45,8 +46,14 @@ export function HomeMemberImportPrompt() {
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.primary }]} testID="home-import-prompt">
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: colors.text }]}>{t('homeImportPrompt.title')}</Text>
-        <Pressable onPress={dismiss} hitSlop={12} accessibilityRole="button" testID="home-import-prompt-dismiss">
-          <Text style={[styles.dismiss, { color: colors.textSecondary }]}>✕</Text>
+        <Pressable
+          onPress={dismiss}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+          testID="home-import-prompt-dismiss"
+        >
+          <XIcon size={18} color={colors.textSecondary} />
         </Pressable>
       </View>
       <Text style={[styles.body, { color: colors.textSecondary }]}>{t('homeImportPrompt.body')}</Text>

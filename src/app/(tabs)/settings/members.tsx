@@ -393,7 +393,7 @@ export default function MembersScreen() {
                     <View style={styles.codeField}>
                       <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>{t('pdfImport.countryCode')}</Text>
                       <TextInput
-                        style={[styles.codeInput, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                        style={[styles.codeInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.background }]}
                         value={countryCode}
                         onChangeText={setCountryCode}
                         keyboardType="phone-pad"
@@ -405,7 +405,7 @@ export default function MembersScreen() {
                     <View style={styles.codeField}>
                       <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>{t('pdfImport.areaCode')}</Text>
                       <TextInput
-                        style={[styles.codeInput, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                        style={[styles.codeInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.background }]}
                         value={areaCode}
                         onChangeText={setAreaCode}
                         keyboardType="phone-pad"
@@ -482,7 +482,7 @@ export default function MembersScreen() {
 
                     {/* Destructive replace warning */}
                     <View style={[styles.warningBox, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
-                      <Text style={[styles.warningText, { color: colors.error }]} testID="members-import-warning">
+                      <Text style={[styles.warningText, { color: colors.text }]} testID="members-import-warning">
                         {t('members.csvImportWarning')}
                       </Text>
                     </View>
@@ -511,12 +511,12 @@ export default function MembersScreen() {
                         testID="members-import-errors"
                       >
                         {shownErrors.map((err, idx) => (
-                          <Text key={idx} style={[styles.errorLine, { color: colors.error }]}>
+                          <Text key={idx} style={[styles.errorLine, { color: colors.text }]}>
                             {formatCsvError(err, t)}
                           </Text>
                         ))}
                         {extraErrorCount > 0 && (
-                          <Text style={[styles.errorLine, styles.errorMore, { color: colors.error }]}>
+                          <Text style={[styles.errorLine, styles.errorMore, { color: colors.text }]}>
                             {t('members.csvMoreErrors', { count: extraErrorCount })}
                           </Text>
                         )}
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   backButton: {
     fontSize: 16,

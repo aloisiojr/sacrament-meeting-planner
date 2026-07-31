@@ -5,7 +5,7 @@
  * phone/email, garbage phone, emails split across lines, and the Count/Contagem/Recuento line.
  */
 import { describe, it, expect } from 'vitest';
-import { parseLcrText } from '../lib/lcrPdfParser';
+import { parseLcrText, lcrNameToFirstLast } from '../lib/lcrPdfParser';
 
 // --- pt fixture: title + wrapped header + footer + count; a multi-line name; a page-split row ---
 const PT = [
@@ -136,5 +136,27 @@ describe('parseLcrText — edge cases', () => {
     const r = parseLcrText('Name Gender Age\nX, Y M 40 1 Jan 1985\nCount: 9\n');
     expect(r.records).toHaveLength(1);
     expect(r.expectedCount).toBe(9); // caller compares → mismatch warning (AC3)
+  });
+});
+
+describe('lcrNameToFirstLast — Rule 1 (AC4)', () => {
+  it('reorders "Last, First" to "First Last"', () => {
+    expect(lcrNameToFirstLast('Sobrenome, Alfa Beta')).toBe('Alfa Beta Sobrenome');
+  });
+  it('preserves lowercase particles in the surname', () => {
+    expect(lcrNameToFirstLast('de Oliveira, Fernando')).toBe('Fernando de Oliveira');
+  });
+  it('preserves accents and capitalization', () => {
+    expect(lcrNameToFirstLast('Apellido, Félix José')).toBe('Félix José Apellido');
+  });
+  it('leaves a no-comma name as-is (already First Last)', () => {
+    expect(lcrNameToFirstLast('Greg Exemplo')).toBe('Greg Exemplo');
+  });
+  it('collapses extra whitespace and splits on the first comma only', () => {
+    expect(lcrNameToFirstLast('  Sobrenome  Beta  dos ,  Renata  ')).toBe('Renata Sobrenome Beta dos');
+  });
+  it('handles a missing first or last gracefully', () => {
+    expect(lcrNameToFirstLast('Solo,')).toBe('Solo');
+    expect(lcrNameToFirstLast(', OnlyFirst')).toBe('OnlyFirst');
   });
 });

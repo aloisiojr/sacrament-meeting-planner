@@ -27,6 +27,22 @@ export interface LcrParseResult {
   expectedCount: number | null;
 }
 
+/**
+ * Rule 1 — convert an LCR name from "Last, First" to "First Last". Accents/case and lowercase
+ * particles are preserved ("de Oliveira, Fernando" → "Fernando de Oliveira"). A name without a
+ * comma is assumed already "First Last" and returned trimmed. Splits on the FIRST comma only.
+ */
+export function lcrNameToFirstLast(name: string): string {
+  const trimmed = name.replace(/\s+/g, ' ').trim();
+  const idx = trimmed.indexOf(',');
+  if (idx === -1) return trimmed;
+  const last = trimmed.slice(0, idx).trim();
+  const first = trimmed.slice(idx + 1).trim();
+  if (!first) return last;
+  if (!last) return first;
+  return `${first} ${last}`;
+}
+
 // Union of pt/en/es month abbreviations (lowercase, accent-stripped). es "mayo" is 4 letters.
 const MONTH_TOKENS = new Set([
   'jan', 'feb', 'fev', 'mar', 'apr', 'abr', 'may', 'mai', 'mayo',

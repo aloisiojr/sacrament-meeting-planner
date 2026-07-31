@@ -18,6 +18,7 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Linking,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -44,11 +45,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useMembers, memberKeys } from '../../../hooks/useMembers';
 import { PdfImportModal } from '../../../components/PdfImportModal';
 import { guessWardCodes } from '../../../lib/wardPhoneCodes';
-import { ChevronDownIcon, ChevronRightIcon } from '../../../components/icons';
+import { ChevronRightIcon } from '../../../components/icons';
 
 // Sentinel thrown by the import mutation when the CSV fails validation, so the error handler can
 // tell parse failures (shown in the in-screen panel) apart from RPC/network failures.
 const CSV_PARSE_ERROR = 'csv/parse';
+
+// LCR (Leader and Clerk Resources) member-list page — where the source PDF is printed from.
+const LCR_URL = 'https://lcr.churchofjesuschrist.org/mlt/records/member-list';
 
 type TFn = ReturnType<typeof useTranslation>['t'];
 
@@ -84,8 +88,27 @@ export default function MembersScreen() {
   const [importErrors, setImportErrors] = useState<CsvValidationError[]>([]);
 
   // Which import card is expanded — PDF (recommended) or CSV (advanced). Opening one closes the
-  // other, like the Home "play" cards.
+  // other, like the Home "play" cards; the tapped card scrolls up to the top of the screen.
   const [openCard, setOpenCard] = useState<'pdf' | 'csv'>('pdf');
+  const scrollRef = useRef<ScrollView>(null);
+  const cardY = useRef<{ pdf: number; csv: number }>({ pdf: 0, csv: 0 });
+  const pendingScroll = useRef<'pdf' | 'csv' | null>(null);
+
+  // Open a card and run its top up to the top of the screen. onLayout refines the target once the
+  // expand/collapse settles (the other card's height changes shift the tapped card's position).
+  const selectCard = useCallback((key: 'pdf' | 'csv') => {
+    setOpenCard(key);
+    pendingScroll.current = key;
+    scrollRef.current?.scrollTo({ y: cardY.current[key], animated: true });
+  }, []);
+
+  const onCardLayout = useCallback((key: 'pdf' | 'csv', y: number) => {
+    cardY.current[key] = y;
+    if (pendingScroll.current === key) {
+      scrollRef.current?.scrollTo({ y, animated: true });
+      pendingScroll.current = null;
+    }
+  }, []);
 
   // PDF import: country/area codes live here (no intermediate screen) + the picked PDF base64 that
   // hands off to the extraction/review modal. Codes are pre-filled from the existing roster once.
@@ -320,7 +343,7 @@ export default function MembersScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Read-only member count */}
         {!isLoading && (
           <Text style={[styles.count, { color: colors.text }]} testID="members-count">
@@ -331,10 +354,13 @@ export default function MembersScreen() {
         {canImport ? (
           <>
             {/* PDF card (recommended): pick the LCR PDF; DDI/DDD live inline (no extra screen). */}
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}
+              onLayout={(e) => onCardLayout('pdf', e.nativeEvent.layout.y)}
+            >
               <Pressable
                 style={styles.cardHeader}
-                onPress={() => setOpenCard('pdf')}
+                onPress={() => selectCard('pdf')}
                 accessibilityRole="button"
                 accessibilityState={{ expanded: openCard === 'pdf' }}
                 testID="members-pdf-card-header"
@@ -343,15 +369,26 @@ export default function MembersScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('pdfImport.sectionTitle')}</Text>
                   <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{t('pdfImport.sectionDesc')}</Text>
                 </View>
-                {openCard === 'pdf' ? (
-                  <ChevronDownIcon size={20} color={colors.textSecondary} />
-                ) : (
-                  <ChevronRightIcon size={20} color={colors.textSecondary} />
-                )}
+                {openCard !== 'pdf' && <ChevronRightIcon size={20} color={colors.textSecondary} />}
               </Pressable>
               {openCard === 'pdf' && (
                 <View style={styles.cardBody}>
-                  <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>{t('pdfImport.codesHint')}</Text>
+                  {/* On-device import instructions + LGPD privacy note. */}
+                  <Text style={[styles.pdfIntro, { color: colors.text }]}>{t('pdfImport.introText')}</Text>
+                  <Text style={[styles.pdfPrivacy, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700' }}>{t('pdfImport.privacyLabel')} </Text>
+                    {t('pdfImport.privacyText')}
+                  </Text>
+                  <Text style={[styles.pdfInstrTitle, { color: colors.text }]}>{t('pdfImport.instructionsTitle')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>
+                    {t('pdfImport.instrGoTo')}{' '}
+                    <Text style={{ color: colors.primary, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(LCR_URL)}>
+                      {t('pdfImport.lcrLink')}
+                    </Text>
+                  </Text>
+                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrFilters')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrPrint')}</Text>
+                  <Text style={[styles.stepDesc, styles.pdfCodesHint, { color: colors.textSecondary }]}>{t('pdfImport.codesHint')}</Text>
                   <View style={styles.codeRow}>
                     <View style={styles.codeField}>
                       <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>{t('pdfImport.countryCode')}</Text>
@@ -393,10 +430,13 @@ export default function MembersScreen() {
             </View>
 
             {/* CSV card (advanced): the guided 3-step export → edit → import flow. */}
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}>
+            <View
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}
+              onLayout={(e) => onCardLayout('csv', e.nativeEvent.layout.y)}
+            >
               <Pressable
                 style={styles.cardHeader}
-                onPress={() => setOpenCard('csv')}
+                onPress={() => selectCard('csv')}
                 accessibilityRole="button"
                 accessibilityState={{ expanded: openCard === 'csv' }}
                 testID="members-csv-card-header"
@@ -405,11 +445,7 @@ export default function MembersScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('members.csvSectionTitle')}</Text>
                   <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{t('members.csvSectionDesc')}</Text>
                 </View>
-                {openCard === 'csv' ? (
-                  <ChevronDownIcon size={20} color={colors.textSecondary} />
-                ) : (
-                  <ChevronRightIcon size={20} color={colors.textSecondary} />
-                )}
+                {openCard !== 'csv' && <ChevronRightIcon size={20} color={colors.textSecondary} />}
               </Pressable>
               {openCard === 'csv' && (
                 <View style={styles.cardBody}>
@@ -565,6 +601,29 @@ const styles = StyleSheet.create({
   cardBody: {
     paddingHorizontal: 16,
     paddingBottom: 20,
+  },
+  pdfIntro: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  pdfPrivacy: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  pdfInstrTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  pdfStep: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  pdfCodesHint: {
+    marginTop: 8,
   },
   codeRow: {
     flexDirection: 'row',

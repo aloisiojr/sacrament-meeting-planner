@@ -75,7 +75,7 @@ describe('CR-290: Account self-deletion', () => {
     it('AC-290-11: deleteAccountLastMemberWarning exists in all 3 locales', () => {
       expect(ptBR.users.deleteAccountLastMemberWarning).toBeDefined();
       expect(enUS.users.deleteAccountLastMemberWarning).toBe(
-        'You are the only member of this ward. Deleting your account will permanently delete the entire ward and all associated data. Do you want to continue?'
+        'You are the only member of this Ward. Deleting your account will permanently delete the entire Ward and all associated data. Do you want to continue?'
       );
       expect(esLA.users.deleteAccountLastMemberWarning).toBeDefined();
     });

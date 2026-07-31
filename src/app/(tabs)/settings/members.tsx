@@ -9,14 +9,16 @@
  * shown. When the ward has no members, export ships clearly-marked example rows instead.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   Pressable,
   Alert,
+  Linking,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -41,10 +43,16 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useMembers, memberKeys } from '../../../hooks/useMembers';
+import { PdfImportModal } from '../../../components/PdfImportModal';
+import { guessWardCodes } from '../../../lib/wardPhoneCodes';
+import { ChevronRightIcon } from '../../../components/icons';
 
 // Sentinel thrown by the import mutation when the CSV fails validation, so the error handler can
 // tell parse failures (shown in the in-screen panel) apart from RPC/network failures.
 const CSV_PARSE_ERROR = 'csv/parse';
+
+// LCR (Leader and Clerk Resources) member-list page — where the source PDF is printed from.
+const LCR_URL = 'https://lcr.churchofjesuschrist.org/mlt/records/member-list';
 
 type TFn = ReturnType<typeof useTranslation>['t'];
 
@@ -78,6 +86,62 @@ export default function MembersScreen() {
 
   // Detailed CSV validation errors shown in the in-screen red panel (empty = hidden).
   const [importErrors, setImportErrors] = useState<CsvValidationError[]>([]);
+
+  // Which import card is expanded — PDF (recommended) or CSV (advanced). Opening one closes the
+  // other, like the Home "play" cards; the tapped card scrolls up to the top of the screen.
+  const [openCard, setOpenCard] = useState<'pdf' | 'csv'>('pdf');
+  const scrollRef = useRef<ScrollView>(null);
+  const cardY = useRef<{ pdf: number; csv: number }>({ pdf: 0, csv: 0 });
+  const pendingScroll = useRef<'pdf' | 'csv' | null>(null);
+
+  // Open a card and run its top up to the top of the screen. onLayout refines the target once the
+  // expand/collapse settles (the other card's height changes shift the tapped card's position).
+  const selectCard = useCallback((key: 'pdf' | 'csv') => {
+    setOpenCard(key);
+    pendingScroll.current = key;
+    scrollRef.current?.scrollTo({ y: cardY.current[key], animated: true });
+  }, []);
+
+  const onCardLayout = useCallback((key: 'pdf' | 'csv', y: number) => {
+    cardY.current[key] = y;
+    if (pendingScroll.current === key) {
+      scrollRef.current?.scrollTo({ y, animated: true });
+      pendingScroll.current = null;
+    }
+  }, []);
+
+  // PDF import: country/area codes live here (no intermediate screen) + the picked PDF base64 that
+  // hands off to the extraction/review modal. Codes are pre-filled from the existing roster once.
+  const [countryCode, setCountryCode] = useState('');
+  const [areaCode, setAreaCode] = useState('');
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const codesPrefilledRef = useRef(false);
+
+  // Pre-fill DDI/DDD once the roster loads (guess from existing members); user can override.
+  useEffect(() => {
+    if (codesPrefilledRef.current || !members) return;
+    codesPrefilledRef.current = true;
+    const guess = guessWardCodes(members);
+    setCountryCode((c) => c || guess.countryCode);
+    setAreaCode((a) => a || guess.areaCode);
+  }, [members]);
+
+  // Pick the LCR PDF and read it as base64 → opens the extraction/review modal.
+  const pickPdf = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', '*/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const picked = new File(result.assets[0].uri);
+      setPdfBase64(await picked.base64());
+    } catch (err: any) {
+      const msg = (err?.message ?? '').toLowerCase();
+      if (msg.includes('cancel')) return;
+      Alert.alert(t('common.error'), t('pdfImport.pickFailed'));
+    }
+  }, [t]);
 
   // Export guard to prevent double-tap
   const exportingRef = useRef(false);
@@ -279,7 +343,7 @@ export default function MembersScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Read-only member count */}
         {!isLoading && (
           <Text style={[styles.count, { color: colors.text }]} testID="members-count">
@@ -289,80 +353,187 @@ export default function MembersScreen() {
 
         {canImport ? (
           <>
-            {/* Step 1: download the current list */}
-            <View style={styles.step}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step1Title')}</Text>
-              <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
-                {t('members.step1Desc')}
-              </Text>
+            {/* PDF card (recommended): pick the LCR PDF; DDI/DDD live inline (no extra screen). */}
+            <View
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}
+              onLayout={(e) => onCardLayout('pdf', e.nativeEvent.layout.y)}
+            >
               <Pressable
-                style={[styles.csvButton, { borderColor: colors.primary }]}
-                onPress={handleExport}
+                style={styles.cardHeader}
+                onPress={() => selectCard('pdf')}
                 accessibilityRole="button"
-                accessibilityLabel={t('members.exportCsv')}
-                testID="members-export-button"
+                accessibilityState={{ expanded: openCard === 'pdf' }}
+                testID="members-pdf-card-header"
               >
-                <Text style={[styles.csvButtonText, { color: colors.primary }]}>
-                  {t('members.exportCsv')}
-                </Text>
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('pdfImport.sectionTitle')}</Text>
+                  <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{t('pdfImport.sectionDesc')}</Text>
+                </View>
+                {openCard !== 'pdf' && <ChevronRightIcon size={20} color={colors.textSecondary} />}
               </Pressable>
-            </View>
-
-            {/* Step 2: edit the spreadsheet */}
-            <View style={styles.step}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step2Title')}</Text>
-              <Text style={[styles.stepDesc, { color: colors.textSecondary }]} testID="members-step2-note">
-                {t('members.step2Desc')}
-              </Text>
-            </View>
-
-            {/* Step 3: import the file */}
-            <View style={styles.step}>
-              <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step3Title')}</Text>
-
-              {/* Destructive replace warning */}
-              <View style={[styles.warningBox, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
-                <Text style={[styles.warningText, { color: colors.error }]} testID="members-import-warning">
-                  {t('members.csvImportWarning')}
-                </Text>
-              </View>
-
-              <Pressable
-                style={[styles.csvButton, { borderColor: colors.primary }, !isOnline && { opacity: 0.5 }]}
-                onPress={handleImport}
-                disabled={importMutation.isPending || !isOnline}
-                accessibilityRole="button"
-                accessibilityLabel={t('members.importCsv')}
-                testID="members-import-button"
-              >
-                {importMutation.isPending ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={[styles.csvButtonText, { color: colors.primary }]}>
-                    {t('members.importCsv')}
+              {openCard === 'pdf' && (
+                <View style={styles.cardBody}>
+                  {/* On-device import instructions + LGPD privacy note (intro is the card subtitle). */}
+                  <Text style={[styles.pdfPrivacy, { color: colors.textSecondary }]}>
+                    <Text style={{ fontWeight: '700' }}>{t('pdfImport.privacyLabel')} </Text>
+                    {t('pdfImport.privacyText')}
                   </Text>
-                )}
-              </Pressable>
-
-              {/* Detailed CSV validation errors (first 5 + "… e mais N") */}
-              {importErrors.length > 0 && (
-                <View
-                  style={[styles.errorPanel, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}
-                  testID="members-import-errors"
-                >
-                  {shownErrors.map((err, idx) => (
-                    <Text key={idx} style={[styles.errorLine, { color: colors.error }]}>
-                      {formatCsvError(err, t)}
+                  <Text style={[styles.pdfInstrTitle, { color: colors.textSecondary }]}>{t('pdfImport.instructionsTitle')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>
+                    {t('pdfImport.instrGoTo')}{' '}
+                    <Text style={{ color: colors.primary, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(LCR_URL)}>
+                      {t('pdfImport.lcrLink')}
                     </Text>
-                  ))}
-                  {extraErrorCount > 0 && (
-                    <Text style={[styles.errorLine, styles.errorMore, { color: colors.error }]}>
-                      {t('members.csvMoreErrors', { count: extraErrorCount })}
-                    </Text>
-                  )}
+                  </Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrFilters')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrPrint')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrPick')}</Text>
+                  <Text style={[styles.stepDesc, styles.pdfCodesHint, { color: colors.textSecondary }]}>{t('pdfImport.codesHint')}</Text>
+                  <View style={styles.codeRow}>
+                    <View style={styles.codeField}>
+                      <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>{t('pdfImport.countryCode')}</Text>
+                      <TextInput
+                        style={[styles.codeInput, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                        value={countryCode}
+                        onChangeText={setCountryCode}
+                        keyboardType="phone-pad"
+                        placeholder="+55"
+                        placeholderTextColor={colors.textTertiary}
+                        testID="pdf-country-code"
+                      />
+                    </View>
+                    <View style={styles.codeField}>
+                      <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>{t('pdfImport.areaCode')}</Text>
+                      <TextInput
+                        style={[styles.codeInput, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.background }]}
+                        value={areaCode}
+                        onChangeText={setAreaCode}
+                        keyboardType="phone-pad"
+                        placeholder="11"
+                        placeholderTextColor={colors.textTertiary}
+                        testID="pdf-area-code"
+                      />
+                    </View>
+                  </View>
+                  <Pressable
+                    style={[styles.csvButton, { borderColor: colors.primary }, !isOnline && { opacity: 0.5 }]}
+                    onPress={pickPdf}
+                    disabled={!isOnline}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('pdfImport.pick')}
+                    testID="members-pdf-import-button"
+                  >
+                    <Text style={[styles.csvButtonText, { color: colors.primary }]}>{t('pdfImport.pick')}</Text>
+                  </Pressable>
                 </View>
               )}
             </View>
+
+            {/* CSV card (advanced): the guided 3-step export → edit → import flow. */}
+            <View
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.divider }]}
+              onLayout={(e) => onCardLayout('csv', e.nativeEvent.layout.y)}
+            >
+              <Pressable
+                style={styles.cardHeader}
+                onPress={() => selectCard('csv')}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: openCard === 'csv' }}
+                testID="members-csv-card-header"
+              >
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('members.csvSectionTitle')}</Text>
+                  <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{t('members.csvSectionDesc')}</Text>
+                </View>
+                {openCard !== 'csv' && <ChevronRightIcon size={20} color={colors.textSecondary} />}
+              </Pressable>
+              {openCard === 'csv' && (
+                <View style={styles.cardBody}>
+                  {/* Step 1: download the current list */}
+                  <View style={styles.step}>
+                    <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step1Title')}</Text>
+                    <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
+                      {t('members.step1Desc')}
+                    </Text>
+                    <Pressable
+                      style={[styles.csvButton, { borderColor: colors.primary }]}
+                      onPress={handleExport}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('members.exportCsv')}
+                      testID="members-export-button"
+                    >
+                      <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                        {t('members.exportCsv')}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Step 2: edit the spreadsheet */}
+                  <View style={styles.step}>
+                    <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step2Title')}</Text>
+                    <Text style={[styles.stepDesc, { color: colors.textSecondary }]} testID="members-step2-note">
+                      {t('members.step2Desc')}
+                    </Text>
+                  </View>
+
+                  {/* Step 3: import the file */}
+                  <View style={styles.step}>
+                    <Text style={[styles.stepTitle, { color: colors.text }]}>{t('members.step3Title')}</Text>
+
+                    {/* Destructive replace warning */}
+                    <View style={[styles.warningBox, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
+                      <Text style={[styles.warningText, { color: colors.error }]} testID="members-import-warning">
+                        {t('members.csvImportWarning')}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      style={[styles.csvButton, { borderColor: colors.primary }, !isOnline && { opacity: 0.5 }]}
+                      onPress={handleImport}
+                      disabled={importMutation.isPending || !isOnline}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('members.importCsv')}
+                      testID="members-import-button"
+                    >
+                      {importMutation.isPending ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text style={[styles.csvButtonText, { color: colors.primary }]}>
+                          {t('members.importCsv')}
+                        </Text>
+                      )}
+                    </Pressable>
+
+                    {/* Detailed CSV validation errors (first 5 + "… e mais N") */}
+                    {importErrors.length > 0 && (
+                      <View
+                        style={[styles.errorPanel, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}
+                        testID="members-import-errors"
+                      >
+                        {shownErrors.map((err, idx) => (
+                          <Text key={idx} style={[styles.errorLine, { color: colors.error }]}>
+                            {formatCsvError(err, t)}
+                          </Text>
+                        ))}
+                        {extraErrorCount > 0 && (
+                          <Text style={[styles.errorLine, styles.errorMore, { color: colors.error }]}>
+                            {t('members.csvMoreErrors', { count: extraErrorCount })}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <PdfImportModal
+              visible={pdfBase64 != null}
+              base64={pdfBase64}
+              countryCode={countryCode}
+              areaCode={areaCode}
+              onClose={() => setPdfBase64(null)}
+            />
           </>
         ) : (
           <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
@@ -401,6 +572,74 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 20,
+  },
+  card: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  cardHeaderText: {
+    flex: 1,
+    marginRight: 8,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  cardBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  pdfPrivacy: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  pdfInstrTitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  pdfStep: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  pdfCodesHint: {
+    marginTop: 8,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  codeField: {
+    flex: 1,
+  },
+  codeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  codeInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    minHeight: 44,
   },
   step: {
     marginBottom: 28,

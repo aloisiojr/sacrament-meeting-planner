@@ -17,6 +17,7 @@ import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { useRouter } from 'expo-router';
+import { HomeMemberImportPrompt } from '../../components/HomeMemberImportPrompt';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useOnlineStatus } from '../../contexts/OnlineStatusContext';
@@ -138,6 +139,7 @@ function HomeTabContent() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <HomeMemberImportPrompt />
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">
             {wardName

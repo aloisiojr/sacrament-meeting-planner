@@ -39,6 +39,8 @@ const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, opts?: unknown) => (opts ? `${k}${JSON.stringify(opts)}` : k) }),
 }));
+// The Home onboarding prompt is tested separately; stub it here to avoid its hook/context imports.
+vi.mock('../components/HomeMemberImportPrompt', () => ({ HomeMemberImportPrompt: () => null }));
 
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),

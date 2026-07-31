@@ -73,7 +73,11 @@ export function normalizeLcrPhone(
   if (!d || !countryDigits) return null;
 
   let full: string | null = null;
-  if (d.startsWith(countryDigits) && d.length >= 11 && d.length <= 15) {
+  // "Already international" only if dropping the country code still leaves a full national number
+  // (≥10 digits). Otherwise an 11-digit NATIONAL number whose area code equals the country code
+  // (e.g. BR DDD 55 with country +55 → "55987654321") would be mistaken for international and lose
+  // its area code. Require length ≥ countryDigits + 10 so a national number is treated as national.
+  if (d.startsWith(countryDigits) && d.length >= countryDigits.length + 10 && d.length <= 15) {
     full = d; // already international
   } else if (d.length > 11) {
     full = null; // too long to place confidently → unrepaired (garbage / already-invalid)

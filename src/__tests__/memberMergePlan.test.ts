@@ -53,6 +53,14 @@ describe('buildMergePlan', () => {
     expect(plan.phoneConflicts).toHaveLength(0);
   });
 
+  it('does not flag a conflict when the DB stored a national phone with no country_code', () => {
+    // Legacy row: national phone, country_code null → digits are a suffix of the PDF full number.
+    const db = [member({ full_name: 'Ana Lima', country_code: null as unknown as string, phone: '11900000011' })];
+    const plan = buildMergePlan([p('Ana Lima', '+5511900000011')], db);
+    expect(plan.phoneConflicts).toHaveLength(0);
+    expect(plan.unchanged).toBe(1);
+  });
+
   it('keeps the DB member unchanged when the PDF has no phone', () => {
     const db = [member({ full_name: 'Bob Reis', country_code: '+55', phone: '11912345678' })];
     const plan = buildMergePlan([p('Bob Reis', null)], db);

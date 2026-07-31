@@ -43,6 +43,12 @@ function digits(s: string | null | undefined): string {
   return (s ?? '').replace(/\D/g, '');
 }
 
+/** Same phone when one side lacks a country code: the shorter (≥8 digits) is a suffix of the longer. */
+function sameNationalNumber(a: string, b: string): boolean {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.length >= 8 && short !== long && long.endsWith(short);
+}
+
 /** Full DB phone as digits: country_code + national phone (empty when no phone). */
 function dbFullDigits(m: Member): string {
   if (!m.phone) return '';
@@ -77,7 +83,9 @@ export function buildMergePlan(parsed: ParsedMember[], dbMembers: Member[]): Mer
       plan.unchanged += 1; // PDF has no phone → keep DB as-is
     } else if (!dbDigits) {
       plan.toUpdate.push({ member: dbMember, phone: p.phone as string }); // fill empty phone
-    } else if (dbDigits === pdfDigits) {
+    } else if (dbDigits === pdfDigits || sameNationalNumber(dbDigits, pdfDigits)) {
+      // Same number — including when the DB row stored a national phone with no country_code, so its
+      // digits are a suffix of the PDF's full "+cc<national>". Not a conflict.
       plan.unchanged += 1;
     } else {
       plan.phoneConflicts.push({ member: dbMember, appPhone: dbDigits, pdfPhone: p.phone as string });

@@ -23,6 +23,10 @@ describe('normalizeLcrPhone (Rule 3)', () => {
   it('works for other countries via the provided codes (US +1)', () => {
     expect(normalizeLcrPhone('(801) 859-5405', '1', '801')).toBe('+18018595405');
   });
+  it('treats an 11-digit national mobile whose DDD equals the country code as national (BR +55, DDD 55)', () => {
+    // "(55) 98765-4321" → "55987654321"; must NOT be read as already-international (would drop the DDD).
+    expect(normalizeLcrPhone('(55) 98765-4321', '55', '55')).toBe('+5555987654321');
+  });
   it('returns null for garbage / out-of-range (never invents digits)', () => {
     expect(normalizeLcrPhone('8600000000000000', '55', '11')).toBeNull(); // 16 digits
     expect(normalizeLcrPhone('129915075245', '55', '11')).toBeNull(); // 12, not intl

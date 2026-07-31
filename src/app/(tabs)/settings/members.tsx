@@ -378,16 +378,16 @@ export default function MembersScreen() {
                     <Text style={{ fontWeight: '700' }}>{t('pdfImport.privacyLabel')} </Text>
                     {t('pdfImport.privacyText')}
                   </Text>
-                  <Text style={[styles.pdfInstrTitle, { color: colors.text }]}>{t('pdfImport.instructionsTitle')}</Text>
-                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>
+                  <Text style={[styles.pdfInstrTitle, { color: colors.textSecondary }]}>{t('pdfImport.instructionsTitle')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>
                     {t('pdfImport.instrGoTo')}{' '}
                     <Text style={{ color: colors.primary, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(LCR_URL)}>
                       {t('pdfImport.lcrLink')}
                     </Text>
                   </Text>
-                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrFilters')}</Text>
-                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrPrint')}</Text>
-                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrPick')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrFilters')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrPrint')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.text }]}>{t('pdfImport.instrPick')}</Text>
                   <Text style={[styles.stepDesc, styles.pdfCodesHint, { color: colors.textSecondary }]}>{t('pdfImport.codesHint')}</Text>
                   <View style={styles.codeRow}>
                     <View style={styles.codeField}>

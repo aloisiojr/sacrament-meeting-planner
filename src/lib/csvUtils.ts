@@ -79,7 +79,7 @@ const PHONE_REGEX = /^\+?\d{8,15}$/;
  * Normalize a name for case- and accent-insensitive comparison (Responsável ↔ Nome).
  * Local to this module by design — do NOT import search helpers from hooks here.
  */
-function normalizeName(text: string): string {
+export function normalizeName(text: string): string {
   return text
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

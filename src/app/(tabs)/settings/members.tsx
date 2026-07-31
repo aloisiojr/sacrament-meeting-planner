@@ -608,8 +608,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pdfInstrTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 8,
   },
   pdfStep: {

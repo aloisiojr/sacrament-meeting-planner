@@ -373,8 +373,7 @@ export default function MembersScreen() {
               </Pressable>
               {openCard === 'pdf' && (
                 <View style={styles.cardBody}>
-                  {/* On-device import instructions + LGPD privacy note. */}
-                  <Text style={[styles.pdfIntro, { color: colors.text }]}>{t('pdfImport.introText')}</Text>
+                  {/* On-device import instructions + LGPD privacy note (intro is the card subtitle). */}
                   <Text style={[styles.pdfPrivacy, { color: colors.textSecondary }]}>
                     <Text style={{ fontWeight: '700' }}>{t('pdfImport.privacyLabel')} </Text>
                     {t('pdfImport.privacyText')}
@@ -388,6 +387,7 @@ export default function MembersScreen() {
                   </Text>
                   <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrFilters')}</Text>
                   <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrPrint')}</Text>
+                  <Text style={[styles.pdfStep, { color: colors.textSecondary }]}>{t('pdfImport.instrPick')}</Text>
                   <Text style={[styles.stepDesc, styles.pdfCodesHint, { color: colors.textSecondary }]}>{t('pdfImport.codesHint')}</Text>
                   <View style={styles.codeRow}>
                     <View style={styles.codeField}>
@@ -601,11 +601,6 @@ const styles = StyleSheet.create({
   cardBody: {
     paddingHorizontal: 16,
     paddingBottom: 20,
-  },
-  pdfIntro: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
   },
   pdfPrivacy: {
     fontSize: 13,

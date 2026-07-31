@@ -179,7 +179,7 @@ export function PdfImportReview({
               testID="pdf-conflict-master"
               value={allApp}
               onValueChange={setAllApp}
-              trackColor={{ false: colors.divider, true: colors.primary }}
+              trackColor={{ false: colors.primary, true: colors.primary }}
             />
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.appShort')}</Text>
           </View>
@@ -232,7 +232,7 @@ export function PdfImportReview({
                   testID={`pdf-conflict-toggle-${c.member.id}`}
                   value={useApp[c.member.id] !== false}
                   onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
-                  trackColor={{ false: colors.divider, true: colors.primary }}
+                  trackColor={{ false: colors.primary, true: colors.primary }}
                 />
                 <Text style={[styles.phoneText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1}>+{c.appPhone}</Text>
               </View>

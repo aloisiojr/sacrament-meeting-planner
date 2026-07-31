@@ -33,6 +33,32 @@ export interface RepairResult {
 
 const UNDER_AGE = 12;
 
+// Significant national-number length [min,max] (area/DDD + subscriber) per country calling code.
+// Used to tell an ALREADY-INTERNATIONAL number (country code + national) apart from a NATIONAL number
+// whose own leading digits merely coincide with the country code — e.g. BR +55 with DDD 55, where
+// "55987654321" (11 digits) is national, not international. Unknown codes use a permissive default.
+const NATIONAL_LEN: Record<string, [number, number]> = {
+  '55': [10, 11], // Brazil (2-digit DDD + 8/9)
+  '1': [10, 10], // US / Canada
+  '54': [10, 11], // Argentina
+  '52': [10, 10], // Mexico
+  '57': [10, 10], // Colombia
+  '56': [9, 9], // Chile
+  '51': [9, 9], // Peru
+  '593': [9, 9], // Ecuador
+  '595': [9, 9], // Paraguay
+  '598': [8, 8], // Uruguay
+  '591': [8, 8], // Bolivia
+  '34': [9, 9], // Spain
+  '351': [9, 9], // Portugal
+  '502': [8, 8], '503': [8, 8], '504': [8, 8], '505': [8, 8], '506': [8, 8], '507': [8, 8], // Central America
+};
+const DEFAULT_NATIONAL_LEN: [number, number] = [8, 11];
+
+function nationalRange(countryDigits: string): [number, number] {
+  return NATIONAL_LEN[countryDigits] ?? DEFAULT_NATIONAL_LEN;
+}
+
 function digits(s: string): string {
   return (s || '').replace(/\D/g, '');
 }
@@ -72,21 +98,21 @@ export function normalizeLcrPhone(
   const d = digits(raw);
   if (!d || !countryDigits) return null;
 
+  const [nmin, nmax] = nationalRange(countryDigits);
+
   let full: string | null = null;
-  // "Already international" only if dropping the country code still leaves a full national number
-  // (≥10 digits). Otherwise an 11-digit NATIONAL number whose area code equals the country code
-  // (e.g. BR DDD 55 with country +55 → "55987654321") would be mistaken for international and lose
-  // its area code. Require length ≥ countryDigits + 10 so a national number is treated as national.
-  if (d.startsWith(countryDigits) && d.length >= countryDigits.length + 10 && d.length <= 15) {
-    full = d; // already international
-  } else if (d.length > 11) {
-    full = null; // too long to place confidently → unrepaired (garbage / already-invalid)
-  } else if (d.length >= 10) {
-    full = countryDigits + d; // has an area/DDD, missing only country
-  } else if (d.length >= 8 && areaDigits) {
-    full = countryDigits + areaDigits + d; // local number, missing area + country
+  const remainder = d.length - countryDigits.length;
+  if (d.startsWith(countryDigits) && remainder >= nmin && remainder <= nmax && d.length <= 15) {
+    // Already international: country code + a full national number.
+    full = d;
+  } else if (d.length >= nmin && d.length <= nmax) {
+    // National number (has area/DDD), missing only the country code.
+    full = countryDigits + d;
+  } else if (areaDigits && d.length >= 8 && d.length < nmin) {
+    // Local number (shorter than a full national), missing area + country.
+    full = countryDigits + areaDigits + d;
   } else {
-    full = null; // too short / no area code available
+    full = null; // can't place confidently → unrepaired (blank for manual fix)
   }
 
   if (!full) return null;

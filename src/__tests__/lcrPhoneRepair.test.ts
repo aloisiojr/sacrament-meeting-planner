@@ -27,6 +27,16 @@ describe('normalizeLcrPhone (Rule 3)', () => {
     // "(55) 98765-4321" → "55987654321"; must NOT be read as already-international (would drop the DDD).
     expect(normalizeLcrPhone('(55) 98765-4321', '55', '55')).toBe('+5555987654321');
   });
+  it('accepts already-international numbers for 8–9-digit-national countries (no country-code doubling)', () => {
+    expect(normalizeLcrPhone('34612345678', '34', '')).toBe('+34612345678'); // Spain (9-digit national)
+    expect(normalizeLcrPhone('51987654321', '51', '')).toBe('+51987654321'); // Peru
+    expect(normalizeLcrPhone('56987654321', '56', '')).toBe('+56987654321'); // Chile
+    expect(normalizeLcrPhone('59812345678', '598', '')).toBe('+59812345678'); // Uruguay (8-digit)
+    expect(normalizeLcrPhone('351912345678', '351', '')).toBe('+351912345678'); // Portugal
+  });
+  it('completes a national-only number for a 9-digit-national country via the country code', () => {
+    expect(normalizeLcrPhone('612345678', '34', '')).toBe('+34612345678'); // Spain national → +34…
+  });
   it('returns null for garbage / out-of-range (never invents digits)', () => {
     expect(normalizeLcrPhone('8600000000000000', '55', '11')).toBeNull(); // 16 digits
     expect(normalizeLcrPhone('129915075245', '55', '11')).toBeNull(); // 12, not intl

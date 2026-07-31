@@ -24,6 +24,7 @@ const state = vi.hoisted(() => ({
   updateMember: vi.fn(),
   back: vi.fn(),
   pickerOnSelect: null as null | ((m: Member) => void),
+  canWrite: true,
 }));
 
 function makeMember(overrides: Partial<Member> = {}): Member {
@@ -62,7 +63,7 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => true }),
+  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? state.canWrite : true) }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
@@ -120,6 +121,7 @@ beforeEach(() => {
   state.updateMember = vi.fn();
   state.back = vi.fn();
   state.pickerOnSelect = null;
+  state.canWrite = true;
   vi.restoreAllMocks();
 });
 
@@ -152,6 +154,18 @@ describe('Designation edit screen (step 2)', () => {
     // Member calling set to the new value (AC11 sustain).
     expect(state.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: 'Presidente do Quórum de Élderes' });
     expect(state.back).toHaveBeenCalled();
+  });
+
+  it('does NOT save without agenda:write permission (observer deep-link)', () => {
+    state.canWrite = false;
+    const r = render();
+    press(r, 'designation-type-sustain');
+    selectPerson(makeMember());
+
+    // Save is gated: the button is disabled and pressing it is a no-op.
+    expect(nodes(r, 'designation-edit-save-button')[0].props.disabled).toBe(true);
+    press(r, 'designation-edit-save-button');
+    expect(state.updateAgenda).not.toHaveBeenCalled();
   });
 
   it('release: on decline saves snapshot but does NOT update member', () => {

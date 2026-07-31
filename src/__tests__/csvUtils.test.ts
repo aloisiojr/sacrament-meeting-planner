@@ -532,6 +532,14 @@ describe('CSV formula-injection guard (P2)', () => {
     expect(csv).toContain("'@cmd");
   });
 
+  it('guards every dangerous leading char (= + - @) and round-trips them', () => {
+    for (const lead of ['=', '+', '-', '@']) {
+      const result = parseCsv(generateCsv([member({ full_name: `${lead}danger` })]));
+      expect(result.success).toBe(true);
+      expect(result.members[0].full_name).toBe(`${lead}danger`);
+    }
+  });
+
   it('round-trips a guarded value back to its original text on import', () => {
     const original = member({ full_name: '=SUM(A1)', calling: '-danger' });
     const result = parseCsv(generateCsv([original]));
@@ -557,5 +565,18 @@ describe('CSV multi-line round-trip (P2)', () => {
     expect(result.success).toBe(true);
     expect(result.members).toHaveLength(1);
     expect(result.members[0].calling).toBe('Line one\nLine two');
+  });
+
+  it('does NOT split a field on a bare carriage return (no spurious rows)', () => {
+    const original: CsvExportMember = {
+      full_name: 'Solo Member', informal_name: 'Solo', country_code: '+55', phone: '11999990000',
+      can_preside: false, can_conduct: false, can_lead_music: false, can_play_piano: false,
+      can_be_recognized: false, responsible_name: '', calling: 'A\rB',
+    };
+    const result = parseCsv(generateCsv([original]));
+    expect(result.success).toBe(true);
+    expect(result.members).toHaveLength(1);
+    expect(result.members[0].full_name).toBe('Solo Member');
+    expect(result.members[0].calling).toBe('A\rB');
   });
 });

@@ -422,7 +422,9 @@ export function splitCsvRecords(content: string): string[] {
  */
 function escapeCsvField(value: string): string {
   const guarded = guardFormula(value);
-  if (guarded.includes(',') || guarded.includes('"') || guarded.includes('\n')) {
+  // Must quote on \r as well as \n: splitCsvRecords treats a bare, unquoted \r as a record
+  // boundary, so an un-quoted CR would split one field into two rows on a destructive import.
+  if (/[",\n\r]/.test(guarded)) {
     return `"${guarded.replace(/"/g, '""')}"`;
   }
   return guarded;

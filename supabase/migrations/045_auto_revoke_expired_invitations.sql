@@ -27,6 +27,12 @@ BEGIN
 END;
 $$;
 
+-- Least privilege: Postgres grants EXECUTE to PUBLIC by default, which would expose this
+-- cross-ward delete as a PostgREST RPC to any authenticated user. Lock it down — only the
+-- scheduled job (postgres/service role) should invoke it.
+REVOKE EXECUTE ON FUNCTION public.revoke_expired_invitations() FROM public;
+REVOKE EXECUTE ON FUNCTION public.revoke_expired_invitations() FROM anon, authenticated;
+
 -- Schedule a daily sweep when pg_cron is available. If pg_cron is not installed on this project,
 -- the function still exists and can be scheduled from the Supabase dashboard (same pattern as
 -- process-notifications). Guarded so the migration succeeds either way, and idempotent on re-run.

@@ -9,7 +9,6 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
@@ -124,7 +123,7 @@ export function PdfImportModal({ visible, onClose }: PdfImportModalProps) {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {step === 'codes' && (
           <View style={styles.body}>
             <Text style={[styles.title, { color: colors.text }]}>{t('pdfImport.title')}</Text>
@@ -190,13 +189,15 @@ export function PdfImportModal({ visible, onClose }: PdfImportModalProps) {
             onApply={onApply}
           />
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  // Inside a RN Modal the safe-area context is 0, so pad the top for the status bar (matches
+  // PersonEditor's modal convention).
+  container: { flex: 1, paddingTop: 60 },
   body: { padding: 16 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: '700', marginBottom: 8 },

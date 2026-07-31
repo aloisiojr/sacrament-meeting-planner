@@ -174,6 +174,6 @@ const styles = StyleSheet.create({
   conflictRow: { paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   choices: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, gap: 12 },
   absentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  actions: { flexDirection: 'row', justifyContent: 'space-between', padding: 16 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
   action: { fontSize: 16 },
 });

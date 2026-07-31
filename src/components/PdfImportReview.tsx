@@ -189,7 +189,7 @@ export function PdfImportReview({
         <View style={styles.stepHeader}>
           <Text style={[styles.stepTitle, { color: colors.text }]}>{t('pdfImport.stepRemovalsTitle')}</Text>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.stepRemovalsHint')}</Text>
-          <View style={[styles.masterRow, { borderBottomColor: colors.divider }]}>
+          <View style={[styles.masterRow, styles.masterRowRight, { borderBottomColor: colors.divider }]}>
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.selectAll')}</Text>
             <Switch
               testID="pdf-remove-master"
@@ -333,6 +333,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  masterRowRight: { justifyContent: 'flex-end' },
   masterLabel: { fontSize: 14, fontWeight: '600' },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 16, paddingBottom: 16 },

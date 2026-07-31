@@ -33,9 +33,11 @@ const BOOTSTRAP = `
       const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-      // Pass 1: per page, build visual lines (text grouped by Y, ordered left→right by X with a
-      // STABLE sort so same-X glyphs keep reading order, e.g. "José de").
+      // Pass 1: per page, collect text items grouped into visual lines (by Y). Keep raw items
+      // (x, advance width, glyph size) so we can split the name column from the data columns and
+      // glue accented glyphs (pdf.js emits accents like ç/ã/é as separate adjacent items).
       const pages = [];
+      const genderXs = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const tc = await page.getTextContent();
@@ -43,59 +45,82 @@ const BOOTSTRAP = `
         for (const it of tc.items) {
           if (typeof it.str !== 'string' || !it.str.trim()) continue;
           const y = Math.round(it.transform[5]);
-          if (!lines.has(y)) lines.set(y, []);
-          lines.get(y).push({
+          const o = {
             x: it.transform[4],
             w: it.width || 0,
             size: Math.hypot(it.transform[2], it.transform[3]) || it.height || 8,
             s: it.str,
-          });
+          };
+          if (!lines.has(y)) lines.set(y, []);
+          lines.get(y).push(o);
+          if (/^[VMF]$/.test(o.s.trim())) genderXs.push(o.x); // Gender (Sexo) column marker
         }
         const ys = Array.from(lines.keys()).sort((a, b) => b - a); // top → bottom
-        const vlines = [];
-        for (const y of ys) {
-          const arr = lines.get(y).map((o, i) => ({ ...o, i }));
-          arr.sort((a, b) => (a.x - b.x) || (a.i - b.i)); // stable by X
-          // Join items, inserting a space ONLY for a real horizontal gap (word/column boundary).
-          // Accented letters render as separate adjacent glyph items (gap ~0) → concatenate, so
-          // "Gon" "ç" "alves" → "Gonçalves", not "Gon ç alves".
-          let text = '';
-          let prevEnd = null;
-          for (const o of arr) {
-            if (prevEnd !== null && o.x - prevEnd > o.size * 0.2 && !text.endsWith(' ') && !o.s.startsWith(' ')) {
-              text += ' ';
-            }
-            text += o.s;
-            prevEnd = o.x + o.w;
-          }
-          text = text.replace(/\\s+/g, ' ').trim();
-          if (text) vlines.push({ y, text });
-        }
-        pages.push(vlines);
+        pages.push({ ys, lines });
       }
-      // A member's name can wrap across visual lines (the anchor row + name lines above/below share
-      // one table ROW). Rows are separated by a larger vertical gap than lines within a row. Compute
-      // the threshold globally as the midpoint of the two most common line-gaps (within-row spacing
-      // vs between-row spacing), then merge close-gap lines into one line per row.
+      // Name/data boundary = just left of the Gender column (the first data column after the name).
+      // Names always sit left of it; gender/age/date/phone/email sit at or after it. Splitting by
+      // this X keeps an email that wrapped ABOVE the name from being mis-read as the name, and keeps
+      // phone/email out of the name entirely.
+      let boundary = Infinity;
+      if (genderXs.length) {
+        genderXs.sort((a, b) => a - b);
+        boundary = genderXs[Math.floor(genderXs.length / 2)] - 4;
+      }
+      // A member's name can wrap across visual lines within one table ROW. Rows are separated by a
+      // larger vertical gap than lines within a row. Threshold = midpoint of the two MOST FREQUENT
+      // line-gaps (within-row spacing vs between-row spacing).
       const freq = new Map();
-      for (const vl of pages) {
-        for (let k = 1; k < vl.length; k++) {
-          const g = Math.round(Math.abs(vl[k - 1].y - vl[k].y));
+      for (const pg of pages) {
+        for (let k = 1; k < pg.ys.length; k++) {
+          const g = Math.round(Math.abs(pg.ys[k - 1] - pg.ys[k]));
           if (g > 0) freq.set(g, (freq.get(g) || 0) + 1);
         }
       }
       const common = Array.from(freq.entries()).sort((a, b) => b[1] - a[1]).map((e) => e[0]);
       let thr = Infinity;
       if (common.length >= 2) thr = (Math.min(common[0], common[1]) + Math.max(common[0], common[1])) / 2;
-      const out = [];
-      for (const vl of pages) {
-        for (let k = 0; k < vl.length; k++) {
-          if (k > 0 && Math.abs(vl[k - 1].y - vl[k].y) < thr) {
-            out[out.length - 1] = (out[out.length - 1] + ' ' + vl[k].text).trim();
-          } else {
-            out.push(vl[k].text);
+      // Join items into text: group by line (Y, top→bottom), order each line left→right by X and
+      // insert a space only for a real gap (word/column boundary, NOT between accent glyphs), then
+      // join lines with a space. So "Gon" "ç" "alves" → "Gonçalves", "Jos" "é" → "José".
+      const joinCol = (items) => {
+        const byY = new Map();
+        for (const o of items) { if (!byY.has(o.y)) byY.set(o.y, []); byY.get(o.y).push(o); }
+        const yy = Array.from(byY.keys()).sort((a, b) => b - a);
+        const parts = [];
+        for (const y of yy) {
+          const arr = byY.get(y).map((o, i) => ({ ...o, i }));
+          arr.sort((a, b) => (a.x - b.x) || (a.i - b.i));
+          let text = '';
+          let prevEnd = null;
+          for (const o of arr) {
+            if (prevEnd !== null && o.x - prevEnd > o.size * 0.2 && !text.endsWith(' ') && !o.s.startsWith(' ')) text += ' ';
+            text += o.s;
+            prevEnd = o.x + o.w;
           }
+          parts.push(text.trim());
         }
+        return parts.join(' ').replace(/\\s+/g, ' ').trim();
+      };
+      // Emit one line per table row: "<name column> <data columns>".
+      const out = [];
+      for (const pg of pages) {
+        let cur = [];
+        const flush = () => {
+          if (!cur.length) return;
+          const items = [];
+          for (const y of cur) for (const o of pg.lines.get(y)) items.push({ ...o, y });
+          const line = (joinCol(items.filter((o) => o.x < boundary)) + ' ' + joinCol(items.filter((o) => o.x >= boundary)))
+            .replace(/\\s+/g, ' ')
+            .trim();
+          if (line) out.push(line);
+          cur = [];
+        };
+        for (let k = 0; k < pg.ys.length; k++) {
+          if (k > 0 && Math.abs(pg.ys[k - 1] - pg.ys[k]) >= thr) flush();
+          cur.push(pg.ys[k]);
+        }
+        flush();
       }
       window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, text: out.join('\\n') }));
     } catch (e) {

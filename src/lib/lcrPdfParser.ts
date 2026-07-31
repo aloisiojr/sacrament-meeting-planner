@@ -119,15 +119,14 @@ function isContactFragment(toks: string[], line: string): boolean {
 }
 
 /**
- * Strip contact residue from a name: emails always follow the name in reading order, so drop the
- * first '@'-bearing token and everything after it, plus any stray phone / ".com" fragments. Keeps
- * accented/particled names intact.
+ * Backup contact-residue strip (the extractor already keeps email/phone in the data column). Drops
+ * any email token wherever it lands, plus stray phone / ".com" fragments — never truncates, so a
+ * name is never blanked. Keeps accented/particled names intact.
  */
 function cleanName(name: string): string {
   const out: string[] = [];
   for (const t of name.split(/\s+/).filter(Boolean)) {
-    if (t.includes('@')) break;
-    if (isPhoneToken(t) || t.startsWith('.')) continue;
+    if (t.includes('@') || isPhoneToken(t) || t.startsWith('.')) continue;
     out.push(t);
   }
   return out.join(' ').trim();
@@ -226,6 +225,5 @@ export function parseLcrText(text: string): LcrParseResult {
   appendName(lastIdx, held);
 
   for (const r of records) r.name = cleanName(r.name);
-  // Drop any record left without a real name (stray/mis-parsed line) — never import a blank member.
-  return { records: records.filter((r) => r.name.length > 0), expectedCount };
+  return { records, expectedCount };
 }

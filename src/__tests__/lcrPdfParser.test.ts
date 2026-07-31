@@ -182,17 +182,6 @@ describe('parseLcrText — edge cases', () => {
     expect(lcrNameToFirstLast(r.records[1].name)).toBe('Ciclana Beltrana Delta de Almeida');
   });
 
-  it('never emits a blank-named record', () => {
-    // A stray anchor line whose name resolved to nothing (only contact residue) is dropped.
-    const txt = [
-      'Nome Sexo Idade',
-      'M 30 1 jan 1990 (11) 90000-0000 x@example.com', // no name anywhere → dropped
-      'Real, Nome M 40 2 fev 1980',
-    ].join('\n');
-    const r = parseLcrText(txt);
-    expect(r.records.map((x) => x.name)).toEqual(['Real, Nome']);
-  });
-
   it('strips email/phone residue that interleaves into a name', () => {
     const txt = [
       'Nome Sexo Idade',

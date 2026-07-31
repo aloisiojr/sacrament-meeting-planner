@@ -49,7 +49,10 @@ Deno.serve(async (req) => {
     console.warn('[invite-redirect] EXTERNAL_PAGES_URL not set, using default');
   }
 
-  const redirectUrl = `${externalPagesUrl}/accept-invite.html?token=${token}`;
+  // Pass this project's URL so the (shared) accept page calls the SAME project that owns the invite.
+  // The page whitelists the URL, so an unknown value is ignored (no open redirect).
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const redirectUrl = `${externalPagesUrl}/accept-invite.html?token=${token}&supabase_url=${encodeURIComponent(supabaseUrl)}`;
   console.log('[invite-redirect] Redirecting to external page');
 
   return new Response(null, {

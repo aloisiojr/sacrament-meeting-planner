@@ -164,15 +164,23 @@
   </div>
 
   <script>
-    // --- Constants ---
-    var SUPABASE_URL = 'https://poizgglzdjqwrhsnhkke.supabase.co';
-    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvaXpnZ2x6ZGpxd3Joc25oa2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDI3MTEsImV4cCI6MjA4NjY3ODcxMX0.vkDBYuurtZuDetmD_LQjBrqyw_n_VK0HMk4bbYReEMc';
-    var apiBase = SUPABASE_URL + '/functions/v1';
-    var apiKey = SUPABASE_ANON_KEY;
+    // --- Project whitelist (anon keys are public) — call the backend that owns the invite ---
+    // The invite-redirect passes ?supabase_url=<current project>. We only honor a whitelisted value
+    // so an arbitrary URL can never point this page at an attacker's backend (no open redirect).
+    var PROJECTS = {
+      'https://poizgglzdjqwrhsnhkke.supabase.co': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvaXpnZ2x6ZGpxd3Joc25oa2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDI3MTEsImV4cCI6MjA4NjY3ODcxMX0.vkDBYuurtZuDetmD_LQjBrqyw_n_VK0HMk4bbYReEMc',
+      'https://nfraidzguordqmbpqkcf.supabase.co': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mcmFpZHpndW9yZHFtYnBxa2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjYzOTgsImV4cCI6MjEwMDg0MjM5OH0.ky2ZG16davtPtCuxQ4NM0Tu0MdNrhAnI9KoaL5z6h68'
+    };
+    var DEFAULT_SUPABASE_URL = 'https://poizgglzdjqwrhsnhkke.supabase.co';
 
     // --- Read params from URL ---
     var params = new URLSearchParams(window.location.search);
     var inviteToken = params.get('token');
+    var requestedUrl = params.get('supabase_url');
+    var SUPABASE_URL = (requestedUrl && PROJECTS[requestedUrl]) ? requestedUrl : DEFAULT_SUPABASE_URL;
+    var SUPABASE_ANON_KEY = PROJECTS[SUPABASE_URL];
+    var apiBase = SUPABASE_URL + '/functions/v1';
+    var apiKey = SUPABASE_ANON_KEY;
 
     // --- i18n ---
     var translations = {

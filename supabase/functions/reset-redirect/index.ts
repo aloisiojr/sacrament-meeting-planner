@@ -62,7 +62,10 @@ Deno.serve(async (req) => {
     console.warn('[reset-redirect] EXTERNAL_PAGES_URL not set, using default');
   }
 
-  const redirectUrl = `${externalPagesUrl}/reset-password.html?token=${token}&type=${type}`;
+  // Pass this project's URL so the (shared) reset page validates the token against the SAME project
+  // that minted it. The page whitelists the URL, so an unknown value is ignored (no open redirect).
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const redirectUrl = `${externalPagesUrl}/reset-password.html?token=${token}&type=${type}&supabase_url=${encodeURIComponent(supabaseUrl)}`;
   console.log('[reset-redirect] Redirecting to external page');
 
   return new Response(null, {

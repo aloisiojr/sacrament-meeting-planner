@@ -202,8 +202,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build deep link
-    const deepLink = `https://poizgglzdjqwrhsnhkke.supabase.co/functions/v1/reset-redirect?token=${hashed_token}&type=recovery`;
+    // Build deep link against THIS project (env-injected), not a hardcoded project — otherwise a
+    // token minted here gets validated against a different project and reads as "expired/invalid".
+    const deepLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/reset-redirect?token=${hashed_token}&type=recovery`;
 
     // Get email template
     const template = getEmailTemplate(language, deepLink);

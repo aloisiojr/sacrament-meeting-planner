@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'react-native';
+import { AppSwitch } from '../../../components/AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -213,11 +214,10 @@ export default function SettingsScreen() {
                       {t('settings.managePrayersDescription')}
                     </Text>
                   </View>
-                  <Switch
+                  <AppSwitch
                     value={managePrayers}
                     onValueChange={(val) => toggleManagePrayersMutation.mutate(val)}
                     disabled={!isOnline}
-                    trackColor={{ false: colors.divider, true: colors.primary }}
                   />
                 </View>
               )}

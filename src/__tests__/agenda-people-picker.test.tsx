@@ -251,6 +251,17 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     expect(fields.recognized_names).toBe('Bob Jones\nAlice Smith');
   });
 
+  it('recognition: Save preserves free-typed (non-member) names and replaces the member part', () => {
+    AGENDA.recognized_names = 'Guest Speaker'; // free text, not a ward member
+    MEMBERS = [MEMBER];
+    const renderer = render();
+    press(renderer.root, 'mock-recognize-add');
+    expect(h.lastPickerProps?.selectedIds).toEqual([]); // free text isn't a member → not seeded
+    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBER]));
+    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    expect(fields.recognized_names).toBe('Guest Speaker\nAlice Smith');
+  });
+
   it('recognition: Save with an empty selection clears the list', () => {
     AGENDA.recognized_names = 'Alice Smith';
     const renderer = render();

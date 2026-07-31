@@ -17,8 +17,8 @@ import {
   StyleSheet,
   Pressable,
   Alert,
-  Switch,
 } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -183,12 +183,11 @@ export const SpeechSlot = React.memo(function SpeechSlot({
           <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
           {/* F118: Toggle switch for position 2 (hidden for prayer slots) */}
           {position === 2 && !isPrayer && onToggleSecondSpeech && (
-            <Switch
+            <AppSwitch
               testID="speech-slot-2-toggle"
               value={isSecondSpeechEnabled !== false}
               onValueChange={onToggleSecondSpeech}
               disabled={!canToggleSecondSpeech}
-              trackColor={{ false: colors.divider, true: colors.primary }}
               style={styles.toggle}
             />
           )}

@@ -25,9 +25,9 @@ import {
   FlatList,
   Pressable,
   Modal,
-  Switch,
   Alert,
 } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -442,7 +442,7 @@ export function PeoplePicker({
                 <Text style={[styles.viewAllText, { color: colors.textSecondary }]}>
                   {t('people.viewAll')}
                 </Text>
-                <Switch
+                <AppSwitch
                   testID="people-picker-view-all"
                   style={styles.viewAllSwitch}
                   value={showAll}
@@ -458,7 +458,7 @@ export function PeoplePicker({
               <Text style={[styles.viewAllText, { color: colors.text }]}>
                 {t('people.viewAll')}
               </Text>
-              <Switch
+              <AppSwitch
                 testID="people-picker-view-all"
                 value={showAll}
                 onValueChange={setShowAll}

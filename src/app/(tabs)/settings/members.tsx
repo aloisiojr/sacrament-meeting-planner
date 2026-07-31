@@ -49,7 +49,7 @@ const CSV_PARSE_ERROR = 'csv/parse';
 
 // Hosted step-by-step guide (AI prompt that merges the ward PDF + this CSV). GitHub-Pages URL —
 // update if the site's public base changes.
-const IMPORT_GUIDE_URL = 'https://aloisiojr.github.io/sacrament-meeting-planner/public/import-members.html';
+const IMPORT_GUIDE_URL = 'https://aloisiojr.github.io/sacrament-meeting-planner/import-members.html';
 
 type TFn = ReturnType<typeof useTranslation>['t'];
 

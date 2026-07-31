@@ -53,6 +53,17 @@ describe('resolveTemplate', () => {
     expect(result).toBe('Pedro Caridade');
   });
 
+  it('substitutes English and Spanish token aliases (incl. accented forms) — H1', () => {
+    const en = resolveTemplate('Hi {name}, on {date} about {title} from {collection} {link}', {
+      speakerName: 'John', date: 'Feb 15', topic: 'Faith', collection: 'Ward Topics', link: 'https://x',
+    });
+    expect(en).toBe('Hi John, on Feb 15 about Faith from Ward Topics https://x');
+    const es = resolveTemplate('Hola {nombre}, el {fecha} sobre {título} de {colección} {enlace}', {
+      speakerName: 'Ana', date: '15 feb', topic: 'Fe', collection: 'Temas', link: 'https://y',
+    });
+    expect(es).toBe('Hola Ana, el 15 feb sobre Fe de Temas https://y');
+  });
+
   it('preserves intentional line breaks in multi-line templates (P2)', () => {
     const template = 'Olá {nome},\n\nSeu discurso é em {data}.\nTema: {titulo}';
     const result = resolveTemplate(template, {

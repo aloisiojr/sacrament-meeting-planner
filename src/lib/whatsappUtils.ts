@@ -157,16 +157,35 @@ export interface WhatsAppVariables {
 
 // --- Functions ---
 
+// Placeholder tokens are shown/typed in the app language, so each field accepts its localized
+// aliases across the 3 supported locales (incl. accented forms shown by the template editor chips).
+// Substitution replaces any of them — mirrors designations.ts TOKEN_ALIASES.
+const WA_TOKEN_ALIASES: Record<'name' | 'date' | 'collection' | 'title' | 'link', readonly string[]> = {
+  name: ['nome', 'name', 'nombre'],
+  date: ['data', 'date', 'fecha'],
+  collection: ['colecao', 'coleção', 'collection', 'colección'],
+  title: ['titulo', 'título', 'title'],
+  link: ['link', 'enlace'],
+};
+
 /**
- * Resolve template placeholders with actual values.
+ * Resolve template placeholders with actual values. Accepts each field's pt/en/es token aliases so
+ * a template typed (or a chip tapped) in any language substitutes correctly.
  */
 export function resolveTemplate(template: string, vars: WhatsAppVariables): string {
+  const values: Record<'name' | 'date' | 'collection' | 'title' | 'link', string> = {
+    name: vars.speakerName,
+    date: vars.date,
+    collection: vars.collection ?? '',
+    title: vars.topic,
+    link: vars.link ?? '',
+  };
   let result = template;
-  result = result.replace(/\{nome\}/g, vars.speakerName);
-  result = result.replace(/\{data\}/g, vars.date);
-  result = result.replace(/\{colecao\}/g, vars.collection ?? '');
-  result = result.replace(/\{titulo\}/g, vars.topic);
-  result = result.replace(/\{link\}/g, vars.link ?? '');
+  for (const field of ['name', 'date', 'collection', 'title', 'link'] as const) {
+    for (const alias of WA_TOKEN_ALIASES[field]) {
+      result = result.split(`{${alias}}`).join(values[field]);
+    }
+  }
   // Clean up whitespace left by empty placeholders WITHOUT flattening intentional line breaks:
   // collapse runs of spaces/tabs, drop trailing spaces per line, and cap blank-line runs.
   result = result

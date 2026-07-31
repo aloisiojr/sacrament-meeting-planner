@@ -442,7 +442,7 @@ describe('CR-283 Tester AC-283-02: add area opens PeoplePicker', () => {
   });
 
   it('i18n placeholder agenda.addPresence in pt-BR', () => {
-    expect((ptBR as any).agenda.addPresence).toBe('Reconhecer nova presenca');
+    expect((ptBR as any).agenda.addPresence).toBe('Reconhecer nova presença');
   });
 
   it('i18n placeholder agenda.addPresence in en-US', () => {

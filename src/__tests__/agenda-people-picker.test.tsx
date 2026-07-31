@@ -27,7 +27,8 @@ const h = vi.hoisted(() => ({
     capability?: string;
     multiSelect?: boolean;
     selectedIds?: string[];
-    onSelect: (m: Member) => void;
+    onSelect?: (m: Member) => void;
+    onConfirmMulti?: (members: Member[]) => void;
   },
 }));
 
@@ -215,7 +216,7 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
       expect(h.lastPickerProps?.context).toBe(context);
       expect(h.lastPickerProps?.multiSelect).toBeFalsy();
 
-      act(() => h.lastPickerProps!.onSelect(MEMBER));
+      act(() => h.lastPickerProps!.onSelect!(MEMBER));
       expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
       const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
       expect(fields[nameField]).toBe('Alice Smith');
@@ -224,38 +225,38 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     });
   }
 
-  it('recognition: opens multiSelect with context be_recognized and newline-joins names', () => {
+  it('recognition: opens multiSelect (draft) and Save commits the selected names', () => {
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
     expect(h.lastPickerProps?.context).toBe('be_recognized');
     expect(h.lastPickerProps?.multiSelect).toBe(true);
     expect(h.lastPickerProps?.selectedIds).toEqual([]);
 
-    act(() => h.lastPickerProps!.onSelect(MEMBER));
+    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBER]));
     expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
     const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Alice Smith');
   });
 
-  it('recognition: appends to existing names (newline-joined) and reflects selectedIds', () => {
+  it('recognition: Save replaces the list with the full confirmed selection', () => {
     AGENDA.recognized_names = 'Bob Jones';
     MEMBERS = [MEMBER, makeMember({ id: 'm2', full_name: 'Bob Jones' })];
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
-    // Bob is already recognized → highlighted via selectedIds.
+    // Bob is already recognized → seeded into the draft via selectedIds.
     expect(h.lastPickerProps?.selectedIds).toEqual(['m2']);
 
-    act(() => h.lastPickerProps!.onSelect(MEMBER));
+    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBERS[1], MEMBER]));
     const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Bob Jones\nAlice Smith');
   });
 
-  it('recognition: toggling an already-selected member removes it', () => {
+  it('recognition: Save with an empty selection clears the list', () => {
     AGENDA.recognized_names = 'Alice Smith';
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
     expect(h.lastPickerProps?.selectedIds).toEqual(['m1']);
-    act(() => h.lastPickerProps!.onSelect(MEMBER));
+    act(() => h.lastPickerProps!.onConfirmMulti!([]));
     const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBeNull();
   });
@@ -267,7 +268,7 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     expect(h.lastPickerProps?.capability).toBeUndefined();
     expect(h.lastPickerProps?.multiSelect).toBeFalsy();
 
-    act(() => h.lastPickerProps!.onSelect(MEMBER));
+    act(() => h.lastPickerProps!.onSelect!(MEMBER));
     expect(assignSpeakerMutate).toHaveBeenCalledTimes(1);
     const input = assignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s0');
@@ -286,7 +287,7 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     const renderer = render();
     press(renderer.root, 'agenda-closing-prayer-selector');
     expect(h.lastPickerProps?.context).toBe('closing_prayer');
-    act(() => h.lastPickerProps!.onSelect(delegated));
+    act(() => h.lastPickerProps!.onSelect!(delegated));
     const input = assignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s4');
     expect(input.isDelegated).toBe(true);

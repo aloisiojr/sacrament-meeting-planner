@@ -415,4 +415,42 @@ describe('PeoplePicker', () => {
     });
     expect(ids(renderer)).not.toContain('b');
   });
+
+  describe('multiSelect draft (recognition)', () => {
+    it('Save grants the capability to selected + confirms the set; Cancel discards', () => {
+      const onConfirmMulti = vi.fn();
+      const { renderer, onClose } = render({
+        context: 'be_recognized',
+        multiSelect: true,
+        onConfirmMulti,
+        selectedIds: [],
+      });
+      // Toggle Bob (lacks can_be_recognized) into the draft.
+      press(renderRow(renderer, MEMBER_B).root, 'people-picker-item-b');
+      // Save → prompt (Bob is missing the capability).
+      press(renderer.root, 'people-picker-save');
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      const yes = alertButtons().find((b) => b.text === 'common.yes');
+      act(() => yes?.onPress?.());
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'b', can_be_recognized: true })
+      );
+      expect(onConfirmMulti).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })]);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('Cancel does not commit the draft', () => {
+      const onConfirmMulti = vi.fn();
+      const { renderer, onClose } = render({
+        context: 'be_recognized',
+        multiSelect: true,
+        onConfirmMulti,
+        selectedIds: [],
+      });
+      press(renderRow(renderer, MEMBER_B).root, 'people-picker-item-b');
+      press(renderer.root, 'people-picker-close');
+      expect(onConfirmMulti).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
 });

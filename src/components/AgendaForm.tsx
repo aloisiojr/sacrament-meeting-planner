@@ -180,14 +180,11 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   );
 
   // Handle recognition toggle (multi-select). Stores newline-joined member names (snapshot).
-  const handleRecognizeToggle = useCallback(
-    (member: Member) => {
+  // Draft multi-select commit: replace the recognition list with the confirmed selection.
+  const handleRecognizeConfirm = useCallback(
+    (selected: Member[]) => {
       if (!agenda || isObserver) return;
-      const currentItems = parseItems(agenda.recognized_names ?? null);
-      const newItems = currentItems.includes(member.full_name)
-        ? currentItems.filter((n) => n !== member.full_name)
-        : [...currentItems, member.full_name];
-      updateField('recognized_names', joinItems(newItems));
+      updateField('recognized_names', joinItems(selected.map((m) => m.full_name)));
     },
     [agenda, isObserver, updateField]
   );
@@ -688,7 +685,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           context="be_recognized"
           multiSelect
           selectedIds={recognizedSelectedIds}
-          onSelect={handleRecognizeToggle}
+          onConfirmMulti={handleRecognizeConfirm}
           onClose={() => setPeoplePicker(null)}
         />
       )}

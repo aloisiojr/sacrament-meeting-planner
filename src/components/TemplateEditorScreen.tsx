@@ -241,7 +241,7 @@ export function TemplateEditorScreen({
         </View>
         <TextInput
           testID="template-editor"
-          style={[styles.editor, { color: colors.text, borderColor: colors.divider, backgroundColor: colors.surfaceVariant }]}
+          style={[styles.editor, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.surfaceVariant }]}
           value={currentText}
           onChangeText={handleChange}
           onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}

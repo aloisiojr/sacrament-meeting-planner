@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   content: {
-    borderRadius: 12,
+    borderRadius: 14,
     width: '100%',
     maxWidth: 320,
     paddingTop: 16,

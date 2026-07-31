@@ -100,7 +100,7 @@ export const lightColors: ThemeColors = {
 
   inputBackground: '#F8FAFC',   // Slate-50
   inputBorder: '#94A3B8',       // Slate-400 (matches border)
-  placeholder: '#94A3B8',       // Slate-400 (bluish placeholder)
+  placeholder: '#64748B',       // Slate-500 (~4.6:1 on inputBackground; was #94A3B8 at 2.45:1)
 };
 
 export const darkColors: ThemeColors = {

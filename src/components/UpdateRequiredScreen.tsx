@@ -35,7 +35,7 @@ export function UpdateRequiredScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
-  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 16 },
+  title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 16 },
   message: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
   button: { height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   buttonText: { fontSize: 16, fontWeight: '600' },

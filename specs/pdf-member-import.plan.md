@@ -1,6 +1,7 @@
 # Plan — On-device PDF member import & merge
 
-For `specs/pdf-member-import.md` (APPROVED Gate 1). Status: **awaiting Gate 2 (plan approval)**.
+For `specs/pdf-member-import.md` (APPROVED Gate 1). Status: **BUILT (S0–S10 complete, 2026-07-31)** —
+next: on-device validation of S6 extraction + verify-change (adversarial) → Gate 3.
 Branch `feature/pdf-member-import`. Principle: isolate the pure, testable core (parse/repair/merge)
 from the untestable-in-vitest edges (WebView extraction, screens). Each step = 1 atomic commit.
 

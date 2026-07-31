@@ -107,9 +107,42 @@ function isAnchorAt(tokens: string[], i: number): boolean {
   return true;
 }
 
+/** First index in `toks` where an anchor (gender+age+date) begins, or -1. */
+function findAnchor(toks: string[]): number {
+  for (let i = 0; i < toks.length; i++) if (isAnchorAt(toks, i)) return i;
+  return -1;
+}
+
+/** A pure line that is leftover contact data (a split email tail or bare phone), not a name. */
+function isContactFragment(toks: string[], line: string): boolean {
+  return toks.some((t) => t.includes('@')) || toks.every(isPhoneToken) || line.startsWith('.');
+}
+
 /**
- * Parse extracted LCR text into records. Robust to multi-line names, page-split rows, missing
- * phone/email, and emails split across lines.
+ * Strip contact residue from a name: emails always follow the name in reading order, so drop the
+ * first '@'-bearing token and everything after it, plus any stray phone / ".com" fragments. Keeps
+ * accented/particled names intact.
+ */
+function cleanName(name: string): string {
+  const out: string[] = [];
+  for (const t of name.split(/\s+/).filter(Boolean)) {
+    if (t.includes('@')) break;
+    if (isPhoneToken(t) || t.startsWith('.')) continue;
+    out.push(t);
+  }
+  return out.join(' ').trim();
+}
+
+/**
+ * Parse extracted LCR text into records. The extractor emits one text line per visual PDF line, so
+ * a member's name can wrap across lines EITHER before its anchor row ("de Souza Oliveira," / "João
+ * M 40 …") or after it ("Sobrenome Junior, Alfa M 43 …" / "José de"). Names are NOT always
+ * "Last, First" with a comma (e.g. "Ciclana Beltrana Delta"), so we cannot key off the comma.
+ * Instead we keep line structure and "hold" each pure (anchor-less) line until the next anchor
+ * line resolves it: if that anchor line carries its OWN name, the held line was the PREVIOUS
+ * record's wrapped tail (post-wrap); if the anchor line has no name of its own, the held line IS
+ * this record's name (pre-wrap). Contact-only leftovers (a split email TLD, a bare phone) are
+ * dropped. Robust to page-split rows, missing phone/email, and emails split across lines.
  */
 export function parseLcrText(text: string): LcrParseResult {
   let expectedCount: number | null = null;
@@ -132,42 +165,66 @@ export function parseLcrText(text: string): LcrParseResult {
     kept.push(line);
   }
 
-  const tokens = kept.join(' ').split(/\s+/).filter(Boolean);
   const records: LcrRecord[] = [];
-  let nameTokens: string[] = [];
-  let i = 0;
-  while (i < tokens.length) {
-    if (!isAnchorAt(tokens, i)) {
-      nameTokens.push(tokens[i]);
-      i += 1;
+  let held: string[] = []; // pure anchor-less line(s) awaiting pre/post-wrap resolution
+  let lastIdx = -1; // record eligible to receive a post-wrap tail
+  let expectEmailTail = false; // an email ended with "." → its TLD wrapped to the next line
+
+  const appendName = (idx: number, extra: string[]) => {
+    if (idx < 0 || !extra.length) return;
+    records[idx].name = `${records[idx].name} ${extra.join(' ')}`.replace(/\s+/g, ' ').trim();
+  };
+
+  for (const line of kept) {
+    let toks = line.split(/\s+/).filter(Boolean);
+    // A wrapped email TLD ("…@HOTMAIL." then "COM") occupies the next line's first token — drop it.
+    if (expectEmailTail) {
+      expectEmailTail = false;
+      toks = toks.slice(1);
+    }
+    if (!toks.length) continue;
+
+    const at = findAnchor(toks);
+    if (at === -1) {
+      // Pure line: ignore contact leftovers; otherwise hold it for the next anchor to resolve.
+      if (!isContactFragment(toks, line)) held = held.concat(toks);
       continue;
     }
-    const age = Number(tokens[i + 1]);
-    const name = nameTokens.join(' ').replace(/\s+/g, ' ').trim();
-    nameTokens = [];
 
-    // Skip gender + age + day + month + year.
-    let j = i + 5;
-    // Trailing phone fragments belong to THIS record (stop at the next name / anchor).
+    const nameBefore = toks.slice(0, at);
+    if (nameBefore.length > 0) {
+      // This record names itself → any held line was the PREVIOUS record's wrapped tail.
+      appendName(lastIdx, held);
+    }
+    // If the anchor line has no name of its own, the held line(s) ARE this record's name.
+    const name = (nameBefore.length > 0 ? nameBefore : held).join(' ').replace(/\s+/g, ' ').trim();
+    held = [];
+    const age = Number(toks[at + 1]);
+
+    // Skip gender + age + day + month + year, then take trailing phone + optional email.
+    let j = at + 5;
     const phoneTokens: string[] = [];
-    while (j < tokens.length && !isAnchorAt(tokens, j) && isPhoneToken(tokens[j])) {
-      phoneTokens.push(tokens[j]);
+    while (j < toks.length && !isAnchorAt(toks, j) && isPhoneToken(toks[j])) {
+      phoneTokens.push(toks[j]);
       j += 1;
     }
-    // Optional email (contains '@'); may be split across lines ("…@gmail" ".com" / "…@X." "COM").
-    if (j < tokens.length && tokens[j].includes('@')) {
-      const endedWithDot = tokens[j].endsWith('.');
+    if (j < toks.length && toks[j].includes('@')) {
+      const endedWithDot = toks[j].endsWith('.');
       j += 1;
-      if (j < tokens.length && (endedWithDot || tokens[j].startsWith('.'))) j += 1;
+      if (j < toks.length && (endedWithDot || toks[j].startsWith('.'))) j += 1;
+      else if (endedWithDot) expectEmailTail = true; // TLD wrapped to the next line
     }
 
-    records.push({
-      name,
-      rawPhone: phoneTokens.length ? joinPhone(phoneTokens) : null,
-      age,
-    });
-    i = j;
+    records.push({ name, rawPhone: phoneTokens.length ? joinPhone(phoneTokens) : null, age });
+    lastIdx = records.length - 1;
+
+    // Any name tokens still trailing on THIS line (overflow that didn't wrap) belong to this record.
+    appendName(lastIdx, toks.slice(j).filter((t) => !t.includes('@') && !isPhoneToken(t)));
   }
 
+  // A wrapped tail on the very last record has no following anchor line to resolve it.
+  appendName(lastIdx, held);
+
+  for (const r of records) r.name = cleanName(r.name);
   return { records, expectedCount };
 }

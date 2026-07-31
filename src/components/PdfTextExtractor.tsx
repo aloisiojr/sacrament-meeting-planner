@@ -33,7 +33,9 @@ const BOOTSTRAP = `
       const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-      const out = [];
+      // Pass 1: per page, build visual lines (text grouped by Y, ordered left→right by X with a
+      // STABLE sort so same-X glyphs keep reading order, e.g. "José de").
+      const pages = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const tc = await page.getTextContent();
@@ -41,14 +43,41 @@ const BOOTSTRAP = `
         for (const it of tc.items) {
           if (typeof it.str !== 'string' || !it.str.trim()) continue;
           const y = Math.round(it.transform[5]);
-          const x = it.transform[4];
           if (!lines.has(y)) lines.set(y, []);
-          lines.get(y).push({ x, s: it.str });
+          lines.get(y).push({ x: it.transform[4], s: it.str });
         }
         const ys = Array.from(lines.keys()).sort((a, b) => b - a); // top → bottom
+        const vlines = [];
         for (const y of ys) {
-          const parts = lines.get(y).sort((a, b) => a.x - b.x).map((o) => o.s);
-          out.push(parts.join(' ').replace(/\\s+/g, ' ').trim());
+          const arr = lines.get(y).map((o, i) => ({ ...o, i }));
+          arr.sort((a, b) => (a.x - b.x) || (a.i - b.i)); // stable by X
+          const text = arr.map((o) => o.s).join(' ').replace(/\\s+/g, ' ').trim();
+          if (text) vlines.push({ y, text });
+        }
+        pages.push(vlines);
+      }
+      // A member's name can wrap across visual lines (the anchor row + name lines above/below share
+      // one table ROW). Rows are separated by a larger vertical gap than lines within a row. Compute
+      // the threshold globally as the midpoint of the two most common line-gaps (within-row spacing
+      // vs between-row spacing), then merge close-gap lines into one line per row.
+      const freq = new Map();
+      for (const vl of pages) {
+        for (let k = 1; k < vl.length; k++) {
+          const g = Math.round(Math.abs(vl[k - 1].y - vl[k].y));
+          if (g > 0) freq.set(g, (freq.get(g) || 0) + 1);
+        }
+      }
+      const common = Array.from(freq.entries()).sort((a, b) => b[1] - a[1]).map((e) => e[0]);
+      let thr = Infinity;
+      if (common.length >= 2) thr = (Math.min(common[0], common[1]) + Math.max(common[0], common[1])) / 2;
+      const out = [];
+      for (const vl of pages) {
+        for (let k = 0; k < vl.length; k++) {
+          if (k > 0 && Math.abs(vl[k - 1].y - vl[k].y) < thr) {
+            out[out.length - 1] = (out[out.length - 1] + ' ' + vl[k].text).trim();
+          } else {
+            out.push(vl[k].text);
+          }
         }
       }
       window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, text: out.join('\\n') }));

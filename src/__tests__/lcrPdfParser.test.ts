@@ -137,6 +137,73 @@ describe('parseLcrText — edge cases', () => {
     expect(r.records).toHaveLength(1);
     expect(r.expectedCount).toBe(9); // caller compares → mismatch warning (AC3)
   });
+
+  it('attaches a name that wraps BELOW its anchor row to the right record (post-wrap)', () => {
+    // The anchor (M 43 …) sits on the first visual line; the name overflows to the next line.
+    const txt = [
+      'Nome Sexo Idade',
+      'Sobrenome Junior, Alfa M 43 8 jun 1982 (11) 99999-0000 aloisio@example.com',
+      'José de', // wrapped tail of the record above — no anchor of its own
+      'Seguinte, Maria F 30 1 jan 1990 (11) 98888-0000',
+    ].join('\n');
+    const r = parseLcrText(txt);
+    expect(r.records).toHaveLength(2);
+    expect(r.records[0].name).toBe('Sobrenome Junior, Alfa José de');
+    expect(r.records[1].name).toBe('Seguinte, Maria');
+    // Rule: "Sobrenome, ComeçoDoNome" + "RestoDoNome" → "ComeçoDoNome RestoDoNome Sobrenome".
+    expect(lcrNameToFirstLast(r.records[0].name)).toBe('Alfa José de Sobrenome Junior');
+  });
+
+  it('handles a no-comma name that wraps below its anchor row', () => {
+    // Names are not always "Last, First" — the comma cannot be used to detect a wrapped tail.
+    const txt = [
+      'Nome Sexo Idade',
+      'Ciclana Beltrana M 57 17 jun 1969 (11) 90000-0019 c@example.com',
+      'Soares', // wrapped tail, no comma anywhere
+      'Outro, Joao M 40 2 fev 1984',
+    ].join('\n');
+    const r = parseLcrText(txt);
+    expect(r.records.map((x) => x.name)).toEqual(['Ciclana Beltrana Delta', 'Outro, Joao']);
+  });
+
+  it('reads a wrapped name from a single merged-row line (name + anchor + tail)', () => {
+    // The extractor merges a table row's wrapped lines into ONE line in reading order:
+    // "<name1> <anchor+data> <name2-tail>". The tail after the contact data joins the name.
+    const txt = [
+      'Nome Sexo Idade',
+      'Sobrenome Junior, Alfa M 43 13 abr 1983 (11) 90000-0020 alfa@example.com José de',
+      'Ciclana Beltrana Delta F 35 10 set 1990 (11) 90000-0021 c@example.com de Almeida',
+    ].join('\n');
+    const r = parseLcrText(txt);
+    expect(r.records[0].name).toBe('Sobrenome Junior, Alfa José de');
+    expect(lcrNameToFirstLast(r.records[0].name)).toBe('Alfa José de Sobrenome Junior');
+    // No comma anywhere — the tail still joins.
+    expect(r.records[1].name).toBe('Ciclana Beltrana Delta de Almeida');
+    expect(lcrNameToFirstLast(r.records[1].name)).toBe('Ciclana Beltrana Delta de Almeida');
+  });
+
+  it('strips email/phone residue that interleaves into a name', () => {
+    const txt = [
+      'Nome Sexo Idade',
+      'Santos, Brenda M 20 1 jan 2005 fulana.exemplo@gmail Almeida .com',
+      'Leal, Rui M 88 12 nov 1937 860590019568983',
+    ].join('\n');
+    const r = parseLcrText(txt);
+    expect(r.records[0].name).toBe('Santos, Brenda Almeida'); // email token + ".com" dropped
+    expect(r.records[1].name).toBe('Leal, Rui'); // 15-digit garbage phone dropped from the name
+  });
+
+  it('still joins a pre-wrap name (name lines BEFORE an anchor with no name of its own)', () => {
+    const txt = [
+      'Nome Sexo Idade',
+      'Curto, Bruno M 26 4 out 1999 (11) 90000-0000', // record 0 names itself
+      'Sobrenome, Alfa', // pre-wrap name for record 1 …
+      'Beta Gama', // … continued …
+      'M 8 26 jul 2018 alfa@example.com', // … resolved by an anchor line with no name
+    ].join('\n');
+    const r = parseLcrText(txt);
+    expect(r.records.map((x) => x.name)).toEqual(['Curto, Bruno', 'Sobrenome, Alfa Beta Gama']);
+  });
 });
 
 describe('lcrNameToFirstLast — Rule 1 (AC4)', () => {

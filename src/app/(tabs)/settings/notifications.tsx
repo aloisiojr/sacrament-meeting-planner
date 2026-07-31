@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { AppSwitch } from '../../../components/AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,12 +44,11 @@ export default function NotificationsSettingsScreen() {
                 {t('notificationSettings.pushEnabledDescription')}
               </Text>
             </View>
-            <Switch
+            <AppSwitch
               testID="notifications-master-switch"
               value={enabled}
               onValueChange={(val) => setEnabled.mutate(val)}
               disabled={!isOnline || setEnabled.isPending}
-              trackColor={{ false: colors.divider, true: colors.primary }}
             />
           </View>
           {!isOnline && (

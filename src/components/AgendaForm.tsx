@@ -10,12 +10,12 @@ import {
   View,
   Text,
   StyleSheet,
-  Switch,
   Pressable,
   Modal,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
@@ -180,16 +180,17 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
   );
 
   // Handle recognition toggle (multi-select). Stores newline-joined member names (snapshot).
-  const handleRecognizeToggle = useCallback(
-    (member: Member) => {
+  // Draft multi-select commit. The recognition field is dual-input (free-typed names + this picker),
+  // and the picker only lists members — so preserve any free-typed non-member entries and replace
+  // only the member-derived part with the confirmed selection.
+  const handleRecognizeConfirm = useCallback(
+    (selected: Member[]) => {
       if (!agenda || isObserver) return;
-      const currentItems = parseItems(agenda.recognized_names ?? null);
-      const newItems = currentItems.includes(member.full_name)
-        ? currentItems.filter((n) => n !== member.full_name)
-        : [...currentItems, member.full_name];
-      updateField('recognized_names', joinItems(newItems));
+      const memberNames = new Set((members ?? []).map((m) => m.full_name));
+      const freeText = parseItems(agenda.recognized_names ?? null).filter((n) => !memberNames.has(n));
+      updateField('recognized_names', joinItems([...freeText, ...selected.map((m) => m.full_name)]));
     },
-    [agenda, isObserver, updateField]
+    [agenda, isObserver, members, updateField]
   );
 
   // Ids of members currently in the recognition list (for multi-select highlighting).
@@ -688,7 +689,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
           context="be_recognized"
           multiSelect
           selectedIds={recognizedSelectedIds}
-          onSelect={handleRecognizeToggle}
+          onConfirmMulti={handleRecognizeConfirm}
           onClose={() => setPeoplePicker(null)}
         />
       )}
@@ -861,11 +862,10 @@ function ToggleField({
   return (
     <View style={styles.toggleRow}>
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Switch
+      <AppSwitch
         value={value}
         onValueChange={disabled ? undefined : onToggle}
         disabled={disabled}
-        trackColor={{ false: colors.border, true: colors.primary }}
       />
     </View>
   );

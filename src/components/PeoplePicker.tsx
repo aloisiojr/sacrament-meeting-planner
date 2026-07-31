@@ -17,7 +17,7 @@
  *  - Selecting is gated by agenda:write / speech:assign; observers are view-only.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,9 +25,9 @@ import {
   FlatList,
   Pressable,
   Modal,
-  Switch,
   Alert,
 } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -83,7 +83,14 @@ export interface PeoplePickerProps {
   multiSelect?: boolean;
   /** Currently selected member ids (highlight in single mode, checkbox in multi mode). */
   selectedIds?: string[];
-  onSelect: (member: Member) => void;
+  /** Single-select commit (per tap). Optional in draft multi-select (use onConfirmMulti). */
+  onSelect?: (member: Member) => void;
+  /**
+   * Draft multi-select commit. When provided (with multiSelect), the picker holds selection locally:
+   * taps toggle a draft, a header Save commits the full set here, and Cancel discards it. On Save the
+   * user is asked whether to grant the context capability to all selected who lack it.
+   */
+  onConfirmMulti?: (members: Member[]) => void;
   onClose: () => void;
 }
 
@@ -94,6 +101,7 @@ export function PeoplePicker({
   multiSelect = false,
   selectedIds,
   onSelect,
+  onConfirmMulti,
   onClose,
 }: PeoplePickerProps) {
   const { t } = useTranslation();
@@ -104,6 +112,15 @@ export function PeoplePicker({
   const [showAll, setShowAll] = useState(false);
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+
+  // Draft multi-select: hold the selection locally so Cancel discards it and Save commits it once.
+  const isDraft = multiSelect && !!onConfirmMulti;
+  const [draftIds, setDraftIds] = useState<Set<string>>(() => new Set(selectedIds ?? []));
+  // Re-seed the draft from the incoming selection each time the picker opens.
+  useEffect(() => {
+    if (visible) setDraftIds(new Set(selectedIds ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const { data: allMembers } = useMembers();
   const { data: speechCounts } = useSpeechCounts();
@@ -127,7 +144,10 @@ export function PeoplePicker({
       ? 'none'
       : 'speech';
 
-  const selectedSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
+  const selectedSet = useMemo(
+    () => (isDraft ? draftIds : new Set(selectedIds ?? [])),
+    [isDraft, draftIds, selectedIds]
+  );
 
   const responsibleForMap = useMemo(
     () => getResponsibleForMap(allMembers ?? []),
@@ -158,12 +178,13 @@ export function PeoplePicker({
 
   const handleClose = useCallback(() => {
     resetTransient();
+    setDraftIds(new Set(selectedIds ?? [])); // discard draft edits (Cancel undoes everything)
     onClose();
-  }, [resetTransient, onClose]);
+  }, [resetTransient, onClose, selectedIds]);
 
   const commitSelect = useCallback(
     (member: Member) => {
-      onSelect(member);
+      onSelect?.(member);
       if (!multiSelect) {
         resetTransient();
       }
@@ -171,9 +192,49 @@ export function PeoplePicker({
     [onSelect, multiSelect, resetTransient]
   );
 
+  // Draft multi-select: Save commits the whole set (and optionally grants the capability to those
+  // selected who lack it).
+  const handleSave = useCallback(() => {
+    const selected = (allMembers ?? []).filter((m) => draftIds.has(m.id));
+    const missing = capabilityField ? selected.filter((m) => m[capabilityField] !== true) : [];
+    const commit = (grant: boolean) => {
+      if (grant && capabilityField) {
+        for (const m of missing) updateMember.mutate({ id: m.id, [capabilityField]: true });
+      }
+      onConfirmMulti?.(selected);
+      resetTransient();
+      onClose();
+    };
+    if (capabilityField && missing.length > 0) {
+      Alert.alert(
+        t('people.grantAllTitle'),
+        t('people.grantAllMessage', {
+          count: missing.length,
+          capability: effectiveCapability ? t(`capabilities.${effectiveCapability}`) : '',
+        }),
+        [
+          { text: t('common.no'), onPress: () => commit(false) },
+          { text: t('common.yes'), onPress: () => commit(true) },
+        ]
+      );
+    } else {
+      commit(false);
+    }
+  }, [allMembers, draftIds, capabilityField, updateMember, onConfirmMulti, resetTransient, onClose, t, effectiveCapability]);
+
   const handleSelect = useCallback(
     (member: Member) => {
       if (!canSelect) return;
+      // Draft multi-select: just toggle locally (bulk grant is offered on Save).
+      if (isDraft) {
+        setDraftIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(member.id)) next.delete(member.id);
+          else next.add(member.id);
+          return next;
+        });
+        return;
+      }
       // Grant-on-select: capability context + member missing the flag → confirm then grant.
       if (capabilityField && member[capabilityField] !== true) {
         Alert.alert(
@@ -201,7 +262,7 @@ export function PeoplePicker({
       }
       commitSelect(member);
     },
-    [canSelect, capabilityField, effectiveCapability, t, updateMember, commitSelect]
+    [canSelect, isDraft, capabilityField, effectiveCapability, t, updateMember, commitSelect]
   );
 
   const openEditor = useCallback((member: Member | null) => {
@@ -325,7 +386,20 @@ export function PeoplePicker({
           >
             {t('people.pickerTitle')}
           </Text>
-          <View style={styles.topBarBtn} />
+          {isDraft ? (
+            <Pressable
+              testID="people-picker-save"
+              onPress={handleSave}
+              style={[styles.topBarBtn, styles.topBarBtnRight]}
+              disabled={!canSelect}
+            >
+              <Text style={[styles.topBarBtnText, styles.topBarBtnSave, { color: canSelect ? colors.primary : colors.textTertiary }]}>
+                {t('common.save')}
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.topBarBtn} />
+          )}
         </View>
 
         {/* Search + compact add button (member:write only). */}
@@ -368,7 +442,7 @@ export function PeoplePicker({
                 <Text style={[styles.viewAllText, { color: colors.textSecondary }]}>
                   {t('people.viewAll')}
                 </Text>
-                <Switch
+                <AppSwitch
                   testID="people-picker-view-all"
                   style={styles.viewAllSwitch}
                   value={showAll}
@@ -384,7 +458,7 @@ export function PeoplePicker({
               <Text style={[styles.viewAllText, { color: colors.text }]}>
                 {t('people.viewAll')}
               </Text>
-              <Switch
+              <AppSwitch
                 testID="people-picker-view-all"
                 value={showAll}
                 onValueChange={setShowAll}
@@ -438,8 +512,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minWidth: 72,
   },
+  topBarBtnRight: {
+    alignItems: 'flex-end',
+  },
   topBarBtnText: {
     fontSize: 16,
+  },
+  topBarBtnSave: {
+    fontWeight: '700',
   },
   title: {
     flex: 1,

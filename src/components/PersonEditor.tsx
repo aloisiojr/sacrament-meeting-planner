@@ -17,9 +17,9 @@ import {
   FlatList,
   Pressable,
   Modal,
-  Switch,
   Alert,
 } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -400,7 +400,7 @@ export function PersonEditor({
                 <Text style={[styles.capLabel, { color: colors.text }]}>
                   {t(`capabilities.${cap}`)}
                 </Text>
-                <Switch
+                <AppSwitch
                   testID={`person-editor-cap-switch-${cap}`}
                   value={caps[cap]}
                   onValueChange={() => toggleCap(cap)}

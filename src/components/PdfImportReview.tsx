@@ -11,7 +11,8 @@
  * name list scrolls — the step header + master toggle stay fixed. Empty steps are skipped.
  */
 import React, { useState } from 'react';
-import { View, Text, Pressable, Switch, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { PencilIcon } from './icons';
@@ -175,7 +176,7 @@ export function PdfImportReview({
           <Text style={[styles.stepTitle, { color: colors.text }]}>{t('pdfImport.stepConflictsTitle')}</Text>
           <View style={[styles.masterRow, { borderBottomColor: colors.divider }]}>
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.pdfShort')}</Text>
-            <Switch
+            <AppSwitch
               testID="pdf-conflict-master"
               accessibilityLabel={`${t('pdfImport.pdfShort')} / ${t('pdfImport.appShort')}`}
               value={allApp}
@@ -193,12 +194,12 @@ export function PdfImportReview({
           <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.stepRemovalsHint')}</Text>
           <View style={[styles.masterRow, styles.masterRowRight, { borderBottomColor: colors.divider }]}>
             <Text style={[styles.masterLabel, { color: colors.textSecondary }]}>{t('pdfImport.selectAll')}</Text>
-            <Switch
+            <AppSwitch
               testID="pdf-remove-master"
               accessibilityLabel={t('pdfImport.selectAll')}
               value={allRemove}
               onValueChange={setAllRemove}
-              trackColor={{ false: colors.divider, true: colors.error }}
+              trackColor={{ true: colors.error }}
             />
           </View>
         </View>
@@ -237,13 +238,13 @@ export function PdfImportReview({
               <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{c.member.full_name}</Text>
               <View style={styles.conflictRow}>
                 <Text style={[styles.phoneText, { color: colors.textSecondary }]} numberOfLines={1}>{c.pdfPhone}</Text>
-                <Switch
+                <AppSwitch
                   testID={`pdf-conflict-toggle-${c.member.id}`}
                   accessibilityLabel={c.member.full_name}
                   value={useApp[c.member.id] !== false}
                   onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
                   trackColor={{ false: colors.primary, true: colors.primary }}
-              ios_backgroundColor={colors.primary}
+                  ios_backgroundColor={colors.primary}
                 />
                 <Text style={[styles.phoneText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1}>+{c.appPhone}</Text>
               </View>
@@ -254,12 +255,12 @@ export function PdfImportReview({
           plan.absentInDb.map((m) => (
             <View key={m.id} style={[styles.row, { borderBottomColor: colors.divider }]}>
               <Text style={[styles.name, { color: colors.text, flex: 1 }]} numberOfLines={1}>{m.full_name}</Text>
-              <Switch
+              <AppSwitch
                 testID={`pdf-remove-${m.id}`}
                 accessibilityLabel={m.full_name}
                 value={!!toRemove[m.id]}
                 onValueChange={(v) => setToRemove((s) => ({ ...s, [m.id]: v }))}
-                trackColor={{ false: colors.divider, true: colors.error }}
+                trackColor={{ true: colors.error }}
               />
             </View>
           ))}

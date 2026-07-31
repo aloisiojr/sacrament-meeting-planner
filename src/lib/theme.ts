@@ -47,6 +47,8 @@ export interface ThemeColors {
   inputBackground: string;
   inputBorder: string;
   placeholder: string;
+  /** Off-state track for toggles (Switch). Visible against light/dark backgrounds. */
+  switchTrackOff: string;
 }
 
 export interface ThemeContextValue {
@@ -101,6 +103,7 @@ export const lightColors: ThemeColors = {
   inputBackground: '#F8FAFC',   // Slate-50
   inputBorder: '#94A3B8',       // Slate-400 (matches border)
   placeholder: '#64748B',       // Slate-500 (~4.6:1 on inputBackground; was #94A3B8 at 2.45:1)
+  switchTrackOff: '#94A3B8',    // Slate-400 — visible off-track (default iOS gray was ~invisible)
 };
 
 export const darkColors: ThemeColors = {
@@ -142,6 +145,7 @@ export const darkColors: ThemeColors = {
   inputBackground: '#1E293B',
   inputBorder: '#475569',
   placeholder: '#64748B',
+  switchTrackOff: '#64748B',    // Slate-500 — visible off-track on dark surfaces
 };
 
 // --- Storage ---

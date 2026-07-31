@@ -44,14 +44,31 @@ const BOOTSTRAP = `
           if (typeof it.str !== 'string' || !it.str.trim()) continue;
           const y = Math.round(it.transform[5]);
           if (!lines.has(y)) lines.set(y, []);
-          lines.get(y).push({ x: it.transform[4], s: it.str });
+          lines.get(y).push({
+            x: it.transform[4],
+            w: it.width || 0,
+            size: Math.hypot(it.transform[2], it.transform[3]) || it.height || 8,
+            s: it.str,
+          });
         }
         const ys = Array.from(lines.keys()).sort((a, b) => b - a); // top → bottom
         const vlines = [];
         for (const y of ys) {
           const arr = lines.get(y).map((o, i) => ({ ...o, i }));
           arr.sort((a, b) => (a.x - b.x) || (a.i - b.i)); // stable by X
-          const text = arr.map((o) => o.s).join(' ').replace(/\\s+/g, ' ').trim();
+          // Join items, inserting a space ONLY for a real horizontal gap (word/column boundary).
+          // Accented letters render as separate adjacent glyph items (gap ~0) → concatenate, so
+          // "Gon" "ç" "alves" → "Gonçalves", not "Gon ç alves".
+          let text = '';
+          let prevEnd = null;
+          for (const o of arr) {
+            if (prevEnd !== null && o.x - prevEnd > o.size * 0.2 && !text.endsWith(' ') && !o.s.startsWith(' ')) {
+              text += ' ';
+            }
+            text += o.s;
+            prevEnd = o.x + o.w;
+          }
+          text = text.replace(/\\s+/g, ' ').trim();
           if (text) vlines.push({ y, text });
         }
         pages.push(vlines);

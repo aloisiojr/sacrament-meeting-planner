@@ -226,5 +226,6 @@ export function parseLcrText(text: string): LcrParseResult {
   appendName(lastIdx, held);
 
   for (const r of records) r.name = cleanName(r.name);
-  return { records, expectedCount };
+  // Drop any record left without a real name (stray/mis-parsed line) — never import a blank member.
+  return { records: records.filter((r) => r.name.length > 0), expectedCount };
 }

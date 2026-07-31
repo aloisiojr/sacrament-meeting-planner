@@ -105,6 +105,9 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
 }: UnifiedSundayCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  // AA-legible "done/filled" green + warning as TEXT (theme tokens; fall back for older mocks).
+  const successColor = colors.successText ?? GREEN;
+  const warnColor = colors.warningText ?? colors.warning;
 
   const reason = exceptionReason === 'speeches' ? null : exceptionReason;
   const isNoSacrament = isNoSacramentReason(exceptionReason);
@@ -155,7 +158,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
   // The yellow "Reunião de testemunho" line for the names block (Home upcoming cards only).
   const testimonyLine = (
     <View style={styles.nameRow} testID="unified-block2-testimony">
-      <Text style={[styles.nameText, { color: colors.warning, fontStyle: 'italic' }]} numberOfLines={1}>
+      <Text style={[styles.nameText, { color: warnColor, fontStyle: 'italic' }]} numberOfLines={1}>
         {reasonLabel}
       </Text>
     </View>
@@ -174,7 +177,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
                 <Text style={{ color: colors.textSecondary }}>{' | '}</Text>
               ) : null}
               <Text
-                style={{ color: r.filled ? GREEN : colors.textSecondary }}
+                style={{ color: r.filled ? successColor : colors.textSecondary }}
                 testID={`unified-role-${r.key}`}
               >
                 {r.label}
@@ -187,7 +190,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
       {/* Line 2: speakers count — or the yellow testimony label */}
       {isTestimony ? (
         <Text
-          style={[styles.countLine, { color: colors.warning }]}
+          style={[styles.countLine, { color: warnColor }]}
           numberOfLines={1}
           testID="unified-testimony"
         >
@@ -195,7 +198,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
         </Text>
       ) : isNoSacrament ? (
         <Text
-          style={[styles.countLine, { color: colors.warning }]}
+          style={[styles.countLine, { color: warnColor }]}
           numberOfLines={1}
           testID="unified-reason"
         >
@@ -205,7 +208,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
         <Text
           style={[
             styles.countLine,
-            { color: speakers.done === speakers.total ? GREEN : colors.textSecondary },
+            { color: speakers.done === speakers.total ? successColor : colors.textSecondary },
           ]}
           numberOfLines={1}
           testID="unified-count-speakers"
@@ -219,7 +222,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
         <Text
           style={[
             styles.countLine,
-            { color: prayers.done === prayers.total ? GREEN : colors.textSecondary },
+            { color: prayers.done === prayers.total ? successColor : colors.textSecondary },
           ]}
           numberOfLines={1}
           testID="unified-count-prayers"
@@ -233,7 +236,7 @@ export const UnifiedSundayCard = React.memo(function UnifiedSundayCard({
         <Text
           style={[
             styles.countLine,
-            { color: hymns.done === hymns.total ? GREEN : colors.textSecondary },
+            { color: hymns.done === hymns.total ? successColor : colors.textSecondary },
           ]}
           numberOfLines={1}
           testID="unified-count-hymns"

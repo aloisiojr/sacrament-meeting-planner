@@ -1,5 +1,7 @@
 // --- Types ---
 
+import type { SpeechStatus } from '../types/database';
+
 export type ThemeMode = 'automatic' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
@@ -27,6 +29,11 @@ export interface ThemeColors {
   errorContainer: string;
   success: string;
   warning: string;
+  /** Success/warning tuned for use as TEXT (AA on light backgrounds); success/warning stay for fills. */
+  successText: string;
+  warningText: string;
+  /** Speech-status indicator colors, tuned per theme for ≥3:1 as dots/LEDs. Single source of truth. */
+  status: Record<SpeechStatus, string>;
 
   // Borders & Dividers
   border: string;
@@ -75,6 +82,15 @@ export const lightColors: ThemeColors = {
   errorContainer: '#FEE2E2',
   success: '#16A34A',
   warning: '#D97706',
+  successText: '#166534',       // green-800, 4.9:1 on white / 4.6:1 on hero (AA text)
+  warningText: '#B45309',       // amber-700, 5.3:1 on white (AA text)
+  status: {
+    not_assigned: '#6B7280',          // 4.5:1 on white
+    assigned_not_invited: '#EA580C',  // 3.8:1 on white
+    assigned_invited: '#A16207',      // 5.3:1 on white (yellow is illegible bright on white)
+    assigned_confirmed: '#15803D',    // 4.6:1 on white
+    gave_up: '#7F1D1D',               // 13:1 on white
+  },
 
   border: '#94A3B8',            // Slate-400 (bluish border)
   divider: '#CBD5E1',           // Slate-300 (bluish divider)
@@ -107,6 +123,15 @@ export const darkColors: ThemeColors = {
   errorContainer: '#451A1A',
   success: '#4ADE80',
   warning: '#FBBF24',
+  successText: '#4ADE80',       // already high-contrast on dark surfaces
+  warningText: '#FBBF24',
+  status: {
+    not_assigned: '#9CA3AF',
+    assigned_not_invited: '#F97316',
+    assigned_invited: '#EAB308',
+    assigned_confirmed: '#22C55E',
+    gave_up: '#F87171',               // was #7F1D1D → 1.46:1 (invisible) on dark; now legible
+  },
 
   border: '#475569',
   divider: '#334155',

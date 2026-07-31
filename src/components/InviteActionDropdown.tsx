@@ -96,7 +96,7 @@ export function InviteActionDropdown({
                 <View
                   style={[
                     styles.indicator,
-                    { backgroundColor: STATUS_INDICATOR_COLORS[statusOption] },
+                    { backgroundColor: colors.status?.[statusOption] ?? STATUS_INDICATOR_COLORS[statusOption] },
                   ]}
                 />
                 <Text

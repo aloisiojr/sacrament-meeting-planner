@@ -34,8 +34,21 @@ describe('ThemeContext - Color Palettes', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(lightColors)) {
-        expect(value, `lightColors.${key} is not a valid hex`).toMatch(hexRegex);
+        const vals = typeof value === 'string' ? [value] : Object.values(value);
+        for (const v of vals) expect(v, `lightColors.${key} is not a valid hex`).toMatch(hexRegex);
       }
+    });
+
+    it('status dots meet ≥3:1 on the white card (H2)', () => {
+      for (const [k, v] of Object.entries(lightColors.status)) {
+        const ratio = contrastRatio(v, lightColors.card);
+        expect(ratio, `status.${k} on card: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    it('successText / warningText meet AA (4.5:1) as text on the white card (H1/H3)', () => {
+      expect(contrastRatio(lightColors.successText, lightColors.card)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightColors.warningText, lightColors.card)).toBeGreaterThanOrEqual(4.5);
     });
 
     it('should have WCAG AA contrast for text on background (4.5:1)', () => {
@@ -63,7 +76,15 @@ describe('ThemeContext - Color Palettes', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(darkColors)) {
-        expect(value, `darkColors.${key} is not a valid hex`).toMatch(hexRegex);
+        const vals = typeof value === 'string' ? [value] : Object.values(value);
+        for (const v of vals) expect(v, `darkColors.${key} is not a valid hex`).toMatch(hexRegex);
+      }
+    });
+
+    it('status dots meet ≥3:1 on the dark card (incl. gave_up, H2)', () => {
+      for (const [k, v] of Object.entries(darkColors.status)) {
+        const ratio = contrastRatio(v, darkColors.card);
+        expect(ratio, `status.${k} on card: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
       }
     });
 

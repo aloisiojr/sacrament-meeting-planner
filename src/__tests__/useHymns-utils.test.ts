@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { filterHymns, formatHymnDisplay, hymnKeys } from '../hooks/useHymns';
 import type { Hymn } from '../types/database';
 

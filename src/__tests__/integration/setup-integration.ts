@@ -2,8 +2,8 @@
  * Shared integration test infrastructure.
  * Provides TestWrapper, renderHook, mock factories, and Supabase mock helpers.
  *
- * IMPORTANT: This file does NOT call vi.mock(). Each test file must
- * call its own vi.mock() at the top level.
+ * IMPORTANT: This file does NOT call jest.mock(). Each test file must
+ * call its own jest.mock() at the top level.
  *
  * Uses react-test-renderer for renderHook (no react-native dependency).
  */
@@ -13,7 +13,6 @@ import TestRenderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext, type AuthContextValue } from '../../contexts/AuthContext';
 import { hasPermission as checkPermission } from '../../lib/permissions';
-import { vi } from 'vitest';
 import type {
   Member,
   Speech,
@@ -171,11 +170,11 @@ export function createMockAuthContext(overrides?: Partial<AuthContextValue>): Au
     userName: 'Test User',
     wardLanguage: 'pt-BR',
     loading: false,
-    signIn: vi.fn(),
-    signOut: vi.fn(),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
     hasPermission: (perm: Permission) => checkPermission(role, perm),
-    updateAppLanguage: vi.fn(),
-    setWardLanguage: vi.fn(),
+    updateAppLanguage: jest.fn(),
+    setWardLanguage: jest.fn(),
     ...overrides,
   };
 }
@@ -231,7 +230,7 @@ export function createWrapper(
  * Configures the mocked supabase.from() to return a chainable query builder
  * that resolves with the given response.
  *
- * @param supabaseMock - The mocked supabase module (vi.mocked)
+ * @param supabaseMock - The mocked supabase module (jest.mocked)
  * @param table - Table name to intercept
  * @param response - The { data, error } to resolve with
  */
@@ -305,17 +304,17 @@ export function createMockSupabaseAuth(options?: MockSupabaseAuthOptions) {
   let authChangeCallback: ((event: string, session: any) => void) | null = null;
 
   const auth = {
-    getSession: vi.fn().mockResolvedValue({
+    getSession: jest.fn().mockResolvedValue({
       data: { session: options?.session ?? MOCK_SESSION },
       error: null,
     }),
-    signInWithPassword: vi.fn().mockResolvedValue({ data: {}, error: null }),
-    signOut: vi.fn().mockResolvedValue({ error: null }),
-    onAuthStateChange: vi.fn((callback: (event: string, session: any) => void) => {
+    signInWithPassword: jest.fn().mockResolvedValue({ data: {}, error: null }),
+    signOut: jest.fn().mockResolvedValue({ error: null }),
+    onAuthStateChange: jest.fn((callback: (event: string, session: any) => void) => {
       authChangeCallback = callback;
       return {
         data: {
-          subscription: { unsubscribe: vi.fn() },
+          subscription: { unsubscribe: jest.fn() },
         },
       };
     }),

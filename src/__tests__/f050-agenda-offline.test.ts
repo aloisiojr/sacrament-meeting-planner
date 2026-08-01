@@ -5,7 +5,6 @@
  * Verifies Agenda tab restricts UI when offline.
  */
 
-import { describe, it, expect } from 'vitest';
 import { isExcludedFromAgenda } from '../hooks/useAgenda';
 import { getTodaySundayDate } from '../hooks/usePresentationMode';
 

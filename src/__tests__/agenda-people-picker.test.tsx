@@ -9,19 +9,18 @@
  *  - recognition opens multiSelect with capability `be_recognized` and newline-joins names;
  *  - prayers open PeoplePicker with NO capability and assign the member to the speech.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member, SundayAgenda, Speech } from '../types/database';
-// vi.mock calls below are hoisted above these imports, so the mocks still apply.
+// jest.mock calls below are hoisted above these imports, so the mocks still apply.
 import { AgendaForm } from '../components/AgendaForm';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// --- Hoisted shared spies (referenced inside vi.mock factories) ---
+// --- Hoisted shared spies (referenced inside jest.mock factories) ---
 
-const h = vi.hoisted(() => ({
+const mockH = {
   lastPickerProps: null as null | {
     context?: string;
     capability?: string;
@@ -30,11 +29,11 @@ const h = vi.hoisted(() => ({
     onSelect?: (m: Member) => void;
     onConfirmMulti?: (members: Member[]) => void;
   },
-}));
+};
 
-const updateAgendaMutate = vi.fn();
-const assignSpeakerMutate = vi.fn();
-const removeAssignmentMutate = vi.fn();
+const mockUpdateAgendaMutate = jest.fn();
+const mockAssignSpeakerMutate = jest.fn();
+const mockRemoveAssignmentMutate = jest.fn();
 
 // --- Test data ---
 
@@ -60,8 +59,8 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 
 const MEMBER = makeMember({ id: 'm1', full_name: 'Alice Smith', informal_name: 'Alice', phone: '555' });
 
-let AGENDA: SundayAgenda;
-let MEMBERS: Member[] = [];
+let mockAGENDA: SundayAgenda;
+let mockMEMBERS: Member[] = [];
 const SPEECHES: Speech[] = [
   { id: 's0', ward_id: 'w1', sunday_date: '2026-01-04', position: 0, member_id: null, speaker_name: null, speaker_informal_name: null, speaker_phone: null, topic_title: null, topic_link: null, topic_collection: null, assigned_by_role: null, status: 'not_assigned', contact_phone: null, is_delegated: false, delegate_for_name: null, created_at: '', updated_at: '' },
   { id: 's4', ward_id: 'w1', sunday_date: '2026-01-04', position: 4, member_id: null, speaker_name: null, speaker_informal_name: null, speaker_phone: null, topic_title: null, topic_link: null, topic_collection: null, assigned_by_role: null, status: 'not_assigned', contact_phone: null, is_delegated: false, delegate_for_name: null, created_at: '', updated_at: '' },
@@ -69,9 +68,9 @@ const SPEECHES: Speech[] = [
 
 // --- Mocks ---
 
-vi.mock('../components/PeoplePicker', () => ({
+jest.mock('../components/PeoplePicker', () => ({
   PeoplePicker: (props: Record<string, unknown>) => {
-    h.lastPickerProps = props as unknown as typeof h.lastPickerProps;
+    mockH.lastPickerProps = props as unknown as typeof mockH.lastPickerProps;
     return null;
   },
 }));
@@ -79,7 +78,7 @@ vi.mock('../components/PeoplePicker', () => ({
 // EditableListField: the real module pulls in react-native-draggable-flatlist (untransformed), so
 // reimplement the pure \n-join helpers here and stub the UI to expose onAddPress via a testID for
 // the recognition field only (the sole usage that passes onAddPress).
-vi.mock('../components/EditableListField', async () => {
+jest.mock('../components/EditableListField', async () => {
   const ReactMod = (await import('react')).default;
   const parseItems = (value: string | string[] | null): string[] =>
     Array.isArray(value)
@@ -96,24 +95,24 @@ vi.mock('../components/EditableListField', async () => {
   };
 });
 
-vi.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
+jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
 
-vi.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -123,36 +122,36 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-vi.mock('../contexts/AuthContext', () => ({
+jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('../hooks/useAgenda', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useAgenda', () => {
+  const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;
   return {
     ...actual,
-    useAgenda: () => ({ data: AGENDA }),
-    useUpdateAgenda: () => ({ mutate: updateAgendaMutate }),
+    useAgenda: () => ({ data: mockAGENDA }),
+    useUpdateAgenda: () => ({ mutate: mockUpdateAgendaMutate }),
   };
 });
 
-vi.mock('../hooks/useSpeeches', () => ({
+jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: SPEECHES }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
-  useAssignSpeaker: () => ({ mutate: assignSpeakerMutate }),
-  useRemoveAssignment: () => ({ mutate: removeAssignmentMutate }),
-  useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+  useAssignSpeaker: () => ({ mutate: mockAssignSpeakerMutate }),
+  useRemoveAssignment: () => ({ mutate: mockRemoveAssignmentMutate }),
+  useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
 }));
 
-vi.mock('../hooks/useHymns', () => ({
+jest.mock('../hooks/useHymns', () => ({
   useHymns: () => ({ data: [] }),
   useSacramentalHymns: () => ({ data: [] }),
   formatHymnDisplay: () => '',
   filterHymns: (h2: unknown[]) => h2,
 }));
 
-vi.mock('../hooks/useMembers', () => ({
-  useMembers: () => ({ data: MEMBERS }),
+jest.mock('../hooks/useMembers', () => ({
+  useMembers: () => ({ data: mockMEMBERS }),
 }));
 
 // --- Helpers ---
@@ -175,7 +174,7 @@ function press(root: TestRenderer.TestInstance, testID: string) {
 }
 
 beforeEach(() => {
-  AGENDA = {
+  mockAGENDA = {
     id: 'ag1', ward_id: 'w1', sunday_date: '2026-01-04',
     presiding_name: null,
     conducting_name: null,
@@ -192,11 +191,11 @@ beforeEach(() => {
     has_second_speech: true, closing_hymn_id: null, closing_prayer_member_id: null,
     closing_prayer_name: null, attendance: null, created_at: '', updated_at: '',
   };
-  MEMBERS = [MEMBER];
-  h.lastPickerProps = null;
-  updateAgendaMutate.mockClear();
-  assignSpeakerMutate.mockClear();
-  removeAssignmentMutate.mockClear();
+  mockMEMBERS = [MEMBER];
+  mockH.lastPickerProps = null;
+  mockUpdateAgendaMutate.mockClear();
+  mockAssignSpeakerMutate.mockClear();
+  mockRemoveAssignmentMutate.mockClear();
 });
 
 // --- Tests ---
@@ -213,12 +212,12 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     it(`${nameField}: opens PeoplePicker with context='${context}' and writes only the name snapshot`, () => {
       const renderer = render();
       press(renderer.root, testID);
-      expect(h.lastPickerProps?.context).toBe(context);
-      expect(h.lastPickerProps?.multiSelect).toBeFalsy();
+      expect(mockH.lastPickerProps?.context).toBe(context);
+      expect(mockH.lastPickerProps?.multiSelect).toBeFalsy();
 
-      act(() => h.lastPickerProps!.onSelect!(MEMBER));
-      expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
-      const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+      act(() => mockH.lastPickerProps!.onSelect!(MEMBER));
+      expect(mockUpdateAgendaMutate).toHaveBeenCalledTimes(1);
+      const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
       expect(fields[nameField]).toBe('Alice Smith');
       // v2.0: only the name snapshot column is written (no actor FK columns).
       expect(Object.keys(fields)).toEqual([nameField]);
@@ -228,78 +227,78 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
   it('recognition: opens multiSelect (draft) and Save commits the selected names', () => {
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
-    expect(h.lastPickerProps?.context).toBe('be_recognized');
-    expect(h.lastPickerProps?.multiSelect).toBe(true);
-    expect(h.lastPickerProps?.selectedIds).toEqual([]);
+    expect(mockH.lastPickerProps?.context).toBe('be_recognized');
+    expect(mockH.lastPickerProps?.multiSelect).toBe(true);
+    expect(mockH.lastPickerProps?.selectedIds).toEqual([]);
 
-    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBER]));
-    expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
-    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    act(() => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
+    expect(mockUpdateAgendaMutate).toHaveBeenCalledTimes(1);
+    const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Alice Smith');
   });
 
   it('recognition: Save replaces the list with the full confirmed selection', () => {
-    AGENDA.recognized_names = 'Bob Jones';
-    MEMBERS = [MEMBER, makeMember({ id: 'm2', full_name: 'Bob Jones' })];
+    mockAGENDA.recognized_names = 'Bob Jones';
+    mockMEMBERS = [MEMBER, makeMember({ id: 'm2', full_name: 'Bob Jones' })];
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
     // Bob is already recognized → seeded into the draft via selectedIds.
-    expect(h.lastPickerProps?.selectedIds).toEqual(['m2']);
+    expect(mockH.lastPickerProps?.selectedIds).toEqual(['m2']);
 
-    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBERS[1], MEMBER]));
-    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    act(() => mockH.lastPickerProps!.onConfirmMulti!([mockMEMBERS[1], MEMBER]));
+    const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Bob Jones\nAlice Smith');
   });
 
   it('recognition: Save preserves free-typed (non-member) names and replaces the member part', () => {
-    AGENDA.recognized_names = 'Guest Speaker'; // free text, not a ward member
-    MEMBERS = [MEMBER];
+    mockAGENDA.recognized_names = 'Guest Speaker'; // free text, not a ward member
+    mockMEMBERS = [MEMBER];
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
-    expect(h.lastPickerProps?.selectedIds).toEqual([]); // free text isn't a member → not seeded
-    act(() => h.lastPickerProps!.onConfirmMulti!([MEMBER]));
-    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    expect(mockH.lastPickerProps?.selectedIds).toEqual([]); // free text isn't a member → not seeded
+    act(() => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
+    const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Guest Speaker\nAlice Smith');
   });
 
   it('recognition: Save with an empty selection clears the list', () => {
-    AGENDA.recognized_names = 'Alice Smith';
+    mockAGENDA.recognized_names = 'Alice Smith';
     const renderer = render();
     press(renderer.root, 'mock-recognize-add');
-    expect(h.lastPickerProps?.selectedIds).toEqual(['m1']);
-    act(() => h.lastPickerProps!.onConfirmMulti!([]));
-    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    expect(mockH.lastPickerProps?.selectedIds).toEqual(['m1']);
+    act(() => mockH.lastPickerProps!.onConfirmMulti!([]));
+    const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBeNull();
   });
 
   it('prayers: open PeoplePicker with context opening_prayer and assign the member to the speech', () => {
     const renderer = render();
     press(renderer.root, 'agenda-opening-prayer-selector');
-    expect(h.lastPickerProps?.context).toBe('opening_prayer');
-    expect(h.lastPickerProps?.capability).toBeUndefined();
-    expect(h.lastPickerProps?.multiSelect).toBeFalsy();
+    expect(mockH.lastPickerProps?.context).toBe('opening_prayer');
+    expect(mockH.lastPickerProps?.capability).toBeUndefined();
+    expect(mockH.lastPickerProps?.multiSelect).toBeFalsy();
 
-    act(() => h.lastPickerProps!.onSelect!(MEMBER));
-    expect(assignSpeakerMutate).toHaveBeenCalledTimes(1);
-    const input = assignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
+    act(() => mockH.lastPickerProps!.onSelect!(MEMBER));
+    expect(mockAssignSpeakerMutate).toHaveBeenCalledTimes(1);
+    const input = mockAssignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s0');
     expect(input.memberId).toBe('m1');
     expect(input.speakerName).toBe('Alice Smith');
     expect(input.speakerPhone).toBe('+1555');
     expect(input.isDelegated).toBe(false);
     // Prayers write to the speech, not the agenda actor columns.
-    expect(updateAgendaMutate).not.toHaveBeenCalled();
+    expect(mockUpdateAgendaMutate).not.toHaveBeenCalled();
   });
 
   it('prayers: delegation snapshot resolves the responsible contact', () => {
     const responsible = makeMember({ id: 'r1', full_name: 'Carol Boss', country_code: '+55', phone: '999' });
     const delegated = makeMember({ id: 'd1', full_name: 'Dan Dep', informal_name: 'Dan', contact_via_responsible: true, responsible_id: 'r1' });
-    MEMBERS = [responsible, delegated];
+    mockMEMBERS = [responsible, delegated];
     const renderer = render();
     press(renderer.root, 'agenda-closing-prayer-selector');
-    expect(h.lastPickerProps?.context).toBe('closing_prayer');
-    act(() => h.lastPickerProps!.onSelect!(delegated));
-    const input = assignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
+    expect(mockH.lastPickerProps?.context).toBe('closing_prayer');
+    act(() => mockH.lastPickerProps!.onSelect!(delegated));
+    const input = mockAssignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s4');
     expect(input.isDelegated).toBe(true);
     expect(input.contactPhone).toBe('+55999');

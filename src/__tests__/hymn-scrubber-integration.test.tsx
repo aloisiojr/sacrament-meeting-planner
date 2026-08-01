@@ -6,7 +6,6 @@
  *  - the FlatList uses a fixed-height getItemLayout (exact scroll math);
  *  - the rail disappears once a search filter is active (AC5).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { SundayAgenda, Hymn } from '../types/database';
@@ -14,14 +13,14 @@ import type { SundayAgenda, Hymn } from '../types/database';
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const H = vi.hoisted(() => ({
-  scrollToOffset: vi.fn(),
+const mockH = {
+  scrollToOffset: jest.fn(),
   searchProps: null as null | { value: string; onChangeText: (s: string) => void },
-}));
-const auth = vi.hoisted(() => ({ canWrite: true }));
-const updateAgendaMutate = vi.fn();
+};
+const mockAuth = { canWrite: true };
+const mockUpdateAgendaMutate = jest.fn();
 
-let AGENDA: SundayAgenda;
+let mockAGENDA: SundayAgenda;
 const HYMNS: Hymn[] = [
   { id: 'h1', language: 'pt-BR', number: 1, title: 'Hino 1', is_sacramental: false },
   { id: 'h50', language: 'pt-BR', number: 50, title: 'Hino 50', is_sacramental: false },
@@ -29,11 +28,11 @@ const HYMNS: Hymn[] = [
 ];
 
 // Partial react-native mock: give FlatList a real ref (scrollToOffset spy) and render its rows.
-vi.mock('react-native', async () => {
-  const actual = (await vi.importActual('./stubs/react-native')) as Record<string, unknown>;
+jest.mock('react-native', async () => {
+  const actual = (await jest.requireActual('./stubs/react-native')) as Record<string, unknown>;
   const ReactMod = (await import('react')).default;
   const FlatList = ReactMod.forwardRef((props: any, ref: any) => {
-    ReactMod.useImperativeHandle(ref, () => ({ scrollToOffset: H.scrollToOffset }));
+    ReactMod.useImperativeHandle(ref, () => ({ scrollToOffset: mockH.scrollToOffset }));
     const data: any[] = props.data ?? [];
     return ReactMod.createElement(
       'FlatList',
@@ -51,29 +50,29 @@ vi.mock('react-native', async () => {
   return { ...actual, FlatList };
 });
 
-vi.mock('../components/SearchInput', () => ({
+jest.mock('../components/SearchInput', () => ({
   SearchInput: (props: any) => {
-    H.searchProps = props;
+    mockH.searchProps = props;
     return null;
   },
 }));
-vi.mock('../components/DesignationListField', () => ({ DesignationListField: () => null }));
-vi.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
-vi.mock('../components/EditableListField', () => ({
+jest.mock('../components/DesignationListField', () => ({ DesignationListField: () => null }));
+jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
+jest.mock('../components/EditableListField', () => ({
   parseItems: () => [],
   joinItems: () => null,
   EditableListField: () => null,
 }));
-vi.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
-vi.mock('./icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
-vi.mock('../components/icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
+jest.mock('./icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
+jest.mock('../components/icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'pt-BR' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'pt-BR' }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -82,27 +81,27 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? auth.canWrite : true) }),
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? mockAuth.canWrite : true) }),
 }));
-vi.mock('../hooks/useAgenda', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, useAgenda: () => ({ data: AGENDA }), useUpdateAgenda: () => ({ mutate: updateAgendaMutate }) };
+jest.mock('../hooks/useAgenda', () => {
+  const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;
+  return { ...actual, useAgenda: () => ({ data: mockAGENDA }), useUpdateAgenda: () => ({ mutate: mockUpdateAgendaMutate }) };
 });
-vi.mock('../hooks/useSpeeches', () => ({
+jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: [] }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
-  useAssignSpeaker: () => ({ mutate: vi.fn() }),
-  useRemoveAssignment: () => ({ mutate: vi.fn() }),
-  useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+  useAssignSpeaker: () => ({ mutate: jest.fn() }),
+  useRemoveAssignment: () => ({ mutate: jest.fn() }),
+  useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
 }));
-vi.mock('../hooks/useHymns', () => ({
+jest.mock('../hooks/useHymns', () => ({
   useHymns: () => ({ data: HYMNS }),
   useSacramentalHymns: () => ({ data: [] }),
   formatHymnDisplay: (h: Hymn) => `${h.number} - ${h.title}`,
   filterHymns: (h: Hymn[]) => h,
 }));
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
 
 import { AgendaForm } from '../components/AgendaForm';
 
@@ -124,11 +123,11 @@ const railOf = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-scrubber-rail')[0] as any;
 
 beforeEach(() => {
-  auth.canWrite = true;
-  H.scrollToOffset.mockClear();
-  H.searchProps = null;
-  updateAgendaMutate.mockClear();
-  AGENDA = {
+  mockAuth.canWrite = true;
+  mockH.scrollToOffset.mockClear();
+  mockH.searchProps = null;
+  mockUpdateAgendaMutate.mockClear();
+  mockAGENDA = {
     id: 'ag1', ward_id: 'w1', sunday_date: '2026-01-04',
     presiding_name: null, conducting_name: null, recognized_names: null,
     welcome_new_families: null, announcements: null, pianist_name: null, conductor_name: null,
@@ -156,7 +155,7 @@ describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
     // A touch well below the band clamps to the last anchor (170).
     act(() => rail.props.onPanResponderGrant({ nativeEvent: { pageY: 100000 } }));
     // first hymn >= 170 is 174 at index 2 → offset 2*44.
-    expect(H.scrollToOffset).toHaveBeenLastCalledWith({ offset: 88, animated: false });
+    expect(mockH.scrollToOffset).toHaveBeenLastCalledWith({ offset: 88, animated: false });
   });
 
   it('uses a fixed-height getItemLayout on the FlatList', () => {
@@ -168,7 +167,7 @@ describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
   it('hides the rail once a search filter is active (AC5)', () => {
     const r = renderAndOpenHymnModal();
     expect(railOf(r)).toBeTruthy();
-    act(() => H.searchProps!.onChangeText('50'));
+    act(() => mockH.searchProps!.onChangeText('50'));
     expect(railOf(r)).toBeUndefined();
   });
 });

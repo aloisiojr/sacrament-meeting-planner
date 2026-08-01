@@ -2,7 +2,6 @@
  * Tests for WhatsApp integration utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   resolveTemplate,
   buildWhatsAppUrl,

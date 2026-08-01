@@ -1,12 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
 import { logAction, createLogger, buildLogDescription, parseLogDescription, formatLogDescription } from '../lib/activityLog';
 import type { TFunction } from 'i18next';
 
 // Mock supabase
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
     from: () => ({
-      insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+      insert: jest.fn().mockResolvedValue({ data: null, error: null }),
     }),
   },
 }));

@@ -4,30 +4,29 @@
  *
  * `react-native` is aliased to a test stub (vitest.config.ts).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const setMock = vi.fn();
-const prefHolder = vi.hoisted(() => ({ enabled: true, isLoading: false }));
-const onlineHolder = vi.hoisted(() => ({ value: true }));
+const mockSetMock = jest.fn();
+const mockPrefHolder = { enabled: true, isLoading: false };
+const mockOnlineHolder = { value: true };
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', card: '#111', divider: '#333' } }),
 }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => onlineHolder.value }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('../hooks/useNotifications', () => ({
-  useNotificationsEnabled: () => ({ enabled: prefHolder.enabled, isLoading: prefHolder.isLoading }),
-  useSetNotificationsEnabled: () => ({ mutate: setMock, isPending: false }),
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => mockOnlineHolder.value }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
+jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: ({ children }: { children: React.ReactNode }) => children }));
+jest.mock('../hooks/useNotifications', () => ({
+  useNotificationsEnabled: () => ({ enabled: mockPrefHolder.enabled, isLoading: mockPrefHolder.isLoading }),
+  useSetNotificationsEnabled: () => ({ mutate: mockSetMock, isPending: false }),
 }));
 
 import NotificationsSettingsScreen from '../app/(tabs)/settings/notifications';
@@ -45,15 +44,15 @@ function sw(renderer: TestRenderer.ReactTestRenderer) {
 }
 
 beforeEach(() => {
-  setMock.mockClear();
-  prefHolder.enabled = true;
-  prefHolder.isLoading = false;
-  onlineHolder.value = true;
+  mockSetMock.mockClear();
+  mockPrefHolder.enabled = true;
+  mockPrefHolder.isLoading = false;
+  mockOnlineHolder.value = true;
 });
 
 describe('NotificationsSettingsScreen (P2 gap D)', () => {
   it('reflects the current opt-out state', () => {
-    prefHolder.enabled = false;
+    mockPrefHolder.enabled = false;
     const renderer = render();
     expect(sw(renderer).props.value).toBe(false);
   });
@@ -63,11 +62,11 @@ describe('NotificationsSettingsScreen (P2 gap D)', () => {
     act(() => {
       (sw(renderer).props.onValueChange as (v: boolean) => void)(false);
     });
-    expect(setMock).toHaveBeenCalledWith(false);
+    expect(mockSetMock).toHaveBeenCalledWith(false);
   });
 
   it('disables the switch when offline', () => {
-    onlineHolder.value = false;
+    mockOnlineHolder.value = false;
     const renderer = render();
     expect(sw(renderer).props.disabled).toBe(true);
   });

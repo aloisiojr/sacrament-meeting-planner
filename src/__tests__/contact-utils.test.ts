@@ -2,7 +2,6 @@
  * Tests for contact-delegation resolution (src/lib/contact.ts) — v2.0.
  */
 
-import { describe, it, expect } from 'vitest';
 import { resolveContactSnapshot } from '../lib/contact';
 import type { Member } from '../types/database';
 

@@ -3,7 +3,6 @@
  * Verifies the context module exports and default values.
  */
 
-import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { OnlineStatusProvider, useOnlineStatus } from '../contexts/OnlineStatusContext';
 

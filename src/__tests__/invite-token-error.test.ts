@@ -3,14 +3,12 @@
  * code from a non-2xx functions.invoke result (body on error.context: Response), not just data.error
  * — otherwise token_used/expired/invalid messages are unreachable.
  */
-import { describe, it, expect, vi } from 'vitest';
-
 // The screen imports supabase/i18n at module load; stub them so importing the helper is cheap.
-vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: vi.fn() } } }));
-vi.mock('../i18n', () => ({ changeLanguage: vi.fn() }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-vi.mock('../contexts/ThemeContext', () => ({ useTheme: () => ({ colors: {} }) }));
-vi.mock('expo-router', () => ({ useLocalSearchParams: () => ({}) }));
+jest.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: jest.fn() } } }));
+jest.mock('../i18n', () => ({ changeLanguage: jest.fn() }));
+jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+jest.mock('../contexts/ThemeContext', () => ({ useTheme: () => ({ colors: {} }) }));
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}) }));
 
 import { extractInviteError } from '../app/(auth)/invite/[token]';
 

@@ -4,8 +4,6 @@
  * Does not import _layout.tsx directly (React Native parse issues in vitest).
  */
 
-import { describe, it, expect } from 'vitest';
-
 // Constants mirrored from _layout.tsx for verification
 const SEVEN_DAYS_MS = 1000 * 60 * 60 * 24 * 7;
 

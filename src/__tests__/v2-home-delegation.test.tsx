@@ -10,7 +10,6 @@
  * verifies the *wiring*: the section uses PeoplePicker and the
  * responsible lookup + snapshot fields are passed on assignment.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member } from '../types/database';
@@ -96,41 +95,41 @@ const PENDING_ENTRY = {
   ],
 };
 
-const assignSpeakerMock = vi.fn();
+const assignSpeakerMock = jest.fn();
 
 // --- Mocks ---
 
 // Partial mock: keep initReactI18next (used by the real i18n loaded via the hook chains).
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f' } }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
+jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
-vi.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
 
 // SundayCard mock: expose a toggle press and render children so the SpeechSlots surface.
-vi.mock('../components/SundayCard', () => ({
+jest.mock('../components/SundayCard', () => ({
   SundayCard: ({ children, onToggle }: { children?: React.ReactNode; onToggle?: () => void }) =>
-    React.createElement(
+    require('react').createElement(
       'SundayCard',
       {},
-      React.createElement('Pressable', { testID: 'sunday-toggle', onPress: () => onToggle?.() }),
+      require('react').createElement('Pressable', { testID: 'sunday-toggle', onPress: () => onToggle?.() }),
       children
     ),
 }));
 
 // SpeechSlot mock: expose a press that opens the speaker selector for its speech.
-vi.mock('../components/SpeechSlot', () => ({
+jest.mock('../components/SpeechSlot', () => ({
   SpeechSlot: ({ speech, position, onOpenSpeakerSelector }: { speech: { id: string } | null; position: number; onOpenSpeakerSelector?: (id: string) => void }) =>
-    React.createElement('Pressable', {
+    require('react').createElement('Pressable', {
       testID: `open-selector-${position}`,
       onPress: () => onOpenSpeakerSelector?.(speech ? speech.id : `speech-${position}`),
     }),
@@ -138,35 +137,35 @@ vi.mock('../components/SpeechSlot', () => ({
 
 // PeoplePicker mock: capture props each render so we can invoke onSelect.
 let peoplePickerProps: { visible: boolean; onSelect: (m: Member) => void; onClose: () => void } | null = null;
-vi.mock('../components/PeoplePicker', () => ({
+jest.mock('../components/PeoplePicker', () => ({
   PeoplePicker: (props: { visible: boolean; onSelect: (m: Member) => void; onClose: () => void }) => {
     peoplePickerProps = props;
     return null;
   },
 }));
 
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
 
-vi.mock('../hooks/useSpeeches', () => ({
-  useSpeeches: () => ({ data: [], isError: false, error: null, refetch: vi.fn() }),
-  useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+jest.mock('../hooks/useSpeeches', () => ({
+  useSpeeches: () => ({ data: [], isError: false, error: null, refetch: jest.fn() }),
+  useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
   useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
-  useAssignTopic: () => ({ mutate: vi.fn() }),
-  useChangeStatus: () => ({ mutate: vi.fn() }),
-  useRemoveAssignment: () => ({ mutate: vi.fn() }),
+  useAssignTopic: () => ({ mutate: jest.fn() }),
+  useChangeStatus: () => ({ mutate: jest.fn() }),
+  useRemoveAssignment: () => ({ mutate: jest.fn() }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
   groupSpeechesBySunday: () => [],
 }));
 
-vi.mock('../hooks/useSundayTypes', () => ({
-  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: vi.fn() }),
-  useSetSundayType: () => ({ mutate: vi.fn() }),
-  useRemoveSundayException: () => ({ mutate: vi.fn() }),
+jest.mock('../hooks/useSundayTypes', () => ({
+  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: jest.fn() }),
+  useSetSundayType: () => ({ mutate: jest.fn() }),
+  useRemoveSundayException: () => ({ mutate: jest.fn() }),
 }));
-vi.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
+jest.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
 
 // speechUtils: force "next 3 fully assigned" + a controlled pending sunday so the section renders.
-vi.mock('../lib/speechUtils', () => ({
+jest.mock('../lib/speechUtils', () => ({
   areNext3FullyAssigned: () => true,
   findNextPendingSunday: () => PENDING_ENTRY,
 }));

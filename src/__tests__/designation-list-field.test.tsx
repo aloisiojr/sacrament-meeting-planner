@@ -4,7 +4,6 @@
  * to a stub; theme + i18n are mocked. Asserts row rendering (2 lines), the add affordance, and
  * that tap/remove/add invoke their callbacks — and that disabled mode drops all affordances.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { DesignationListField } from '../components/DesignationListField';
@@ -21,15 +20,15 @@ const LABELS: Record<string, string> = {
   'agenda.designations.office.deacon': 'Diácono',
 };
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => LABELS[k] ?? k }),
 }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: { text: '#fff', textSecondary: '#aaa', textTertiary: '#888', border: '#444' },
   }),
 }));
-vi.mock('../components/icons', () => ({ XIcon: () => null }));
+jest.mock('../components/icons', () => ({ XIcon: () => null }));
 
 const items: Designation[] = [
   { type: 'sustain', person_name: 'João Silva', member_id: 'm1', calling: 'Presidente EQ', office: null },
@@ -37,9 +36,9 @@ const items: Designation[] = [
 ];
 
 function render(props: Partial<React.ComponentProps<typeof DesignationListField>> = {}) {
-  const onItemPress = vi.fn();
-  const onAddPress = vi.fn();
-  const onRemove = vi.fn();
+  const onItemPress = jest.fn();
+  const onAddPress = jest.fn();
+  const onRemove = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
@@ -66,7 +65,7 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string[] {
     .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => jest.clearAllMocks());
 
 describe('DesignationListField (step 3)', () => {
   it('renders one row per item plus the add affordance', () => {

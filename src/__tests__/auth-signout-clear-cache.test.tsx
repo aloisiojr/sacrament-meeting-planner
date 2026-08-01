@@ -5,7 +5,6 @@
  *
  * `react-native` is aliased to a test stub (vitest.config.ts).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -14,15 +13,15 @@ const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Capture the onAuthStateChange handler so the test can fire SIGNED_OUT.
-const authHandler = vi.hoisted(() => ({ fn: null as null | ((event: string, session: unknown) => void) }));
+const mockAuthHandler = { fn: null as null | ((event: string, session: unknown) => void) };
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null } }),
       onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
-        authHandler.fn = cb;
-        return { data: { subscription: { unsubscribe: vi.fn() } } };
+        mockAuthHandler.fn = cb;
+        return { data: { subscription: { unsubscribe: jest.fn() } } };
       },
     },
   },
@@ -31,7 +30,7 @@ vi.mock('../lib/supabase', () => ({
 import { AuthProvider } from '../contexts/AuthContext';
 
 beforeEach(() => {
-  authHandler.fn = null;
+  mockAuthHandler.fn = null;
 });
 
 describe('AuthProvider clears query cache on sign-out (P2)', () => {
@@ -51,10 +50,10 @@ describe('AuthProvider clears query cache on sign-out (P2)', () => {
 
     // Sanity: the cache holds the prior user's data before sign-out.
     expect(queryClient.getQueryData(['members', 'w1'])).toEqual([{ id: 'stale' }]);
-    expect(authHandler.fn).toBeTruthy();
+    expect(mockAuthHandler.fn).toBeTruthy();
 
     await act(async () => {
-      authHandler.fn!('SIGNED_OUT', null);
+      mockAuthHandler.fn!('SIGNED_OUT', null);
     });
 
     expect(queryClient.getQueryData(['members', 'w1'])).toBeUndefined();
@@ -75,7 +74,7 @@ describe('AuthProvider clears query cache on sign-out (P2)', () => {
     });
 
     await act(async () => {
-      authHandler.fn!('TOKEN_REFRESHED', null);
+      mockAuthHandler.fn!('TOKEN_REFRESHED', null);
     });
 
     expect(queryClient.getQueryData(['members', 'w1'])).toEqual([{ id: 'keep' }]);

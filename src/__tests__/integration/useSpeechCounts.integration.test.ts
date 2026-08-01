@@ -16,7 +16,6 @@
  *   EC-046-10: Leap year/month boundary -> Date.setMonth handles correctly
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   renderHook,
   waitFor,
@@ -32,44 +31,44 @@ import type { QueryClient } from '@tanstack/react-query';
 
 // --- Module mocks ---
 
-vi.mock('../../lib/supabase', () => ({
+jest.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 // --- Setup / Teardown ---
 
 let queryClient: QueryClient;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  jest.clearAllMocks();
   queryClient = createTestQueryClient();
 });
 

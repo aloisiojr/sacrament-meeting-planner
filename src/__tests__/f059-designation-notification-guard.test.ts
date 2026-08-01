@@ -10,8 +10,6 @@
  * rather than static SQL content.
  */
 
-import { describe, it, expect } from 'vitest';
-
 // ============================================================================
 // Types mirroring the DB trigger
 // ============================================================================

@@ -7,7 +7,6 @@
  * assignment) and Case 6B (secretary topic change).
  */
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

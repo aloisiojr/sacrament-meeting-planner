@@ -4,10 +4,9 @@
  * PeoplePicker, TopicSelectorModal) are mocked to lightweight seams; the data hooks are mocked so
  * we can drive the sunday-type / managePrayers matrix and assert which rows the screen renders.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-// Imported after the (hoisted) vi.mock calls below take effect.
+// Imported after the (hoisted) jest.mock calls below take effect.
 import SpeechesEditScreen from '../app/speeches/[date]';
 
 const { act } = TestRenderer;
@@ -15,13 +14,13 @@ const { act } = TestRenderer;
 
 const DATE = '2026-08-02';
 
-// Mutable state shared with the hoisted mocks.
-const state = vi.hoisted(() => ({
+// Mutable mockState shared with the hoisted mocks.
+const mockState = {
   managePrayers: true,
   exceptions: [] as { date: string; reason: string; custom_reason?: string | null }[],
   speeches: [] as { id: string; position: number }[] | undefined,
   rendered: [] as { position: number; isPrayer: boolean }[],
-}));
+};
 
 function makeSpeech(position: number) {
   return {
@@ -49,11 +48,11 @@ function makeSpeech(position: number) {
 // --- Mocks ---
 
 // Partial mock: keep initReactI18next (used by the real i18n loaded via getCurrentLanguage).
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', text: '#fff', textSecondary: '#aaa', divider: '#333',
@@ -61,54 +60,54 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => true }));
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => true }));
 
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
 
-vi.mock('expo-router', () => ({
+jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ date: DATE }),
-  useRouter: () => ({ back: vi.fn() }),
+  useRouter: () => ({ back: jest.fn() }),
 }));
 
-vi.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
+jest.mock('../components/ErrorBoundary', () => ({
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
 }));
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
-vi.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
-vi.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
+jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
 
 // SpeechSlot mock: record each rendered row (position + prayer flag).
-vi.mock('../components/SpeechSlot', () => ({
+jest.mock('../components/SpeechSlot', () => ({
   SpeechSlot: ({ position, isPrayer }: { position: number; isPrayer?: boolean }) => {
-    state.rendered.push({ position, isPrayer: !!isPrayer });
-    return React.createElement('SpeechSlot', { testID: `slot-${position}` });
+    mockState.rendered.push({ position, isPrayer: !!isPrayer });
+    return require('react').createElement('SpeechSlot', { testID: `slot-${position}` });
   },
 }));
 
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
-vi.mock('../hooks/useAgenda', () => ({
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
+jest.mock('../hooks/useAgenda', () => ({
   useAgenda: () => ({ data: { has_second_speech: true } }),
-  useUpdateAgendaByDate: () => ({ mutate: vi.fn() }),
+  useUpdateAgendaByDate: () => ({ mutate: jest.fn() }),
 }));
-vi.mock('../hooks/useSundayTypes', () => ({
-  useSundayExceptions: () => ({ data: state.exceptions, isError: false, error: null, refetch: vi.fn() }),
+jest.mock('../hooks/useSundayTypes', () => ({
+  useSundayExceptions: () => ({ data: mockState.exceptions, isError: false, error: null, refetch: jest.fn() }),
 }));
-vi.mock('../hooks/useSpeeches', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useSpeeches', () => {
+  const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: state.speeches, isError: false, error: null, refetch: vi.fn() }),
-    useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
-    useAssignSpeaker: () => ({ mutate: vi.fn() }),
-    useAssignTopic: () => ({ mutate: vi.fn() }),
-    useChangeStatus: () => ({ mutate: vi.fn() }),
-    useRemoveAssignment: () => ({ mutate: vi.fn() }),
-    useWardManagePrayers: () => ({ managePrayers: state.managePrayers, isLoading: false }),
+    useSpeeches: () => ({ data: mockState.speeches, isError: false, error: null, refetch: jest.fn() }),
+    useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
+    useAssignSpeaker: () => ({ mutate: jest.fn() }),
+    useAssignTopic: () => ({ mutate: jest.fn() }),
+    useChangeStatus: () => ({ mutate: jest.fn() }),
+    useRemoveAssignment: () => ({ mutate: jest.fn() }),
+    useWardManagePrayers: () => ({ managePrayers: mockState.managePrayers, isLoading: false }),
   };
 });
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../lib/supabase', () => ({ supabase: {} }));
 
 function render() {
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -119,14 +118,14 @@ function render() {
 }
 
 function positions() {
-  return state.rendered.map((r) => r.position).sort((a, b) => a - b);
+  return mockState.rendered.map((r) => r.position).sort((a, b) => a - b);
 }
 
 beforeEach(() => {
-  state.managePrayers = true;
-  state.exceptions = [];
-  state.speeches = [0, 1, 2, 3, 4].map(makeSpeech);
-  state.rendered = [];
+  mockState.managePrayers = true;
+  mockState.exceptions = [];
+  mockState.speeches = [0, 1, 2, 3, 4].map(makeSpeech);
+  mockState.rendered = [];
 });
 
 describe('Speeches edit screen (N2)', () => {
@@ -134,28 +133,28 @@ describe('Speeches edit screen (N2)', () => {
     render();
     expect(positions()).toEqual([0, 1, 2, 3, 4]);
     // Positions 0 and 4 render as prayer rows.
-    const prayerPositions = state.rendered.filter((r) => r.isPrayer).map((r) => r.position).sort();
+    const prayerPositions = mockState.rendered.filter((r) => r.isPrayer).map((r) => r.position).sort();
     expect(prayerPositions).toEqual([0, 4]);
   });
 
   it('renders no prayer rows when managePrayers is off (speeches 1..3 only)', () => {
-    state.managePrayers = false;
+    mockState.managePrayers = false;
     render();
     expect(positions()).toEqual([1, 2, 3]);
-    expect(state.rendered.some((r) => r.isPrayer)).toBe(false);
+    expect(mockState.rendered.some((r) => r.isPrayer)).toBe(false);
   });
 
   it('renders only prayer rows for a testimony meeting (managePrayers on)', () => {
-    state.exceptions = [{ date: DATE, reason: 'testimony_meeting' }];
+    mockState.exceptions = [{ date: DATE, reason: 'testimony_meeting' }];
     render();
     expect(positions()).toEqual([0, 4]);
-    expect(state.rendered.every((r) => r.isPrayer)).toBe(true);
+    expect(mockState.rendered.every((r) => r.isPrayer)).toBe(true);
   });
 
   it('renders nothing (no rows) for a testimony meeting when managePrayers is off', () => {
-    state.managePrayers = false;
-    state.exceptions = [{ date: DATE, reason: 'testimony_meeting' }];
+    mockState.managePrayers = false;
+    mockState.exceptions = [{ date: DATE, reason: 'testimony_meeting' }];
     render();
-    expect(state.rendered.length).toBe(0);
+    expect(mockState.rendered.length).toBe(0);
   });
 });

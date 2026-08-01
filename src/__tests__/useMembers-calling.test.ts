@@ -5,7 +5,6 @@
  * - useUpdateMember is pass-through → `calling` must reach the UPDATE payload.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
   createTestQueryClient,
@@ -20,61 +19,61 @@ import type { Member } from '../types/database';
 
 // --- Module mocks ---
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../lib/activityLog', () => ({
-  logAction: vi.fn(),
-  buildLogDescription: vi.fn(() => 'test description'),
+jest.mock('../lib/activityLog', () => ({
+  logAction: jest.fn(),
+  buildLogDescription: jest.fn(() => 'test description'),
 }));
 
-vi.mock('../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 describe('useCreateMember — calling', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
   let lastInsert: Record<string, unknown> | null = null;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
     lastInsert = null;
   });
 
   function setupInsert(returned: Member) {
-    const single = vi.fn().mockResolvedValue({ data: returned, error: null });
-    const select = vi.fn().mockReturnValue({ single });
-    const insert = vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+    const single = jest.fn().mockResolvedValue({ data: returned, error: null });
+    const select = jest.fn().mockReturnValue({ single });
+    const insert = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
       lastInsert = payload;
       return { select };
     });
-    (mockedSupabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+    (mockedSupabase.from as ReturnType<typeof jest.fn>).mockImplementation((table: string) => {
       if (table === 'members') return { insert };
       return {};
     });
@@ -118,26 +117,26 @@ describe('useUpdateMember — calling', () => {
   let lastUpdate: Record<string, unknown> | null = null;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
     lastUpdate = null;
   });
 
   function setupUpdate(returned: Member) {
-    const single = vi.fn().mockResolvedValue({ data: returned, error: null });
-    const select = vi.fn().mockReturnValue({ single });
-    const eq = vi.fn().mockReturnValue({ select });
-    const update = vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+    const single = jest.fn().mockResolvedValue({ data: returned, error: null });
+    const select = jest.fn().mockReturnValue({ single });
+    const eq = jest.fn().mockReturnValue({ select });
+    const update = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
       lastUpdate = payload;
       return { eq };
     });
 
     // speeches cascade (best-effort) in onSuccess
-    const speechGte = vi.fn().mockResolvedValue({ data: null, error: null });
-    const speechEq = vi.fn().mockReturnValue({ gte: speechGte });
-    const speechUpdate = vi.fn().mockReturnValue({ eq: speechEq });
+    const speechGte = jest.fn().mockResolvedValue({ data: null, error: null });
+    const speechEq = jest.fn().mockReturnValue({ gte: speechGte });
+    const speechUpdate = jest.fn().mockReturnValue({ eq: speechEq });
 
-    (mockedSupabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+    (mockedSupabase.from as ReturnType<typeof jest.fn>).mockImplementation((table: string) => {
       if (table === 'members') return { update };
       if (table === 'speeches') return { update: speechUpdate };
       return {};

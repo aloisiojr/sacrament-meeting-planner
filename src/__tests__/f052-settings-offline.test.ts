@@ -5,8 +5,6 @@
  * Verifies Settings tab hides Users item when offline.
  */
 
-import { describe, it, expect } from 'vitest';
-
 describe('F052: Settings Tab Offline UI Logic', () => {
   // Simulates the conditional rendering from settings/index.tsx:
   // {hasPermission('settings:users') && isOnline && (<SettingsItem ... />)}

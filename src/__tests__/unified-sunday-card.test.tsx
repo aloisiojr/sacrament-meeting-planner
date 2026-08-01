@@ -5,7 +5,6 @@
  * the current-language helper are mocked per-file so we render the card in the node environment and
  * assert on host-node props (colors, testIDs, tap handlers).
  */
-import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { UnifiedSundayCard, type UnifiedSundayCardProps, type UnifiedNameRow } from '../components/UnifiedSundayCard';
@@ -19,25 +18,25 @@ const SECONDARY = '#aaa';
 const WARNING = '#ff0';
 
 // Render icons + StatusLED as identifiable host elements (no react-native-svg / reanimated needed).
-vi.mock('../components/icons', () => ({
-  ChevronRightIcon: (p: Record<string, unknown>) => React.createElement('ChevronRightIcon', p),
-  PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),
+jest.mock('../components/icons', () => ({
+  ChevronRightIcon: (p: Record<string, unknown>) => require('react').createElement('ChevronRightIcon', p),
+  PencilIcon: (p: Record<string, unknown>) => require('react').createElement('PencilIcon', p),
 }));
 
-vi.mock('../components/StatusLED', () => ({
-  StatusLED: (p: Record<string, unknown>) => React.createElement('StatusLED', p),
+jest.mock('../components/StatusLED', () => ({
+  StatusLED: (p: Record<string, unknown>) => require('react').createElement('StatusLED', p),
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (k: string, opts?: unknown) =>
       opts && typeof opts === 'object' ? `${k}${JSON.stringify(opts)}` : k,
   }),
 }));
 
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       card: '#111',
@@ -66,8 +65,8 @@ function baseProps(over: Partial<UnifiedSundayCardProps> = {}): UnifiedSundayCar
     hymns: { done: 0, total: 4 },
     managePrayers: false,
     nameRows: [],
-    onPressStatus: vi.fn(),
-    onPressSpeakers: vi.fn(),
+    onPressStatus: jest.fn(),
+    onPressSpeakers: jest.fn(),
     ...over,
   };
 }
@@ -313,7 +312,7 @@ describe('UnifiedSundayCard — no-sacrament Sunday (U5)', () => {
   });
 
   it('makes the WHOLE card (incl. DateBlock) the tap zone → onPressStatus (#3)', () => {
-    const onPressStatus = vi.fn();
+    const onPressStatus = jest.fn();
     const { root } = render(
       baseProps({ exceptionReason: 'general_conference', onPressStatus })
     );
@@ -337,20 +336,20 @@ describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
   });
 
   it('is shown when isPast and onSetAttendance are both provided', () => {
-    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn() }));
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: jest.fn() }));
     expect(byTestID(root, ATT).length).toBe(1);
   });
 
   // P0-2 (C): offline, the collapsed past-Sunday card must not allow attendance edits.
   it('passes attendanceDisabled through to the AttendanceBlock (read-only offline)', () => {
-    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn(), attendanceDisabled: true }));
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: jest.fn(), attendanceDisabled: true }));
     const block = root.findAll((n) => n.type === AttendanceBlock)[0];
     expect(block).toBeDefined();
     expect(block.props.disabled).toBe(true);
   });
 
   it('attendance tile is editable when not disabled (online)', () => {
-    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn() }));
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: jest.fn() }));
     const block = root.findAll((n) => n.type === AttendanceBlock)[0];
     expect(block.props.disabled).toBe(false);
   });
@@ -361,20 +360,20 @@ describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
   });
 
   it('is hidden for future Sundays even with a callback', () => {
-    const { root } = render(baseProps({ isPast: false, onSetAttendance: vi.fn() }));
+    const { root } = render(baseProps({ isPast: false, onSetAttendance: jest.fn() }));
     expect(byTestID(root, ATT).length).toBe(0);
   });
 
   it('is hidden for no-sacrament Sundays even when past', () => {
     const { root } = render(
-      baseProps({ isPast: true, onSetAttendance: vi.fn(), exceptionReason: 'general_conference' })
+      baseProps({ isPast: true, onSetAttendance: jest.fn(), exceptionReason: 'general_conference' })
     );
     expect(byTestID(root, ATT).length).toBe(0);
   });
 
   it('tapping the attendance tile does NOT call onPressStatus', () => {
-    const onPressStatus = vi.fn();
-    const { root } = render(baseProps({ isPast: true, onSetAttendance: vi.fn(), onPressStatus }));
+    const onPressStatus = jest.fn();
+    const { root } = render(baseProps({ isPast: true, onSetAttendance: jest.fn(), onPressStatus }));
     press(root, ATT);
     expect(onPressStatus).not.toHaveBeenCalled();
   });
@@ -403,14 +402,14 @@ describe('UnifiedSundayCard — hideStatusBlock (Home upcoming cards)', () => {
 
 describe('UnifiedSundayCard — tap zones + chevron (U7)', () => {
   it('calls onPressStatus when the status zone is tapped', () => {
-    const onPressStatus = vi.fn();
+    const onPressStatus = jest.fn();
     const { root } = render(baseProps({ onPressStatus }));
     press(root, 'unified-status-2026-08-02');
     expect(onPressStatus).toHaveBeenCalledWith('2026-08-02');
   });
 
   it('calls onPressSpeakers when the speakers zone is tapped', () => {
-    const onPressSpeakers = vi.fn();
+    const onPressSpeakers = jest.fn();
     const { root } = render(baseProps({ onPressSpeakers }));
     press(root, 'unified-speakers-2026-08-02');
     expect(onPressSpeakers).toHaveBeenCalledWith('2026-08-02');

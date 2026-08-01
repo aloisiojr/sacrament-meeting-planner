@@ -10,7 +10,6 @@
  * (resolveContactSnapshot) and buildFullPhone stay real — this verifies the screen's *wiring*:
  * responsible lookup + snapshot fields on assignment + prayer picker context.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member } from '../types/database';
@@ -96,17 +95,17 @@ function makeSpeech(id: string, position: number) {
 
 const SPEECHES = [0, 1, 2, 3, 4].map((p) => makeSpeech(`sp${p}`, p));
 
-const assignSpeakerMock = vi.fn();
+const assignSpeakerMock = jest.fn();
 
 // --- Mocks ---
 
 // Partial mock: keep initReactI18next (used by the real i18n loaded via getCurrentLanguage).
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', text: '#fff', textSecondary: '#aaa', divider: '#333',
@@ -114,27 +113,27 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => true }));
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => true }));
 
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
 
-vi.mock('expo-router', () => ({
+jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ date: DATE }),
-  useRouter: () => ({ back: vi.fn() }),
+  useRouter: () => ({ back: jest.fn() }),
 }));
 
-vi.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
+jest.mock('../components/ErrorBoundary', () => ({
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
 }));
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
-vi.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));
 
 // SpeechSlot mock: expose a press that opens the speaker selector for its speech.
-vi.mock('../components/SpeechSlot', () => ({
+jest.mock('../components/SpeechSlot', () => ({
   SpeechSlot: ({ speech, position, onOpenSpeakerSelector }: { speech: { id: string } | null; position: number; onOpenSpeakerSelector?: (id: string) => void }) =>
-    React.createElement('Pressable', {
+    require('react').createElement('Pressable', {
       testID: `open-selector-${position}`,
       onPress: () => onOpenSpeakerSelector?.(speech ? speech.id : `speech-${position}`),
     }),
@@ -142,39 +141,39 @@ vi.mock('../components/SpeechSlot', () => ({
 
 // PeoplePicker mock: capture props each render so we can invoke onSelect.
 let peoplePickerProps: { visible: boolean; context?: string; onSelect: (m: Member) => void; onClose: () => void } | null = null;
-vi.mock('../components/PeoplePicker', () => ({
+jest.mock('../components/PeoplePicker', () => ({
   PeoplePicker: (props: { visible: boolean; context?: string; onSelect: (m: Member) => void; onClose: () => void }) => {
     peoplePickerProps = props;
     return null;
   },
 }));
 
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
 
-vi.mock('../hooks/useAgenda', () => ({
+jest.mock('../hooks/useAgenda', () => ({
   useAgenda: () => ({ data: { has_second_speech: true } }),
-  useUpdateAgendaByDate: () => ({ mutate: vi.fn() }),
+  useUpdateAgendaByDate: () => ({ mutate: jest.fn() }),
 }));
 
-vi.mock('../hooks/useSundayTypes', () => ({
-  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: vi.fn() }),
+jest.mock('../hooks/useSundayTypes', () => ({
+  useSundayExceptions: () => ({ data: [], isError: false, error: null, refetch: jest.fn() }),
 }));
 
-vi.mock('../hooks/useSpeeches', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useSpeeches', () => {
+  const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: vi.fn() }),
-    useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: jest.fn() }),
+    useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
     useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
-    useAssignTopic: () => ({ mutate: vi.fn() }),
-    useChangeStatus: () => ({ mutate: vi.fn() }),
-    useRemoveAssignment: () => ({ mutate: vi.fn() }),
+    useAssignTopic: () => ({ mutate: jest.fn() }),
+    useChangeStatus: () => ({ mutate: jest.fn() }),
+    useRemoveAssignment: () => ({ mutate: jest.fn() }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
 
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../lib/supabase', () => ({ supabase: {} }));
 
 // --- Helpers ---
 

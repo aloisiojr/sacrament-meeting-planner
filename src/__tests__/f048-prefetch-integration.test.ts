@@ -5,7 +5,6 @@
  * Verifies prefetch behavior using renderHook with QueryClient.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,7 +18,7 @@ import { sundayTypeKeys } from '../hooks/useSundayTypes';
 const { act } = TestRenderer;
 
 // Mock supabase
-vi.mock('../lib/supabase', () => {
+jest.mock('../lib/supabase', () => {
   const chain: any = new Proxy({}, {
     get(_t, prop: string) {
       if (prop === 'then') return (cb: any) => Promise.resolve({ data: [], error: null }).then(cb);
@@ -40,11 +39,11 @@ function createMockAuthContext(overrides?: Partial<AuthContextValue>): AuthConte
     userName: 'Test',
     wardLanguage: 'pt-BR',
     loading: false,
-    signIn: vi.fn(),
-    signOut: vi.fn(),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
     hasPermission: (perm: any) => checkPermission(role, perm),
-    updateAppLanguage: vi.fn(),
-    setWardLanguage: vi.fn(),
+    updateAppLanguage: jest.fn(),
+    setWardLanguage: jest.fn(),
     ...overrides,
   };
 }
@@ -53,7 +52,7 @@ function renderPrefetchHook(isOnline: boolean, overrides?: Partial<AuthContextVa
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
   });
-  const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+  const prefetchSpy = jest.spyOn(queryClient, 'prefetchQuery');
   const authCtx = createMockAuthContext(overrides);
 
   let currentIsOnline = isOnline;
@@ -96,7 +95,7 @@ function renderPrefetchHook(isOnline: boolean, overrides?: Partial<AuthContextVa
 
 describe('F048: useOfflinePrefetch Integration', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('AC-048-01: Next Sunday agenda prefetched', () => {
@@ -209,7 +208,7 @@ describe('F048: useOfflinePrefetch Integration', () => {
       const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } },
       });
-      const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+      const prefetchSpy = jest.spyOn(queryClient, 'prefetchQuery');
       let ward: string | null = null;
 
       function TestComponent() {

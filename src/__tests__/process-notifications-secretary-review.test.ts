@@ -6,7 +6,6 @@
  * secretary_review entries are routed to immediateEntries (never grouped).
  */
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

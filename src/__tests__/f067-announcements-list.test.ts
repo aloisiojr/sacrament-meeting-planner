@@ -12,7 +12,6 @@
  * S015-05: Zebra striping + bullet_list for welcome/sustaining in presentation
  */
 
-import { describe, it, expect, vi } from 'vitest';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
@@ -319,7 +318,7 @@ describe('F067 S014-03: AgendaForm -> EditableListField integration', () => {
   });
 
   it("AgendaForm onSave calls updateField('announcements', text)", () => {
-    const updateField = vi.fn();
+    const updateField = jest.fn();
     const onSave = (text: string | null) => updateField('announcements', text);
     onSave('A\nB');
     expect(updateField).toHaveBeenCalledWith('announcements', 'A\nB');
@@ -354,7 +353,7 @@ describe('F068 S015-02: AgendaForm -> EditableListField for welcome/sustaining',
   });
 
   it('welcome_new_families onSave calls updateField(welcome_new_families, ...)', () => {
-    const updateField = vi.fn();
+    const updateField = jest.fn();
     const onSave = (text: string | null) => updateField('welcome_new_families', text);
     onSave('Familia Silva\nFamilia Santos');
     expect(updateField).toHaveBeenCalledWith('welcome_new_families', 'Familia Silva\nFamilia Santos');

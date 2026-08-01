@@ -2,7 +2,6 @@
  * Tests for notification pure utilities (ordinals, text building, name formatting).
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   getOrdinal,
   buildNotificationText,

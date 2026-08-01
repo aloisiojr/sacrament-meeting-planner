@@ -3,7 +3,6 @@
  * Verifies disabled prop suppresses all interactions.
  */
 
-import { describe, it, expect } from 'vitest';
 import type { Role } from '../types/database';
 import type { AgendaFormProps } from '../components/AgendaForm';
 import type { SpeechSlotProps } from '../components/SpeechSlot';

@@ -5,7 +5,6 @@
  * Verifies context default values, prop passing, and re-render on change.
  */
 
-import { describe, it, expect } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { OnlineStatusProvider, useOnlineStatus } from '../contexts/OnlineStatusContext';

@@ -3,7 +3,6 @@
  * Covers: AC-046-06 (query keys), AC-046-09 (sync invalidation via speechCountKeys.all)
  */
 
-import { describe, it, expect } from 'vitest';
 import { speechCountKeys } from '../hooks/useSpeechCounts';
 
 describe('speechCountKeys', () => {

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { parseVersion, compareVersions, isBelowMinimum } from '../lib/semver';
 
 describe('semver', () => {

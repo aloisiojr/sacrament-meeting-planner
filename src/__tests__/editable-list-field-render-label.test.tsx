@@ -6,21 +6,20 @@
  * are stubbed. Asserts that `renderItemLabel` only affects the DISPLAYED text — parse/save/delete
  * and `onItemPress` all operate on the RAW item.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-// vi.mock calls below are hoisted above this import.
+// jest.mock calls below are hoisted above this import.
 import { EditableListField } from '../components/EditableListField';
 
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // DraggableFlatList: render each item through renderItem so rows appear in the tree.
-vi.mock('react-native-draggable-flatlist', async () => {
+jest.mock('react-native-draggable-flatlist', async () => {
   const ReactMod = (await import('react')).default;
   const DraggableFlatList = (props: Record<string, unknown>) => {
     const data = (props.data as string[]) ?? [];
-    const renderItem = props.renderItem as (info: {
+    const renderItem = props.renderItem as (mockInfo: {
       item: string;
       drag: () => void;
       getIndex: () => number;
@@ -41,13 +40,13 @@ vi.mock('react-native-draggable-flatlist', async () => {
   return { default: DraggableFlatList, ScaleDecorator };
 });
 
-vi.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const h = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: h('Svg'), Svg: h('Svg'), Path: h('Path'), Circle: h('Circle') };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       text: '#fff', textTertiary: '#888', border: '#333', error: '#f00',
@@ -87,13 +86,13 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
 const LABEL = (item: string) => `${item} — Bispo`;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  jest.clearAllMocks();
 });
 
 describe('EditableListField renderItemLabel', () => {
   it('active (onItemPress) rows display the transformed label but pass the RAW item on press', () => {
-    const onSave = vi.fn();
-    const onItemPress = vi.fn();
+    const onSave = jest.fn();
+    const onItemPress = jest.fn();
     const renderer = render({
       value: 'Alice\nBob',
       onSave,
@@ -123,13 +122,13 @@ describe('EditableListField renderItemLabel', () => {
   });
 
   it('deleting a row saves the RAW remaining items (no label transform in stored data)', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const renderer = render({
       value: 'Alice\nBob',
       onSave,
       disabled: false,
       placeholder: 'add',
-      onItemPress: vi.fn(),
+      onItemPress: jest.fn(),
       renderItemLabel: LABEL,
     });
 
@@ -151,7 +150,7 @@ describe('EditableListField renderItemLabel', () => {
   it('disabled rows display the transformed label (display-only)', () => {
     const renderer = render({
       value: 'Alice\nBob',
-      onSave: vi.fn(),
+      onSave: jest.fn(),
       disabled: true,
       placeholder: 'add',
       renderItemLabel: LABEL,
@@ -164,10 +163,10 @@ describe('EditableListField renderItemLabel', () => {
   it('without renderItemLabel the raw item is displayed', () => {
     const renderer = render({
       value: 'Alice',
-      onSave: vi.fn(),
+      onSave: jest.fn(),
       disabled: false,
       placeholder: 'add',
-      onItemPress: vi.fn(),
+      onItemPress: jest.fn(),
     });
     const text = allText(renderer);
     expect(text).toContain('Alice');

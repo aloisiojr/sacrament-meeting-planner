@@ -3,7 +3,6 @@
  * is aliased to a stub; expo-blur/icons/theme/i18n are mocked. Asserts: one read-text block per
  * designation (in order), close via X and backdrop, and nothing rendered when not visible.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { DesignationReadModal } from '../components/DesignationReadModal';
@@ -22,13 +21,13 @@ const MAP: Record<string, string> = {
   'agenda.designations.readText.release': 'DESOBRIGA {name} de {calling}.',
   'agenda.designations.readText.new_member': 'NOVO {name} da Ala {ward}.',
 };
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => MAP[k] ?? k }) }));
-vi.mock('expo-blur', () => ({
+jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => MAP[k] ?? k }) }));
+jest.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-    React.createElement('BlurView', p, p.children),
+    require('react').createElement('BlurView', p, p.children),
 }));
-vi.mock('../components/icons', () => ({ XIcon: () => null }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../components/icons', () => ({ XIcon: () => null }));
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: { card: '#111', border: '#333', divider: '#333', text: '#fff', textSecondary: '#aaa', surfaceVariant: '#222' },
   }),
@@ -42,7 +41,7 @@ const items: Designation[] = [
 ];
 
 function render(props: Partial<React.ComponentProps<typeof DesignationReadModal>> = {}) {
-  const onClose = vi.fn();
+  const onClose = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
@@ -67,7 +66,7 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string[] {
     .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => jest.clearAllMocks());
 
 describe('DesignationReadModal (step 2)', () => {
   it('renders one read-text block per designation', () => {

@@ -5,7 +5,6 @@
  * Verifies Speeches tab restricts UI when offline.
  */
 
-import { describe, it, expect } from 'vitest';
 import { getNext3Sundays } from '../hooks/useOfflinePrefetch';
 
 describe('F051: Speeches Tab Offline UI Logic', () => {

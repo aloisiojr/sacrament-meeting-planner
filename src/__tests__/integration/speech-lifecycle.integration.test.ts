@@ -5,7 +5,6 @@
  * Covers: AC-082-23 to AC-082-26, EC-082-13, EC-082-14
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createTestQueryClient,
   createWrapper,
@@ -30,22 +29,22 @@ import type { QueryClient } from '@tanstack/react-query';
 
 // --- Module mocks ---
 
-vi.mock('../../lib/supabase', () => ({
+jest.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../../lib/activityLog', () => ({
-  logAction: vi.fn(),
+jest.mock('../../lib/activityLog', () => ({
+  logAction: jest.fn(),
   buildLogDescription: (actionType: string, params: Record<string, string | number>) => {
     const parts = [actionType];
     for (const [key, value] of Object.entries(params)) {
@@ -55,31 +54,31 @@ vi.mock('../../lib/activityLog', () => ({
   },
 }));
 
-vi.mock('../../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-vi.mock('../../lib/dateUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../lib/dateUtils')>();
+jest.mock('../../lib/dateUtils', () => {
+  const actual = jest.requireActual<typeof import('../../lib/dateUtils')>('../../lib/dateUtils');
   return {
     ...actual,
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 // ==========================================================================
 // 1. VALID_TRANSITIONS map (AC-082-23)
@@ -179,7 +178,7 @@ describe('Assign speaker lifecycle', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
   });
 
@@ -265,7 +264,7 @@ describe('v2.0 delegation snapshot on assign/unassign', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
   });
 
@@ -395,7 +394,7 @@ describe('Invalid transition error (EC-082-14)', () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
   });
 

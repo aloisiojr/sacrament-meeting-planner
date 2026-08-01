@@ -4,12 +4,11 @@
  * `react-native` is aliased to a test stub (vitest.config.ts). Data hooks, contexts and i18n are
  * mocked per-file; pure utils stay real via importOriginal.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { Alert } from 'react-native';
 import type { Member } from '../types/database';
-// vi.mock calls below are hoisted above this import, so the mocks still apply.
+// jest.mock calls below are hoisted above this import, so the mocks still apply.
 import { PersonEditor, type PersonEditorProps } from '../components/PersonEditor';
 
 const { act } = TestRenderer;
@@ -39,49 +38,49 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 
 const SELF = makeMember({ id: 'self', full_name: 'Self Person' });
 const OTHER = makeMember({ id: 'other', full_name: 'Other Person' });
-let MEMBERS: Member[] = [];
+let mockMEMBERS: Member[] = [];
 
 type MutateOpts = { onSuccess?: (m: Member) => void; onError?: (e: unknown) => void };
-const createMock = vi.fn((_input: unknown, opts?: MutateOpts) =>
+const mockCreateMock = jest.fn((_input: unknown, opts?: MutateOpts) =>
   opts?.onSuccess?.(makeMember({ id: 'new', full_name: 'Created' }))
 );
-const updateMock = vi.fn((_input: unknown, opts?: MutateOpts) =>
+const mockUpdateMock = jest.fn((_input: unknown, opts?: MutateOpts) =>
   opts?.onSuccess?.(SELF)
 );
-const deleteMock = vi.fn((_input: unknown, opts?: { onSuccess?: (name: string) => void }) =>
+const mockDeleteMock = jest.fn((_input: unknown, opts?: { onSuccess?: (name: string) => void }) =>
   opts?.onSuccess?.('deleted')
 );
 
-let hasPermissionResult = true;
+let mockHasPermissionResult = true;
 
-vi.mock('../hooks/useMembers', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useMembers', () => {
+  const actual = (jest.requireActual('../hooks/useMembers')) as Record<string, unknown>;
   return {
     ...actual,
-    useMembers: () => ({ data: MEMBERS }),
-    useCreateMember: () => ({ mutate: createMock }),
-    useUpdateMember: () => ({ mutate: updateMock }),
-    useDeleteMember: () => ({ mutate: deleteMock }),
+    useMembers: () => ({ data: mockMEMBERS }),
+    useCreateMember: () => ({ mutate: mockCreateMock }),
+    useUpdateMember: () => ({ mutate: mockUpdateMock }),
+    useDeleteMember: () => ({ mutate: mockDeleteMock }),
   };
 });
 
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => hasPermissionResult }),
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => mockHasPermissionResult }),
 }));
 
 // `react-native-svg` (via icons/SearchInput) ships untransformed Flow/TS — stub it.
-vi.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -94,8 +93,8 @@ vi.mock('../contexts/ThemeContext', () => ({
 // --- Helpers ---
 
 function render(props: Partial<PersonEditorProps> = {}) {
-  const onClose = vi.fn();
-  const onSaved = vi.fn();
+  const onClose = jest.fn();
+  const onSaved = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
@@ -133,11 +132,11 @@ function toggleSwitch(renderer: TestRenderer.ReactTestRenderer, testID: string) 
 }
 
 beforeEach(() => {
-  MEMBERS = [SELF, OTHER];
-  hasPermissionResult = true;
-  createMock.mockClear();
-  updateMock.mockClear();
-  deleteMock.mockClear();
+  mockMEMBERS = [SELF, OTHER];
+  mockHasPermissionResult = true;
+  mockCreateMock.mockClear();
+  mockUpdateMock.mockClear();
+  mockDeleteMock.mockClear();
 });
 
 describe('PersonEditor', () => {
@@ -149,8 +148,8 @@ describe('PersonEditor', () => {
     toggleSwitch(renderer, 'person-editor-cap-switch-play_piano');
     press(renderer, 'person-editor-save');
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock.mock.calls[0][0]).toMatchObject({
+    expect(mockCreateMock).toHaveBeenCalledTimes(1);
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
       full_name: 'New Person',
       country_code: '+55',
       phone: '11999',
@@ -166,7 +165,7 @@ describe('PersonEditor', () => {
 
   it('shows an error and keeps the modal open when saving fails (P1 #7)', () => {
     // Drive the mutation's onError instead of onSuccess.
-    createMock.mockImplementationOnce((_input: unknown, opts?: MutateOpts) =>
+    mockCreateMock.mockImplementationOnce((_input: unknown, opts?: MutateOpts) =>
       opts?.onError?.(new Error('insert failed'))
     );
     const { renderer, onClose } = render();
@@ -192,8 +191,8 @@ describe('PersonEditor', () => {
     change(renderer, 'person-editor-calling', 'Bispo');
     press(renderer, 'person-editor-save');
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock.mock.calls[0][0]).toMatchObject({ full_name: 'With Calling', calling: 'Bispo' });
+    expect(mockCreateMock).toHaveBeenCalledTimes(1);
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({ full_name: 'With Calling', calling: 'Bispo' });
   });
 
   it('E3b: prefills the calling from an edited member', () => {
@@ -213,7 +212,7 @@ describe('PersonEditor', () => {
     toggleSwitch(renderer, 'person-editor-cap-switch-conduct');
     toggleSwitch(renderer, 'person-editor-cap-switch-preside');
     press(renderer, 'person-editor-save');
-    expect(updateMock.mock.calls[0][0]).toMatchObject({
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({
       id: 'self',
       can_conduct: false,
       can_preside: true,
@@ -245,14 +244,14 @@ describe('PersonEditor', () => {
     });
 
     press(renderer, 'person-editor-save');
-    expect(createMock.mock.calls[0][0]).toMatchObject({ country_code: '+1' });
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({ country_code: '+1' });
   });
 
   it('E4: responsible-for list renders only when the member has dependents', () => {
     // OTHER points at SELF via responsible_id → SELF is responsible for OTHER.
     const self = makeMember({ id: 'self', full_name: 'Self Person' });
     const dependent = makeMember({ id: 'other', full_name: 'Dependent Person', responsible_id: 'self' });
-    MEMBERS = [self, dependent];
+    mockMEMBERS = [self, dependent];
     const { renderer } = render({ member: self });
     expect(find(renderer.root, 'person-editor-responsible-for').length).toBe(1);
     const names = renderer.root.findAll(
@@ -277,14 +276,14 @@ describe('PersonEditor', () => {
   });
 
   it('E5: delete button hidden without member:write', () => {
-    hasPermissionResult = false;
+    mockHasPermissionResult = false;
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
     const { renderer } = render({ member });
     expect(find(renderer.root, 'person-editor-delete').length).toBe(0);
   });
 
   it('E5: pressing delete confirms then deletes and closes', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
     const { renderer, onClose } = render({ member });
     press(renderer, 'person-editor-delete');
@@ -297,8 +296,8 @@ describe('PersonEditor', () => {
       destructive.onPress?.();
     });
 
-    expect(deleteMock).toHaveBeenCalledTimes(1);
-    expect(deleteMock.mock.calls[0][0]).toMatchObject({ memberId: 'self', memberName: 'Self Person' });
+    expect(mockDeleteMock).toHaveBeenCalledTimes(1);
+    expect(mockDeleteMock.mock.calls[0][0]).toMatchObject({ memberId: 'self', memberName: 'Self Person' });
     expect(onClose).toHaveBeenCalled();
     alertSpy.mockRestore();
   });
@@ -310,8 +309,8 @@ describe('PersonEditor', () => {
     // country_code left empty
     press(renderer, 'person-editor-save');
 
-    expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createMock.mock.calls[0][0]).toMatchObject({
+    expect(mockCreateMock).toHaveBeenCalledTimes(1);
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
       full_name: 'No Country Code',
       country_code: '+55',
       phone: '11999',
@@ -328,14 +327,14 @@ describe('PersonEditor', () => {
 
     change(renderer, 'person-editor-full-name', 'Renamed');
     press(renderer, 'person-editor-save');
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    expect(updateMock.mock.calls[0][0]).toMatchObject({ id: 'self', full_name: 'Renamed', can_conduct: true });
+    expect(mockUpdateMock).toHaveBeenCalledTimes(1);
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({ id: 'self', full_name: 'Renamed', can_conduct: true });
   });
 
   it('requires a full name (AC7)', () => {
     const { renderer } = render();
     press(renderer, 'person-editor-save');
-    expect(createMock).not.toHaveBeenCalled();
+    expect(mockCreateMock).not.toHaveBeenCalled();
     expect(find(renderer.root, 'person-editor-error').length).toBe(1);
   });
 
@@ -344,7 +343,7 @@ describe('PersonEditor', () => {
     change(renderer, 'person-editor-full-name', 'Needs Delegate');
     press(renderer, 'person-editor-contact-via-responsible');
     press(renderer, 'person-editor-save');
-    expect(createMock).not.toHaveBeenCalled();
+    expect(mockCreateMock).not.toHaveBeenCalled();
     expect(find(renderer.root, 'person-editor-error').length).toBe(1);
   });
 
@@ -371,8 +370,8 @@ describe('PersonEditor', () => {
     });
 
     press(renderer, 'person-editor-save');
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    expect(updateMock.mock.calls[0][0]).toMatchObject({
+    expect(mockUpdateMock).toHaveBeenCalledTimes(1);
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({
       id: 'self',
       contact_via_responsible: true,
       responsible_id: 'other',

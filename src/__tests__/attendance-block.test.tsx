@@ -5,7 +5,6 @@
  * we render in the node environment and assert on host-node props (rendered text, TextInput props,
  * and the onChange callback fired on blur/submit).
  */
-import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { AttendanceBlock, type AttendanceBlockProps } from '../components/AttendanceBlock';
@@ -13,11 +12,11 @@ import { AttendanceBlock, type AttendanceBlockProps } from '../components/Attend
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => (k === 'agenda.attendanceLabel' ? 'Freq' : k) }),
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       border: '#333',
@@ -56,19 +55,19 @@ function press(root: Node, testID: string) {
 
 describe('AttendanceBlock — display', () => {
   it('renders "000" for null', () => {
-    const { root } = render({ value: null, onChange: vi.fn(), testID: 'att' });
+    const { root } = render({ value: null, onChange: jest.fn(), testID: 'att' });
     expect(textOf(root, 'att-text')).toBe('000');
   });
 
   it('zero-pads to 3 digits: 85 → "085", 7 → "007"', () => {
-    const a = render({ value: 85, onChange: vi.fn(), testID: 'att' });
+    const a = render({ value: 85, onChange: jest.fn(), testID: 'att' });
     expect(textOf(a.root, 'att-text')).toBe('085');
-    const b = render({ value: 7, onChange: vi.fn(), testID: 'att' });
+    const b = render({ value: 7, onChange: jest.fn(), testID: 'att' });
     expect(textOf(b.root, 'att-text')).toBe('007');
   });
 
   it('renders the "Freq" label', () => {
-    const { root } = render({ value: null, onChange: vi.fn(), testID: 'att' });
+    const { root } = render({ value: null, onChange: jest.fn(), testID: 'att' });
     const labels = root
       .findAll((n) => n.type === 'Text')
       .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
@@ -78,7 +77,7 @@ describe('AttendanceBlock — display', () => {
 
 describe('AttendanceBlock — inline editing', () => {
   it('turns into a TextInput when tapped', () => {
-    const { root } = render({ value: 85, onChange: vi.fn(), testID: 'att' });
+    const { root } = render({ value: 85, onChange: jest.fn(), testID: 'att' });
     expect(inputNode(root)).toBeUndefined();
     press(root, 'att');
     expect(inputNode(root)).toBeDefined();
@@ -86,7 +85,7 @@ describe('AttendanceBlock — inline editing', () => {
   });
 
   it('strips non-digits and caps at 3 digits while typing', () => {
-    const { root } = render({ value: null, onChange: vi.fn(), testID: 'att' });
+    const { root } = render({ value: null, onChange: jest.fn(), testID: 'att' });
     press(root, 'att');
     act(() => {
       (inputNode(root)!.props.onChangeText as (t: string) => void)('1a2b3c4d5');
@@ -98,7 +97,7 @@ describe('AttendanceBlock — inline editing', () => {
   });
 
   it('fires onChange with the parsed int on blur', () => {
-    const onChange = vi.fn();
+    const onChange = jest.fn();
     const { root } = render({ value: null, onChange, testID: 'att' });
     press(root, 'att');
     act(() => {
@@ -111,7 +110,7 @@ describe('AttendanceBlock — inline editing', () => {
   });
 
   it('fires onChange with null when cleared', () => {
-    const onChange = vi.fn();
+    const onChange = jest.fn();
     const { root } = render({ value: 85, onChange, testID: 'att' });
     press(root, 'att');
     act(() => {
@@ -125,7 +124,7 @@ describe('AttendanceBlock — inline editing', () => {
 
   it('clamps values above 999 down to 999', () => {
     // maxLength/strip already cap at 3 digits, so the max reachable is 999 — assert it stays valid.
-    const onChange = vi.fn();
+    const onChange = jest.fn();
     const { root } = render({ value: null, onChange, testID: 'att' });
     press(root, 'att');
     act(() => {
@@ -138,7 +137,7 @@ describe('AttendanceBlock — inline editing', () => {
   });
 
   it('is not editable when disabled', () => {
-    const onChange = vi.fn();
+    const onChange = jest.fn();
     const { root } = render({ value: 85, onChange, disabled: true, testID: 'att' });
     press(root, 'att');
     expect(inputNode(root)).toBeUndefined();

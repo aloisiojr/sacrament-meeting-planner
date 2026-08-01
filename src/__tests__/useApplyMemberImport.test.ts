@@ -2,26 +2,25 @@
  * S5 tests — useApplyMemberImport applies a confirmed merge (batched insert / per-row phone update /
  * delete-in), non-destructively (no delete unless ids marked). (AC11)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, createTestQueryClient, createWrapper } from './integration/setup-integration';
 import { act } from 'react';
 
 import { supabase } from '../lib/supabase';
 import { useApplyMemberImport } from '../hooks/useApplyMemberImport';
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 // Captured calls.
 let insertedRows: any[] | null;
@@ -32,7 +31,7 @@ function wireSupabase() {
   insertedRows = null;
   updateCalls = [];
   deleteIds = null;
-  (mockedSupabase.from as ReturnType<typeof vi.fn>).mockReturnValue({
+  (mockedSupabase.from as ReturnType<typeof jest.fn>).mockReturnValue({
     insert: (rows: any[]) => {
       insertedRows = rows;
       return Promise.resolve({ error: null });
@@ -55,7 +54,7 @@ function wireSupabase() {
 describe('useApplyMemberImport', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     wireSupabase();
     queryClient = createTestQueryClient();
   });

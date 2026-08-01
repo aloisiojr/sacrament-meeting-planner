@@ -8,7 +8,6 @@
  * Tests import BEHAVIOR - no fs.readFileSync or string matching.
  */
 
-import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';

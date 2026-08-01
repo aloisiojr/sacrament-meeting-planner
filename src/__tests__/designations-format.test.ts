@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { formatDesignationLines } from '../lib/designations';
 import type { Designation } from '../types/database';
 

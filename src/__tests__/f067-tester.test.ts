@@ -13,7 +13,6 @@
  * - i18n key values (AC-067-20)
  */
 
-import { describe, it, expect, vi } from 'vitest';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
 import type { PresentationField } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
@@ -120,7 +119,7 @@ describe('F067 AC-067-17: Storage format round-trip', () => {
 
 describe('F067 AC-067-21: onSave callback contract', () => {
   it('add operation: onSave receives joined string with new item', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('A\nB');
     const addText = 'C';
     const trimmed = addText.trim();
@@ -132,7 +131,7 @@ describe('F067 AC-067-21: onSave callback contract', () => {
   });
 
   it('delete operation: onSave receives joined string without deleted item', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('A\nB\nC');
     const deleteIndex = 1;
     const newItems = items.filter((_, i) => i !== deleteIndex);
@@ -141,7 +140,7 @@ describe('F067 AC-067-21: onSave callback contract', () => {
   });
 
   it('delete last item: onSave receives null', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('Only');
     const newItems = items.filter((_, i) => i !== 0);
     onSave(joinItems(newItems));
@@ -149,7 +148,7 @@ describe('F067 AC-067-21: onSave callback contract', () => {
   });
 
   it('edit operation: onSave receives joined string with updated item', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('Old\nKeep');
     const editIndex = 0;
     const newText = 'New';
@@ -159,7 +158,7 @@ describe('F067 AC-067-21: onSave callback contract', () => {
   });
 
   it('reorder operation: onSave receives joined string with new order', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('A\nB\nC');
     const idx = 0;
     const newItems = [...items];
@@ -230,7 +229,7 @@ describe('F067 EC-067-01: Single-line TextInput behavior', () => {
 
 describe('F067 EC-067-05: Reorder with single item', () => {
   it('move up on single item (index 0) does nothing', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = ['Only item'];
     const index = 0;
     // Simulates handleMoveUp guard: if (index === 0) return;
@@ -245,7 +244,7 @@ describe('F067 EC-067-05: Reorder with single item', () => {
   });
 
   it('move down on single item (index = length-1) does nothing', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = ['Only item'];
     const index = 0;
     // Simulates handleMoveDown guard: if (index === items.length - 1) return;
@@ -266,7 +265,7 @@ describe('F067 EC-067-05: Reorder with single item', () => {
 
 describe('F067 EC-067-06: Whitespace-only item handling', () => {
   it('inline edit resulting in spaces-only deletes item', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = ['Keep', 'To be cleared', 'Also keep'];
     const editIndex = 1;
     const editText = '   '; // User clears text to whitespace
@@ -280,7 +279,7 @@ describe('F067 EC-067-06: Whitespace-only item handling', () => {
   });
 
   it('inline edit resulting in tab-only deletes item', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = ['A', 'B'];
     const editIndex = 0;
     const editText = '\t\t';
@@ -293,7 +292,7 @@ describe('F067 EC-067-06: Whitespace-only item handling', () => {
   });
 
   it('add with tabs and spaces does not save', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const addText = '  \t  ';
     const trimmed = addText.trim();
     if (trimmed !== '') {
@@ -472,7 +471,7 @@ describe('F067: PresentationField bullet_list type acceptance', () => {
 
 describe('F067 AC-067-04: Empty/whitespace add-input guard', () => {
   it('empty string add does not trigger save', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const addText = '';
     const trimmed = addText.trim();
     if (trimmed !== '') {
@@ -482,7 +481,7 @@ describe('F067 AC-067-04: Empty/whitespace add-input guard', () => {
   });
 
   it('newline-only add does not trigger save', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const addText = '\n\n';
     const trimmed = addText.trim();
     if (trimmed !== '') {
@@ -492,7 +491,7 @@ describe('F067 AC-067-04: Empty/whitespace add-input guard', () => {
   });
 
   it('mixed whitespace add does not trigger save', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const addText = ' \t \n ';
     const trimmed = addText.trim();
     if (trimmed !== '') {

@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { parseCollectionPeriod, compareActiveTopics } from '../lib/topics';
 import type { TopicWithCollection } from '../types/database';
 

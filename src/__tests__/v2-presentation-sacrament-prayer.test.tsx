@@ -4,7 +4,6 @@
  * router and safe-area are mocked to lightweight seams. `react-i18next` is mocked with a real
  * dot-path lookup into the en-US locale JSON so we can assert the VERBATIM prayer strings.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import enUS from '../i18n/locales/en-US.json';
@@ -16,7 +15,7 @@ const { act } = TestRenderer;
 const DATE = '2026-08-02';
 
 // dot-path lookup into the real locale JSON → exact translated strings.
-function tLookup(key: string, fallback?: string): string {
+function mockTLookup(key: string, fallback?: string): string {
   const parts = key.split('.');
   let cur: unknown = enUS;
   for (const p of parts) {
@@ -29,39 +28,39 @@ function tLookup(key: string, fallback?: string): string {
   return typeof cur === 'string' ? cur : fallback ?? key;
 }
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string, f?: string) => tLookup(k, f) }),
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string, f?: string) => mockTLookup(k, f) }),
 }));
 
-vi.mock('react-native-reanimated', () => ({
+jest.mock('react-native-reanimated', () => ({
   default: {
     View: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-      React.createElement('Animated.View', p, p.children),
+      require('react').createElement('Animated.View', p, p.children),
   },
   SlideInDown: {},
   SlideOutUp: {},
   LinearTransition: { duration: () => ({}) },
 }));
 
-vi.mock('expo-blur', () => ({
+jest.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-    React.createElement('BlurView', p, p.children),
+    require('react').createElement('BlurView', p, p.children),
 }));
 
-vi.mock('../hooks/useWard', () => ({
+jest.mock('../hooks/useWard', () => ({
   useWardName: () => 'Test Ward',
   useWardDesignationTemplates: () => ({ templates: {}, isLoaded: true }),
 }));
 
-vi.mock('../components/icons', () => ({
-  PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),
-  XIcon: (p: Record<string, unknown>) => React.createElement('XIcon', p),
-  ScrollTextIcon: (p: Record<string, unknown>) => React.createElement('ScrollTextIcon', p),
-  ChevronDownIcon: (p: Record<string, unknown>) => React.createElement('ChevronDownIcon', p),
-  ChevronUpIcon: (p: Record<string, unknown>) => React.createElement('ChevronUpIcon', p),
+jest.mock('../components/icons', () => ({
+  PencilIcon: (p: Record<string, unknown>) => require('react').createElement('PencilIcon', p),
+  XIcon: (p: Record<string, unknown>) => require('react').createElement('XIcon', p),
+  ScrollTextIcon: (p: Record<string, unknown>) => require('react').createElement('ScrollTextIcon', p),
+  ChevronDownIcon: (p: Record<string, unknown>) => require('react').createElement('ChevronDownIcon', p),
+  ChevronUpIcon: (p: Record<string, unknown>) => require('react').createElement('ChevronUpIcon', p),
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', border: '#333', text: '#fff',
@@ -71,21 +70,21 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-vi.mock('react-native-safe-area-context', () => ({
+jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: (p: { children?: React.ReactNode }) =>
-    React.createElement('SafeAreaView', {}, p.children),
+    require('react').createElement('SafeAreaView', {}, p.children),
 }));
 
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({ date: DATE }),
 }));
 
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
 
 // Partial mock: keep buildPresentationCards / getTodaySundayDate real, stub the data hook.
-vi.mock('../hooks/usePresentationMode', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/usePresentationMode', () => {
+  const actual = (jest.requireActual('../hooks/usePresentationMode')) as Record<string, unknown>;
   return {
     ...actual,
     usePresentationData: () => ({
@@ -149,7 +148,7 @@ function expandCard(renderer: TestRenderer.ReactTestRenderer, index: number): vo
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  jest.clearAllMocks();
 });
 
 describe('Sacrament-prayer interstitial (P2/P3)', () => {

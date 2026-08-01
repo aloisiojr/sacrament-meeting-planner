@@ -12,7 +12,6 @@
  *       in register-first-user and register-invited-user via source code.
  */
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { lightColors, darkColors } from '../lib/theme';

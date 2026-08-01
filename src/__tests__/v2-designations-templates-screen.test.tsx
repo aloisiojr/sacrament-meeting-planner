@@ -4,7 +4,6 @@
  * the props it receives. Asserts the tab config (per-type value/default/localized tokens), saveMode,
  * and that onSave routes to the update mutation.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import DesignationTemplatesScreen from '../app/(tabs)/settings/designations';
@@ -13,26 +12,26 @@ import type { TemplateTab } from '../components/TemplateEditorScreen';
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const state = vi.hoisted(() => ({
+const mockState = {
   templates: {} as Record<string, string | null>,
-  mutate: vi.fn(),
+  mutate: jest.fn(),
   props: null as null | {
     title: string;
     tabs: TemplateTab[];
     saveMode?: string;
     onSave: (key: string, value: string | null) => void;
   },
-}));
+};
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'pt-BR' }));
-vi.mock('../hooks/useWard', () => ({
-  useWardDesignationTemplates: () => ({ templates: state.templates, isLoaded: true }),
-  useUpdateWardDesignationTemplate: () => ({ mutate: state.mutate }),
+jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'pt-BR' }));
+jest.mock('../hooks/useWard', () => ({
+  useWardDesignationTemplates: () => ({ templates: mockState.templates, isLoaded: true }),
+  useUpdateWardDesignationTemplate: () => ({ mutate: mockState.mutate }),
 }));
-vi.mock('../components/TemplateEditorScreen', () => ({
+jest.mock('../components/TemplateEditorScreen', () => ({
   TemplateEditorScreen: (props: Record<string, unknown>) => {
-    state.props = props as unknown as typeof state.props;
+    mockState.props = props as unknown as typeof mockState.props;
     return null;
   },
 }));
@@ -43,25 +42,25 @@ function render() {
   });
 }
 function tab(key: string): TemplateTab {
-  return state.props!.tabs.find((t) => t.key === key)!;
+  return mockState.props!.tabs.find((t) => t.key === key)!;
 }
 
 beforeEach(() => {
-  state.templates = {};
-  state.mutate = vi.fn();
-  state.props = null;
+  mockState.templates = {};
+  mockState.mutate = jest.fn();
+  mockState.props = null;
 });
 
 describe('Ward Business Templates wrapper', () => {
   it('builds a tab per type in order with collapse save mode', () => {
     render();
-    expect(state.props!.saveMode).toBe('collapse');
-    expect(state.props!.title).toBe('settings.designationsTemplate');
-    expect(state.props!.tabs.map((t) => t.key)).toEqual(['sustain', 'release', 'priesthood', 'new_member']);
+    expect(mockState.props!.saveMode).toBe('collapse');
+    expect(mockState.props!.title).toBe('settings.designationsTemplate');
+    expect(mockState.props!.tabs.map((t) => t.key)).toEqual(['sustain', 'release', 'priesthood', 'new_member']);
   });
 
   it('a tab value is the ward override (else null), default is the localized readText', () => {
-    state.templates = { sustain: 'MY CUSTOM' };
+    mockState.templates = { sustain: 'MY CUSTOM' };
     render();
     expect(tab('sustain').value).toBe('MY CUSTOM');
     expect(tab('release').value).toBeNull();
@@ -77,9 +76,9 @@ describe('Ward Business Templates wrapper', () => {
 
   it('onSave routes to the update mutation with { type, value }', () => {
     render();
-    act(() => state.props!.onSave('priesthood', 'text'));
-    expect(state.mutate).toHaveBeenCalledWith({ type: 'priesthood', value: 'text' });
-    act(() => state.props!.onSave('sustain', null));
-    expect(state.mutate).toHaveBeenCalledWith({ type: 'sustain', value: null });
+    act(() => mockState.props!.onSave('priesthood', 'text'));
+    expect(mockState.mutate).toHaveBeenCalledWith({ type: 'priesthood', value: 'text' });
+    act(() => mockState.props!.onSave('sustain', null));
+    expect(mockState.mutate).toHaveBeenCalledWith({ type: 'sustain', value: null });
   });
 });

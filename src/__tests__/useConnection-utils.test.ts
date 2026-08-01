@@ -2,7 +2,6 @@
  * Tests for useConnection pure utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import { isNetInfoOnline } from '../lib/connectionUtils';
 
 describe('isNetInfoOnline', () => {

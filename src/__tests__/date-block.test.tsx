@@ -4,7 +4,6 @@
  * `react-native` is aliased to a test stub (vitest.config.ts). Theme + current-language helpers are
  * mocked per-file; dateUtils stays real (pure) so we assert on the rendered day/month text.
  */
-import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { DateBlock } from '../components/DateBlock';
@@ -15,9 +14,9 @@ const { act } = TestRenderer;
 const SURFACE = '#222';
 const PRIMARY = '#00f';
 
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       text: '#fff',

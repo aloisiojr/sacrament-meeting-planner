@@ -4,7 +4,6 @@
  * include assigned_by_role in their update payloads.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
   createTestQueryClient,
@@ -18,65 +17,65 @@ import { useAssignSpeaker, useAssignTopic, useRemoveAssignment } from '../hooks/
 
 // --- Module mocks ---
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../lib/activityLog', () => ({
-  logAction: vi.fn(),
-  buildLogDescription: vi.fn(() => 'test description'),
+jest.mock('../lib/activityLog', () => ({
+  logAction: jest.fn(),
+  buildLogDescription: jest.fn(() => 'test description'),
 }));
 
-vi.mock('../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-vi.mock('../lib/dateUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../lib/dateUtils')>();
+jest.mock('../lib/dateUtils', () => {
+  const actual = jest.requireActual<typeof import('../lib/dateUtils')>('../lib/dateUtils');
   return {
     ...actual,
     formatDateHumanReadable: (dateStr: string) => dateStr,
   };
 });
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 // Track .update() calls to verify payload
 let lastUpdatePayload: Record<string, unknown> | null = null;
 
 function mockUpdateChain(returnData: unknown) {
   lastUpdatePayload = null;
-  const single = vi.fn().mockResolvedValue({ data: returnData, error: null });
-  const select = vi.fn().mockReturnValue({ single });
-  const eq = vi.fn().mockReturnValue({ select });
-  const updateFn = vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+  const single = jest.fn().mockResolvedValue({ data: returnData, error: null });
+  const select = jest.fn().mockReturnValue({ single });
+  const eq = jest.fn().mockReturnValue({ select });
+  const updateFn = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
     lastUpdatePayload = payload;
     return { eq };
   });
 
-  (mockedSupabase.from as ReturnType<typeof vi.fn>).mockReturnValue({
+  (mockedSupabase.from as ReturnType<typeof jest.fn>).mockReturnValue({
     update: updateFn,
   });
 }
@@ -85,7 +84,7 @@ describe('useSpeeches mutations - assigned_by_role', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
     lastUpdatePayload = null;
   });

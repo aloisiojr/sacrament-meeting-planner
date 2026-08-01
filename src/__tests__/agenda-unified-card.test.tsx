@@ -5,15 +5,14 @@
  * FlatList so it actually renders its items (the stub renders a bare host node), which lets the
  * tab mount its per-Sunday cards. UnifiedSundayCard is replaced by a seam that exposes the props +
  * tap handlers it receives; the expanded body's AgendaForm / type dropdown are stubbed so we can
- * detect expansion. All data hooks are mocked via shared mutable state.
+ * detect expansion. All data hooks are mocked via shared mutable mockState.
  *
  * buildUnifiedCardData is left REAL so the asserted props reflect the true mapping.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Speech, SundayAgenda, SundayException } from '../types/database';
-// Imported after the (hoisted) vi.mock calls below take effect.
+// Imported after the (hoisted) jest.mock calls below take effect.
 import AgendaTab from '../app/(tabs)/agenda';
 
 const { act } = TestRenderer;
@@ -21,7 +20,7 @@ const { act } = TestRenderer;
 
 const DATE = '2026-08-02';
 
-const state = vi.hoisted(() => ({
+const mockState = {
   sundays: [] as string[],
   nextSunday: '' as string,
   exceptions: [] as SundayException[],
@@ -29,54 +28,28 @@ const state = vi.hoisted(() => ({
   agendas: [] as SundayAgenda[],
   managePrayers: false,
   online: true,
-}));
+};
 
-const routerPush = vi.hoisted(() => vi.fn());
-const updateByDateMutate = vi.hoisted(() => vi.fn());
+const mockRouterPush = jest.fn();
+const mockUpdateByDateMutate = jest.fn();
 
 // --- Mocks ---
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, opts?: unknown) => (opts ? `${k}${JSON.stringify(opts)}` : k) }),
 }));
 
-// FlatList that renders its items so the per-Sunday cards mount.
-vi.mock('react-native', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  const ReactMod = (await import('react')).default;
-  const FlatList = ({
-    data,
-    renderItem,
-    keyExtractor,
-  }: {
-    data?: unknown[];
-    renderItem?: (info: { item: unknown; index: number }) => React.ReactNode;
-    keyExtractor?: (item: unknown, index: number) => string;
-  }) =>
-    ReactMod.createElement(
-      'FlatList',
-      {},
-      (data ?? []).map((item, index) =>
-        ReactMod.createElement(
-          ReactMod.Fragment,
-          { key: keyExtractor ? keyExtractor(item, index) : index },
-          renderItem?.({ item, index })
-        )
-      )
-    );
-  return { ...actual, FlatList };
-});
 
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
 
-vi.mock('expo-router', () => ({
+jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ push: routerPush, setParams: vi.fn() }),
+  useRouter: () => ({ push: mockRouterPush, setParams: jest.fn() }),
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', border: '#333', text: '#fff', textSecondary: '#aaa',
@@ -84,62 +57,62 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => state.online }));
+jest.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => mockState.online }));
 
-vi.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
+jest.mock('../components/ErrorBoundary', () => ({
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
 }));
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
-vi.mock('../components/AgendaForm', () => ({
-  AgendaForm: () => React.createElement('AgendaForm', { testID: 'mock-agenda-form' }),
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/AgendaForm', () => ({
+  AgendaForm: () => require('react').createElement('AgendaForm', { testID: 'mock-agenda-form' }),
 }));
-vi.mock('../components/SundayCard', () => ({
-  SundayTypeDropdown: () => React.createElement('SundayTypeDropdown', { testID: 'mock-type-dropdown' }),
+jest.mock('../components/SundayCard', () => ({
+  SundayTypeDropdown: () => require('react').createElement('SundayTypeDropdown', { testID: 'mock-type-dropdown' }),
 }));
-vi.mock('../components/icons', () => ({ PlayIcon: () => null, ChevronUpIcon: () => null }));
+jest.mock('../components/icons', () => ({ PlayIcon: () => null, ChevronUpIcon: () => null }));
 
 // UnifiedSundayCard seam: render a host node carrying every prop for inspection + tap invocation.
-vi.mock('../components/UnifiedSundayCard', () => ({
-  UnifiedSundayCard: (props: Record<string, unknown>) => React.createElement('UnifiedSundayCard', props),
+jest.mock('../components/UnifiedSundayCard', () => ({
+  UnifiedSundayCard: (props: Record<string, unknown>) => require('react').createElement('UnifiedSundayCard', props),
 }));
 // DateBlock is stubbed so the compact expanded header can render without pulling in the i18n init
 // chain (the real DateBlock imports src/i18n).
-vi.mock('../components/DateBlock', () => ({
-  DateBlock: (props: Record<string, unknown>) => React.createElement('DateBlock', props),
+jest.mock('../components/DateBlock', () => ({
+  DateBlock: (props: Record<string, unknown>) => require('react').createElement('DateBlock', props),
 }));
 
-vi.mock('../hooks/useSundayList', () => ({
+jest.mock('../hooks/useSundayList', () => ({
   useSundayList: () => ({
-    sundays: state.sundays,
-    startDate: state.sundays[0] ?? '',
-    endDate: state.sundays[state.sundays.length - 1] ?? '',
-    loadMoreFuture: vi.fn(),
-    loadMorePast: vi.fn(),
+    sundays: mockState.sundays,
+    startDate: mockState.sundays[0] ?? '',
+    endDate: mockState.sundays[mockState.sundays.length - 1] ?? '',
+    loadMoreFuture: jest.fn(),
+    loadMorePast: jest.fn(),
     hasMoreFuture: false,
     hasMorePast: false,
-    nextSunday: state.nextSunday,
+    nextSunday: mockState.nextSunday,
   }),
 }));
-vi.mock('../hooks/useSundayTypes', () => ({
+jest.mock('../hooks/useSundayTypes', () => ({
   SUNDAY_TYPE_SPEECHES: 'speeches',
-  useSundayExceptions: () => ({ data: state.exceptions, isError: false, error: null, refetch: vi.fn() }),
-  useSetSundayType: () => ({ mutate: vi.fn() }),
-  useRemoveSundayException: () => ({ mutate: vi.fn() }),
+  useSundayExceptions: () => ({ data: mockState.exceptions, isError: false, error: null, refetch: jest.fn() }),
+  useSetSundayType: () => ({ mutate: jest.fn() }),
+  useRemoveSundayException: () => ({ mutate: jest.fn() }),
   useAutoAssignMissingSundayTypes: () => {},
 }));
-vi.mock('../hooks/useSpeeches', () => ({
-  useSpeeches: () => ({ data: state.speeches }),
-  useDeleteSpeechesByDate: () => ({ mutate: vi.fn() }),
-  useWardManagePrayers: () => ({ managePrayers: state.managePrayers, isLoading: false }),
+jest.mock('../hooks/useSpeeches', () => ({
+  useSpeeches: () => ({ data: mockState.speeches }),
+  useDeleteSpeechesByDate: () => ({ mutate: jest.fn() }),
+  useWardManagePrayers: () => ({ managePrayers: mockState.managePrayers, isLoading: false }),
 }));
-vi.mock('../hooks/useAgenda', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useAgenda', () => {
+  const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;
   return {
     ...actual,
-    useAgendaRange: () => ({ data: state.agendas }),
-    useLazyCreateAgenda: () => ({ mutate: vi.fn() }),
-    useUpdateAgendaByDate: () => ({ mutate: updateByDateMutate }),
+    useAgendaRange: () => ({ data: mockState.agendas }),
+    useLazyCreateAgenda: () => ({ mutate: jest.fn() }),
+    useUpdateAgendaByDate: () => ({ mutate: mockUpdateByDateMutate }),
   };
 });
 
@@ -190,15 +163,15 @@ function render() {
 }
 
 beforeEach(() => {
-  state.sundays = [DATE];
-  state.nextSunday = DATE;
-  state.exceptions = [];
-  state.speeches = [makeSpeech(1, { speaker_name: 'Alice' })];
-  state.agendas = [makeAgenda({ presiding_name: 'Bishop' })];
-  state.managePrayers = false;
-  state.online = true;
-  routerPush.mockClear();
-  updateByDateMutate.mockClear();
+  mockState.sundays = [DATE];
+  mockState.nextSunday = DATE;
+  mockState.exceptions = [];
+  mockState.speeches = [makeSpeech(1, { speaker_name: 'Alice' })];
+  mockState.agendas = [makeAgenda({ presiding_name: 'Bishop' })];
+  mockState.managePrayers = false;
+  mockState.online = true;
+  mockRouterPush.mockClear();
+  mockUpdateByDateMutate.mockClear();
 });
 
 describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
@@ -208,7 +181,7 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     expect(cards.length).toBe(1);
     const card = cards[0];
     expect(card.props.testID).toBe(`agenda-card-${DATE}`);
-    // DATE is the next Sunday (state.nextSunday) → highlighted (#2 restored border).
+    // DATE is the next Sunday (mockState.nextSunday) → highlighted (#2 restored border).
     expect(card.props.highlighted).toBe(true);
     // Roles + name rows come from buildUnifiedCardData (kept real).
     expect((card.props.roles as { preside: boolean }).preside).toBe(true);
@@ -223,7 +196,7 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     act(() => {
       (card.props.onPressSpeakers as (d: string) => void)(DATE);
     });
-    expect(routerPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: DATE } });
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: DATE } });
   });
 
   it('tapping the status area toggles the inline expanded agenda body', () => {
@@ -268,7 +241,7 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
   });
 
   it('a no-sacrament expanded card renders the type dropdown but no AgendaForm or Play', () => {
-    state.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
+    mockState.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
     const { root } = render();
     // Expand via the collapsed card's status tap zone — must not throw (conference regression).
     expect(() => {
@@ -284,7 +257,7 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
   });
 
   it('passes onPressStatus to a no-sacrament collapsed card so tapping it expands', () => {
-    state.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
+    mockState.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
     const { root } = render();
     const card = unifiedCards(root)[0];
     expect(card.props.exceptionReason).toBe('general_conference');
@@ -297,9 +270,9 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
   });
 
   it('passes testimony exception + prayer rows through to the card (managePrayers on)', () => {
-    state.managePrayers = true;
-    state.exceptions = [{ date: DATE, reason: 'testimony_meeting', custom_reason: null } as SundayException];
-    state.speeches = [makeSpeech(0, { speaker_name: 'Opener' }), makeSpeech(4)];
+    mockState.managePrayers = true;
+    mockState.exceptions = [{ date: DATE, reason: 'testimony_meeting', custom_reason: null } as SundayException];
+    mockState.speeches = [makeSpeech(0, { speaker_name: 'Opener' }), makeSpeech(4)];
     const { root } = render();
     const card = unifiedCards(root)[0];
     expect(card.props.exceptionReason).toBe('testimony_meeting');
@@ -312,10 +285,10 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     const PAST = '2020-01-05';
 
     beforeEach(() => {
-      state.sundays = [PAST];
-      state.nextSunday = '2099-12-27';
-      state.speeches = [makeSpeech(1, { speaker_name: 'Alice', sunday_date: PAST })];
-      state.agendas = [makeAgenda({ sunday_date: PAST, attendance: 85 })];
+      mockState.sundays = [PAST];
+      mockState.nextSunday = '2099-12-27';
+      mockState.speeches = [makeSpeech(1, { speaker_name: 'Alice', sunday_date: PAST })];
+      mockState.agendas = [makeAgenda({ sunday_date: PAST, attendance: 85 })];
     });
 
     it('passes isPast + attendance through to the collapsed card', () => {
@@ -332,7 +305,7 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
       act(() => {
         (card.props.onSetAttendance as (v: number | null) => void)(120);
       });
-      expect(updateByDateMutate).toHaveBeenCalledWith({
+      expect(mockUpdateByDateMutate).toHaveBeenCalledWith({
         sundayDate: PAST,
         updates: { attendance: 120 },
       });
@@ -355,6 +328,6 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     act(() => {
       (byTestID(root, `agenda-play-${DATE}`)[0].props.onPress as () => void)();
     });
-    expect(routerPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: DATE } });
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: DATE } });
   });
 });

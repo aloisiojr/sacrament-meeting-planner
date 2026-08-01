@@ -4,7 +4,6 @@
  * query keys match existing hook key factories.
  */
 
-import { describe, it, expect } from 'vitest';
 import { getNext3Sundays } from '../hooks/useOfflinePrefetch';
 import { agendaKeys } from '../hooks/useAgenda';
 import { speechKeys } from '../hooks/useSpeeches';

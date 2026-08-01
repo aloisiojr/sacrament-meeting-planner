@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
   hasPermission,
   getPermissions,
@@ -83,10 +82,7 @@ describe('Permissions', () => {
         'history:read',
       ];
       for (const perm of expected) {
-        expect(
-          hasPermission('bishopric', perm),
-          `Bishopric should have ${perm}`
-        ).toBe(true);
+        expect(hasPermission('bishopric', perm)).toBe(true);
       }
     });
 

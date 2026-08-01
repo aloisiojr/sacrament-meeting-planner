@@ -5,8 +5,6 @@
  * Covers: AC-082-15 to AC-082-18, EC-082-09, EC-082-10
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
 // Import sync utilities (pure, no RN dependency)
 import { SYNCED_TABLES, getQueryKeysForTable, TABLE_TO_QUERY_KEYS, POLLING_INTERVAL_MS } from '../../lib/sync';
 import { isNetInfoOnline } from '../../lib/connectionUtils';
@@ -25,41 +23,41 @@ import {
 
 // --- Module mocks ---
 
-vi.mock('../../lib/supabase', () => ({
+jest.mock('../../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(() => ({
-      on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn(),
+    channel: jest.fn(() => ({
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn(),
     })),
-    removeChannel: vi.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../../lib/activityLog', () => ({
-  logAction: vi.fn(),
+jest.mock('../../lib/activityLog', () => ({
+  logAction: jest.fn(),
 }));
 
-vi.mock('../../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
 // ==========================================================================

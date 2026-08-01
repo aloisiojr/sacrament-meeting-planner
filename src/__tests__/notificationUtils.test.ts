@@ -5,7 +5,6 @@
  * and verifies existing notification types still work (no regression).
  */
 
-import { describe, it, expect } from 'vitest';
 import { buildNotificationText } from '../lib/notificationUtils';
 
 // ============================================================================

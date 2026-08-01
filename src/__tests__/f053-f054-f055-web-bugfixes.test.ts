@@ -7,7 +7,6 @@
  * - F055: HymnSelectorModal filtering and display behavior
  */
 
-import { describe, it, expect } from 'vitest';
 import { filterHymns, formatHymnDisplay } from '../hooks/useHymns';
 import type { Hymn } from '../types/database';
 

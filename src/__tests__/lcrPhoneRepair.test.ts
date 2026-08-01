@@ -1,7 +1,6 @@
 /**
  * S3 tests — phone repair (Rules 2+3, AC5/AC6/AC16) + ward-code pre-fill guess.
  */
-import { describe, it, expect } from 'vitest';
 import { repairPhones, normalizeLcrPhone } from '../lib/lcrPhoneRepair';
 import { guessWardCodes } from '../lib/wardPhoneCodes';
 import type { LcrRecord } from '../lib/lcrPdfParser';

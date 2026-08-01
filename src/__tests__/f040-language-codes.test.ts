@@ -11,7 +11,6 @@
  * imported in vitest.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   SUPPORTED_LANGUAGES,
   LANGUAGE_LABELS,

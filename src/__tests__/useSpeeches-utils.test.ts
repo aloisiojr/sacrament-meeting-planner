@@ -2,7 +2,6 @@
  * Tests for useSpeeches hook utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   speechKeys,
   VALID_TRANSITIONS,

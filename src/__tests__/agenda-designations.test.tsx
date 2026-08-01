@@ -7,7 +7,6 @@
  *  - remove writes the filtered array back via updateField (AC5b);
  *  - an observer gets a read-only (disabled) field (AC14).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { SundayAgenda, Designation } from '../types/database';
@@ -16,7 +15,7 @@ import { AgendaForm } from '../components/AgendaForm';
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const dlf = vi.hoisted(() => ({
+const mockDlf = {
   props: null as null | {
     value: Designation[];
     disabled?: boolean;
@@ -24,39 +23,39 @@ const dlf = vi.hoisted(() => ({
     onAddPress: () => void;
     onRemove: (i: number) => void;
   },
-}));
-const auth = vi.hoisted(() => ({ canWrite: true }));
-const routerPush = vi.fn();
-const updateAgendaMutate = vi.fn();
+};
+const mockAuth = { canWrite: true };
+const mockRouterPush = jest.fn();
+const mockUpdateAgendaMutate = jest.fn();
 
-let AGENDA: SundayAgenda;
+let mockAGENDA: SundayAgenda;
 
 // --- Mocks ---
-vi.mock('../components/DesignationListField', () => ({
+jest.mock('../components/DesignationListField', () => ({
   DesignationListField: (props: Record<string, unknown>) => {
-    dlf.props = props as unknown as typeof dlf.props;
+    mockDlf.props = props as unknown as typeof mockDlf.props;
     return null;
   },
 }));
-vi.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
-vi.mock('../components/EditableListField', () => ({
+jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
+jest.mock('../components/EditableListField', () => ({
   parseItems: () => [],
   joinItems: () => null,
   EditableListField: () => null,
 }));
-vi.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
-vi.mock('react-native-svg', async () => {
+jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: routerPush }) }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockRouterPush }) }));
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -65,31 +64,31 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? auth.canWrite : true) }),
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? mockAuth.canWrite : true) }),
 }));
-vi.mock('../hooks/useAgenda', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useAgenda', () => {
+  const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;
   return {
     ...actual,
-    useAgenda: () => ({ data: AGENDA }),
-    useUpdateAgenda: () => ({ mutate: updateAgendaMutate }),
+    useAgenda: () => ({ data: mockAGENDA }),
+    useUpdateAgenda: () => ({ mutate: mockUpdateAgendaMutate }),
   };
 });
-vi.mock('../hooks/useSpeeches', () => ({
+jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: [] }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
-  useAssignSpeaker: () => ({ mutate: vi.fn() }),
-  useRemoveAssignment: () => ({ mutate: vi.fn() }),
-  useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+  useAssignSpeaker: () => ({ mutate: jest.fn() }),
+  useRemoveAssignment: () => ({ mutate: jest.fn() }),
+  useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
 }));
-vi.mock('../hooks/useHymns', () => ({
+jest.mock('../hooks/useHymns', () => ({
   useHymns: () => ({ data: [] }),
   useSacramentalHymns: () => ({ data: [] }),
   formatHymnDisplay: () => '',
   filterHymns: (h: unknown[]) => h,
 }));
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
 
 const DESIGNATIONS: Designation[] = [
   { type: 'sustain', person_name: 'Alice', member_id: 'm1', calling: 'Presidente', office: null },
@@ -107,11 +106,11 @@ function render() {
 }
 
 beforeEach(() => {
-  auth.canWrite = true;
-  routerPush.mockClear();
-  updateAgendaMutate.mockClear();
-  dlf.props = null;
-  AGENDA = {
+  mockAuth.canWrite = true;
+  mockRouterPush.mockClear();
+  mockUpdateAgendaMutate.mockClear();
+  mockDlf.props = null;
+  mockAGENDA = {
     id: 'ag1', ward_id: 'w1', sunday_date: '2026-01-04',
     presiding_name: null, conducting_name: null, recognized_names: null,
     welcome_new_families: null, announcements: null, pianist_name: null, conductor_name: null,
@@ -130,13 +129,13 @@ beforeEach(() => {
 describe('AgendaForm → DesignationListField (step 4)', () => {
   it('passes the agenda designations through to the list (AC4)', () => {
     render();
-    expect(dlf.props?.value).toEqual(DESIGNATIONS);
+    expect(mockDlf.props?.value).toEqual(DESIGNATIONS);
   });
 
   it('add affordance navigates to the edit screen with no index (AC5)', () => {
     render();
-    act(() => dlf.props!.onAddPress());
-    expect(routerPush).toHaveBeenCalledWith({
+    act(() => mockDlf.props!.onAddPress());
+    expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: '/designations/[date]',
       params: { date: '2026-01-04' },
     });
@@ -144,8 +143,8 @@ describe('AgendaForm → DesignationListField (step 4)', () => {
 
   it('tapping a row navigates to the edit screen with that index (AC5)', () => {
     render();
-    act(() => dlf.props!.onItemPress(1));
-    expect(routerPush).toHaveBeenCalledWith({
+    act(() => mockDlf.props!.onItemPress(1));
+    expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: '/designations/[date]',
       params: { date: '2026-01-04', index: '1' },
     });
@@ -153,15 +152,15 @@ describe('AgendaForm → DesignationListField (step 4)', () => {
 
   it('remove writes the filtered array back via updateField (AC5b)', () => {
     render();
-    act(() => dlf.props!.onRemove(0));
-    expect(updateAgendaMutate).toHaveBeenCalledTimes(1);
-    const { fields } = updateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
+    act(() => mockDlf.props!.onRemove(0));
+    expect(mockUpdateAgendaMutate).toHaveBeenCalledTimes(1);
+    const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.designations).toEqual([DESIGNATIONS[1]]);
   });
 
   it('observer gets a read-only (disabled) field (AC14)', () => {
-    auth.canWrite = false;
+    mockAuth.canWrite = false;
     render();
-    expect(dlf.props?.disabled).toBe(true);
+    expect(mockDlf.props?.disabled).toBe(true);
   });
 });

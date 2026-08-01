@@ -5,7 +5,6 @@
  * CR-270, CR-271, CR-272
  */
 
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';

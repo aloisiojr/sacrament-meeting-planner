@@ -2,7 +2,6 @@
  * Tests for useAgenda utilities (pure functions).
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   isExcludedFromAgenda,
   isSpecialMeeting,

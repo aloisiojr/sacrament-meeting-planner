@@ -12,7 +12,6 @@
  * Covers: AC-064-01 through AC-064-17, EC-064-01 through EC-064-08
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
   waitFor,
@@ -24,24 +23,24 @@ import { topicKeys } from '../hooks/useTopics';
 
 // --- Module mocks ---
 
-const mockFrom = vi.fn();
+const mockFrom = jest.fn();
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
     from: (...args: any[]) => mockFrom(...args),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../lib/activityLog', () => ({
-  logAction: vi.fn(),
+jest.mock('../lib/activityLog', () => ({
+  logAction: jest.fn(),
   buildLogDescription: (actionType: string, params: Record<string, string | number>) => {
     const parts = [actionType];
     for (const [key, value] of Object.entries(params)) {
@@ -51,21 +50,21 @@ vi.mock('../lib/activityLog', () => ({
   },
 }));
 
-vi.mock('../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   toDbLocale: (lang: string) => lang,
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
 // =============================================================================
@@ -115,7 +114,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
       { email: 'other@example.com' },
     ];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: page1Users }, error: null })
       .mockResolvedValueOnce({ data: { users: page2Users }, error: null });
 
@@ -135,7 +134,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
       { email: 'bob@example.com' },
     ];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: pageUsers }, error: null });
 
     const result = await paginatedFindUser(listUsers, 'target@example.com');
@@ -156,7 +155,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
       { email: 'bob@example.com' },
     ];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: page1Users }, error: null })
       .mockResolvedValueOnce({ data: { users: page2Users }, error: null });
 
@@ -173,7 +172,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
     }));
     const page2Users = [{ email: 'target@example.com' }];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: page1Users }, error: null })
       .mockResolvedValueOnce({ data: { users: page2Users }, error: null });
 
@@ -185,7 +184,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
   });
 
   it('EC-064-02: empty user list (0 users) returns null', async () => {
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: [] }, error: null });
 
     const result = await paginatedFindUser(listUsers, 'target@example.com');
@@ -195,7 +194,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
   });
 
   it('throws error when listUsers returns an error', async () => {
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: [] }, error: { message: 'Internal error' } });
 
     await expect(paginatedFindUser(listUsers, 'target@example.com')).rejects.toThrow('Error listing users');
@@ -204,7 +203,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
   it('case-insensitive email matching', async () => {
     const pageUsers = [{ email: 'Target@Example.COM' }];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: pageUsers }, error: null });
 
     const result = await paginatedFindUser(listUsers, 'target@example.com');
@@ -219,7 +218,7 @@ describe('F064-S1: send-reset-email paginated listUsers', () => {
     const page2 = Array.from({ length: 50 }, (_, i) => ({ email: `p2u${i}@test.com` }));
     const page3 = [{ email: 'target@test.com' }];
 
-    const listUsers = vi.fn()
+    const listUsers = jest.fn()
       .mockResolvedValueOnce({ data: { users: page1 }, error: null })
       .mockResolvedValueOnce({ data: { users: page2 }, error: null })
       .mockResolvedValueOnce({ data: { users: page3 }, error: null });
@@ -286,7 +285,7 @@ describe('F064-S2: useRegisterPushToken includes role in upsert', () => {
   it('AC-064-05/AC-064-06: upsert payload includes role field from useAuth', async () => {
     // We verify that the upsert call in useNotifications.ts includes role
     // by examining the actual hook code behavior via the mock
-    const upsertFn = vi.fn().mockResolvedValue({ error: null });
+    const upsertFn = jest.fn().mockResolvedValue({ error: null });
 
     // Simulate the upsert payload that the hook builds
     const payload = {

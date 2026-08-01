@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import {
   lightColors,
   darkColors,
@@ -133,7 +132,7 @@ describe('Theme Module', () => {
       };
 
       for (const key of keys) {
-        expect(mockValue[key], `ThemeContextValue should have ${key}`).toBeDefined();
+        expect(mockValue[key]).toBeDefined();
       }
     });
   });

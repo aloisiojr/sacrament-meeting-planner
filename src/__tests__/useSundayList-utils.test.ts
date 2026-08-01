@@ -2,7 +2,6 @@
  * Tests for useSundayList hook utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   addMonths,
   findNextSunday,

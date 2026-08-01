@@ -1,7 +1,6 @@
 /**
  * S4 tests — merge plan classification (Rule 4; AC7/AC8/AC9-classify).
  */
-import { describe, it, expect } from 'vitest';
 import { buildMergePlan, type ParsedMember } from '../lib/memberMergePlan';
 import type { Member } from '../types/database';
 

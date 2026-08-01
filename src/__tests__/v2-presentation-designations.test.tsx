@@ -5,7 +5,6 @@
  * read-text (with tokens substituted) can be asserted. The presentation data hook is stubbed so we
  * can drive the designations list.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import enUS from '../i18n/locales/en-US.json';
@@ -17,12 +16,12 @@ const { act } = TestRenderer;
 
 const DATE = '2026-08-02';
 
-const state = vi.hoisted(() => ({
+const mockState = {
   designations: [] as Designation[],
   templates: {} as Record<string, string | null>,
-}));
+};
 
-function tLookup(key: string, fallback?: string): string {
+function mockTLookup(key: string, fallback?: string): string {
   const parts = key.split('.');
   let cur: unknown = enUS;
   for (const p of parts) {
@@ -35,34 +34,34 @@ function tLookup(key: string, fallback?: string): string {
   return typeof cur === 'string' ? cur : fallback ?? key;
 }
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string, f?: string) => tLookup(k, f) }),
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string, f?: string) => mockTLookup(k, f) }),
 }));
-vi.mock('react-native-reanimated', () => ({
+jest.mock('react-native-reanimated', () => ({
   default: {
     View: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-      React.createElement('Animated.View', p, p.children),
+      require('react').createElement('Animated.View', p, p.children),
   },
   SlideInDown: {},
   SlideOutUp: {},
   LinearTransition: { duration: () => ({}) },
 }));
-vi.mock('expo-blur', () => ({
+jest.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-    React.createElement('BlurView', p, p.children),
+    require('react').createElement('BlurView', p, p.children),
 }));
-vi.mock('../hooks/useWard', () => ({
+jest.mock('../hooks/useWard', () => ({
   useWardName: () => 'Jardim',
-  useWardDesignationTemplates: () => ({ templates: state.templates, isLoaded: true }),
+  useWardDesignationTemplates: () => ({ templates: mockState.templates, isLoaded: true }),
 }));
-vi.mock('../components/icons', () => ({
-  PencilIcon: (p: Record<string, unknown>) => React.createElement('PencilIcon', p),
-  XIcon: (p: Record<string, unknown>) => React.createElement('XIcon', p),
-  ScrollTextIcon: (p: Record<string, unknown>) => React.createElement('ScrollTextIcon', p),
-  ChevronDownIcon: (p: Record<string, unknown>) => React.createElement('ChevronDownIcon', p),
-  ChevronUpIcon: (p: Record<string, unknown>) => React.createElement('ChevronUpIcon', p),
+jest.mock('../components/icons', () => ({
+  PencilIcon: (p: Record<string, unknown>) => require('react').createElement('PencilIcon', p),
+  XIcon: (p: Record<string, unknown>) => require('react').createElement('XIcon', p),
+  ScrollTextIcon: (p: Record<string, unknown>) => require('react').createElement('ScrollTextIcon', p),
+  ChevronDownIcon: (p: Record<string, unknown>) => require('react').createElement('ChevronDownIcon', p),
+  ChevronUpIcon: (p: Record<string, unknown>) => require('react').createElement('ChevronUpIcon', p),
 }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', border: '#333', text: '#fff',
@@ -71,20 +70,20 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: (p: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, p.children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: (p: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, p.children),
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({ date: DATE }),
 }));
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
-vi.mock('../hooks/usePresentationMode', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../hooks/usePresentationMode', () => {
+  const actual = (jest.requireActual('../hooks/usePresentationMode')) as Record<string, unknown>;
   return {
     ...actual,
     usePresentationData: () => ({
-      agenda: { sacrament_hymn_id: null, has_second_speech: true, designations: state.designations },
+      agenda: { sacrament_hymn_id: null, has_second_speech: true, designations: mockState.designations },
       speeches: [],
       exception: null,
       isSpecial: false,
@@ -130,11 +129,11 @@ function expandCard(renderer: TestRenderer.ReactTestRenderer, index: number): vo
 }
 
 beforeEach(() => {
-  state.designations = [
+  mockState.designations = [
     { type: 'sustain', person_name: 'John Doe', member_id: 'm1', calling: 'Elders Quorum President', office: null },
   ];
-  state.templates = {};
-  vi.clearAllMocks();
+  mockState.templates = {};
+  jest.clearAllMocks();
 });
 
 describe('Designations interstitial (Play)', () => {
@@ -154,7 +153,7 @@ describe('Designations interstitial (Play)', () => {
   });
 
   it('uses the ward override template when set (AC7)', () => {
-    state.templates = { sustain: 'CUSTOM: {name} → {calling}.' };
+    mockState.templates = { sustain: 'CUSTOM: {name} → {calling}.' };
     const r = render();
     act(() => { expandCard(r, 1); });
     act(() => { press(r, 'designations-read-icon-button'); });
@@ -164,7 +163,7 @@ describe('Designations interstitial (Play)', () => {
   });
 
   it('shows no icon when there are no designations (AC8)', () => {
-    state.designations = [];
+    mockState.designations = [];
     const r = render();
     act(() => { expandCard(r, 1); });
     expect(findByTestID(r, 'designations-read-icon-button').length).toBe(0);

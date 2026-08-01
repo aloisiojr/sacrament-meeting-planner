@@ -5,7 +5,6 @@
  * the designations array written back and the optional member-calling update. Alert.alert is
  * spied so we can exercise the "update calling?" branches.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { Alert } from 'react-native';
@@ -17,15 +16,15 @@ const { act } = TestRenderer;
 
 const DATE = '2026-08-02';
 
-const state = vi.hoisted(() => ({
+const mockState = {
   params: { date: '2026-08-02' } as { date?: string; index?: string },
   designations: [] as Designation[],
-  updateAgenda: vi.fn(),
-  updateMember: vi.fn(),
-  back: vi.fn(),
+  updateAgenda: jest.fn(),
+  updateMember: jest.fn(),
+  back: jest.fn(),
   pickerOnSelect: null as null | ((m: Member) => void),
   canWrite: true,
-}));
+};
 
 function makeMember(overrides: Partial<Member> = {}): Member {
   return {
@@ -50,11 +49,11 @@ function makeMember(overrides: Partial<Member> = {}): Member {
 }
 
 // --- Mocks ---
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -62,31 +61,31 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? state.canWrite : true) }),
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: (p: string) => (p === 'agenda:write' ? mockState.canWrite : true) }),
 }));
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
-vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => state.params,
-  useRouter: () => ({ back: state.back }),
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockState.params,
+  useRouter: () => ({ back: mockState.back }),
 }));
-vi.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
+jest.mock('../components/ErrorBoundary', () => ({
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
 }));
-vi.mock('../components/PeoplePicker', () => ({
+jest.mock('../components/PeoplePicker', () => ({
   PeoplePicker: (props: { onSelect: (m: Member) => void }) => {
-    state.pickerOnSelect = props.onSelect;
+    mockState.pickerOnSelect = props.onSelect;
     return null;
   },
 }));
-vi.mock('../hooks/useAgenda', () => ({
-  useAgenda: () => ({ data: { id: 'a1', sunday_date: DATE, designations: state.designations } }),
-  useUpdateAgendaByDate: () => ({ mutate: state.updateAgenda }),
+jest.mock('../hooks/useAgenda', () => ({
+  useAgenda: () => ({ data: { id: 'a1', sunday_date: DATE, designations: mockState.designations } }),
+  useUpdateAgendaByDate: () => ({ mutate: mockState.updateAgenda }),
 }));
-vi.mock('../hooks/useMembers', () => ({
-  useUpdateMember: () => ({ mutate: state.updateMember }),
+jest.mock('../hooks/useMembers', () => ({
+  useUpdateMember: () => ({ mutate: mockState.updateMember }),
 }));
 
 function render() {
@@ -110,24 +109,24 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
 
 function selectPerson(member: Member) {
   act(() => {
-    state.pickerOnSelect?.(member);
+    mockState.pickerOnSelect?.(member);
   });
 }
 
 beforeEach(() => {
-  state.params = { date: DATE };
-  state.designations = [];
-  state.updateAgenda = vi.fn();
-  state.updateMember = vi.fn();
-  state.back = vi.fn();
-  state.pickerOnSelect = null;
-  state.canWrite = true;
-  vi.restoreAllMocks();
+  mockState.params = { date: DATE };
+  mockState.designations = [];
+  mockState.updateAgenda = jest.fn();
+  mockState.updateMember = jest.fn();
+  mockState.back = jest.fn();
+  mockState.pickerOnSelect = null;
+  mockState.canWrite = true;
+  jest.restoreAllMocks();
 });
 
 describe('Designation edit screen (step 2)', () => {
   it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-type-sustain'); // AC6
     selectPerson(makeMember({ calling: 'Presidente do Quórum de Élderes' })); // AC7 + AC8 prefill
@@ -142,8 +141,8 @@ describe('Designation edit screen (step 2)', () => {
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
     act(() => buttons[1].onPress?.());
 
-    expect(state.updateAgenda).toHaveBeenCalledTimes(1);
-    const item = (state.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
+    expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);
+    const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
     expect(item).toMatchObject({
       type: 'sustain',
       person_name: 'João Silva',
@@ -152,12 +151,12 @@ describe('Designation edit screen (step 2)', () => {
       office: null,
     });
     // Member calling set to the new value (AC11 sustain).
-    expect(state.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: 'Presidente do Quórum de Élderes' });
-    expect(state.back).toHaveBeenCalled();
+    expect(mockState.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: 'Presidente do Quórum de Élderes' });
+    expect(mockState.back).toHaveBeenCalled();
   });
 
   it('does NOT save without agenda:write permission (observer deep-link)', () => {
-    state.canWrite = false;
+    mockState.canWrite = false;
     const r = render();
     press(r, 'designation-type-sustain');
     selectPerson(makeMember());
@@ -165,11 +164,11 @@ describe('Designation edit screen (step 2)', () => {
     // Save is gated: the button is disabled and pressing it is a no-op.
     expect(nodes(r, 'designation-edit-save-button')[0].props.disabled).toBe(true);
     press(r, 'designation-edit-save-button');
-    expect(state.updateAgenda).not.toHaveBeenCalled();
+    expect(mockState.updateAgenda).not.toHaveBeenCalled();
   });
 
   it('release: on decline saves snapshot but does NOT update member', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-type-release');
     selectPerson(makeMember({ calling: 'Secretário da Ala' }));
@@ -178,12 +177,12 @@ describe('Designation edit screen (step 2)', () => {
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
     act(() => buttons[0].onPress?.()); // "Agora não"
 
-    expect(state.updateAgenda).toHaveBeenCalledTimes(1); // AC12 always saves
-    expect(state.updateMember).not.toHaveBeenCalled(); // declined
+    expect(mockState.updateAgenda).toHaveBeenCalledTimes(1); // AC12 always saves
+    expect(mockState.updateMember).not.toHaveBeenCalled(); // declined
   });
 
   it('release: on confirm clears the member calling (sets null)', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-type-release');
     selectPerson(makeMember({ calling: 'Secretário da Ala' }));
@@ -191,11 +190,11 @@ describe('Designation edit screen (step 2)', () => {
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
     act(() => buttons[1].onPress?.());
 
-    expect(state.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: null });
+    expect(mockState.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: null });
   });
 
   it('priesthood: shows office selector, no calling field, saves office and no prompt', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-type-priesthood'); // AC9
     selectPerson(makeMember());
@@ -206,12 +205,12 @@ describe('Designation edit screen (step 2)', () => {
     press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled(); // no member-calling prompt for priesthood
-    const item = (state.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
+    const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
     expect(item).toMatchObject({ type: 'priesthood', office: 'deacon', calling: null });
   });
 
   it('new_member: no extra field, saves snapshot, no prompt', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-type-new_member'); // AC10
     selectPerson(makeMember({ full_name: 'Maria Souza' }));
@@ -221,22 +220,22 @@ describe('Designation edit screen (step 2)', () => {
     press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled();
-    const item = (state.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
+    const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
     expect(item).toMatchObject({ type: 'new_member', person_name: 'Maria Souza', office: null, calling: null });
   });
 
   it('editing an existing item with no linked member (member_id null): no prompt (AC13)', () => {
-    state.params = { date: DATE, index: '0' };
-    state.designations = [
+    mockState.params = { date: DATE, index: '0' };
+    mockState.designations = [
       { type: 'sustain', person_name: 'Convidado Externo', member_id: null, calling: 'Líder', office: null },
     ];
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = render();
     press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled();
-    expect(state.updateAgenda).toHaveBeenCalledTimes(1);
+    expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);
     // Edited in place at index 0 (not appended).
-    expect((state.updateAgenda.mock.calls[0][0].updates.designations as Designation[]).length).toBe(1);
+    expect((mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[]).length).toBe(1);
   });
 });

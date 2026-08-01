@@ -9,7 +9,6 @@
  * ECs covered: EC-022-01..06
  */
 
-import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';

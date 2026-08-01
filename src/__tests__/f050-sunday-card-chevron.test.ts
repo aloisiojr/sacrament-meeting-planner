@@ -3,7 +3,6 @@
  * Verifies the showChevron prop controls header tap and defaults to true.
  */
 
-import { describe, it, expect } from 'vitest';
 import { SundayCardProps } from '../components/SundayCard';
 
 // Test the type system: verify showChevron is optional

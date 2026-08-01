@@ -2,7 +2,6 @@
  * Tests for sync utilities (pure functions).
  */
 
-import { describe, it, expect } from 'vitest';
 import { SYNCED_TABLES, getQueryKeysForTable, POLLING_INTERVAL_MS } from '../lib/sync';
 
 describe('SYNCED_TABLES', () => {

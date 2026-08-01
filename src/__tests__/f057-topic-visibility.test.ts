@@ -6,8 +6,6 @@
  * of whether speech is null, and both hidden for prayer positions (0, 4).
  */
 
-import { describe, it, expect } from 'vitest';
-
 // Replicate the showTopicRow logic from SpeechSlot.tsx
 function computeShowTopicRow(isPrayer: boolean): boolean {
   return !isPrayer;

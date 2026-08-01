@@ -4,7 +4,6 @@
  * number unless toggled to PDF — individually or via the master toggle (step 2), and removals
  * defaulting to none unless toggled — individually or via the master toggle (step 3).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { PdfImportReview } from '../components/PdfImportReview';
@@ -15,11 +14,11 @@ import type { Member } from '../types/database';
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', textTertiary: '#777', primary: '#07f', divider: '#333', error: '#f00', errorContainer: '#300' } }),
 }));
 
@@ -44,7 +43,7 @@ function makePlan(): MergePlan {
   };
 }
 
-function render(onApply: ReturnType<typeof vi.fn>, blanks: { name: string; memberId?: string }[] = [], plan = makePlan()) {
+function render(onApply: ReturnType<typeof jest.fn>, blanks: { name: string; memberId?: string }[] = [], plan = makePlan()) {
   let r!: TestRenderer.ReactTestRenderer;
   act(() => {
     r = TestRenderer.create(
@@ -53,7 +52,7 @@ function render(onApply: ReturnType<typeof vi.fn>, blanks: { name: string; membe
         blanks,
         countryCode: '+55',
         areaCode: '',
-        onCancel: vi.fn(),
+        onCancel: jest.fn(),
         onApply: onApply as unknown as (a: MemberImportApply) => void,
       })
     );
@@ -76,8 +75,8 @@ function finish(r: TestRenderer.ReactTestRenderer, steps: number) {
 }
 
 describe('PdfImportReview wizard', () => {
-  let onApply: ReturnType<typeof vi.fn>;
-  beforeEach(() => { onApply = vi.fn(); });
+  let onApply: ReturnType<typeof jest.fn>;
+  beforeEach(() => { onApply = jest.fn(); });
 
   it('defaults across all steps: inserts all, phone-fill only, conflicts keep app, no removals', () => {
     const r = render(onApply); // steps: conflicts, removals (no blanks) → 1 Próximo then Concluir

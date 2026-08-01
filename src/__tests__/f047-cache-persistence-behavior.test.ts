@@ -5,7 +5,6 @@
  * Verifies _layout.tsx configuration and persister behavior.
  */
 
-import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 
@@ -15,9 +14,9 @@ describe('F047: Cache Persistence Behavior', () => {
   describe('AC-047-01: Cache persisted to AsyncStorage', () => {
     it('createAsyncStoragePersister creates a valid persister with correct key', () => {
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(null),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(null),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -34,9 +33,9 @@ describe('F047: Cache Persistence Behavior', () => {
 
     it('persister uses @query_cache key for storage operations', async () => {
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(null),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(null),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -64,9 +63,9 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(cachedData),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(cachedData),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -81,9 +80,9 @@ describe('F047: Cache Persistence Behavior', () => {
 
     it('returns undefined when no cache exists (first launch)', async () => {
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(null),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(null),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -116,9 +115,9 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(expiredCache),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(expiredCache),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -165,9 +164,9 @@ describe('F047: Cache Persistence Behavior', () => {
       });
 
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(cachedWithOldVersion),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(cachedWithOldVersion),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -197,9 +196,9 @@ describe('F047: Cache Persistence Behavior', () => {
   describe('EC-047-01: AsyncStorage full or corrupted', () => {
     it('persister handles storage getItem errors gracefully', async () => {
       const mockStorage = {
-        getItem: vi.fn().mockRejectedValue(new Error('Storage full')),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockRejectedValue(new Error('Storage full')),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -215,9 +214,9 @@ describe('F047: Cache Persistence Behavior', () => {
 
     it('persister handles corrupted JSON in storage', async () => {
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue('not valid json {{{'),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue('not valid json {{{'),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -237,12 +236,12 @@ describe('F047: Cache Persistence Behavior', () => {
     it('AsyncStorage write is atomic per key', async () => {
       let storedValue: string | null = null;
       const mockStorage = {
-        getItem: vi.fn().mockImplementation(() => Promise.resolve(storedValue)),
-        setItem: vi.fn().mockImplementation((_key: string, value: string) => {
+        getItem: jest.fn().mockImplementation(() => Promise.resolve(storedValue)),
+        setItem: jest.fn().mockImplementation((_key: string, value: string) => {
           storedValue = value;
           return Promise.resolve();
         }),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({
@@ -266,9 +265,9 @@ describe('F047: Cache Persistence Behavior', () => {
   describe('EC-047-03: User clears app storage', () => {
     it('empty storage results in no restored cache', async () => {
       const mockStorage = {
-        getItem: vi.fn().mockResolvedValue(null),
-        setItem: vi.fn().mockResolvedValue(undefined),
-        removeItem: vi.fn().mockResolvedValue(undefined),
+        getItem: jest.fn().mockResolvedValue(null),
+        setItem: jest.fn().mockResolvedValue(undefined),
+        removeItem: jest.fn().mockResolvedValue(undefined),
       };
 
       const persister = createAsyncStoragePersister({

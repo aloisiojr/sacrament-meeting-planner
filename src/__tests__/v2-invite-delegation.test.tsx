@@ -7,7 +7,6 @@
  *  - when speech.is_delegated, the base message is wrapped by the delegation wrapper, addressed to
  *    the responsible resolved LIVE from the member chain.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member, Speech } from '../types/database';
@@ -52,50 +51,50 @@ const WARD = {
   designation_template_new_member: null,
 };
 
-let SPEECHES: Speech[] = [];
-const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
-const changeStatusMock = vi.fn();
+let mockSPEECHES: Speech[] = [];
+const mockOpenWhatsAppMock = jest.fn((..._args: unknown[]) => Promise.resolve(true));
+const mockChangeStatusMock = jest.fn();
 
 // --- Mocks ---
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', primaryContainer: '#013', onPrimary: '#fff', error: '#f00', divider: '#333' } }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
+jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true, wardId: 'w1', wardLanguage: 'pt-BR' }),
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: WARD }) }));
+jest.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: WARD }) }));
 
-vi.mock('../lib/whatsapp', () => ({
-  openWhatsApp: (...args: unknown[]) => openWhatsAppMock(...args),
+jest.mock('../lib/whatsapp', () => ({
+  openWhatsApp: (...args: unknown[]) => mockOpenWhatsAppMock(...args),
   buildWhatsAppConversationUrl: (phone: string) => `https://wa.me/${phone.replace('+', '')}`,
 }));
 
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../lib/supabase', () => ({ supabase: {} }));
 
-vi.mock('../components/icons', () => ({
+jest.mock('../components/icons', () => ({
   WhatsAppIcon: () => null,
   MoreVerticalIcon: () => null,
 }));
-vi.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
-vi.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: () => null }));
-vi.mock('../components/PersonEditor', () => ({ PersonEditor: () => null }));
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
+jest.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: () => null }));
+jest.mock('../components/PersonEditor', () => ({ PersonEditor: () => null }));
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
-vi.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
-vi.mock('../hooks/useSpeeches', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
+jest.mock('../hooks/useSpeeches', () => {
+  const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: vi.fn() }),
-    useChangeStatus: () => ({ mutate: changeStatusMock }),
+    useSpeeches: () => ({ data: mockSPEECHES, isError: false, error: null, refetch: jest.fn() }),
+    useChangeStatus: () => ({ mutate: mockChangeStatusMock }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
@@ -122,32 +121,32 @@ async function pressSend(renderer: TestRenderer.ReactTestRenderer) {
 
 /** Decode the ?text= payload from the last wa.me URL passed to openWhatsApp. */
 function lastSentText(): { phone: string; text: string } {
-  const url = openWhatsAppMock.mock.calls[openWhatsAppMock.mock.calls.length - 1][0] as string;
+  const url = mockOpenWhatsAppMock.mock.calls[mockOpenWhatsAppMock.mock.calls.length - 1][0] as string;
   const m = url.match(/wa\.me\/([^?]+)\?text=(.*)$/)!;
   return { phone: m[1], text: decodeURIComponent(m[2]) };
 }
 
 beforeEach(() => {
-  openWhatsAppMock.mockClear();
-  changeStatusMock.mockClear();
-  SPEECHES = [];
+  mockOpenWhatsAppMock.mockClear();
+  mockChangeStatusMock.mockClear();
+  mockSPEECHES = [];
 });
 
 describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
   it('non-delegated: sends the plain base message to contact_phone', async () => {
-    SPEECHES = [makeSpeech({ id: 'sp1', is_delegated: false, contact_phone: '+15550009' })];
+    mockSPEECHES = [makeSpeech({ id: 'sp1', is_delegated: false, contact_phone: '+15550009' })];
     const renderer = render();
     await pressSend(renderer);
 
-    expect(openWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(mockOpenWhatsAppMock).toHaveBeenCalledTimes(1);
     const { phone, text } = lastSentText();
     expect(phone).toBe('15550009');
     expect(text).not.toContain('Temos um convite para');
-    expect(changeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
+    expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
   });
 
   it('delegated: wraps the base message and sends to the responsible phone (AC9)', async () => {
-    SPEECHES = [
+    mockSPEECHES = [
       makeSpeech({
         id: 'sp1',
         is_delegated: true,
@@ -167,11 +166,11 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
     expect(text).toContain('Temos um convite para Del:');
     // base per-position message still embedded inside the wrapper
     expect(text).toContain('primeiro discurso');
-    expect(changeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
+    expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
   });
 
   it('orphaned delegation (no contact_phone): still wraps, falls back to the assignee phone', async () => {
-    SPEECHES = [
+    mockSPEECHES = [
       makeSpeech({
         id: 'sp1',
         is_delegated: true,

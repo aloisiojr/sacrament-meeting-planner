@@ -5,26 +5,25 @@
  * `react-native` is aliased to a test stub (see vitest.config.ts), so the screen renders with
  * react-test-renderer under the node environment. Providers + supabase are mocked per-file.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 
-// Import AFTER mocks (vitest hoists vi.mock above imports).
+// Import AFTER mocks (vitest hoists jest.mock above imports).
 import ForgotPasswordScreen from '../app/(auth)/forgot-password';
 
 const { act } = TestRenderer;
 
 // --- Mocks (per-file) --------------------------------------------------------
 
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', text: '#fff', textSecondary: '#aaa',
@@ -34,9 +33,9 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-const invokeMock = vi.fn();
-vi.mock('../lib/supabase', () => ({
-  supabase: { functions: { invoke: (...args: unknown[]) => invokeMock(...args) } },
+const mockInvokeMock = jest.fn();
+jest.mock('../lib/supabase', () => ({
+  supabase: { functions: { invoke: (...args: unknown[]) => mockInvokeMock(...args) } },
 }));
 
 // --- Helpers -----------------------------------------------------------------
@@ -71,17 +70,17 @@ function renderedText(renderer: TestRenderer.ReactTestRenderer): string {
 
 describe('ForgotPasswordScreen — reset email error visibility', () => {
   beforeEach(() => {
-    invokeMock.mockReset();
+    mockInvokeMock.mockReset();
   });
 
   it('logs the underlying error and shows the failure message when invoke fails (AC1/AC2)', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    invokeMock.mockResolvedValue({ data: null, error: { message: 'smtp rejected' } });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockInvokeMock.mockResolvedValue({ data: null, error: { message: 'smtp rejected' } });
 
     const renderer = renderScreen();
     await submitWithEmail(renderer, 'user@example.com');
 
-    expect(invokeMock).toHaveBeenCalledWith('send-reset-email', {
+    expect(mockInvokeMock).toHaveBeenCalledWith('send-reset-email', {
       body: { email: 'user@example.com' },
     });
     // AC1: the real error is logged (not swallowed) — with the actual error object.
@@ -98,7 +97,7 @@ describe('ForgotPasswordScreen — reset email error visibility', () => {
   });
 
   it('shows the success state when invoke succeeds (AC3)', async () => {
-    invokeMock.mockResolvedValue({ data: { success: true }, error: null });
+    mockInvokeMock.mockResolvedValue({ data: { success: true }, error: null });
 
     const renderer = renderScreen();
     await submitWithEmail(renderer, 'user@example.com');

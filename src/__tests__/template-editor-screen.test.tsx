@@ -4,7 +4,6 @@
  * Covers: tabs, non-edited fields reflecting props, chip insertion, blur-save (raw vs collapse),
  * restore-default, and the live preview.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { TemplateEditorScreen, type TemplateTab } from '../components/TemplateEditorScreen';
@@ -12,12 +11,12 @@ import { TemplateEditorScreen, type TemplateTab } from '../components/TemplateEd
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', card: '#111', surfaceVariant: '#222', divider: '#333' },
   }),
@@ -44,7 +43,7 @@ function makeTabs(over: Partial<TemplateTab>[] = []): TemplateTab[] {
 }
 
 function render(props: Partial<React.ComponentProps<typeof TemplateEditorScreen>> = {}) {
-  const onSave = vi.fn();
+  const onSave = jest.fn();
   let r!: TestRenderer.ReactTestRenderer;
   act(() => {
     r = TestRenderer.create(
@@ -63,7 +62,7 @@ function editorValue(r: TestRenderer.ReactTestRenderer) {
   return node(r, 'template-editor').props.value as string;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => jest.clearAllMocks());
 
 describe('TemplateEditorScreen', () => {
   it('shows the first tab; a non-edited field reflects its override, else the default', () => {

@@ -9,7 +9,6 @@
  * All tests import and test BEHAVIOR - no fs.readFileSync or string matching.
  */
 
-import { describe, it, expect, vi } from 'vitest';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
 import type { SundayAgenda } from '../types/database';
 import ptBR from '../i18n/locales/pt-BR.json';
@@ -302,7 +301,7 @@ describe('CR-282 Tester AC-282-02: drag reorder via grip icon long-press', () =>
   });
 
   it('drag reorder saves via onSave callback with \\n-joined string', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const reordered = ['Bob', 'Alice', 'Charlie'];
     onSave(joinItems(reordered));
     expect(onSave).toHaveBeenCalledWith('Bob\nAlice\nCharlie');
@@ -325,7 +324,7 @@ describe('CR-282 Tester AC-282-03: tap triggers edit, not drag', () => {
 
   it('tap-to-edit: with onItemPress, callback is called instead of startEdit', () => {
     // When onItemPress IS provided, tap calls onItemPress(idx, item)
-    const onItemPress = vi.fn();
+    const onItemPress = jest.fn();
     const items = ['Alice', 'Bob'];
     // Simulates tap on item at index 1
     onItemPress(1, items[1]);
@@ -427,7 +426,7 @@ describe('CR-283 Tester AC-283-01: recognized persons as separate items', () => 
 
 describe('CR-283 Tester AC-283-02: add area opens PeoplePicker', () => {
   it('onAddPress callback is used when provided (Pressable replaces TextInput)', () => {
-    const onAddPress = vi.fn();
+    const onAddPress = jest.fn();
     // Simulates user tapping the add area
     onAddPress();
     expect(onAddPress).toHaveBeenCalledTimes(1);
@@ -474,7 +473,7 @@ describe('CR-283 Tester AC-283-03: selecting actor appends name', () => {
   });
 
   it('add mode: onSave called with full \\n-joined string', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const currentItems = ['Alice'];
     const newItems = [...currentItems, 'Bob'];
     onSave(joinItems(newItems));
@@ -496,7 +495,7 @@ describe('CR-283 Tester AC-283-03: selecting actor appends name', () => {
 
 describe('CR-283 Tester AC-283-04: onItemPress for edit/replace', () => {
   it('onItemPress called with correct index and item when user taps name', () => {
-    const onItemPress = vi.fn();
+    const onItemPress = jest.fn();
     const items = ['Alice', 'Bob', 'Charlie'];
     // User taps on Bob (index 1)
     onItemPress(1, items[1]);
@@ -576,7 +575,7 @@ describe('CR-283 Tester AC-283-06: recognized_names reorder', () => {
   });
 
   it('reorder saves via updateField with \\n-joined string', () => {
-    const updateField = vi.fn();
+    const updateField = jest.fn();
     const reordered = ['Charlie', 'Alice', 'Bob'];
     updateField('recognized_names', joinItems(reordered));
     expect(updateField).toHaveBeenCalledWith('recognized_names', 'Charlie\nAlice\nBob');
@@ -791,14 +790,14 @@ describe('CR-283 Tester AC-283-12: PeoplePicker disabledNames', () => {
 
   it('disabled actor onPress is undefined (not callable)', () => {
     const isDisabled = true;
-    const handleSelect = vi.fn();
+    const handleSelect = jest.fn();
     const onPress = isDisabled ? undefined : () => handleSelect({});
     expect(onPress).toBeUndefined();
   });
 
   it('non-disabled actor onPress is callable', () => {
     const isDisabled = false;
-    const handleSelect = vi.fn();
+    const handleSelect = jest.fn();
     const onPress = isDisabled ? undefined : () => handleSelect({});
     expect(onPress).toBeDefined();
     onPress!();

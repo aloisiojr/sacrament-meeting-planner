@@ -7,7 +7,6 @@
  * member's live phone/delegation state.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
   createTestQueryClient,
@@ -22,42 +21,42 @@ import type { Member } from '../types/database';
 
 // --- Module mocks ---
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({
+        data: { subscription: { unsubscribe: jest.fn() } },
       })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
 
-vi.mock('../lib/activityLog', () => ({
-  logAction: vi.fn(),
-  buildLogDescription: vi.fn(() => 'test description'),
+jest.mock('../lib/activityLog', () => ({
+  logAction: jest.fn(),
+  buildLogDescription: jest.fn(() => 'test description'),
 }));
 
-vi.mock('../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'),
-  changeLanguage: vi.fn(),
-  initI18n: vi.fn(),
+jest.mock('../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'),
+  changeLanguage: jest.fn(),
+  initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { language: 'pt-BR', changeLanguage: vi.fn() },
+    i18n: { language: 'pt-BR', changeLanguage: jest.fn() },
   }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 // Capture the payload passed to the speeches cascade update.
 let lastSpeechesUpdate: Record<string, unknown> | null = null;
@@ -66,20 +65,20 @@ function setupMocks(updatedMember: Member) {
   lastSpeechesUpdate = null;
 
   // members: update().eq().select().single()
-  const memberSingle = vi.fn().mockResolvedValue({ data: updatedMember, error: null });
-  const memberSelect = vi.fn().mockReturnValue({ single: memberSingle });
-  const memberEq = vi.fn().mockReturnValue({ select: memberSelect });
-  const memberUpdate = vi.fn().mockReturnValue({ eq: memberEq });
+  const memberSingle = jest.fn().mockResolvedValue({ data: updatedMember, error: null });
+  const memberSelect = jest.fn().mockReturnValue({ single: memberSingle });
+  const memberEq = jest.fn().mockReturnValue({ select: memberSelect });
+  const memberUpdate = jest.fn().mockReturnValue({ eq: memberEq });
 
   // speeches: update().eq().gte()  → awaited
-  const speechGte = vi.fn().mockResolvedValue({ data: null, error: null });
-  const speechEq = vi.fn().mockReturnValue({ gte: speechGte });
-  const speechUpdate = vi.fn().mockImplementation((payload: Record<string, unknown>) => {
+  const speechGte = jest.fn().mockResolvedValue({ data: null, error: null });
+  const speechEq = jest.fn().mockReturnValue({ gte: speechGte });
+  const speechUpdate = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
     lastSpeechesUpdate = payload;
     return { eq: speechEq };
   });
 
-  (mockedSupabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+  (mockedSupabase.from as ReturnType<typeof jest.fn>).mockImplementation((table: string) => {
     if (table === 'members') return { update: memberUpdate };
     if (table === 'speeches') return { update: speechUpdate };
     return {};
@@ -90,7 +89,7 @@ describe('useUpdateMember — contact-snapshot cascade', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
     lastSpeechesUpdate = null;
   });

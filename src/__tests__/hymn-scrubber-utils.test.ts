@@ -2,7 +2,6 @@
  * Unit tests for the hymn scrubber pure helpers
  * (specs/v2-hymn-scrubber.md, specs/v2-selectors-and-testimony.md).
  */
-import { describe, it, expect } from 'vitest';
 import { buildHymnAnchors, firstIndexAtOrAbove, anchorForFraction } from '../lib/hymnScrubber';
 import type { Hymn } from '../types/database';
 

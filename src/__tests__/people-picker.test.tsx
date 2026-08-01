@@ -4,12 +4,11 @@
  * `react-native` is aliased to a test stub (vitest.config.ts). Data hooks, contexts and i18n are
  * mocked per-file; pure utils (getResponsibleForMap/filterMembers) stay real via importOriginal.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { Alert } from 'react-native';
 import type { Member } from '../types/database';
-// vi.mock calls below are hoisted above this import, so the mocks still apply.
+// jest.mock calls below are hoisted above this import, so the mocks still apply.
 import { PeoplePicker, type PeoplePickerProps } from '../components/PeoplePicker';
 
 const { act } = TestRenderer;
@@ -41,41 +40,41 @@ const MEMBER_A = makeMember({ id: 'a', full_name: 'Alice Preside', can_preside: 
 const MEMBER_B = makeMember({ id: 'b', full_name: 'Bob NoFlag' });
 const MEMBER_C = makeMember({ id: 'c', full_name: 'Carol Dependent', responsible_id: 'a' });
 
-let MEMBERS: Member[] = [];
-const updateMock = vi.fn((_vars: { id: string }, opts?: { onSuccess?: (m: Member) => void }) =>
+let mockMEMBERS: Member[] = [];
+const mockUpdateMock = jest.fn((_vars: { id: string }, opts?: { onSuccess?: (m: Member) => void }) =>
   opts?.onSuccess?.({ ...MEMBER_B, can_preside: true })
 );
-const deleteMock = vi.fn();
+const mockDeleteMock = jest.fn();
 
-vi.mock('../hooks/useMembers', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useMembers', () => {
+  const actual = (jest.requireActual('../hooks/useMembers')) as Record<string, unknown>;
   return {
     ...actual,
-    useMembers: () => ({ data: MEMBERS }),
-    useCreateMember: () => ({ mutate: vi.fn() }),
-    useUpdateMember: () => ({ mutate: updateMock }),
-    useDeleteMember: () => ({ mutate: deleteMock }),
+    useMembers: () => ({ data: mockMEMBERS }),
+    useCreateMember: () => ({ mutate: jest.fn() }),
+    useUpdateMember: () => ({ mutate: mockUpdateMock }),
+    useDeleteMember: () => ({ mutate: mockDeleteMock }),
   };
 });
 
-vi.mock('../hooks/useSpeechCounts', () => ({
+jest.mock('../hooks/useSpeechCounts', () => ({
   useSpeechCounts: () => ({ data: { a: 2 }, isLoading: false }),
 }));
 
 // `react-native-svg` (pulled in via icons/SearchInput) ships untransformed Flow/TS — stub it.
-vi.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });
 
 // Partial mock: keep initReactI18next (used by the real i18n loaded via the useMembers chain).
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -85,16 +84,16 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-const hasPermissionMock = vi.fn((_p: string) => true);
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: hasPermissionMock }),
+const mockHasPermissionMock = jest.fn((_p: string) => true);
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: mockHasPermissionMock }),
 }));
 
 // --- Helpers ---
 
 function render(props: Partial<PeoplePickerProps> = {}) {
-  const onSelect = vi.fn();
-  const onClose = vi.fn();
+  const onSelect = jest.fn();
+  const onClose = jest.fn();
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
     renderer = TestRenderer.create(
@@ -155,11 +154,11 @@ function renderRow(renderer: TestRenderer.ReactTestRenderer, member: Member) {
 }
 
 beforeEach(() => {
-  MEMBERS = [MEMBER_A, MEMBER_B, MEMBER_C];
-  updateMock.mockClear();
-  deleteMock.mockClear();
-  hasPermissionMock.mockImplementation(() => true);
-  vi.spyOn(Alert, 'alert').mockClear();
+  mockMEMBERS = [MEMBER_A, MEMBER_B, MEMBER_C];
+  mockUpdateMock.mockClear();
+  mockDeleteMock.mockClear();
+  mockHasPermissionMock.mockImplementation(() => true);
+  jest.spyOn(Alert, 'alert').mockClear();
 });
 
 function alertButtons() {
@@ -195,7 +194,7 @@ describe('PeoplePicker', () => {
     expect(Alert.alert).toHaveBeenCalledTimes(1);
     const confirm = alertButtons().find((b) => b.style !== 'cancel')!;
     act(() => confirm.onPress?.());
-    expect(updateMock).toHaveBeenCalledWith(
+    expect(mockUpdateMock).toHaveBeenCalledWith(
       { id: 'b', can_preside: true },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
@@ -234,7 +233,7 @@ describe('PeoplePicker', () => {
   });
 
   it('is view-only for observers: no add, no row controls, selection disabled (AC6)', () => {
-    hasPermissionMock.mockImplementation(() => false);
+    mockHasPermissionMock.mockImplementation(() => false);
     const { renderer, onSelect } = render();
     expect(find(renderer.root, 'people-picker-add').length).toBe(0);
     const row = renderRow(renderer, MEMBER_A);
@@ -308,9 +307,9 @@ describe('PeoplePicker', () => {
   // --- Context: per-row secondary line (P3, P4, P5, P5b) ---
 
   it('shows the informal name in parentheses after the full name (P3)', () => {
-    MEMBERS = [makeMember({ id: 'x', full_name: 'João Vasconcelos', informal_name: 'João' })];
+    mockMEMBERS = [makeMember({ id: 'x', full_name: 'João Vasconcelos', informal_name: 'João' })];
     const { renderer } = render({ context: 'speaker' });
-    const row = renderRow(renderer, MEMBERS[0]);
+    const row = renderRow(renderer, mockMEMBERS[0]);
     const nameNode = find(row.root, 'people-picker-item-x')[0];
     const text = JSON.stringify(nameNode.props.children);
     expect(text).toContain('João Vasconcelos');
@@ -328,11 +327,11 @@ describe('PeoplePicker', () => {
   });
 
   it('preside context: 2nd line shows calling (when set), no speech/responsible/functions', () => {
-    MEMBERS = [
+    mockMEMBERS = [
       makeMember({ id: 'p', full_name: 'Ana Lima', calling: 'Presidente da SS', can_preside: true }),
     ];
     const { renderer } = render({ context: 'preside' });
-    const row = renderRow(renderer, MEMBERS[0]);
+    const row = renderRow(renderer, mockMEMBERS[0]);
     expect(textOf(row.root, 'people-picker-calling-p')).toBe('Presidente da SS');
     expect(find(row.root, 'people-picker-responsible-p').length).toBe(0);
     const text = JSON.stringify(row.toJSON());
@@ -341,18 +340,18 @@ describe('PeoplePicker', () => {
   });
 
   it('play_piano/lead_music context: never shows calling — name only', () => {
-    MEMBERS = [
+    mockMEMBERS = [
       makeMember({ id: 'k', full_name: 'Beto Piano', calling: 'Organista', can_play_piano: true }),
     ];
     for (const ctx of ['play_piano', 'lead_music'] as const) {
       const { renderer } = render({ context: ctx });
-      const row = renderRow(renderer, MEMBERS[0]);
+      const row = renderRow(renderer, mockMEMBERS[0]);
       expect(find(row.root, 'people-picker-calling-k').length).toBe(0);
     }
   });
 
   it('calling contexts: search also matches the calling text', () => {
-    MEMBERS = [
+    mockMEMBERS = [
       makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo', can_be_recognized: true }),
       makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: 'Secretário', can_be_recognized: true }),
     ];
@@ -366,7 +365,7 @@ describe('PeoplePicker', () => {
   });
 
   it('be_recognized context: 2nd line shows calling ONLY — no functions (P5b)', () => {
-    MEMBERS = [
+    mockMEMBERS = [
       makeMember({
         id: 'r',
         full_name: 'Ricardo Almeida',
@@ -376,7 +375,7 @@ describe('PeoplePicker', () => {
       }),
     ];
     const { renderer } = render({ context: 'be_recognized' });
-    const row = renderRow(renderer, MEMBERS[0]);
+    const row = renderRow(renderer, mockMEMBERS[0]);
     expect(textOf(row.root, 'people-picker-calling-r')).toBe('Bispo');
     const text = JSON.stringify(row.toJSON());
     // Functions (capabilitiesShort) must NOT appear on the recognize line.
@@ -384,11 +383,11 @@ describe('PeoplePicker', () => {
   });
 
   it('be_recognized context: no calling → no secondary line (P5b)', () => {
-    MEMBERS = [
+    mockMEMBERS = [
       makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: null, can_be_recognized: true }),
     ];
     const { renderer } = render({ context: 'be_recognized' });
-    const row = renderRow(renderer, MEMBERS[0]);
+    const row = renderRow(renderer, mockMEMBERS[0]);
     expect(find(row.root, 'people-picker-calling-r2').length).toBe(0);
   });
 
@@ -418,7 +417,7 @@ describe('PeoplePicker', () => {
 
   describe('multiSelect draft (recognition)', () => {
     it('Save grants the capability to selected + confirms the set; Cancel discards', () => {
-      const onConfirmMulti = vi.fn();
+      const onConfirmMulti = jest.fn();
       const { renderer, onClose } = render({
         context: 'be_recognized',
         multiSelect: true,
@@ -432,7 +431,7 @@ describe('PeoplePicker', () => {
       expect(Alert.alert).toHaveBeenCalledTimes(1);
       const yes = alertButtons().find((b) => b.text === 'common.yes');
       act(() => yes?.onPress?.());
-      expect(updateMock).toHaveBeenCalledWith(
+      expect(mockUpdateMock).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'b', can_be_recognized: true })
       );
       expect(onConfirmMulti).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })]);
@@ -440,7 +439,7 @@ describe('PeoplePicker', () => {
     });
 
     it('Cancel does not commit the draft', () => {
-      const onConfirmMulti = vi.fn();
+      const onConfirmMulti = jest.fn();
       const { renderer, onClose } = render({
         context: 'be_recognized',
         multiSelect: true,

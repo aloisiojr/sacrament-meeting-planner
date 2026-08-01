@@ -4,7 +4,6 @@
  *
  * `react-native` is aliased to a test stub (vitest.config.ts).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { Alert } from 'react-native';
@@ -12,28 +11,28 @@ import { Alert } from 'react-native';
 const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const updateMock = vi.fn(
+const mockUpdateMock = jest.fn(
   (_input: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.()
 );
-const wardInfoHolder = vi.hoisted(() => ({
+const mockWardInfoHolder = {
   data: { name: 'Alpha Ward', stake_name: 'Beta Stake' } as { name: string; stake_name: string } | undefined,
   isLoading: false,
-}));
-const onlineHolder = vi.hoisted(() => ({ value: true }));
+};
+const mockOnlineHolder = { value: true };
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', textTertiary: '#777', primary: '#07f', inputBorder: '#333', inputBackground: '#111', placeholder: '#555', error: '#f00', errorContainer: '#300' } }),
 }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => onlineHolder.value }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('../hooks/useWard', () => ({
-  useWardInfo: () => ({ data: wardInfoHolder.data, isLoading: wardInfoHolder.isLoading }),
-  useUpdateWardInfo: () => ({ mutate: updateMock, isPending: false }),
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => mockOnlineHolder.value }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
+jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: ({ children }: { children: React.ReactNode }) => children }));
+jest.mock('../hooks/useWard', () => ({
+  useWardInfo: () => ({ data: mockWardInfoHolder.data, isLoading: mockWardInfoHolder.isLoading }),
+  useUpdateWardInfo: () => ({ mutate: mockUpdateMock, isPending: false }),
 }));
 
 import WardInfoScreen from '../app/(tabs)/settings/ward';
@@ -51,10 +50,10 @@ function node(renderer: TestRenderer.ReactTestRenderer, testID: string) {
 }
 
 beforeEach(() => {
-  updateMock.mockClear();
-  wardInfoHolder.data = { name: 'Alpha Ward', stake_name: 'Beta Stake' };
-  wardInfoHolder.isLoading = false;
-  onlineHolder.value = true;
+  mockUpdateMock.mockClear();
+  mockWardInfoHolder.data = { name: 'Alpha Ward', stake_name: 'Beta Stake' };
+  mockWardInfoHolder.isLoading = false;
+  mockOnlineHolder.value = true;
 });
 
 describe('WardInfoScreen (P2 gap B)', () => {
@@ -72,12 +71,12 @@ describe('WardInfoScreen (P2 gap B)', () => {
     act(() => {
       (node(renderer, 'ward-info-save').props.onPress as () => void)();
     });
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    expect(updateMock.mock.calls[0][0]).toEqual({ name: 'New Ward', stake_name: 'Beta Stake' });
+    expect(mockUpdateMock).toHaveBeenCalledTimes(1);
+    expect(mockUpdateMock.mock.calls[0][0]).toEqual({ name: 'New Ward', stake_name: 'Beta Stake' });
   });
 
   it('blocks saving when a field is blank', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const renderer = render();
     act(() => {
       (node(renderer, 'ward-info-stake').props.onChangeText as (v: string) => void)('   ');
@@ -85,7 +84,7 @@ describe('WardInfoScreen (P2 gap B)', () => {
     act(() => {
       (node(renderer, 'ward-info-save').props.onPress as () => void)();
     });
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(mockUpdateMock).not.toHaveBeenCalled();
     expect(alertSpy).toHaveBeenCalled();
     alertSpy.mockRestore();
   });

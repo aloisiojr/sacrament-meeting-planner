@@ -4,15 +4,14 @@
  * shared `resolveCallingForName`), while names without a unique/called member stay as plain names.
  *
  * `react-native` is aliased to a test stub. The EditableListField is mocked to render each parsed
- * item through the received `renderItemLabel` (the field that gets one is tagged 'recognized-list'),
+ * mockItem through the received `renderItemLabel` (the field that gets one is tagged 'recognized-list'),
  * exercising the REAL closure + resolveCallingForName. useMembers keeps its real pure exports
  * (normalizeForSearch) via importOriginal so matching works.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Member, SundayAgenda, Speech } from '../types/database';
-// vi.mock calls below are hoisted above these imports.
+// jest.mock calls below are hoisted above these imports.
 import { AgendaForm } from '../components/AgendaForm';
 
 const { act } = TestRenderer;
@@ -38,15 +37,15 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
   };
 }
 
-let AGENDA: SundayAgenda;
-let MEMBERS: Member[] = [];
+let mockAGENDA: SundayAgenda;
+let mockMEMBERS: Member[] = [];
 const SPEECHES: Speech[] = [];
 
 // --- Mocks ---
 
-vi.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
+jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
 
-vi.mock('../components/EditableListField', async () => {
+jest.mock('../components/EditableListField', async () => {
   const ReactMod = (await import('react')).default;
   const parseItems = (value: string | string[] | null): string[] =>
     Array.isArray(value)
@@ -57,7 +56,7 @@ vi.mock('../components/EditableListField', async () => {
     parseItems,
     joinItems,
     EditableListField: (props: Record<string, unknown>) => {
-      const render = props.renderItemLabel as ((item: string) => string) | undefined;
+      const render = props.renderItemLabel as ((mockItem: string) => string) | undefined;
       const items = parseItems(props.value as string | string[] | null);
       return ReactMod.createElement(
         'View',
@@ -70,24 +69,24 @@ vi.mock('../components/EditableListField', async () => {
   };
 });
 
-vi.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
+jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
 
-vi.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', async () => {
   const ReactMod = (await import('react')).default;
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
+jest.mock('../i18n', () => ({ getCurrentLanguage: () => 'en-US' }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn() }) }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', text: '#fff', textSecondary: '#aaa', textTertiary: '#888',
@@ -97,24 +96,24 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-vi.mock('../contexts/AuthContext', () => ({
+jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('../hooks/useAgenda', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, useAgenda: () => ({ data: AGENDA }), useUpdateAgenda: () => ({ mutate: vi.fn() }) };
+jest.mock('../hooks/useAgenda', () => {
+  const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;
+  return { ...actual, useAgenda: () => ({ data: mockAGENDA }), useUpdateAgenda: () => ({ mutate: jest.fn() }) };
 });
 
-vi.mock('../hooks/useSpeeches', () => ({
+jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: SPEECHES }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
-  useAssignSpeaker: () => ({ mutate: vi.fn() }),
-  useRemoveAssignment: () => ({ mutate: vi.fn() }),
-  useLazyCreateSpeeches: () => ({ mutate: vi.fn() }),
+  useAssignSpeaker: () => ({ mutate: jest.fn() }),
+  useRemoveAssignment: () => ({ mutate: jest.fn() }),
+  useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
 }));
 
-vi.mock('../hooks/useHymns', () => ({
+jest.mock('../hooks/useHymns', () => ({
   useHymns: () => ({ data: [] }),
   useSacramentalHymns: () => ({ data: [] }),
   formatHymnDisplay: () => '',
@@ -122,9 +121,9 @@ vi.mock('../hooks/useHymns', () => ({
 }));
 
 // Keep real pure exports (normalizeForSearch used by resolveCallingForName); override useMembers.
-vi.mock('../hooks/useMembers', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, useMembers: () => ({ data: MEMBERS }) };
+jest.mock('../hooks/useMembers', () => {
+  const actual = (jest.requireActual('../hooks/useMembers')) as Record<string, unknown>;
+  return { ...actual, useMembers: () => ({ data: mockMEMBERS }) };
 });
 
 // --- Helpers ---
@@ -151,7 +150,7 @@ function recognizedLabels(renderer: TestRenderer.ReactTestRenderer): string[] {
 }
 
 beforeEach(() => {
-  AGENDA = {
+  mockAGENDA = {
     id: 'ag1', ward_id: 'w1', sunday_date: '2026-01-04',
     presiding_name: null, conducting_name: null,
     recognized_names: null, welcome_new_families: null, announcements: null,
@@ -165,27 +164,27 @@ beforeEach(() => {
     has_second_speech: true, closing_hymn_id: null, closing_prayer_member_id: null,
     closing_prayer_name: null, attendance: null, created_at: '', updated_at: '',
   };
-  MEMBERS = [];
+  mockMEMBERS = [];
 });
 
 describe('AgendaForm recognized list → "Name — Calling"', () => {
   it('appends the calling for a member with a unique calling', () => {
-    AGENDA.recognized_names = 'Ricardo Almeida';
-    MEMBERS = [makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo', can_be_recognized: true })];
+    mockAGENDA.recognized_names = 'Ricardo Almeida';
+    mockMEMBERS = [makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo', can_be_recognized: true })];
     const renderer = render();
     expect(recognizedLabels(renderer)).toEqual(['Ricardo Almeida — Bispo']);
   });
 
   it('shows the plain name when the member has no calling', () => {
-    AGENDA.recognized_names = 'Paulo Santos';
-    MEMBERS = [makeMember({ id: 'p', full_name: 'Paulo Santos', calling: null, can_be_recognized: true })];
+    mockAGENDA.recognized_names = 'Paulo Santos';
+    mockMEMBERS = [makeMember({ id: 'p', full_name: 'Paulo Santos', calling: null, can_be_recognized: true })];
     const renderer = render();
     expect(recognizedLabels(renderer)).toEqual(['Paulo Santos']);
   });
 
   it('enriches each line independently (called + uncalled)', () => {
-    AGENDA.recognized_names = 'Ricardo Almeida\nPaulo Santos';
-    MEMBERS = [
+    mockAGENDA.recognized_names = 'Ricardo Almeida\nPaulo Santos';
+    mockMEMBERS = [
       makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo' }),
       makeMember({ id: 'p', full_name: 'Paulo Santos', calling: null }),
     ];

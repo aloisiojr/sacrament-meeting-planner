@@ -3,7 +3,6 @@
  * Sunday's agenda/speeches/flags to the UnifiedSundayCard inputs. No React / react-native needed:
  * the helper is pure, so we assert on the returned counts and name-row ordering directly.
  */
-import { describe, it, expect } from 'vitest';
 import { buildUnifiedCardData } from '../lib/unifiedCard';
 import type { Speech, SundayAgenda, SpeechStatus } from '../types/database';
 

@@ -6,7 +6,6 @@
  * measureInWindow in the stub).
  */
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HymnScrubberRail, HYMN_RAIL_ROW_H } from '../components/HymnScrubberRail';
 
@@ -15,7 +14,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 
 const colors = { primary: '#0aa' } as any;
 
-function render(anchors: number[], onScrubToAnchor = vi.fn()) {
+function render(anchors: number[], onScrubToAnchor = jest.fn()) {
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     tree = TestRenderer.create(
@@ -46,7 +45,7 @@ function pageYForIndex(anchors: number[], index: number, height: number): number
 }
 
 describe('HymnScrubberRail', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => jest.clearAllMocks());
 
   it('renders one number per anchor (AC3.2)', () => {
     const { tree } = render([1, 10, 200, 1000, 1010]);

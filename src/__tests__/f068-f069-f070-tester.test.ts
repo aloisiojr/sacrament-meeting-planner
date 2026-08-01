@@ -9,7 +9,6 @@
  * All tests import and test BEHAVIOR - no fs.readFileSync or string matching.
  */
 
-import { describe, it, expect, vi } from 'vitest';
 import { lightColors, darkColors } from '../lib/theme';
 import type { ThemeColors } from '../lib/theme';
 import { buildPresentationCards } from '../hooks/usePresentationMode';
@@ -150,7 +149,7 @@ describe('F068 Tester: welcome_new_families integration (AC-068-03 to AC-068-05)
   });
 
   it('onSave callback receives \\n-joined string for welcome_new_families', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('Familia A\nFamilia B');
     const newItems = [...items, 'Familia C'];
     onSave(joinItems(newItems));
@@ -188,7 +187,7 @@ describe('F068 Tester: sustaining_releasing integration (AC-068-06 to AC-068-08)
   });
 
   it('onSave callback receives \\n-joined string for sustaining_releasing', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const items = parseItems('Apoio A');
     const newItems = [...items, 'Apoio B'];
     onSave(joinItems(newItems));
@@ -429,7 +428,7 @@ describe('F069 Tester: drag-to-reorder behavior (AC-069-01, AC-069-02, AC-069-03
   });
 
   it('drag reorder saves via onSave with \\n-joined string', () => {
-    const onSave = vi.fn();
+    const onSave = jest.fn();
     const reordered = ['Second', 'First', 'Third']; // drag first to second
     onSave(joinItems(reordered));
     expect(onSave).toHaveBeenCalledWith('Second\nFirst\nThird');

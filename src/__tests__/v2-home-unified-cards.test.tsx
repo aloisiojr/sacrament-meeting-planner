@@ -9,11 +9,10 @@
  * buildUnifiedCardData is left REAL so the asserted card props reflect the true mapping. dateUtils
  * is mocked to pin the next 3 Sundays deterministically.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Speech, SundayAgenda, SundayException } from '../types/database';
-// Imported after the (hoisted) vi.mock calls below take effect.
+// Imported after the (hoisted) jest.mock calls below take effect.
 import HomeTab from '../app/(tabs)/index';
 
 const { act } = TestRenderer;
@@ -23,34 +22,34 @@ const D1 = '2026-08-02'; // hero (next Sunday)
 const D2 = '2026-08-09'; // próximos [0]
 const D3 = '2026-08-16'; // próximos [1]
 
-const state = vi.hoisted(() => ({
+const mockState = {
   exceptions: [] as SundayException[],
   speeches: [] as Speech[],
   agendas: [] as SundayAgenda[],
   managePrayers: false,
   online: true,
   wardName: 'Ala Modelo' as string | null,
-}));
+};
 
-const routerPush = vi.hoisted(() => vi.fn());
+const mockRouterPush = jest.fn();
 
 // --- Mocks ---
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, opts?: unknown) => (opts ? `${k}${JSON.stringify(opts)}` : k) }),
 }));
 // The Home onboarding prompt is tested separately; stub it here to avoid its hook/context imports.
-vi.mock('../components/HomeMemberImportPrompt', () => ({ HomeMemberImportPrompt: () => null }));
+jest.mock('../components/HomeMemberImportPrompt', () => ({ HomeMemberImportPrompt: () => null }));
 
-vi.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children }: { children?: React.ReactNode }) => React.createElement('SafeAreaView', {}, children),
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children?: React.ReactNode }) => require('react').createElement('SafeAreaView', {}, children),
 }));
 
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: routerPush }),
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       background: '#000', card: '#111', border: '#333', text: '#fff', textSecondary: '#aaa',
@@ -59,44 +58,44 @@ vi.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
-vi.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => state.online }));
+jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => mockState.online }));
 
-vi.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, {}, children),
+jest.mock('../components/ErrorBoundary', () => ({
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
 }));
-vi.mock('../components/icons', () => ({ PlayIcon: () => null }));
+jest.mock('../components/icons', () => ({ PlayIcon: () => null }));
 
 // Role-gated bottom sections: light host stubs so we can assert online gating.
-vi.mock('../components/NextAssignmentsSection', () => ({
-  NextAssignmentsSection: () => React.createElement('NextAssignmentsSection', { testID: 'next-assignments' }),
+jest.mock('../components/NextAssignmentsSection', () => ({
+  NextAssignmentsSection: () => require('react').createElement('NextAssignmentsSection', { testID: 'next-assignments' }),
 }));
-vi.mock('../components/InviteManagementSection', () => ({
-  InviteManagementSection: () => React.createElement('InviteManagementSection', { testID: 'invite-management' }),
+jest.mock('../components/InviteManagementSection', () => ({
+  InviteManagementSection: () => require('react').createElement('InviteManagementSection', { testID: 'invite-management' }),
 }));
 
 // UnifiedSundayCard seam: render a host node carrying every prop for inspection + tap invocation.
-vi.mock('../components/UnifiedSundayCard', () => ({
-  UnifiedSundayCard: (props: Record<string, unknown>) => React.createElement('UnifiedSundayCard', props),
+jest.mock('../components/UnifiedSundayCard', () => ({
+  UnifiedSundayCard: (props: Record<string, unknown>) => require('react').createElement('UnifiedSundayCard', props),
 }));
 
 // Pin the next 3 Sundays.
-vi.mock('../lib/dateUtils', () => ({
+jest.mock('../lib/dateUtils', () => ({
   getNextSundays: () => [new Date(`${D1}T12:00:00`), new Date(`${D2}T12:00:00`), new Date(`${D3}T12:00:00`)],
   toISODateString: (d: Date) => d.toISOString().slice(0, 10),
 }));
 
-vi.mock('../hooks/useSpeeches', () => ({
-  useSpeeches: () => ({ data: state.speeches }),
-  useWardManagePrayers: () => ({ managePrayers: state.managePrayers, isLoading: false }),
+jest.mock('../hooks/useSpeeches', () => ({
+  useSpeeches: () => ({ data: mockState.speeches }),
+  useWardManagePrayers: () => ({ managePrayers: mockState.managePrayers, isLoading: false }),
 }));
-vi.mock('../hooks/useSundayTypes', () => ({
-  useSundayExceptions: () => ({ data: state.exceptions }),
+jest.mock('../hooks/useSundayTypes', () => ({
+  useSundayExceptions: () => ({ data: mockState.exceptions }),
 }));
-vi.mock('../hooks/useAgenda', () => ({
-  useAgendaRange: () => ({ data: state.agendas }),
+jest.mock('../hooks/useAgenda', () => ({
+  useAgendaRange: () => ({ data: mockState.agendas }),
 }));
-vi.mock('../hooks/useWard', () => ({
-  useWardName: () => state.wardName,
+jest.mock('../hooks/useWard', () => ({
+  useWardName: () => mockState.wardName,
 }));
 
 // --- Test data ---
@@ -146,13 +145,13 @@ function render() {
 }
 
 beforeEach(() => {
-  state.exceptions = [];
-  state.speeches = [makeSpeech(D1, 1, { speaker_name: 'Alice' })];
-  state.agendas = [makeAgenda(D1, { presiding_name: 'Bishop' })];
-  state.managePrayers = false;
-  state.online = true;
-  state.wardName = 'Ala Modelo';
-  routerPush.mockClear();
+  mockState.exceptions = [];
+  mockState.speeches = [makeSpeech(D1, 1, { speaker_name: 'Alice' })];
+  mockState.agendas = [makeAgenda(D1, { presiding_name: 'Bishop' })];
+  mockState.managePrayers = false;
+  mockState.online = true;
+  mockState.wardName = 'Ala Modelo';
+  mockRouterPush.mockClear();
 });
 
 describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
@@ -189,7 +188,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     let title = byTestID(r.root, 'home-agenda-title')[0];
     expect(title.props.children).toBe('home.meetingAgendaTitle - Ala Modelo');
 
-    state.wardName = null;
+    mockState.wardName = null;
     r = render();
     title = byTestID(r.root, 'home-agenda-title')[0];
     expect(title.props.children).toBe('home.meetingAgendaTitle');
@@ -201,7 +200,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     act(() => {
       (hero.props.onPressSpeakers as (d: string) => void)(D1);
     });
-    expect(routerPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: D1 } });
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: D1 } });
   });
 
   it('tapping a card status zone pushes the Agendas tab expanded on that date', () => {
@@ -210,7 +209,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     act(() => {
       (upcoming.props.onPressStatus as (d: string) => void)(D2);
     });
-    expect(routerPush).toHaveBeenCalledWith({ pathname: '/(tabs)/agenda', params: { expandDate: D2 } });
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/(tabs)/agenda', params: { expandDate: D2 } });
   });
 
   it('Start Meeting button navigates to presentation with the hero date', () => {
@@ -219,7 +218,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     act(() => {
       (btn.props.onPress as () => void)();
     });
-    expect(routerPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: D1 } });
+    expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: D1 } });
   });
 
   it('shows role-gated sections only when online', () => {
@@ -227,7 +226,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     expect(byTestID(online.root, 'next-assignments').length).toBe(1);
     expect(byTestID(online.root, 'invite-management').length).toBe(1);
 
-    state.online = false;
+    mockState.online = false;
     const offline = render();
     expect(byTestID(offline.root, 'next-assignments').length).toBe(0);
     expect(byTestID(offline.root, 'invite-management').length).toBe(0);

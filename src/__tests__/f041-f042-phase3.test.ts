@@ -5,7 +5,6 @@
  *       speech:assign/speech:unassign, and position-aware permission logic.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   hasPermission,
   getPermissions,

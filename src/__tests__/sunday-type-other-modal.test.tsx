@@ -6,23 +6,23 @@
  * propagation on web (mirroring AgendaForm's bottom sheet), so the modal stays open.
  */
 import React from 'react';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import TestRenderer, { act } from 'react-test-renderer';
 
-// Force web so the stopPropagation guard branch is active.
-vi.mock('react-native', async () => {
-  const actual = await vi.importActual<typeof import('../__tests__/stubs/react-native')>(
-    '../__tests__/stubs/react-native'
-  );
-  return { ...actual, Platform: { ...actual.Platform, OS: 'web' } };
+// Force web so the stopPropagation guard branch is active. Mock the Platform submodule rather
+// than spreading `react-native` itself — the root module exports lazy getters, and spreading it
+// eagerly instantiates every native module.
+jest.mock('react-native/Libraries/Utilities/Platform', () => {
+  const actual = jest.requireActual('react-native/Libraries/Utilities/Platform');
+  const Platform = { ...(actual.default ?? actual), OS: 'web' };
+  return { __esModule: true, default: Platform, ...Platform };
 });
 
-vi.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {
       text: '#000', textSecondary: '#666', textTertiary: '#999', border: '#ccc',
@@ -32,10 +32,10 @@ vi.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-vi.mock('../components/icons', () => ({ ChevronDownIcon: () => null }));
-vi.mock('./icons', () => ({ ChevronDownIcon: () => null }));
-vi.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
-vi.mock('./StatusLED', () => ({ StatusLED: () => null }));
+jest.mock('../components/icons', () => ({ ChevronDownIcon: () => null }));
+jest.mock('./icons', () => ({ ChevronDownIcon: () => null }));
+jest.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
+jest.mock('./StatusLED', () => ({ StatusLED: () => null }));
 
 // @ts-expect-error test env flag
 global.IS_REACT_ACT_ENVIRONMENT = true;
@@ -43,14 +43,14 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 import { SundayTypeDropdown } from '../components/SundayCard';
 
 function render(props: Partial<React.ComponentProps<typeof SundayTypeDropdown>> = {}) {
-  const onSelect = vi.fn();
+  const onSelect = jest.fn();
   let tree!: TestRenderer.ReactTestRenderer;
   act(() => {
     tree = TestRenderer.create(
       <SundayTypeDropdown
         currentType={'testimony_meeting' as any}
         onSelect={onSelect}
-        onRevertToSpeeches={vi.fn()}
+        onRevertToSpeeches={jest.fn()}
         speeches={[]}
         date="2026-08-02"
         {...props}
@@ -77,8 +77,8 @@ function openOtherModal(tree: TestRenderer.ReactTestRenderer) {
 }
 
 describe('SundayTypeDropdown — "Outros" custom reason modal', () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.clearAllMocks());
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => jest.clearAllMocks());
 
   it('opens the custom-reason modal when "other" is selected', () => {
     const { tree } = render();
@@ -106,7 +106,7 @@ describe('SundayTypeDropdown — "Outros" custom reason modal', () => {
     expect(contentView).toBeTruthy();
 
     // Simulate the web click on the content: it must stop propagation to the backdrop.
-    const stopPropagation = vi.fn();
+    const stopPropagation = jest.fn();
     act(() => contentView.props.onClick({ stopPropagation }));
     expect(stopPropagation).toHaveBeenCalledTimes(1);
 

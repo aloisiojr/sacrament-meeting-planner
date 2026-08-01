@@ -4,7 +4,6 @@
  * pt/en/es labels+months, the es V/M gender flip, multi-line names, page-split rows, missing
  * phone/email, garbage phone, emails split across lines, and the Count/Contagem/Recuento line.
  */
-import { describe, it, expect } from 'vitest';
 import { parseLcrText, lcrNameToFirstLast } from '../lib/lcrPdfParser';
 
 // --- pt fixture: title + wrapped header + footer + count; a multi-line name; a page-split row ---

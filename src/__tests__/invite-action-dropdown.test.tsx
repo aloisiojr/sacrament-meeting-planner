@@ -4,7 +4,6 @@
  * `react-native` is aliased to a test stub (vitest.config.ts). i18n/theme/icons and the
  * StatusChangeModal color map are mocked per-file so we can press rows and assert the callbacks.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import type { Speech } from '../types/database';
@@ -16,22 +15,22 @@ const { act } = TestRenderer;
 
 // --- Mocks ---
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { card: '#111', text: '#fff', textSecondary: '#aaa' } }),
 }));
 
-vi.mock('../components/icons', () => ({
+jest.mock('../components/icons', () => ({
   WhatsAppIcon: () => null,
   PhoneIcon: () => null,
   SendIcon: () => null,
 }));
 
-vi.mock('../components/StatusChangeModal', () => ({
+jest.mock('../components/StatusChangeModal', () => ({
   STATUS_INDICATOR_COLORS: {
     not_assigned: '#000',
     assigned_not_invited: '#000',
@@ -55,11 +54,11 @@ function makeSpeech(over: Partial<Speech> = {}): Speech {
 
 function render(props: Partial<React.ComponentProps<typeof InviteActionDropdown>> = {}) {
   const handlers = {
-    onOpenWhatsApp: vi.fn(),
-    onChangeStatus: vi.fn(),
-    onEditContact: vi.fn(),
-    onResendInvite: vi.fn(),
-    onClose: vi.fn(),
+    onOpenWhatsApp: jest.fn(),
+    onChangeStatus: jest.fn(),
+    onEditContact: jest.fn(),
+    onResendInvite: jest.fn(),
+    onClose: jest.fn(),
   };
   let renderer!: TestRenderer.ReactTestRenderer;
   act(() => {
@@ -86,7 +85,7 @@ function pressRow(renderer: TestRenderer.ReactTestRenderer, testID: string) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  jest.clearAllMocks();
 });
 
 describe('InviteActionDropdown', () => {

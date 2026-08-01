@@ -2,7 +2,6 @@
  * Tests for offlineQueue and offlineGuard pure utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   hasCapacity,
   shouldRetry,

@@ -3,7 +3,6 @@
  * we validated (.eq('status', current)). If another device changed it in between, 0 rows update and
  * the mutation surfaces a retry error instead of silently applying an unvalidated transition.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderHook,
   createTestQueryClient,
@@ -15,45 +14,45 @@ import { act } from 'react';
 import { supabase } from '../lib/supabase';
 import { useChangeStatus } from '../hooks/useSpeeches';
 
-vi.mock('../lib/supabase', () => ({
+jest.mock('../lib/supabase', () => ({
   supabase: {
-    from: vi.fn(),
+    from: jest.fn(),
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
     },
-    channel: vi.fn(),
-    removeChannel: vi.fn(),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
   },
 }));
-vi.mock('../lib/activityLog', () => ({ logAction: vi.fn(), buildLogDescription: vi.fn(() => 'd') }));
-vi.mock('../i18n', () => ({
-  getCurrentLanguage: vi.fn(() => 'pt-BR'), changeLanguage: vi.fn(), initI18n: vi.fn(),
+jest.mock('../lib/activityLog', () => ({ logAction: jest.fn(), buildLogDescription: jest.fn(() => 'd') }));
+jest.mock('../i18n', () => ({
+  getCurrentLanguage: jest.fn(() => 'pt-BR'), changeLanguage: jest.fn(), initI18n: jest.fn(),
   SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
-  default: { language: 'pt-BR', isInitialized: true, use: vi.fn().mockReturnThis(), init: vi.fn() },
+  default: { language: 'pt-BR', isInitialized: true, use: jest.fn().mockReturnThis(), init: jest.fn() },
 }));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'pt-BR', changeLanguage: vi.fn() } }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'pt-BR', changeLanguage: jest.fn() } }),
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
 }));
 
-const mockedSupabase = vi.mocked(supabase);
+const mockedSupabase = jest.mocked(supabase);
 
 /**
  * Wire supabase.from('speeches') to serve the status fetch (select→eq→single) and the guarded
  * update (update→eq→eq→select→maybeSingle). `updateResult` is what maybeSingle resolves to.
  */
 function mockChain(currentStatus: string, updateResult: unknown) {
-  const single = vi.fn().mockResolvedValue({ data: { status: currentStatus }, error: null });
-  const selectFetch = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single }) });
+  const single = jest.fn().mockResolvedValue({ data: { status: currentStatus }, error: null });
+  const selectFetch = jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ single }) });
 
-  const maybeSingle = vi.fn().mockResolvedValue({ data: updateResult, error: null });
-  const selectUpdate = vi.fn().mockReturnValue({ maybeSingle });
-  const eq2 = vi.fn().mockReturnValue({ select: selectUpdate });
-  const eq1 = vi.fn().mockReturnValue({ eq: eq2 });
-  const update = vi.fn().mockReturnValue({ eq: eq1 });
+  const maybeSingle = jest.fn().mockResolvedValue({ data: updateResult, error: null });
+  const selectUpdate = jest.fn().mockReturnValue({ maybeSingle });
+  const eq2 = jest.fn().mockReturnValue({ select: selectUpdate });
+  const eq1 = jest.fn().mockReturnValue({ eq: eq2 });
+  const update = jest.fn().mockReturnValue({ eq: eq1 });
 
-  (mockedSupabase.from as ReturnType<typeof vi.fn>).mockReturnValue({
+  (mockedSupabase.from as ReturnType<typeof jest.fn>).mockReturnValue({
     select: selectFetch,
     update,
   });
@@ -62,7 +61,7 @@ function mockChain(currentStatus: string, updateResult: unknown) {
 describe('useChangeStatus concurrency guard', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     queryClient = createTestQueryClient();
   });
 

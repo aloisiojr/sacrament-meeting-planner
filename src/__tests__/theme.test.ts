@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { lightColors, darkColors } from '../lib/theme';
 import type { ThemeColors } from '../lib/theme';
 
@@ -35,7 +34,7 @@ describe('ThemeContext - Color Palettes', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(lightColors)) {
         const vals = typeof value === 'string' ? [value] : Object.values(value);
-        for (const v of vals) expect(v, `lightColors.${key} is not a valid hex`).toMatch(hexRegex);
+        for (const v of vals) expect(v).toMatch(hexRegex);
       }
     });
 
@@ -47,34 +46,31 @@ describe('ThemeContext - Color Palettes', () => {
       for (const bg of lightSurfaces) {
         for (const [k, v] of Object.entries(lightColors.status)) {
           const ratio = contrastRatio(v, bg);
-          expect(ratio, `status.${k} on ${bg}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+          expect(ratio).toBeGreaterThanOrEqual(3);
         }
       }
     });
 
     it('successText / warningText meet AA (4.5:1) as text on the white card AND the hero (H1/H3)', () => {
       for (const bg of lightSurfaces) {
-        expect(contrastRatio(lightColors.successText, bg), `successText on ${bg}`).toBeGreaterThanOrEqual(4.5);
-        expect(contrastRatio(lightColors.warningText, bg), `warningText on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(lightColors.successText, bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(lightColors.warningText, bg)).toBeGreaterThanOrEqual(4.5);
       }
     });
 
     it('should have WCAG AA contrast for text on background (4.5:1)', () => {
       const ratio = contrastRatio(lightColors.text, lightColors.background);
-      expect(ratio, `text on background contrast: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
     });
 
     it('should have WCAG AA contrast for secondary text on background (4.5:1)', () => {
       const ratio = contrastRatio(lightColors.textSecondary, lightColors.background);
-      expect(
-        ratio,
-        `textSecondary on background contrast: ${ratio.toFixed(2)}`
-      ).toBeGreaterThanOrEqual(4.5);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
     });
 
     it('should have WCAG AA contrast for primary on background (3:1 for large text)', () => {
       const ratio = contrastRatio(lightColors.primary, lightColors.background);
-      expect(ratio, `primary on background contrast: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
+      expect(ratio).toBeGreaterThanOrEqual(
         3
       );
     });
@@ -85,33 +81,30 @@ describe('ThemeContext - Color Palettes', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
       for (const [key, value] of Object.entries(darkColors)) {
         const vals = typeof value === 'string' ? [value] : Object.values(value);
-        for (const v of vals) expect(v, `darkColors.${key} is not a valid hex`).toMatch(hexRegex);
+        for (const v of vals) expect(v).toMatch(hexRegex);
       }
     });
 
     it('status dots meet ≥3:1 on the dark card (incl. gave_up, H2)', () => {
       for (const [k, v] of Object.entries(darkColors.status)) {
         const ratio = contrastRatio(v, darkColors.card);
-        expect(ratio, `status.${k} on card: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+        expect(ratio).toBeGreaterThanOrEqual(3);
       }
     });
 
     it('should have WCAG AA contrast for text on background (4.5:1)', () => {
       const ratio = contrastRatio(darkColors.text, darkColors.background);
-      expect(ratio, `text on background contrast: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
     });
 
     it('should have WCAG AA contrast for secondary text on background (4.5:1)', () => {
       const ratio = contrastRatio(darkColors.textSecondary, darkColors.background);
-      expect(
-        ratio,
-        `textSecondary on background contrast: ${ratio.toFixed(2)}`
-      ).toBeGreaterThanOrEqual(4.5);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
     });
 
     it('should have WCAG AA contrast for primary on background (3:1 for large text)', () => {
       const ratio = contrastRatio(darkColors.primary, darkColors.background);
-      expect(ratio, `primary on background contrast: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
+      expect(ratio).toBeGreaterThanOrEqual(
         3
       );
     });
@@ -145,13 +138,13 @@ describe('ThemeContext - Color Palettes', () => {
 
     it('should have all required keys in light palette', () => {
       for (const key of requiredKeys) {
-        expect(lightColors[key], `Missing lightColors.${key}`).toBeDefined();
+        expect(lightColors[key]).toBeDefined();
       }
     });
 
     it('should have all required keys in dark palette', () => {
       for (const key of requiredKeys) {
-        expect(darkColors[key], `Missing darkColors.${key}`).toBeDefined();
+        expect(darkColors[key]).toBeDefined();
       }
     });
 

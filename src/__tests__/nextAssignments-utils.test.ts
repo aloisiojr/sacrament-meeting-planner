@@ -2,7 +2,6 @@
  * Tests for NextAssignmentsSection utilities.
  */
 
-import { describe, it, expect } from 'vitest';
 import {
   areNext3FullyAssigned,
   findNextPendingSunday,

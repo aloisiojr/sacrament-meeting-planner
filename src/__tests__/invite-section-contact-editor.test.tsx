@@ -5,7 +5,6 @@
  * capturer so the test can drive its `onSaved` callback; the WhatsApp send URL is inspected via the
  * mocked openWhatsApp.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { Alert } from 'react-native';
@@ -50,57 +49,55 @@ const WARD = {
   designation_template_new_member: null,
 };
 
-let SPEECHES: Speech[] = [];
-const openWhatsAppMock = vi.fn((..._args: unknown[]) => Promise.resolve(true));
-const changeStatusMock = vi.fn();
+let mockSPEECHES: Speech[] = [];
+const mockOpenWhatsAppMock = jest.fn((..._args: unknown[]) => Promise.resolve(true));
+const mockChangeStatusMock = jest.fn();
 
 // Capture PersonEditor props so the test can drive onSaved / inspect visibility + member.
-const editorHolder = vi.hoisted(
-  () => ({ props: null as null | { visible: boolean; member?: Member | null; onSaved?: (m: Member) => void; onClose?: () => void } })
-);
+const mockEditorHolder = { props: null as null | { visible: boolean; member?: Member | null; onSaved?: (m: Member) => void; onClose?: () => void } };
 
 // --- Mocks ---
 
-vi.mock('react-i18next', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
 });
 
-vi.mock('../contexts/ThemeContext', () => ({
+jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', primaryContainer: '#013', onPrimary: '#fff', error: '#f00', divider: '#333' } }),
 }));
-vi.mock('../contexts/AuthContext', () => ({
+jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true, wardId: 'w1', wardLanguage: 'pt-BR' }),
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: WARD }) }));
+jest.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: WARD }) }));
 
-vi.mock('../lib/whatsapp', () => ({
-  openWhatsApp: (...args: unknown[]) => openWhatsAppMock(...args),
+jest.mock('../lib/whatsapp', () => ({
+  openWhatsApp: (...args: unknown[]) => mockOpenWhatsAppMock(...args),
   buildWhatsAppConversationUrl: (phone: string) => `https://wa.me/${phone.replace('+', '')}`,
 }));
 
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../lib/supabase', () => ({ supabase: {} }));
 
-vi.mock('../components/icons', () => ({ WhatsAppIcon: () => null, MoreVerticalIcon: () => null }));
-vi.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
-vi.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: () => null }));
-vi.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
-vi.mock('../components/PersonEditor', () => ({
-  PersonEditor: (props: typeof editorHolder.props) => {
-    editorHolder.props = props;
+jest.mock('../components/icons', () => ({ WhatsAppIcon: () => null, MoreVerticalIcon: () => null }));
+jest.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
+jest.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: () => null }));
+jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
+jest.mock('../components/PersonEditor', () => ({
+  PersonEditor: (props: typeof mockEditorHolder.props) => {
+    mockEditorHolder.props = props;
     return null;
   },
 }));
 
-vi.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
-vi.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
-vi.mock('../hooks/useSpeeches', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
+jest.mock('../hooks/useSpeeches', () => {
+  const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: vi.fn() }),
-    useChangeStatus: () => ({ mutate: changeStatusMock }),
+    useSpeeches: () => ({ data: mockSPEECHES, isError: false, error: null, refetch: jest.fn() }),
+    useChangeStatus: () => ({ mutate: mockChangeStatusMock }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
@@ -127,16 +124,16 @@ async function pressSend(renderer: TestRenderer.ReactTestRenderer) {
 type AlertButton = { text: string; style?: string; onPress?: () => void };
 
 beforeEach(() => {
-  openWhatsAppMock.mockClear();
-  changeStatusMock.mockClear();
-  editorHolder.props = null;
-  SPEECHES = [];
+  mockOpenWhatsAppMock.mockClear();
+  mockChangeStatusMock.mockClear();
+  mockEditorHolder.props = null;
+  mockSPEECHES = [];
 });
 
 describe('InviteManagementSection — no-phone edit-contact → send-invite flow', () => {
   it('no-phone Alert offers an "Editar Contato" button (member exists)', () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
-    SPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
     const renderer = render();
     act(() => {
       const btn = renderer.root.findAll(
@@ -156,8 +153,8 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
   });
 
   it('saving a contact with a phone triggers the send-invite confirm and sends', async () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
-    SPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
     const renderer = render();
 
     // 1) Press send → no-phone Alert → invoke "Editar Contato".
@@ -173,13 +170,13 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
     });
 
     // 2) The editor opens with the member prefilled.
-    expect(editorHolder.props?.visible).toBe(true);
-    expect(editorHolder.props?.member?.id).toBe('m-del');
+    expect(mockEditorHolder.props?.visible).toBe(true);
+    expect(mockEditorHolder.props?.member?.id).toBe('m-del');
 
     // 3) Save the member (now with a phone) → send-invite confirm Alert appears.
     alertSpy.mockClear();
     act(() => {
-      editorHolder.props!.onSaved!(makeMember({ id: 'm-del', full_name: 'Delegate Person', country_code: '+55', phone: '11999998888' }));
+      mockEditorHolder.props!.onSaved!(makeMember({ id: 'm-del', full_name: 'Delegate Person', country_code: '+55', phone: '11999998888' }));
     });
     expect(alertSpy).toHaveBeenCalledTimes(1);
     const confirmButtons = alertSpy.mock.calls[0][2] as AlertButton[];
@@ -190,34 +187,34 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
     await act(async () => {
       await (sendBtn.onPress as () => Promise<void>)();
     });
-    const url = openWhatsAppMock.mock.calls[openWhatsAppMock.mock.calls.length - 1][0] as string;
+    const url = mockOpenWhatsAppMock.mock.calls[mockOpenWhatsAppMock.mock.calls.length - 1][0] as string;
     expect(url).toContain('wa.me/5511999998888');
-    expect(changeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
+    expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
     alertSpy.mockRestore();
   });
 
   it('sends immediately when a phone already exists (no Alert)', async () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
-    SPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
     const renderer = render();
     await pressSend(renderer);
 
     expect(alertSpy).not.toHaveBeenCalled();
-    expect(openWhatsAppMock).toHaveBeenCalledTimes(1);
-    expect(changeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
+    expect(mockOpenWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
     alertSpy.mockRestore();
   });
 
   it('does NOT mark invited when WhatsApp fails to open', async () => {
-    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     // openWhatsApp reports it could not open (not installed / launch failed).
-    openWhatsAppMock.mockImplementationOnce(() => Promise.resolve(false));
-    SPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
+    mockOpenWhatsAppMock.mockImplementationOnce(() => Promise.resolve(false));
+    mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
     const renderer = render();
     await pressSend(renderer);
 
-    expect(openWhatsAppMock).toHaveBeenCalledTimes(1);
-    expect(changeStatusMock).not.toHaveBeenCalled();
+    expect(mockOpenWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(mockChangeStatusMock).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
 });

@@ -1,5 +1,3 @@
-import { describe, it, expect } from 'vitest';
-
 describe('App Setup', () => {
   it('should have the correct app name in package.json', async () => {
     const pkg = await import('../../package.json');
@@ -34,7 +32,7 @@ describe('App Setup', () => {
     ];
 
     for (const dep of requiredDeps) {
-      expect(deps[dep], `Missing dependency: ${dep}`).toBeDefined();
+      expect(deps[dep]).toBeDefined();
     }
   });
 

@@ -4,12 +4,9 @@
  * designation (in order), close via X and backdrop, and nothing rendered when not visible.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 import { DesignationReadModal } from '../components/DesignationReadModal';
 import type { Designation } from '../types/database';
-
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const MAP: Record<string, string> = {
   'agenda.designations.readTitle': 'Texto para leitura',
@@ -40,53 +37,53 @@ const items: Designation[] = [
   { type: 'release', person_name: 'Ana Lima', member_id: 'm3', calling: 'Secretária', office: null },
 ];
 
-function render(props: Partial<React.ComponentProps<typeof DesignationReadModal>> = {}) {
+async function render(props: Partial<React.ComponentProps<typeof DesignationReadModal>> = {}) {
   const onClose = jest.fn();
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(DesignationReadModal, {
-        visible: true,
-        onClose,
-        designations: items,
-        wardName: 'Jardim',
-        ...props,
-      })
-    );
-  });
-  return { renderer, onClose };
+  await rtlRender(
+    <DesignationReadModal
+      visible
+      onClose={onClose}
+      designations={items}
+      wardName="Jardim"
+      {...props}
+    />
+  );
+  // `renderer` kept for call-site compatibility; the helpers below query `screen`.
+  return { renderer: null, onClose };
 }
 
-function nodes(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function nodes(_renderer: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
-function allText(renderer: TestRenderer.ReactTestRenderer): string[] {
-  return renderer.root
-    .findAll((n) => n.type === 'Text')
-    .map((n) => (Array.isArray(n.props.children) ? n.props.children.join('') : String(n.props.children)));
+
+function allText(_renderer?: unknown): string[] {
+  return screen.queryAllByText(/.*/).map((n) => {
+    const c = n.props.children;
+    return Array.isArray(c) ? c.join('') : String(c);
+  });
 }
 
 beforeEach(() => jest.clearAllMocks());
 
 describe('DesignationReadModal (step 2)', () => {
-  it('renders one read-text block per designation', () => {
-    const { renderer } = render();
+  it('renders one read-text block per designation', async () => {
+    const { renderer } = await render();
     expect(nodes(renderer, 'designation-read-item-0').length).toBe(1);
     expect(nodes(renderer, 'designation-read-item-1').length).toBe(1);
     expect(nodes(renderer, 'designation-read-item-2').length).toBe(1);
     expect(nodes(renderer, 'designation-read-item-3').length).toBe(0);
   });
 
-  it('substitutes tokens in each item (name/calling/ward)', () => {
-    const { renderer } = render();
+  it('substitutes tokens in each item (name/calling/ward)', async () => {
+    const { renderer } = await render();
     const texts = allText(renderer);
     expect(texts).toContain('APOIO João Silva como Presidente EQ.');
     expect(texts).toContain('NOVO Maria Souza da Ala Jardim.');
     expect(texts).toContain('DESOBRIGA Ana Lima de Secretária.');
   });
 
-  it('orders items release → sustain → new_member regardless of input order (AC3)', () => {
-    const { renderer } = render();
+  it('orders items release → sustain → new_member regardless of input order (AC3)', async () => {
+    const { renderer } = await render();
     const texts = allText(renderer);
     const iRelease = texts.findIndex((s) => s.startsWith('DESOBRIGA'));
     const iSustain = texts.findIndex((s) => s.startsWith('APOIO'));
@@ -96,33 +93,33 @@ describe('DesignationReadModal (step 2)', () => {
     expect(iSustain).toBeLessThan(iNew);
   });
 
-  it('uses a non-blank ward override template instead of the default', () => {
-    const { renderer } = render({ templates: { sustain: 'OVERRIDE {name} / {calling}' } });
+  it('uses a non-blank ward override template instead of the default', async () => {
+    const { renderer } = await render({ templates: { sustain: 'OVERRIDE {name} / {calling}' } });
     const texts = allText(renderer);
     expect(texts).toContain('OVERRIDE João Silva / Presidente EQ');
     expect(texts.some((s) => s.startsWith('APOIO'))).toBe(false);
   });
 
-  it('falls back to the default when the override is blank', () => {
-    const { renderer } = render({ templates: { sustain: '   ' } });
+  it('falls back to the default when the override is blank', async () => {
+    const { renderer } = await render({ templates: { sustain: '   ' } });
     const texts = allText(renderer);
     expect(texts).toContain('APOIO João Silva como Presidente EQ.');
   });
 
-  it('closes via the X button', () => {
-    const { renderer, onClose } = render();
-    act(() => (nodes(renderer, 'designation-read-close-button')[0].props.onPress as () => void)());
+  it('closes via the X button', async () => {
+    const { renderer, onClose } = await render();
+    await fireEvent.press(screen.getByTestId('designation-read-close-button'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('closes via the backdrop', () => {
-    const { renderer, onClose } = render();
-    act(() => (nodes(renderer, 'designation-read-backdrop')[0].props.onPress as () => void)());
+  it('closes via the backdrop', async () => {
+    const { renderer, onClose } = await render();
+    await fireEvent.press(screen.getByTestId('designation-read-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('renders nothing when not visible', () => {
-    const { renderer } = render({ visible: false });
+  it('renders nothing when not visible', async () => {
+    const { renderer } = await render({ visible: false });
     expect(nodes(renderer, 'designation-read-panel').length).toBe(0);
   });
 });

@@ -22,8 +22,6 @@ jest.mock('../contexts/ThemeContext', () => ({
   }),
 }));
 
-type Node = TestRenderer.TestInstance;
-
 async function render(props: AttendanceBlockProps) {
   await rtlRender(<AttendanceBlock {...props} />);
   // Returned for call-site compatibility; the helpers below query `screen`.

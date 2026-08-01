@@ -74,6 +74,14 @@ for (const file of files) {
       `  });\n}`
   );
 
+  // 3c. a `press` helper that finds by testID then invokes the prop -> real fireEvent
+  s = s.replace(
+    /function press\((\w+): (?:unknown|TestRenderer\.ReactTestRenderer), (\w+): string\) \{[\s\S]*?\n\}/g,
+    (_m, r, id) =>
+      `async function press(_${r}: unknown, ${id}: string) {\n` +
+      `  await fireEvent.press(screen.getByTestId(${id}));\n}`
+  );
+
   // 4. direct prop invocation -> real events
   s = s.replace(
     /act\(\(\) => \((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.onPress as \(\) => void\)\(\)\);/g,
@@ -130,6 +138,18 @@ for (const file of files) {
 
   // 8. leftover type references to the removed renderer
   s = s.replace(/^type Node = TestRenderer\.TestInstance;\n\n?/m, '');
+
+  // 9. `act` came from TestRenderer; re-import it from RNTL if the file still uses it.
+  if (/\bact\(/.test(s) && !/fireEvent, act \}/.test(s)) {
+    s = s.replace(
+      "import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';",
+      "import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';"
+    );
+  }
+
+  // 10. stray `TestRenderer.` type annotations left on helpers the rules above did not match.
+  s = s.replace(/:\s*TestRenderer\.ReactTestRenderer\b/g, ': unknown');
+  s = s.replace(/:\s*TestRenderer\.TestInstance\b/g, ': unknown');
 
   if (s !== before) {
     fs.writeFileSync(file, s);

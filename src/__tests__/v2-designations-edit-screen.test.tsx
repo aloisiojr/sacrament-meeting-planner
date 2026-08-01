@@ -6,13 +6,11 @@
  * spied so we can exercise the "update calling?" branches.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import DesignationEditScreen from '../app/designations/[date]';
 import type { Member, Designation } from '../types/database';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DATE = '2026-08-02';
 
@@ -88,19 +86,16 @@ jest.mock('../hooks/useMembers', () => ({
   useUpdateMember: () => ({ mutate: mockState.updateMember }),
 }));
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(DesignationEditScreen));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(DesignationEditScreen));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-function nodes(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function nodes(_renderer: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
 
-function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
+function press(renderer: unknown, testID: string) {
   const node = nodes(renderer, testID)[0];
   act(() => {
     (node.props.onPress as () => void)();
@@ -125,9 +120,9 @@ beforeEach(() => {
 });
 
 describe('Designation edit screen (step 2)', () => {
-  it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', () => {
+  it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-sustain'); // AC6
     selectPerson(makeMember({ calling: 'Presidente do Quórum de Élderes' })); // AC7 + AC8 prefill
 
@@ -155,9 +150,9 @@ describe('Designation edit screen (step 2)', () => {
     expect(mockState.back).toHaveBeenCalled();
   });
 
-  it('does NOT save without agenda:write permission (observer deep-link)', () => {
+  it('does NOT save without agenda:write permission (observer deep-link)', async () => {
     mockState.canWrite = false;
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-sustain');
     selectPerson(makeMember());
 
@@ -167,9 +162,9 @@ describe('Designation edit screen (step 2)', () => {
     expect(mockState.updateAgenda).not.toHaveBeenCalled();
   });
 
-  it('release: on decline saves snapshot but does NOT update member', () => {
+  it('release: on decline saves snapshot but does NOT update member', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-release');
     selectPerson(makeMember({ calling: 'Secretário da Ala' }));
 
@@ -181,9 +176,9 @@ describe('Designation edit screen (step 2)', () => {
     expect(mockState.updateMember).not.toHaveBeenCalled(); // declined
   });
 
-  it('release: on confirm clears the member calling (sets null)', () => {
+  it('release: on confirm clears the member calling (sets null)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-release');
     selectPerson(makeMember({ calling: 'Secretário da Ala' }));
     press(r, 'designation-edit-save-button');
@@ -193,9 +188,9 @@ describe('Designation edit screen (step 2)', () => {
     expect(mockState.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: null });
   });
 
-  it('priesthood: shows office selector, no calling field, saves office and no prompt', () => {
+  it('priesthood: shows office selector, no calling field, saves office and no prompt', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-priesthood'); // AC9
     selectPerson(makeMember());
 
@@ -209,9 +204,9 @@ describe('Designation edit screen (step 2)', () => {
     expect(item).toMatchObject({ type: 'priesthood', office: 'deacon', calling: null });
   });
 
-  it('new_member: no extra field, saves snapshot, no prompt', () => {
+  it('new_member: no extra field, saves snapshot, no prompt', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-type-new_member'); // AC10
     selectPerson(makeMember({ full_name: 'Maria Souza' }));
 
@@ -224,13 +219,13 @@ describe('Designation edit screen (step 2)', () => {
     expect(item).toMatchObject({ type: 'new_member', person_name: 'Maria Souza', office: null, calling: null });
   });
 
-  it('editing an existing item with no linked member (member_id null): no prompt (AC13)', () => {
+  it('editing an existing item with no linked member (member_id null): no prompt (AC13)', async () => {
     mockState.params = { date: DATE, index: '0' };
     mockState.designations = [
       { type: 'sustain', person_name: 'Convidado Externo', member_id: null, calling: 'Líder', office: null },
     ];
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const r = render();
+    const r = await render();
     press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled();

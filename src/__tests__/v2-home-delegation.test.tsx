@@ -11,14 +11,12 @@
  * responsible lookup + snapshot fields are passed on assignment.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { Member } from '../types/database';
 
 // Import after mocks are registered.
 import { NextAssignmentsSection } from '../components/NextAssignmentsSection';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Controlled data ---
 
@@ -95,7 +93,7 @@ const PENDING_ENTRY = {
   ],
 };
 
-const assignSpeakerMock = jest.fn();
+const mockAssignSpeakerMock = jest.fn();
 
 // --- Mocks ---
 
@@ -149,7 +147,7 @@ jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) 
 jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: [], isError: false, error: null, refetch: jest.fn() }),
   useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
-  useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
+  useAssignSpeaker: () => ({ mutate: mockAssignSpeakerMock }),
   useAssignTopic: () => ({ mutate: jest.fn() }),
   useChangeStatus: () => ({ mutate: jest.fn() }),
   useRemoveAssignment: () => ({ mutate: jest.fn() }),
@@ -172,45 +170,37 @@ jest.mock('../lib/speechUtils', () => ({
 
 // --- Helpers ---
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(NextAssignmentsSection));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(NextAssignmentsSection));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  const node = renderer.root.findAll(
-    (n) => typeof n.type === 'string' && n.props.testID === testID
-  )[0];
-  act(() => {
-    (node.props.onPress as () => void)();
-  });
+async function press(_renderer: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
 beforeEach(() => {
-  assignSpeakerMock.mockClear();
+  mockAssignSpeakerMock.mockClear();
   peoplePickerProps = null;
 });
 
 describe('Home NextAssignmentsSection — v2.0 people picker + delegation snapshot (Phase 3c)', () => {
-  it('renders the PeoplePicker and it starts hidden', () => {
-    render();
+  it('renders the PeoplePicker and it starts hidden', async () => {
+    await render();
     expect(peoplePickerProps).not.toBeNull();
     expect(peoplePickerProps!.visible).toBe(false);
   });
 
-  it('snapshots the responsible phone + is_delegated when a delegated member is selected (AC8)', () => {
-    const renderer = render();
-    press(renderer, 'sunday-toggle'); // expand to surface the speech slots
-    press(renderer, 'open-selector-1');
+  it('snapshots the responsible phone + is_delegated when a delegated member is selected (AC8)', async () => {
+    const renderer = await render();
+    await press(renderer, 'sunday-toggle'); // expand to surface the speech slots
+    await press(renderer, 'open-selector-1');
     expect(peoplePickerProps!.visible).toBe(true);
 
-    act(() => peoplePickerProps!.onSelect(DELEGATE));
+    await act(() => peoplePickerProps!.onSelect(DELEGATE));
 
-    expect(assignSpeakerMock).toHaveBeenCalledTimes(1);
-    expect(assignSpeakerMock).toHaveBeenCalledWith(
+    expect(mockAssignSpeakerMock).toHaveBeenCalledTimes(1);
+    expect(mockAssignSpeakerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         speechId: 'sp1',
         memberId: 'm-del',
@@ -224,14 +214,14 @@ describe('Home NextAssignmentsSection — v2.0 people picker + delegation snapsh
     );
   });
 
-  it('records a non-delegated snapshot (own phone) for a direct member (AC8)', () => {
-    const renderer = render();
-    press(renderer, 'sunday-toggle');
-    press(renderer, 'open-selector-1');
+  it('records a non-delegated snapshot (own phone) for a direct member (AC8)', async () => {
+    const renderer = await render();
+    await press(renderer, 'sunday-toggle');
+    await press(renderer, 'open-selector-1');
 
-    act(() => peoplePickerProps!.onSelect(DIRECT));
+    await act(() => peoplePickerProps!.onSelect(DIRECT));
 
-    expect(assignSpeakerMock).toHaveBeenCalledWith(
+    expect(mockAssignSpeakerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         memberId: 'm-dir',
         contactPhone: '+15550002',

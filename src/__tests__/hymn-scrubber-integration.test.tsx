@@ -27,9 +27,10 @@ const HYMNS: Hymn[] = [
   { id: 'h174', language: 'pt-BR', number: 174, title: 'Hino 174', is_sacramental: false },
 ];
 
-// Partial react-native mock: give FlatList a real ref (scrollToOffset spy) and render its rows.
-jest.mock('react-native', async () => {
-  const actual = (await jest.requireActual('./stubs/react-native')) as Record<string, unknown>;
+// FlatList is mocked to expose a scrollToOffset spy on its ref, which is what the scrubber
+// asserts against. Only the FlatList submodule is replaced — mocking the `react-native` root and
+// spreading it would eagerly instantiate every lazily-required native module.
+jest.mock('react-native/Libraries/Lists/FlatList', () => {
   const ReactMod = require('react');
   const FlatList = ReactMod.forwardRef((props: any, ref: any) => {
     ReactMod.useImperativeHandle(ref, () => ({ scrollToOffset: mockH.scrollToOffset }));
@@ -47,7 +48,7 @@ jest.mock('react-native', async () => {
     );
   });
   (FlatList as { displayName?: string }).displayName = 'FlatList';
-  return { ...actual, FlatList };
+  return { __esModule: true, default: FlatList };
 });
 
 jest.mock('../components/SearchInput', () => ({
@@ -64,7 +65,6 @@ jest.mock('../components/EditableListField', () => ({
   EditableListField: () => null,
 }));
 jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
-jest.mock('./icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
 jest.mock('../components/icons', () => ({ XIcon: () => null, PencilIcon: () => null }));
 jest.mock('react-i18next', () => {
   const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;

@@ -44,7 +44,7 @@ jest.mock('../components/EditableListField', () => ({
   EditableListField: () => null,
 }));
 jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
-jest.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', () => {
   const ReactMod = require('react');
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };

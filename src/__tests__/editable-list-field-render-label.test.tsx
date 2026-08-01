@@ -15,7 +15,7 @@ const { act } = TestRenderer;
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // DraggableFlatList: render each item through renderItem so rows appear in the tree.
-jest.mock('react-native-draggable-flatlist', async () => {
+jest.mock('react-native-draggable-flatlist', () => {
   const ReactMod = require('react');
   const DraggableFlatList = (props: Record<string, unknown>) => {
     const data = (props.data as string[]) ?? [];
@@ -40,7 +40,7 @@ jest.mock('react-native-draggable-flatlist', async () => {
   return { default: DraggableFlatList, ScaleDecorator };
 });
 
-jest.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', () => {
   const ReactMod = require('react');
   const h = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: h('Svg'), Svg: h('Svg'), Path: h('Path'), Circle: h('Circle') };

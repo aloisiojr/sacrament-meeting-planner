@@ -33,9 +33,7 @@ jest.mock('../contexts/ThemeContext', () => ({
 }));
 
 jest.mock('../components/icons', () => ({ ChevronDownIcon: () => null }));
-jest.mock('./icons', () => ({ ChevronDownIcon: () => null }));
 jest.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
-jest.mock('./StatusLED', () => ({ StatusLED: () => null }));
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 

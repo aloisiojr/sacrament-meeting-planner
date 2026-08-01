@@ -45,7 +45,7 @@ const SPEECHES: Speech[] = [];
 
 jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
 
-jest.mock('../components/EditableListField', async () => {
+jest.mock('../components/EditableListField', () => {
   const ReactMod = require('react');
   const parseItems = (value: string | string[] | null): string[] =>
     Array.isArray(value)
@@ -71,7 +71,7 @@ jest.mock('../components/EditableListField', async () => {
 
 jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
 
-jest.mock('react-native-svg', async () => {
+jest.mock('react-native-svg', () => {
   const ReactMod = require('react');
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };

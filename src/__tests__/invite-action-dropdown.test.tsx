@@ -86,7 +86,7 @@ describe('InviteActionDropdown', () => {
     }
     const current = row('invite-dropdown-status-assigned_invited');
     expect(current).toBeDisabled();
-    fireEvent.press(current);
+    await fireEvent.press(current);
     expect(handlers.onChangeStatus).not.toHaveBeenCalled();
   });
 
@@ -94,7 +94,7 @@ describe('InviteActionDropdown', () => {
     const { handlers } = await renderDropdown({
       speech: makeSpeech({ id: 'sp9', status: 'assigned_invited' }),
     });
-    fireEvent.press(row('invite-dropdown-status-assigned_confirmed'));
+    await fireEvent.press(row('invite-dropdown-status-assigned_confirmed'));
     expect(handlers.onChangeStatus).toHaveBeenCalledWith('sp9', 'assigned_confirmed');
   });
 
@@ -102,7 +102,7 @@ describe('InviteActionDropdown', () => {
     const { handlers } = await renderDropdown({ speech: makeSpeech({ member_id: 'm1' }) });
     const el = row('invite-dropdown-edit-phone');
     expect(el).toBeEnabled();
-    fireEvent.press(el);
+    await fireEvent.press(el);
     expect(handlers.onEditContact).toHaveBeenCalledTimes(1);
   });
 
@@ -110,7 +110,7 @@ describe('InviteActionDropdown', () => {
     const { handlers } = await renderDropdown({ speech: makeSpeech({ member_id: null }) });
     const el = row('invite-dropdown-edit-phone');
     expect(el).toBeDisabled();
-    fireEvent.press(el);
+    await fireEvent.press(el);
     expect(handlers.onEditContact).not.toHaveBeenCalled();
   });
 
@@ -120,7 +120,7 @@ describe('InviteActionDropdown', () => {
     });
     const el = row('invite-dropdown-resend');
     expect(el).toBeEnabled();
-    fireEvent.press(el);
+    await fireEvent.press(el);
     expect(handlers.onResendInvite).toHaveBeenCalledTimes(1);
   });
 
@@ -130,13 +130,13 @@ describe('InviteActionDropdown', () => {
     });
     const el = row('invite-dropdown-resend');
     expect(el).toBeDisabled();
-    fireEvent.press(el);
+    await fireEvent.press(el);
     expect(handlers.onResendInvite).not.toHaveBeenCalled();
   });
 
   it('"Ver conversa" fires onOpenWhatsApp when a phone exists', async () => {
     const { handlers } = await renderDropdown({ speech: makeSpeech({ speaker_phone: '+15550009' }) });
-    fireEvent.press(row('invite-dropdown-view-conversation'));
+    await fireEvent.press(row('invite-dropdown-view-conversation'));
     expect(handlers.onOpenWhatsApp).toHaveBeenCalledTimes(1);
   });
 
@@ -146,7 +146,7 @@ describe('InviteActionDropdown', () => {
     });
     const el = row('invite-dropdown-view-conversation');
     expect(el).toBeDisabled();
-    fireEvent.press(el);
+    await fireEvent.press(el);
     expect(handlers.onOpenWhatsApp).not.toHaveBeenCalled();
   });
 });

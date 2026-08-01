@@ -1,17 +1,15 @@
 /**
  * Behavioral tests for InviteActionDropdown (two-section invite dropdown).
  *
- * `react-native` is aliased to a test stub (vitest.config.ts). i18n/theme/icons and the
- * StatusChangeModal color map are mocked per-file so we can press rows and assert the callbacks.
+ * Renders against real React Native via jest-expo. Presses go through RNTL's fireEvent, which
+ * honours `disabled` / `pointerEvents` — the previous version called `props.onPress()` directly,
+ * so the "disabled row does not fire" assertions could not actually fail.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import type { Speech } from '../types/database';
 
 import { InviteActionDropdown } from '../components/InviteActionDropdown';
-
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Mocks ---
 
@@ -52,7 +50,9 @@ function makeSpeech(over: Partial<Speech> = {}): Speech {
   } as Speech;
 }
 
-function render(props: Partial<React.ComponentProps<typeof InviteActionDropdown>> = {}) {
+async function renderDropdown(
+  props: Partial<React.ComponentProps<typeof InviteActionDropdown>> = {}
+) {
   const handlers = {
     onOpenWhatsApp: jest.fn(),
     onChangeStatus: jest.fn(),
@@ -60,96 +60,93 @@ function render(props: Partial<React.ComponentProps<typeof InviteActionDropdown>
     onResendInvite: jest.fn(),
     onClose: jest.fn(),
   };
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(InviteActionDropdown, {
-        visible: true,
-        speech: makeSpeech(),
-        ...handlers,
-        ...props,
-      })
-    );
-  });
-  return { renderer, handlers };
+  await render(
+    <InviteActionDropdown visible speech={makeSpeech()} {...handlers} {...props} />
+  );
+  return { handlers };
 }
 
-function node(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID)[0];
-}
-
-function pressRow(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  act(() => {
-    (node(renderer, testID).props.onPress as () => void)();
-  });
-}
+const row = (testID: string) => screen.getByTestId(testID);
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('InviteActionDropdown', () => {
-  it('renders both section headers', () => {
-    const { renderer } = render();
-    const headers = renderer.root.findAll(
-      (n) =>
-        typeof n.type === 'string' &&
-        (n.props.children === 'home.changeStatusSection' || n.props.children === 'home.actionSection')
-    );
-    expect(headers.length).toBe(2);
+  it('renders both section headers', async () => {
+    await renderDropdown();
+    expect(screen.getByText('home.changeStatusSection')).toBeOnTheScreen();
+    expect(screen.getByText('home.actionSection')).toBeOnTheScreen();
   });
 
-  it('renders all four assigned statuses; the current one is disabled and does not fire onChangeStatus', () => {
-    const { renderer, handlers } = render({ speech: makeSpeech({ status: 'assigned_invited' }) });
+  it('renders all four assigned statuses; the current one is disabled and does not fire onChangeStatus', async () => {
+    const { handlers } = await renderDropdown({ speech: makeSpeech({ status: 'assigned_invited' }) });
     for (const s of ['assigned_not_invited', 'assigned_invited', 'assigned_confirmed', 'gave_up']) {
-      expect(node(renderer, `invite-dropdown-status-${s}`)).toBeTruthy();
+      expect(row(`invite-dropdown-status-${s}`)).toBeOnTheScreen();
     }
-    const current = node(renderer, 'invite-dropdown-status-assigned_invited');
-    expect(current.props.disabled).toBe(true);
-    pressRow(renderer, 'invite-dropdown-status-assigned_invited');
+    const current = row('invite-dropdown-status-assigned_invited');
+    expect(current).toBeDisabled();
+    fireEvent.press(current);
     expect(handlers.onChangeStatus).not.toHaveBeenCalled();
   });
 
-  it('a non-current status fires onChangeStatus with speech id + status', () => {
-    const { renderer, handlers } = render({ speech: makeSpeech({ id: 'sp9', status: 'assigned_invited' }) });
-    pressRow(renderer, 'invite-dropdown-status-assigned_confirmed');
+  it('a non-current status fires onChangeStatus with speech id + status', async () => {
+    const { handlers } = await renderDropdown({
+      speech: makeSpeech({ id: 'sp9', status: 'assigned_invited' }),
+    });
+    fireEvent.press(row('invite-dropdown-status-assigned_confirmed'));
     expect(handlers.onChangeStatus).toHaveBeenCalledWith('sp9', 'assigned_confirmed');
   });
 
-  it('"Alterar telefone" fires onEditContact when member_id is set', () => {
-    const { renderer, handlers } = render({ speech: makeSpeech({ member_id: 'm1' }) });
-    expect(node(renderer, 'invite-dropdown-edit-phone').props.disabled).toBe(false);
-    pressRow(renderer, 'invite-dropdown-edit-phone');
+  it('"Alterar telefone" fires onEditContact when member_id is set', async () => {
+    const { handlers } = await renderDropdown({ speech: makeSpeech({ member_id: 'm1' }) });
+    const el = row('invite-dropdown-edit-phone');
+    expect(el).toBeEnabled();
+    fireEvent.press(el);
     expect(handlers.onEditContact).toHaveBeenCalledTimes(1);
   });
 
-  it('"Alterar telefone" is disabled and does not fire without member_id', () => {
-    const { renderer, handlers } = render({ speech: makeSpeech({ member_id: null }) });
-    expect(node(renderer, 'invite-dropdown-edit-phone').props.disabled).toBe(true);
-    pressRow(renderer, 'invite-dropdown-edit-phone');
+  it('"Alterar telefone" is disabled and does not fire without member_id', async () => {
+    const { handlers } = await renderDropdown({ speech: makeSpeech({ member_id: null }) });
+    const el = row('invite-dropdown-edit-phone');
+    expect(el).toBeDisabled();
+    fireEvent.press(el);
     expect(handlers.onEditContact).not.toHaveBeenCalled();
   });
 
-  it('"Re-enviar convite" fires onResendInvite when a phone exists; disabled without one', () => {
-    const withPhone = render({ speech: makeSpeech({ contact_phone: '+15550009', speaker_phone: null }) });
-    expect(node(withPhone.renderer, 'invite-dropdown-resend').props.disabled).toBe(false);
-    pressRow(withPhone.renderer, 'invite-dropdown-resend');
-    expect(withPhone.handlers.onResendInvite).toHaveBeenCalledTimes(1);
-
-    const noPhone = render({ speech: makeSpeech({ contact_phone: null, speaker_phone: null }) });
-    expect(node(noPhone.renderer, 'invite-dropdown-resend').props.disabled).toBe(true);
-    pressRow(noPhone.renderer, 'invite-dropdown-resend');
-    expect(noPhone.handlers.onResendInvite).not.toHaveBeenCalled();
+  it('"Re-enviar convite" fires onResendInvite when a phone exists', async () => {
+    const { handlers } = await renderDropdown({
+      speech: makeSpeech({ contact_phone: '+15550009', speaker_phone: null }),
+    });
+    const el = row('invite-dropdown-resend');
+    expect(el).toBeEnabled();
+    fireEvent.press(el);
+    expect(handlers.onResendInvite).toHaveBeenCalledTimes(1);
   });
 
-  it('"Ver conversa" fires onOpenWhatsApp when a phone exists; disabled without one', () => {
-    const withPhone = render({ speech: makeSpeech({ speaker_phone: '+15550009' }) });
-    pressRow(withPhone.renderer, 'invite-dropdown-view-conversation');
-    expect(withPhone.handlers.onOpenWhatsApp).toHaveBeenCalledTimes(1);
+  it('"Re-enviar convite" is disabled and does not fire without a phone', async () => {
+    const { handlers } = await renderDropdown({
+      speech: makeSpeech({ contact_phone: null, speaker_phone: null }),
+    });
+    const el = row('invite-dropdown-resend');
+    expect(el).toBeDisabled();
+    fireEvent.press(el);
+    expect(handlers.onResendInvite).not.toHaveBeenCalled();
+  });
 
-    const noPhone = render({ speech: makeSpeech({ contact_phone: null, speaker_phone: null }) });
-    expect(node(noPhone.renderer, 'invite-dropdown-view-conversation').props.disabled).toBe(true);
-    pressRow(noPhone.renderer, 'invite-dropdown-view-conversation');
-    expect(noPhone.handlers.onOpenWhatsApp).not.toHaveBeenCalled();
+  it('"Ver conversa" fires onOpenWhatsApp when a phone exists', async () => {
+    const { handlers } = await renderDropdown({ speech: makeSpeech({ speaker_phone: '+15550009' }) });
+    fireEvent.press(row('invite-dropdown-view-conversation'));
+    expect(handlers.onOpenWhatsApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Ver conversa" is disabled and does not fire without a phone', async () => {
+    const { handlers } = await renderDropdown({
+      speech: makeSpeech({ contact_phone: null, speaker_phone: null }),
+    });
+    const el = row('invite-dropdown-view-conversation');
+    expect(el).toBeDisabled();
+    fireEvent.press(el);
+    expect(handlers.onOpenWhatsApp).not.toHaveBeenCalled();
   });
 });

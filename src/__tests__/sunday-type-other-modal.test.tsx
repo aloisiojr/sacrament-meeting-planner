@@ -37,7 +37,6 @@ jest.mock('./icons', () => ({ ChevronDownIcon: () => null }));
 jest.mock('../components/StatusLED', () => ({ StatusLED: () => null }));
 jest.mock('./StatusLED', () => ({ StatusLED: () => null }));
 
-// @ts-expect-error test env flag
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 import { SundayTypeDropdown } from '../components/SundayCard';

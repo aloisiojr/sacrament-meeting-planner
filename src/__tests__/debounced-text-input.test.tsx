@@ -6,7 +6,6 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DebouncedTextInput } from '../components/DebouncedTextInput';
 
-// @ts-expect-error test env flag
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 const input = (r: TestRenderer.ReactTestRenderer) =>

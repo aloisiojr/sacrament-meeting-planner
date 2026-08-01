@@ -25,3 +25,6 @@ jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock
 
 // Gesture Handler: installs its own jest globals.
 require('react-native-gesture-handler/jestSetup');
+
+// RNTL >= 12.4 registers its element matchers (toBeDisabled, toBeOnTheScreen, ...) from the main
+// entry point, so no extend-expect import is needed here.

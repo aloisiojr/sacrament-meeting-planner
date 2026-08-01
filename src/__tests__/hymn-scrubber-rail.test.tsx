@@ -9,7 +9,6 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HymnScrubberRail, HYMN_RAIL_ROW_H } from '../components/HymnScrubberRail';
 
-// @ts-expect-error test env flag
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 const colors = { primary: '#0aa' } as any;

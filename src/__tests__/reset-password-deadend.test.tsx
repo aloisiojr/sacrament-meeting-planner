@@ -2,13 +2,11 @@
  * Behavioral test for the reset-password dead-end fix (P1 #7): when no recovery session can be
  * established, the screen must show an error + a back-to-login escape instead of an infinite spinner.
  *
- * `react-native` is aliased to a test stub (vitest.config.ts). supabase.auth / expo-router are mocked.
+ * Renders against real React Native via jest-expo; supabase.auth / expo-router are mocked.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Mock state, driven per test ---
 const mockParams = { value: {} as { token?: string; type?: string } };
@@ -26,7 +24,16 @@ jest.mock('react-i18next', () => {
 jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ colors: { background: '#000', text: '#fff', textSecondary: '#aaa', primary: '#07f', error: '#f00', errorContainer: '#300', inputBackground: '#111', inputBorder: '#222', placeholder: '#555', onPrimary: '#fff' } }),
 }));
-jest.mock('../lib/supabase', () => ({ supabase: { auth: mockAuthMock } }));
+// `auth` is a getter on purpose: babel-jest hoists this factory above `const mockAuthMock`, and
+// the factory runs while the screen module is being imported — i.e. before that const is
+// initialised. Reading it eagerly would capture `undefined`.
+jest.mock('../lib/supabase', () => ({
+  supabase: {
+    get auth() {
+      return mockAuthMock;
+    },
+  },
+}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplaceMock }),
   useLocalSearchParams: () => mockParams.value,
@@ -34,12 +41,8 @@ jest.mock('expo-router', () => ({
 
 import ResetPasswordScreen from '../app/(auth)/reset-password';
 
-function renderScreen() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(ResetPasswordScreen));
-  });
-  return renderer;
+async function renderScreen() {
+  await rtlRender(<ResetPasswordScreen />);
 }
 
 beforeEach(() => {
@@ -61,19 +64,15 @@ describe('reset-password dead-end escape (P1 #7)', () => {
     mockParams.value = { token: 'tok', type: 'recovery' };
     mockAuthMock.verifyOtp.mockImplementation(() => Promise.resolve({ error: { message: 'expired' } }));
 
-    const renderer = renderScreen();
+    await renderScreen();
     // Flush the verifyOtp promise.
     await act(async () => { await Promise.resolve(); });
 
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('auth.resetExpired');
-    expect(json).toContain('auth.backToLogin');
+    expect(screen.getByText('auth.resetExpired')).toBeOnTheScreen();
+    const escape = screen.getByText('auth.backToLogin');
 
-    // Back-to-login escape is wired to router.replace. The error screen has exactly one
-    // pressable (the back-to-login link).
-    const links = renderer.root.findAll((n) => typeof n.props?.onPress === 'function');
-    expect(links.length).toBeGreaterThan(0);
-    act(() => { (links[0].props.onPress as () => void)(); });
+    // Back-to-login escape is wired to router.replace.
+    await fireEvent.press(escape);
     expect(mockReplaceMock).toHaveBeenCalledWith('/(auth)/login');
   });
 
@@ -81,14 +80,13 @@ describe('reset-password dead-end escape (P1 #7)', () => {
     jest.useFakeTimers();
     mockParams.value = {};
 
-    const renderer = renderScreen();
+    await renderScreen();
     // Flush getSession microtask (resolves to no session).
     await act(async () => { await Promise.resolve(); });
     // Advance past the 8s safety window.
     await act(async () => { jest.advanceTimersByTime(8000); });
 
-    const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain('auth.resetExpired');
-    expect(json).toContain('auth.backToLogin');
+    expect(screen.getByText('auth.resetExpired')).toBeOnTheScreen();
+    expect(screen.getByText('auth.backToLogin')).toBeOnTheScreen();
   });
 });

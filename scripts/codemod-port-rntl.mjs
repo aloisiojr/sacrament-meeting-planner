@@ -79,6 +79,23 @@ for (const file of files) {
     (_m, id) => `await fireEvent.press(screen.getByTestId('${id}'));`
   );
 
+  // 4b. act(() => { (node(..,'id').props.onX as ...)(arg) }) -> await fireEvent.x(el, arg)
+  //     Covers the block-bodied form the arrow-bodied rule in 4 does not reach.
+  s = s.replace(
+    /act\(\(\) => \{\s*\n\s*\((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.onChangeText as [^)]*\)\('([^']*)'\);\s*\n\s*\}\);/g,
+    (_m, id, val) => `await fireEvent.changeText(screen.getByTestId('${id}'), '${val}');`
+  );
+  s = s.replace(
+    /act\(\(\) => \{\s*\n\s*\((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.onPress as [^)]*\)\(\);\s*\n\s*\}\);/g,
+    (_m, id) => `await fireEvent.press(screen.getByTestId('${id}'));`
+  );
+
+  // 4c. a render helper that returned the now-removed local
+  s = s.replace(
+    /^(\s*)return renderer;$/m,
+    "$1return null; // call-site compatibility; the helpers query `screen`"
+  );
+
   // 5. async call sites
   s = s.replace(
     /(\bit\(\s*(['"`])(?:[^\2\\]|\\.)*?\2\s*,\s*)\(\)\s*=>/g,

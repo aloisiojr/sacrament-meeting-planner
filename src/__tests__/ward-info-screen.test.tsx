@@ -5,11 +5,9 @@
  * `react-native` is aliased to a test stub (vitest.config.ts).
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUpdateMock = jest.fn(
   (_input: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.()
@@ -37,16 +35,13 @@ jest.mock('../hooks/useWard', () => ({
 
 import WardInfoScreen from '../app/(tabs)/settings/ward';
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(WardInfoScreen));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(<WardInfoScreen />);
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-function node(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID)[0];
+function node(_renderer: unknown, testID: string) {
+  return screen.getByTestId(testID);
 }
 
 beforeEach(() => {
@@ -57,33 +52,25 @@ beforeEach(() => {
 });
 
 describe('WardInfoScreen (P2 gap B)', () => {
-  it('seeds inputs from the loaded ward info', () => {
-    const renderer = render();
+  it('seeds inputs from the loaded ward info', async () => {
+    const renderer = await render();
     expect(node(renderer, 'ward-info-name').props.value).toBe('Alpha Ward');
     expect(node(renderer, 'ward-info-stake').props.value).toBe('Beta Stake');
   });
 
-  it('persists name and stake on save', () => {
-    const renderer = render();
-    act(() => {
-      (node(renderer, 'ward-info-name').props.onChangeText as (v: string) => void)('New Ward');
-    });
-    act(() => {
-      (node(renderer, 'ward-info-save').props.onPress as () => void)();
-    });
+  it('persists name and stake on save', async () => {
+    const renderer = await render();
+    await fireEvent.changeText(screen.getByTestId('ward-info-name'), 'New Ward');
+    await fireEvent.press(screen.getByTestId('ward-info-save'));
     expect(mockUpdateMock).toHaveBeenCalledTimes(1);
     expect(mockUpdateMock.mock.calls[0][0]).toEqual({ name: 'New Ward', stake_name: 'Beta Stake' });
   });
 
-  it('blocks saving when a field is blank', () => {
+  it('blocks saving when a field is blank', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const renderer = render();
-    act(() => {
-      (node(renderer, 'ward-info-stake').props.onChangeText as (v: string) => void)('   ');
-    });
-    act(() => {
-      (node(renderer, 'ward-info-save').props.onPress as () => void)();
-    });
+    const renderer = await render();
+    await fireEvent.changeText(screen.getByTestId('ward-info-stake'), '   ');
+    await fireEvent.press(screen.getByTestId('ward-info-save'));
     expect(mockUpdateMock).not.toHaveBeenCalled();
     expect(alertSpy).toHaveBeenCalled();
     alertSpy.mockRestore();

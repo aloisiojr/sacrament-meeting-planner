@@ -38,10 +38,18 @@ module.exports = {
   // Watchman is present on this machine but not usable (fchmod EPERM on its state dir),
   // and jest's haste map hard-errors instead of falling back. Use node crawling.
   watchman: false,
+  // iOS and Android only — the two platforms this app ships. Running both is the point: the old
+  // single-environment setup pinned Platform.OS to 'ios', which left 9 platform branches dead,
+  // including the Android notification-channel path in hooks/useNotifications.ts.
+  //
+  // `jest-expo/web` is deliberately not a project. Under it RN primitives map to DOM nodes, but
+  // RNTL still renders through the React Native test renderer, which enforces "text must live in
+  // <Text>" and so throws an Invariant Violation on every screen. That is a runner conflict, not
+  // an app defect. The app's web build is a secondary target (5 Platform.OS === 'web' branches);
+  // if it ever needs coverage, Playwright against the real web bundle is the honest tool.
   projects: [
     { ...common, preset: 'jest-expo/ios', displayName: 'ios' },
     { ...common, preset: 'jest-expo/android', displayName: 'android' },
-    { ...common, preset: 'jest-expo/web', displayName: 'web' },
   ],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

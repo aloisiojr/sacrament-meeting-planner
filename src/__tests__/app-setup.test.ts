@@ -1,16 +1,16 @@
 describe('App Setup', () => {
   it('should have the correct app name in package.json', async () => {
-    const pkg = await import('../../package.json');
+    const pkg = require('../../package.json');
     expect(pkg.name).toBe('sacrament-meeting-planner');
   });
 
   it('should use expo-router/entry as main entry point', async () => {
-    const pkg = await import('../../package.json');
+    const pkg = require('../../package.json');
     expect(pkg.main).toBe('expo-router/entry');
   });
 
   it('should have all required dependencies', async () => {
-    const pkg = await import('../../package.json');
+    const pkg = require('../../package.json');
     const deps = pkg.dependencies as Record<string, string>;
 
     const requiredDeps = [
@@ -37,7 +37,7 @@ describe('App Setup', () => {
   });
 
   it('should target a supported Expo SDK (>= 57)', async () => {
-    const pkg = await import('../../package.json');
+    const pkg = require('../../package.json');
     const deps = pkg.dependencies as Record<string, string>;
     const major = Number(deps.expo.match(/(\d+)/)?.[1]);
     expect(major).toBeGreaterThanOrEqual(57);

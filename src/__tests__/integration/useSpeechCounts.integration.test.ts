@@ -245,7 +245,7 @@ describe('useSpeechCounts integration', () => {
 
 describe('sync.ts speechCountKeys integration (AC-046-09)', () => {
   it('speeches table in TABLE_TO_QUERY_KEYS includes speechCountKeys.all', async () => {
-    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    const { TABLE_TO_QUERY_KEYS } = require('../../lib/sync') as typeof import('../../lib/sync');
     const speechesKeys = TABLE_TO_QUERY_KEYS.speeches;
     expect(speechesKeys).toBeDefined();
 
@@ -257,7 +257,7 @@ describe('sync.ts speechCountKeys integration (AC-046-09)', () => {
   });
 
   it('speeches table still includes speechKeys.all', async () => {
-    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    const { TABLE_TO_QUERY_KEYS } = require('../../lib/sync') as typeof import('../../lib/sync');
     const speechesKeys = TABLE_TO_QUERY_KEYS.speeches;
 
     // Should also contain speechKeys.all = ['speeches']
@@ -268,7 +268,7 @@ describe('sync.ts speechCountKeys integration (AC-046-09)', () => {
   });
 
   it('speeches table has exactly 2 query key entries', async () => {
-    const { TABLE_TO_QUERY_KEYS } = await import('../../lib/sync');
+    const { TABLE_TO_QUERY_KEYS } = require('../../lib/sync') as typeof import('../../lib/sync');
     expect(TABLE_TO_QUERY_KEYS.speeches).toHaveLength(2);
   });
 });

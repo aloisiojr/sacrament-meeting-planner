@@ -8,10 +8,12 @@
  */
 
 // AsyncStorage: native module, no JS fallback. Official mock from the package itself.
-jest.mock(
-  '@react-native-async-storage/async-storage',
-  () => require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
+// The mock is CommonJS (`module.exports = asMock`) while the app imports the default export,
+// so it has to be re-wrapped as an ES module.
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const asMock = require('@react-native-async-storage/async-storage/jest/async-storage-mock');
+  return { __esModule: true, default: asMock, ...asMock };
+});
 
 // NetInfo: native module. Official mock; individual tests override per-scenario.
 jest.mock('@react-native-community/netinfo', () =>

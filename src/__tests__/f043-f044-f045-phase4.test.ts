@@ -170,19 +170,19 @@ describe('F044 (CR-260): Remove Agenda Change History', () => {
     });
 
     it('useAgenda module exports do not include logAction', async () => {
-      const agendaModule = await import('../hooks/useAgenda');
+      const agendaModule = require('../hooks/useAgenda');
       const exportedKeys = Object.keys(agendaModule);
       expect(exportedKeys).not.toContain('logAction');
       expect(exportedKeys).not.toContain('buildLogDescription');
     });
 
     it('useUpdateAgenda is still exported and is a function', async () => {
-      const agendaModule = await import('../hooks/useAgenda');
+      const agendaModule = require('../hooks/useAgenda');
       expect(typeof agendaModule.useUpdateAgenda).toBe('function');
     });
 
     it('useUpdateAgendaByDate is still exported and is a function', async () => {
-      const agendaModule = await import('../hooks/useAgenda');
+      const agendaModule = require('../hooks/useAgenda');
       expect(typeof agendaModule.useUpdateAgendaByDate).toBe('function');
     });
   });
@@ -190,56 +190,56 @@ describe('F044 (CR-260): Remove Agenda Change History', () => {
   // --- AC-044-04: I18n keys for agenda actions are removed ---
   describe('AC-044-04: Agenda-related i18n keys removed from all locales', () => {
     it('pt-BR does not contain agenda_edit key', async () => {
-      const ptBR = await import('../i18n/locales/pt-BR.json');
-      const events = (ptBR.default as any).activityLog?.events ?? {};
+      const ptBR = require('../i18n/locales/pt-BR.json');
+      const events = (ptBR as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_edit');
     });
 
     it('pt-BR does not contain agenda_last_minute_speech key', async () => {
-      const ptBR = await import('../i18n/locales/pt-BR.json');
-      const events = (ptBR.default as any).activityLog?.events ?? {};
+      const ptBR = require('../i18n/locales/pt-BR.json');
+      const events = (ptBR as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech');
     });
 
     it('pt-BR does not contain agenda_last_minute_speech_removed key', async () => {
-      const ptBR = await import('../i18n/locales/pt-BR.json');
-      const events = (ptBR.default as any).activityLog?.events ?? {};
+      const ptBR = require('../i18n/locales/pt-BR.json');
+      const events = (ptBR as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech_removed');
     });
 
     it('en-US does not contain agenda_edit key', async () => {
-      const enUS = await import('../i18n/locales/en-US.json');
-      const events = (enUS.default as any).activityLog?.events ?? {};
+      const enUS = require('../i18n/locales/en-US.json');
+      const events = (enUS as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_edit');
     });
 
     it('en-US does not contain agenda_last_minute_speech key', async () => {
-      const enUS = await import('../i18n/locales/en-US.json');
-      const events = (enUS.default as any).activityLog?.events ?? {};
+      const enUS = require('../i18n/locales/en-US.json');
+      const events = (enUS as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech');
     });
 
     it('en-US does not contain agenda_last_minute_speech_removed key', async () => {
-      const enUS = await import('../i18n/locales/en-US.json');
-      const events = (enUS.default as any).activityLog?.events ?? {};
+      const enUS = require('../i18n/locales/en-US.json');
+      const events = (enUS as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech_removed');
     });
 
     it('es-LA does not contain agenda_edit key', async () => {
-      const esLA = await import('../i18n/locales/es-LA.json');
-      const events = (esLA.default as any).activityLog?.events ?? {};
+      const esLA = require('../i18n/locales/es-LA.json');
+      const events = (esLA as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_edit');
     });
 
     it('es-LA does not contain agenda_last_minute_speech key', async () => {
-      const esLA = await import('../i18n/locales/es-LA.json');
-      const events = (esLA.default as any).activityLog?.events ?? {};
+      const esLA = require('../i18n/locales/es-LA.json');
+      const events = (esLA as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech');
     });
 
     it('es-LA does not contain agenda_last_minute_speech_removed key', async () => {
-      const esLA = await import('../i18n/locales/es-LA.json');
-      const events = (esLA.default as any).activityLog?.events ?? {};
+      const esLA = require('../i18n/locales/es-LA.json');
+      const events = (esLA as any).activityLog?.events ?? {};
       expect(events).not.toHaveProperty('agenda_last_minute_speech_removed');
     });
   });
@@ -247,33 +247,33 @@ describe('F044 (CR-260): Remove Agenda Change History', () => {
   // --- AC-044-03: History screen works for other entry types ---
   describe('AC-044-03: Activity log module still works for other entry types', () => {
     it('logAction function is still exported from activityLog module', async () => {
-      const module = await import('../lib/activityLog');
+      const module = require('../lib/activityLog');
       expect(typeof module.logAction).toBe('function');
     });
 
     it('buildLogDescription is still exported', async () => {
-      const module = await import('../lib/activityLog');
+      const module = require('../lib/activityLog');
       expect(typeof module.buildLogDescription).toBe('function');
     });
 
     it('parseLogDescription is still exported', async () => {
-      const module = await import('../lib/activityLog');
+      const module = require('../lib/activityLog');
       expect(typeof module.parseLogDescription).toBe('function');
     });
 
     it('formatLogDescription is still exported', async () => {
-      const module = await import('../lib/activityLog');
+      const module = require('../lib/activityLog');
       expect(typeof module.formatLogDescription).toBe('function');
     });
 
     it('buildLogDescription still produces pipe-delimited format for non-agenda types', async () => {
-      const { buildLogDescription } = await import('../lib/activityLog');
+      const { buildLogDescription } = require('../lib/activityLog');
       const result = buildLogDescription('member:create', { nome: 'Maria Silva' });
       expect(result).toBe('member:create|nome=Maria Silva');
     });
 
     it('parseLogDescription still parses non-agenda types correctly', async () => {
-      const { parseLogDescription } = await import('../lib/activityLog');
+      const { parseLogDescription } = require('../lib/activityLog');
       const result = parseLogDescription('member:create|nome=Maria Silva');
       expect(result).not.toBeNull();
       expect(result!.actionType).toBe('member:create');

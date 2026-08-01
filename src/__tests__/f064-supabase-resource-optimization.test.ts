@@ -510,7 +510,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       return createMockChain({ data: null, error: null });
     });
 
-    const { useActiveTopics } = await import('../hooks/useTopics');
+    const { useActiveTopics } = require('../hooks/useTopics');
     const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useActiveTopics(), {
@@ -556,7 +556,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       return createMockChain({ data: null, error: null });
     });
 
-    const { useActiveTopics } = await import('../hooks/useTopics');
+    const { useActiveTopics } = require('../hooks/useTopics');
     const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useActiveTopics(), {
@@ -590,7 +590,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       return createMockChain({ data: null, error: null });
     });
 
-    const { useActiveTopics } = await import('../hooks/useTopics');
+    const { useActiveTopics } = require('../hooks/useTopics');
     const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useActiveTopics(), {
@@ -638,7 +638,7 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
       return createMockChain({ data: null, error: null });
     });
 
-    const { useActiveTopics } = await import('../hooks/useTopics');
+    const { useActiveTopics } = require('../hooks/useTopics');
     const queryClient = createTestQueryClient();
 
     const { result } = renderHook(() => useActiveTopics(), {

@@ -50,7 +50,7 @@ describe('F047: Cache Persistence configuration', () => {
 
   describe('@tanstack/query-async-storage-persister package', () => {
     it('exports createAsyncStoragePersister', async () => {
-      const mod = await import('@tanstack/query-async-storage-persister');
+      const mod = require('@tanstack/query-async-storage-persister');
       expect(mod.createAsyncStoragePersister).toBeDefined();
       expect(typeof mod.createAsyncStoragePersister).toBe('function');
     });
@@ -58,14 +58,14 @@ describe('F047: Cache Persistence configuration', () => {
 
   describe('@tanstack/react-query-persist-client package', () => {
     it('exports PersistQueryClientProvider', async () => {
-      const mod = await import('@tanstack/react-query-persist-client');
+      const mod = require('@tanstack/react-query-persist-client');
       expect(mod.PersistQueryClientProvider).toBeDefined();
     });
   });
 
   describe('QueryClient gcTime behavior', () => {
     it('gcTime 7 days keeps cache entries for offline use', async () => {
-      const { QueryClient } = await import('@tanstack/react-query');
+      const { QueryClient } = require('@tanstack/react-query');
       const client = new QueryClient({
         defaultOptions: {
           queries: {
@@ -78,7 +78,7 @@ describe('F047: Cache Persistence configuration', () => {
     });
 
     it('staleTime 5 minutes is preserved alongside gcTime', async () => {
-      const { QueryClient } = await import('@tanstack/react-query');
+      const { QueryClient } = require('@tanstack/react-query');
       const staleTime = 1000 * 60 * 5;
       const client = new QueryClient({
         defaultOptions: {

@@ -19,24 +19,24 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
   // --- AC-F053-03 / AC-F053-07: i18n key auth.registrationFailed exists ---
   describe('AC-F053-03 / AC-F053-07: auth.registrationFailed i18n key', () => {
     it('pt-BR has auth.registrationFailed key with correct value', async () => {
-      const ptBR = (await import('../i18n/locales/pt-BR.json')).default;
+      const ptBR = require('../i18n/locales/pt-BR.json');
       expect(ptBR.auth.registrationFailed).toBe('Falha ao criar conta. Tente novamente.');
     });
 
     it('en-US has auth.registrationFailed key with correct value', async () => {
-      const enUS = (await import('../i18n/locales/en-US.json')).default;
+      const enUS = require('../i18n/locales/en-US.json');
       expect(enUS.auth.registrationFailed).toBe('Failed to create account. Please try again.');
     });
 
     it('es-LA has auth.registrationFailed key with correct value', async () => {
-      const esLA = (await import('../i18n/locales/es-LA.json')).default;
+      const esLA = require('../i18n/locales/es-LA.json');
       expect(esLA.auth.registrationFailed).toBe('Error al crear la cuenta. Intente nuevamente.');
     });
 
     it('auth.registrationFailed is non-empty in all locales', async () => {
-      const ptBR = (await import('../i18n/locales/pt-BR.json')).default;
-      const enUS = (await import('../i18n/locales/en-US.json')).default;
-      const esLA = (await import('../i18n/locales/es-LA.json')).default;
+      const ptBR = require('../i18n/locales/pt-BR.json');
+      const enUS = require('../i18n/locales/en-US.json');
+      const esLA = require('../i18n/locales/es-LA.json');
       expect(ptBR.auth.registrationFailed.length).toBeGreaterThan(0);
       expect(enUS.auth.registrationFailed.length).toBeGreaterThan(0);
       expect(esLA.auth.registrationFailed.length).toBeGreaterThan(0);
@@ -46,19 +46,19 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
   // --- AC-F053-01: email_exists error code maps to auth.emailExists ---
   describe('AC-F053-01: email_exists error mapping', () => {
     it('auth.emailExists key exists in pt-BR', async () => {
-      const ptBR = (await import('../i18n/locales/pt-BR.json')).default;
+      const ptBR = require('../i18n/locales/pt-BR.json');
       expect(ptBR.auth.emailExists).toBeDefined();
       expect(ptBR.auth.emailExists.length).toBeGreaterThan(0);
     });
 
     it('auth.emailExists key exists in en-US', async () => {
-      const enUS = (await import('../i18n/locales/en-US.json')).default;
+      const enUS = require('../i18n/locales/en-US.json');
       expect(enUS.auth.emailExists).toBeDefined();
       expect(enUS.auth.emailExists.length).toBeGreaterThan(0);
     });
 
     it('auth.emailExists key exists in es-LA', async () => {
-      const esLA = (await import('../i18n/locales/es-LA.json')).default;
+      const esLA = require('../i18n/locales/es-LA.json');
       expect(esLA.auth.emailExists).toBeDefined();
       expect(esLA.auth.emailExists.length).toBeGreaterThan(0);
     });
@@ -67,19 +67,19 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
   // --- AC-F053-02: stake_ward_exists error code maps to auth.stakeWardExists ---
   describe('AC-F053-02: stake_ward_exists error mapping', () => {
     it('auth.stakeWardExists key exists in pt-BR', async () => {
-      const ptBR = (await import('../i18n/locales/pt-BR.json')).default;
+      const ptBR = require('../i18n/locales/pt-BR.json');
       expect(ptBR.auth.stakeWardExists).toBeDefined();
       expect(ptBR.auth.stakeWardExists.length).toBeGreaterThan(0);
     });
 
     it('auth.stakeWardExists key exists in en-US', async () => {
-      const enUS = (await import('../i18n/locales/en-US.json')).default;
+      const enUS = require('../i18n/locales/en-US.json');
       expect(enUS.auth.stakeWardExists).toBeDefined();
       expect(enUS.auth.stakeWardExists.length).toBeGreaterThan(0);
     });
 
     it('auth.stakeWardExists key exists in es-LA', async () => {
-      const esLA = (await import('../i18n/locales/es-LA.json')).default;
+      const esLA = require('../i18n/locales/es-LA.json');
       expect(esLA.auth.stakeWardExists).toBeDefined();
       expect(esLA.auth.stakeWardExists.length).toBeGreaterThan(0);
     });
@@ -88,9 +88,9 @@ describe('F053 (CR-263): Friendly Registration Error Messages', () => {
   // --- AC-F053-04: auth.requiresConnection key for network errors ---
   describe('AC-F053-04: auth.requiresConnection for network errors', () => {
     it('auth.requiresConnection exists in all 3 locales', async () => {
-      const ptBR = (await import('../i18n/locales/pt-BR.json')).default;
-      const enUS = (await import('../i18n/locales/en-US.json')).default;
-      const esLA = (await import('../i18n/locales/es-LA.json')).default;
+      const ptBR = require('../i18n/locales/pt-BR.json');
+      const enUS = require('../i18n/locales/en-US.json');
+      const esLA = require('../i18n/locales/es-LA.json');
       expect(ptBR.auth.requiresConnection).toBeDefined();
       expect(enUS.auth.requiresConnection).toBeDefined();
       expect(esLA.auth.requiresConnection).toBeDefined();

@@ -30,7 +30,7 @@ const HYMNS: Hymn[] = [
 // Partial react-native mock: give FlatList a real ref (scrollToOffset spy) and render its rows.
 jest.mock('react-native', async () => {
   const actual = (await jest.requireActual('./stubs/react-native')) as Record<string, unknown>;
-  const ReactMod = (await import('react')).default;
+  const ReactMod = require('react');
   const FlatList = ReactMod.forwardRef((props: any, ref: any) => {
     ReactMod.useImperativeHandle(ref, () => ({ scrollToOffset: mockH.scrollToOffset }));
     const data: any[] = props.data ?? [];

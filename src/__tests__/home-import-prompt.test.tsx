@@ -17,7 +17,7 @@ jest.mock('../contexts/ThemeContext', () => ({ useTheme: () => ({ colors: { card
 jest.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ wardId: 'w1', hasPermission: () => mockState.canManage }) }));
 jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockState.members, isSuccess: true }) }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPushMock }) }));
-jest.mock('@react-native-async-storage/async-storage', () => ({ default: mockAsyncStore }));
+jest.mock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: mockAsyncStore }));
 
 import { HomeMemberImportPrompt } from '../components/HomeMemberImportPrompt';
 

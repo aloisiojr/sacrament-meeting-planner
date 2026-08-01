@@ -116,7 +116,7 @@ describe('F052: Settings Tab Offline UI Logic', () => {
 
   describe('Settings imports useOnlineStatus', () => {
     it('OnlineStatusContext exports useOnlineStatus', async () => {
-      const mod = await import('../contexts/OnlineStatusContext');
+      const mod = require('../contexts/OnlineStatusContext');
       expect(typeof mod.useOnlineStatus).toBe('function');
     });
   });

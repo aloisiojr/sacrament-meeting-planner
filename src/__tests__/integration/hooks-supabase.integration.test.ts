@@ -390,7 +390,7 @@ describe('useTopics integration', () => {
 
 describe('useSundayList integration', () => {
   it('generates sunday dates (AC-082-10)', async () => {
-    const { useSundayList } = await import('../../hooks/useSundayList');
+    const { useSundayList } = require('../../hooks/useSundayList') as typeof import('../../hooks/useSundayList');
 
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSundayList(), { wrapper });

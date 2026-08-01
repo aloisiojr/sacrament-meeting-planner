@@ -187,7 +187,7 @@ describe('F047: Cache Persistence Behavior', () => {
 
   describe('AC-047-05: Loading state while restoring cache', () => {
     it('PersistQueryClientProvider is exported from the persist-client package', async () => {
-      const mod = await import('@tanstack/react-query-persist-client');
+      const mod = require('@tanstack/react-query-persist-client');
       expect(mod.PersistQueryClientProvider).toBeDefined();
       expect(typeof mod.PersistQueryClientProvider).toBe('function');
     });

@@ -79,7 +79,7 @@ jest.mock('../components/PeoplePicker', () => ({
 // reimplement the pure \n-join helpers here and stub the UI to expose onAddPress via a testID for
 // the recognition field only (the sole usage that passes onAddPress).
 jest.mock('../components/EditableListField', async () => {
-  const ReactMod = (await import('react')).default;
+  const ReactMod = require('react');
   const parseItems = (value: string | string[] | null): string[] =>
     Array.isArray(value)
       ? value.filter((s) => s.trim() !== '')
@@ -98,7 +98,7 @@ jest.mock('../components/EditableListField', async () => {
 jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
 
 jest.mock('react-native-svg', async () => {
-  const ReactMod = (await import('react')).default;
+  const ReactMod = require('react');
   const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
   return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
 });

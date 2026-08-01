@@ -61,7 +61,7 @@ jest.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (
 jest.mock('../contexts/OnlineStatusContext', () => ({ useOnlineStatus: () => mockState.online }));
 
 jest.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(require('react').Fragment, {}, children),
 }));
 jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 jest.mock('../components/AgendaForm', () => ({

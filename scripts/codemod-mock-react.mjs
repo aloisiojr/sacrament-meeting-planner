@@ -64,9 +64,9 @@ for (const file of files) {
     }
 
     const block = src.slice(j, end + 1);
-    const rewritten = block.replace(/\bReact\.createElement\b/g, () => {
+    const rewritten = block.replace(/\bReact\.(createElement|Fragment)\b/g, (_m, prop) => {
       hits++;
-      return "require('react').createElement";
+      return `require('react').${prop}`;
     });
 
     out += src.slice(i, j) + rewritten;

@@ -72,7 +72,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockState.back }),
 }));
 jest.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(require('react').Fragment, {}, children),
 }));
 jest.mock('../components/PeoplePicker', () => ({
   PeoplePicker: (props: { onSelect: (m: Member) => void }) => {

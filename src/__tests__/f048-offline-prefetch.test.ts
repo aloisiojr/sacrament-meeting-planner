@@ -34,7 +34,7 @@ describe('F048: useOfflinePrefetch', () => {
     });
 
     it('first date is the same as getTodaySundayDate', async () => {
-      const { getTodaySundayDate } = await import('../hooks/usePresentationMode');
+      const { getTodaySundayDate } = require('../hooks/usePresentationMode');
       const sundays = getNext3Sundays();
       expect(sundays[0]).toBe(getTodaySundayDate());
     });
@@ -77,7 +77,7 @@ describe('F048: useOfflinePrefetch', () => {
 
   describe('useOfflinePrefetch export', () => {
     it('exports useOfflinePrefetch function', async () => {
-      const mod = await import('../hooks/useOfflinePrefetch');
+      const mod = require('../hooks/useOfflinePrefetch');
       expect(typeof mod.useOfflinePrefetch).toBe('function');
     });
   });

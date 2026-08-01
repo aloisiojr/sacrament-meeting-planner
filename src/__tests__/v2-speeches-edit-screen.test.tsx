@@ -72,7 +72,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../components/ErrorBoundary', () => ({
-  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(React.Fragment, {}, children),
+  ThemedErrorBoundary: ({ children }: { children?: React.ReactNode }) => require('react').createElement(require('react').Fragment, {}, children),
 }));
 jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 jest.mock('../components/TopicSelectorModal', () => ({ TopicSelectorModal: () => null }));

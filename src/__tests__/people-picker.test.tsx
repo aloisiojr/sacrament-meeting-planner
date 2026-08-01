@@ -62,12 +62,6 @@ jest.mock('../hooks/useSpeechCounts', () => ({
 }));
 
 // `react-native-svg` (pulled in via icons/SearchInput) ships untransformed Flow/TS — stub it.
-jest.mock('react-native-svg', () => {
-  const ReactMod = require('react');
-  const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
-  return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
-});
-
 // Partial mock: keep initReactI18next (used by the real i18n loaded via the useMembers chain).
 jest.mock('react-i18next', () => {
   const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;

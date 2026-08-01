@@ -97,12 +97,6 @@ jest.mock('../components/EditableListField', () => {
 
 jest.mock('../components/DebouncedTextInput', () => ({ DebouncedTextInput: () => null }));
 
-jest.mock('react-native-svg', () => {
-  const ReactMod = require('react');
-  const host = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
-  return { default: host('Svg'), Svg: host('Svg'), Path: host('Path'), Circle: host('Circle') };
-});
-
 jest.mock('react-i18next', () => {
   const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
   return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };

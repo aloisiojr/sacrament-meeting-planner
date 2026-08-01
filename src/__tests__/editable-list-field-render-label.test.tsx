@@ -40,12 +40,6 @@ jest.mock('react-native-draggable-flatlist', () => {
   return { default: DraggableFlatList, ScaleDecorator };
 });
 
-jest.mock('react-native-svg', () => {
-  const ReactMod = require('react');
-  const h = (name: string) => (props: Record<string, unknown>) => ReactMod.createElement(name, props);
-  return { default: h('Svg'), Svg: h('Svg'), Path: h('Path'), Circle: h('Circle') };
-});
-
 jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
     colors: {

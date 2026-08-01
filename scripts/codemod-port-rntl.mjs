@@ -42,8 +42,13 @@ for (const file of files) {
 
   // 2. render helper: unwrap the act(...) + TestRenderer.create(...) sandwich
   s = s.replace(
-    /let renderer!: TestRenderer\.ReactTestRenderer;\s*\n\s*act\(\(\) => \{\s*\n\s*renderer = TestRenderer\.create\(([\s\S]*?)\);\s*\n\s*\}\);/g,
-    (_m, inner) => `await rtlRender(${inner.trim()});`
+    /let (\w+)!: TestRenderer\.ReactTestRenderer;\s*\n\s*act\(\(\) => \{\s*\n\s*\1 = TestRenderer\.create\(([\s\S]*?)\);\s*\n\s*\}\);/g,
+    (_m, _name, inner) => `await rtlRender(${inner.trim()});`
+  );
+  // the same sandwich written on one line
+  s = s.replace(
+    /let (\w+)!: TestRenderer\.ReactTestRenderer;\s*\n\s*act\(\(\) => \{?\s*\1 = TestRenderer\.create\(([\s\S]*?)\)\s*;?\s*\}?\);/g,
+    (_m, _name, inner) => `await rtlRender(${inner.trim()});`
   );
 
   // 3. tree-access helpers -> screen queries (signatures preserved)
@@ -90,6 +95,17 @@ for (const file of files) {
     (_m, id) => `await fireEvent.press(screen.getByTestId('${id}'));`
   );
 
+  // 4d. single-line act(() => (node(..,'id').props.onX as ...)(arg))
+  s = s.replace(
+    /act\(\(\) => \((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.onChangeText as [^)]*\)\('([^']*)'\)\);/g,
+    (_m, id, val) => `await fireEvent.changeText(screen.getByTestId('${id}'), '${val}');`
+  );
+  s = s.replace(
+    /act\(\(\) => \((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.on(Blur|SubmitEditing|EndEditing|Focus) as [^)]*\)\(\)\);/g,
+    (_m, id, ev) =>
+      `await fireEvent(screen.getByTestId('${id}'), '${ev.charAt(0).toLowerCase()}${ev.slice(1)}');`
+  );
+
   // 4c. a render helper that returned the now-removed local
   s = s.replace(
     /^(\s*)return renderer;$/m,
@@ -109,8 +125,8 @@ for (const file of files) {
   s = s.replace(/^function render\(/m, 'async function render(');
 
   // 7. the `renderer` local is gone; keep the key so destructuring call sites still work
-  s = s.replace(/return \{ renderer,/g, 'return { renderer: null,');
-  s = s.replace(/return \{ renderer \};/g, 'return { renderer: null };');
+  s = s.replace(/return \{ (renderer|r|tree)\s*,/g, 'return { $1: null,');
+  s = s.replace(/return \{ (renderer|r|tree)\s*\};/g, 'return { $1: null };');
 
   // 8. leftover type references to the removed renderer
   s = s.replace(/^type Node = TestRenderer\.TestInstance;\n\n?/m, '');

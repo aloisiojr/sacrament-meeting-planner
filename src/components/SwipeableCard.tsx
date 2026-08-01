@@ -5,6 +5,12 @@
  * Only one card can be revealed at a time (managed by parent via activeId).
  */
 
+/* eslint-disable react-hooks/immutability --
+ * Assigning `sharedValue.value` IS the Reanimated API for driving an animation; the rule
+ * treats it as mutating a captured binding. There is no non-mutating alternative — the
+ * shared value is the mutable handle by design. Scoped to this file, not silenced globally.
+ */
+
 import React, { useCallback, useEffect } from 'react';
 import {
   View,

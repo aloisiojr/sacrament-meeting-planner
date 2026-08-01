@@ -9,11 +9,13 @@
  */
 
 import React from 'react';
+import type { ColorValue } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 export interface IconProps {
   size?: number;
-  color?: string;
+  // ColorValue (not string): RN 0.86 types navigator-supplied colors as ColorValue.
+  color?: ColorValue;
 }
 
 // --- Stroke-based Lucide icons ---

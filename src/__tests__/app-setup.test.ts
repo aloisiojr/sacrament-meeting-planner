@@ -38,9 +38,10 @@ describe('App Setup', () => {
     }
   });
 
-  it('should target Expo SDK 54', async () => {
+  it('should target a supported Expo SDK (>= 57)', async () => {
     const pkg = await import('../../package.json');
     const deps = pkg.dependencies as Record<string, string>;
-    expect(deps.expo).toMatch(/54/);
+    const major = Number(deps.expo.match(/(\d+)/)?.[1]);
+    expect(major).toBeGreaterThanOrEqual(57);
   });
 });

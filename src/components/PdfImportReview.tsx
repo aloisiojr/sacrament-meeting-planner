@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   },
   btn: { paddingVertical: 10, paddingHorizontal: 8, minWidth: 88, minHeight: 44, justifyContent: 'center' },
   btnText: { fontSize: 16 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   dialog: { width: '100%', maxWidth: 420, borderRadius: 14, padding: 20 },
   dialogTitle: { fontSize: 16, fontWeight: '700', marginBottom: 14 },
   dialogRow: { flexDirection: 'row', gap: 12 },

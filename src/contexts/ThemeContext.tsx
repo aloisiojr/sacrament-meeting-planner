@@ -75,9 +75,12 @@ export function ThemeProvider({ children, initialPreference }: ThemeProviderProp
   // Resolve the actual theme based on preference and system scheme
   const mode: ResolvedTheme = useMemo(() => {
     if (preference === 'automatic') {
-      if (systemScheme === null || systemScheme === undefined) {
-        // EC-CR022-1: useColorScheme returns null -> fallback to light with log
-        console.warn('ThemeContext: useColorScheme returned null, falling back to light');
+      // RN 0.86 widened ColorSchemeName to include 'unspecified' alongside null/undefined.
+      if (systemScheme !== 'light' && systemScheme !== 'dark') {
+        // EC-CR022-1: no resolvable system scheme -> fallback to light with log
+        console.warn(
+          `ThemeContext: useColorScheme returned ${String(systemScheme)}, falling back to light`
+        );
         return 'light';
       }
       return systemScheme;

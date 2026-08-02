@@ -32,7 +32,7 @@ async function render() {
   await act(async () => { await Promise.resolve(); });
   return null;
 }
-const find = (r: unknown, id: string) => screen.root!.queryAll((n) => n.props?.testID === id);
+const find = (_r: unknown, id: string) => screen.queryAllByTestId(id);
 
 beforeEach(() => {
   mockState.members = [];
@@ -68,14 +68,14 @@ describe('HomeMemberImportPrompt (AC14)', () => {
 
   it('dismiss hides it and persists the flag', async () => {
     const r = await render();
-    await act(async () => { (find(r, 'home-import-prompt-dismiss')[0].props.onPress as () => void)(); });
+    await fireEvent.press(screen.getByTestId('home-import-prompt-dismiss'));
     expect(find(r, 'home-import-prompt')).toHaveLength(0);
     expect(mockAsyncStore.setItem).toHaveBeenCalledWith('pdf-import-prompt-dismissed:w1', '1');
   });
 
   it('import navigates to the members screen', async () => {
     const r = await render();
-    await act(async () => { (find(r, 'home-import-prompt-action')[0].props.onPress as () => void)(); });
+    await fireEvent.press(screen.getByTestId('home-import-prompt-action'));
     expect(mockPushMock).toHaveBeenCalledWith('/(tabs)/settings/members');
   });
 });

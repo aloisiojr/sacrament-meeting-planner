@@ -105,7 +105,7 @@ function allText(renderer: unknown): string {
       walk((node as { children: unknown }).children);
     }
   };
-  walk(renderer.toJSON() as unknown);
+  walk(screen.toJSON() as unknown);
   return out.join('|');
 }
 
@@ -139,7 +139,7 @@ beforeEach(() => {
 describe('Sacrament-prayer interstitial (P2/P3)', () => {
   it('renders the "text to read" icon on the Sacrament Hymn row', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
+    await act(async () => { expandCard(r, 1); });
     const buttons = findByTestID(r, 'sacrament-prayer-icon-button');
     // Doubled by the RN stub (component + host); at least one is present.
     expect(buttons.length).toBeGreaterThan(0);
@@ -149,8 +149,8 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
 
   it('tapping the icon shows the interstitial with the exact bread + water prayers', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
-    act(() => {
+    await act(async () => { expandCard(r, 1); });
+    await act(async () => {
       press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
@@ -165,12 +165,12 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
 
   it('closing via the X button hides the interstitial', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
-    act(() => {
+    await act(async () => { expandCard(r, 1); });
+    await act(async () => {
       press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
-    act(() => {
+    await act(async () => {
       press(r, 'sacrament-prayer-close-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
@@ -178,12 +178,12 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
 
   it('tapping the backdrop (outside the panel) hides the interstitial', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
-    act(() => {
+    await act(async () => { expandCard(r, 1); });
+    await act(async () => {
       press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
-    act(() => {
+    await act(async () => {
       press(r, 'sacrament-prayer-backdrop');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);

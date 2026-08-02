@@ -90,8 +90,8 @@ for (const file of files) {
   s = s.replace(/\b\w+\.root\.findAll\(/g, 'screen.root!.queryAll(');
   s = s.replace(/\broot\.findAll\(/g, 'screen.root!.queryAll(');
   // helper params that were typed to the old renderer/instance
-  s = s.replace(/\((\w+): Node\)/g, '(_$1?: unknown)');
-  s = s.replace(/\((\w+): Node, /g, '(_$1: unknown, ');
+  s = s.replace(/\((\w+): Node\)/g, '($1?: unknown)');
+  s = s.replace(/\((\w+): Node, /g, '($1: unknown, ');
 
   // 4. direct prop invocation -> real events
   s = s.replace(
@@ -141,7 +141,7 @@ for (const file of files) {
   s = s.replace(/\bawait await\b/g, 'await');
 
   // 6. the local render helper is async now
-  s = s.replace(/^function render\(/m, 'async function render(');
+  s = s.replace(/^(?!async )function render\(/m, 'async function render(');
 
   // 7. the `renderer` local is gone; keep the key so destructuring call sites still work
   s = s.replace(/return \{ (renderer|r|tree)\s*,/g, 'return { $1: null,');

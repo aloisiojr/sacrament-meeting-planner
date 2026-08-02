@@ -51,10 +51,10 @@ async function render() {
 function nodes(_r: unknown, testID: string) {
   return screen.queryAllByTestId(testID);
 }
-function setText(r: unknown, testID: string, text: string) {
-  act(() => (nodes(r, testID)[0].props.onChangeText as (t: string) => void)(text));
+async function setText(_r: unknown, testID: string, text: string) {
+  await fireEvent.changeText(screen.getByTestId(testID), text);
 }
-async function press(_r: unknown, testID: string) {
+async function press(__r: unknown, testID: string) {
   await fireEvent.press(screen.getByTestId(testID));
 }
 
@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('TopicSelectorModal (v2 overhaul)', () => {
   it('search matches both the title and the library name', async () => {
     const { r } = await render();
-    setText(r, 'topic-selector-search-input', 'april'); // matches GEN's collection
+    await setText(r, 'topic-selector-search-input', 'april'); // matches GEN's collection
     expect(nodes(r, 'topic-row-g1').length).toBe(1);
     expect(nodes(r, 'topic-row-w1').length).toBe(0);
   });
@@ -83,7 +83,7 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
 
   it('add button creates a custom topic prefilled from search (AC7)', async () => {
     const { r } = await render();
-    setText(r, 'topic-selector-search-input', 'Novo Tema');
+    await setText(r, 'topic-selector-search-input', 'Novo Tema');
     press(r, 'topic-add-button');
     expect(nodes(r, 'topic-editor').length).toBe(1);
     expect(nodes(r, 'topic-edit-title')[0].props.value).toBe('Novo Tema');
@@ -95,8 +95,8 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     const { r } = await render();
     press(r, 'topic-edit-w1');
     expect(nodes(r, 'topic-edit-title')[0].props.value).toBe('Fé');
-    setText(r, 'topic-edit-title', 'Fé em Cristo');
-    setText(r, 'topic-edit-link', 'http://y');
+    await setText(r, 'topic-edit-title', 'Fé em Cristo');
+    await setText(r, 'topic-edit-link', 'http://y');
     press(r, 'topic-edit-confirm');
     expect(mockState.update).toHaveBeenCalledWith({ id: 'w1', title: 'Fé em Cristo', link: 'http://y' });
   });
@@ -105,7 +105,7 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { r } = await render();
     press(r, 'topic-edit-w1');
-    setText(r, 'topic-edit-title', '  ');
+    await setText(r, 'topic-edit-title', '  ');
     press(r, 'topic-edit-confirm');
     expect(alertSpy).toHaveBeenCalled();
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];

@@ -209,7 +209,14 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
               returnKeyType="done"
             />
           )}
-          <Pressable hitSlop={6} onPress={() => handleDelete(idx)}>
+          <Pressable
+            hitSlop={6}
+            onPress={() => handleDelete(idx)}
+            // Icon-only control: without a testID/label it is unreachable both to a screen
+            // reader and to any query that is not walking the raw element tree.
+            testID={`editable-list-delete-${idx}`}
+            accessibilityRole="button"
+          >
             <XIcon size={18} color={colors.textSecondary} />
           </Pressable>
         </View>

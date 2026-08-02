@@ -96,17 +96,9 @@ describe('EditableListField renderItemLabel', () => {
     expect(text).toContain('Alice — Bispo');
     expect(text).toContain('Bob — Bispo');
 
-    // onItemPress receives the RAW item (no calling suffix).
-    const itemPressables = screen.root!.queryAll(
-      (n) =>
-        typeof n.type === 'string' &&
-        n.type === 'Pressable' &&
-        typeof n.props.onPress === 'function' &&
-        n.queryAll((c: any) => typeof c.type === 'string' && c.type === 'Text').length > 0
-    );
-    await act(async () => {
-      (itemPressables[0].props.onPress as () => void)();
-    });
+    // onItemPress receives the RAW item (no calling suffix). Press the row by its displayed
+    // label — real Pressable renders a View, so there is no host node named 'Pressable' to find.
+    await fireEvent.press(screen.getByText('Alice — Bispo'));
     expect(onItemPress).toHaveBeenCalledWith(0, 'Alice');
   });
 
@@ -121,17 +113,9 @@ describe('EditableListField renderItemLabel', () => {
       renderItemLabel: LABEL,
     });
 
-    // The delete control is the Pressable with onPress that contains an Svg (XIcon).
-    const deleteBtns = screen.root!.queryAll(
-      (n) =>
-        typeof n.type === 'string' &&
-        n.type === 'Pressable' &&
-        typeof n.props.onPress === 'function' &&
-        n.queryAll((c: any) => typeof c.type === 'string' && c.type === 'Svg').length > 0
-    );
-    await act(async () => {
-      (deleteBtns[0].props.onPress as () => void)();
-    });
+    // The delete control is icon-only; it now carries a testID (and a button role) so it is
+    // reachable both here and by a screen reader.
+    await fireEvent.press(screen.getByTestId('editable-list-delete-0'));
     // Raw remaining item, not "Bob — Bispo".
     expect(onSave).toHaveBeenCalledWith('Bob');
   });

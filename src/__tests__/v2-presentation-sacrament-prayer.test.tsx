@@ -113,23 +113,18 @@ function findByTestID(renderer: unknown, testID: string) {
   return screen.root!.queryAll((n) => n.props?.testID === testID);
 }
 
-function press(renderer: unknown, testID: string): void {
-  const target = findByTestID(renderer, testID)[0];
-  (target.props.onPress as () => void)();
+async function press(_renderer: unknown, testID: string): Promise<void> {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
 // AccordionCard renders only the expanded card's body. The Sacrament Hymn field lives in the
 // second card (Designations & Sacrament), so expand it before asserting on its content.
-function expandCard(renderer: unknown, index: number): void {
-  // The RN stub renders each primitive as a function component wrapping a same-named host element,
-  // so every header appears twice; keep only the component instances (non-string type) to index.
-  const headers = screen.root!.queryAll(
-    (n) =>
-      typeof n.type !== 'string' &&
-      typeof (n.props?.accessibilityState as { expanded?: boolean } | undefined)?.expanded ===
-        'boolean'
-  );
-  (headers[index].props.onPress as () => void)();
+/** Accordion headers are the buttons exposing accessibilityState.expanded; press the nth. */
+async function expandCard(_renderer: unknown, index: number): Promise<void> {
+  const headers = screen
+    .queryAllByRole('button')
+    .filter((n) => typeof n.props?.accessibilityState?.expanded === 'boolean');
+  await fireEvent.press(headers[index]);
 }
 
 beforeEach(() => {
@@ -139,7 +134,7 @@ beforeEach(() => {
 describe('Sacrament-prayer interstitial (P2/P3)', () => {
   it('renders the "text to read" icon on the Sacrament Hymn row', async () => {
     const r = await render();
-    await act(async () => { expandCard(r, 1); });
+    await act(async () => { await expandCard(r, 1); });
     const buttons = findByTestID(r, 'sacrament-prayer-icon-button');
     // Doubled by the RN stub (component + host); at least one is present.
     expect(buttons.length).toBeGreaterThan(0);
@@ -149,9 +144,9 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
 
   it('tapping the icon shows the interstitial with the exact bread + water prayers', async () => {
     const r = await render();
-    await act(async () => { expandCard(r, 1); });
+    await act(async () => { await expandCard(r, 1); });
     await act(async () => {
-      press(r, 'sacrament-prayer-icon-button');
+      await press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
 
@@ -165,26 +160,26 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
 
   it('closing via the X button hides the interstitial', async () => {
     const r = await render();
-    await act(async () => { expandCard(r, 1); });
+    await act(async () => { await expandCard(r, 1); });
     await act(async () => {
-      press(r, 'sacrament-prayer-icon-button');
+      await press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
     await act(async () => {
-      press(r, 'sacrament-prayer-close-button');
+      await press(r, 'sacrament-prayer-close-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
   });
 
   it('tapping the backdrop (outside the panel) hides the interstitial', async () => {
     const r = await render();
-    await act(async () => { expandCard(r, 1); });
+    await act(async () => { await expandCard(r, 1); });
     await act(async () => {
-      press(r, 'sacrament-prayer-icon-button');
+      await press(r, 'sacrament-prayer-icon-button');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBeGreaterThan(0);
     await act(async () => {
-      press(r, 'sacrament-prayer-backdrop');
+      await press(r, 'sacrament-prayer-backdrop');
     });
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
   });

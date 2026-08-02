@@ -10,13 +10,12 @@
  * buildUnifiedCardData is left REAL so the asserted props reflect the true mapping.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import type { TestInstance as Node } from 'test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { Speech, SundayAgenda, SundayException } from '../types/database';
 // Imported after the (hoisted) jest.mock calls below take effect.
 import AgendaTab from '../app/(tabs)/agenda';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DATE = '2026-08-02';
 
@@ -146,20 +145,16 @@ function makeSpeech(position: number, over: Partial<Speech> = {}): Speech {
   };
 }
 
-type Node = TestRenderer.TestInstance;
-function unifiedCards(root: Node): Node[] {
-  return root.findAll((n) => n.type === 'UnifiedSundayCard');
+function unifiedCards(root?: unknown): Node[] {
+  return screen.root!.queryAll((n) => n.type === 'UnifiedSundayCard');
 }
-function byTestID(root: Node, testID: string): Node[] {
-  return root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function byTestID(root: unknown, testID: string): Node[] {
+  return screen.root!.queryAll((n) => typeof n.type === 'string' && n.props.testID === testID);
 }
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(AgendaTab));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(AgendaTab));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
 beforeEach(() => {
@@ -175,9 +170,9 @@ beforeEach(() => {
 });
 
 describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
-  it('renders each collapsed Sunday via UnifiedSundayCard with mapped data', () => {
-    const { root } = render();
-    const cards = unifiedCards(root);
+  it('renders each collapsed Sunday via UnifiedSundayCard with mapped data', async () => {
+    await render();
+    const cards = unifiedCards(null);
     expect(cards.length).toBe(1);
     const card = cards[0];
     expect(card.props.testID).toBe(`agenda-card-${DATE}`);
@@ -190,91 +185,86 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
     expect(rows[0].name).toBe('Alice');
   });
 
-  it('tapping the speakers area pushes the speeches edit route', () => {
-    const { root } = render();
-    const card = unifiedCards(root)[0];
-    act(() => {
+  it('tapping the speakers area pushes the speeches edit route', async () => {
+    await render();
+    const card = unifiedCards(null)[0];
+    await act(async () => {
       (card.props.onPressSpeakers as (d: string) => void)(DATE);
     });
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: DATE } });
   });
 
-  it('tapping the status area toggles the inline expanded agenda body', () => {
-    const { root } = render();
+  it('tapping the status area toggles the inline expanded agenda body', async () => {
+    await render();
     // Collapsed: no expanded body yet.
-    expect(byTestID(root, 'mock-agenda-form').length).toBe(0);
+    expect(byTestID(null, 'mock-agenda-form').length).toBe(0);
 
-    const card = unifiedCards(root)[0];
-    act(() => {
+    const card = unifiedCards(null)[0];
+    await act(async () => {
       (card.props.onPressStatus as (d: string) => void)(DATE);
     });
     // Expanded: the agenda form + type dropdown + play button appear.
-    expect(byTestID(root, 'mock-agenda-form').length).toBe(1);
-    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
-    expect(byTestID(root, `agenda-play-${DATE}`).length).toBe(1);
+    expect(byTestID(null, 'mock-agenda-form').length).toBe(1);
+    expect(byTestID(null, 'mock-type-dropdown').length).toBe(1);
+    expect(byTestID(null, `agenda-play-${DATE}`).length).toBe(1);
 
     // Tapping the compact header collapses it back.
-    act(() => {
-      (byTestID(root, `agenda-header-${DATE}`)[0].props.onPress as () => void)();
-    });
-    expect(byTestID(root, 'mock-agenda-form').length).toBe(0);
+    await fireEvent.press(screen.getByTestId(`agenda-header-${DATE}`));
+    expect(byTestID(null, 'mock-agenda-form').length).toBe(0);
   });
 
-  it('when expanded: header has DateBlock + Play + collapse chevron; type dropdown in its own section', () => {
-    const { root } = render();
-    act(() => {
-      (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(DATE);
+  it('when expanded: header has DateBlock + Play + collapse chevron; type dropdown in its own section', async () => {
+    await render();
+    await act(async () => {
+      (unifiedCards(null)[0].props.onPressStatus as (d: string) => void)(DATE);
     });
     // Header: DateBlock + Play "Iniciar" + a collapse chevron. Collapsed roles/counts card is gone.
-    expect(root.findAll((n) => n.type === 'DateBlock').length).toBe(1);
-    expect(byTestID(root, `agenda-play-${DATE}`).length).toBe(1);
-    expect(byTestID(root, `agenda-collapse-${DATE}`).length).toBe(1);
+    expect(screen.root!.queryAll((n) => n.type === 'DateBlock').length).toBe(1);
+    expect(byTestID(null, `agenda-play-${DATE}`).length).toBe(1);
+    expect(byTestID(null, `agenda-collapse-${DATE}`).length).toBe(1);
     // Type dropdown moved out of the header into the "Tipo de Domingo" section (still rendered).
-    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
-    expect(unifiedCards(root).length).toBe(0);
+    expect(byTestID(null, 'mock-type-dropdown').length).toBe(1);
+    expect(unifiedCards(null).length).toBe(0);
 
     // Tapping the collapse chevron collapses back to the collapsed card.
-    act(() => {
-      (byTestID(root, `agenda-collapse-${DATE}`)[0].props.onPress as () => void)();
+    await fireEvent.press(screen.getByTestId(`agenda-collapse-${DATE}`));
+    expect(unifiedCards(null).length).toBe(1);
+  });
+
+  it('a no-sacrament expanded card renders the type dropdown but no AgendaForm or Play', async () => {
+    mockState.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
+    await render();
+    // Expand via the collapsed card's status tap zone. This used to throw for conference
+    // Sundays; reaching the assertions below is what proves the regression stays fixed.
+    await act(async () => {
+      (unifiedCards(null)[0].props.onPressStatus as (d: string) => void)(DATE);
     });
-    expect(unifiedCards(root).length).toBe(1);
-  });
-
-  it('a no-sacrament expanded card renders the type dropdown but no AgendaForm or Play', () => {
-    mockState.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
-    const { root } = render();
-    // Expand via the collapsed card's status tap zone — must not throw (conference regression).
-    expect(() => {
-      act(() => {
-        (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(DATE);
-      });
-    }).not.toThrow();
     // Compact header with type dropdown, but no AgendaForm and no Play for a no-sacrament Sunday.
-    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
-    expect(root.findAll((n) => n.type === 'DateBlock').length).toBe(1);
-    expect(byTestID(root, 'mock-agenda-form').length).toBe(0);
-    expect(byTestID(root, `agenda-play-${DATE}`).length).toBe(0);
+    expect(byTestID(null, 'mock-type-dropdown').length).toBe(1);
+    expect(screen.root!.queryAll((n) => n.type === 'DateBlock').length).toBe(1);
+    expect(byTestID(null, 'mock-agenda-form').length).toBe(0);
+    expect(byTestID(null, `agenda-play-${DATE}`).length).toBe(0);
   });
 
-  it('passes onPressStatus to a no-sacrament collapsed card so tapping it expands', () => {
+  it('passes onPressStatus to a no-sacrament collapsed card so tapping it expands', async () => {
     mockState.exceptions = [{ date: DATE, reason: 'general_conference', custom_reason: null } as SundayException];
-    const { root } = render();
-    const card = unifiedCards(root)[0];
+    await render();
+    const card = unifiedCards(null)[0];
     expect(card.props.exceptionReason).toBe('general_conference');
     // The whole-card tap zone (see UnifiedSundayCard tests) is wired to this handler.
     expect(typeof card.props.onPressStatus).toBe('function');
-    act(() => {
+    await act(async () => {
       (card.props.onPressStatus as (d: string) => void)(DATE);
     });
-    expect(byTestID(root, 'mock-type-dropdown').length).toBe(1);
+    expect(byTestID(null, 'mock-type-dropdown').length).toBe(1);
   });
 
-  it('passes testimony exception + prayer rows through to the card (managePrayers on)', () => {
+  it('passes testimony exception + prayer rows through to the card (managePrayers on)', async () => {
     mockState.managePrayers = true;
     mockState.exceptions = [{ date: DATE, reason: 'testimony_meeting', custom_reason: null } as SundayException];
     mockState.speeches = [makeSpeech(0, { speaker_name: 'Opener' }), makeSpeech(4)];
-    const { root } = render();
-    const card = unifiedCards(root)[0];
+    await render();
+    const card = unifiedCards(null)[0];
     expect(card.props.exceptionReason).toBe('testimony_meeting');
     const rows = card.props.nameRows as { key: string }[];
     expect(rows.map((r) => r.key)).toEqual(['prayer-0', 'prayer-4']);
@@ -291,18 +281,18 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
       mockState.agendas = [makeAgenda({ sunday_date: PAST, attendance: 85 })];
     });
 
-    it('passes isPast + attendance through to the collapsed card', () => {
-      const { root } = render();
-      const card = unifiedCards(root)[0];
+    it('passes isPast + attendance through to the collapsed card', async () => {
+      await render();
+      const card = unifiedCards(null)[0];
       expect(card.props.isPast).toBe(true);
       expect(card.props.attendance).toBe(85);
       expect(typeof card.props.onSetAttendance).toBe('function');
     });
 
-    it('persists a new attendance value via updateAgendaByDate (lazy-create + update)', () => {
-      const { root } = render();
-      const card = unifiedCards(root)[0];
-      act(() => {
+    it('persists a new attendance value via updateAgendaByDate (lazy-create + update)', async () => {
+      await render();
+      const card = unifiedCards(null)[0];
+      await act(async () => {
         (card.props.onSetAttendance as (v: number | null) => void)(120);
       });
       expect(mockUpdateByDateMutate).toHaveBeenCalledWith({
@@ -311,23 +301,21 @@ describe('Agendas tab → UnifiedSundayCard (phase 4)', () => {
       });
     });
 
-    it('shows the AttendanceBlock in the expanded header for a past sacrament Sunday (AC7)', () => {
-      const { root } = render();
-      act(() => {
-        (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(PAST);
+    it('shows the AttendanceBlock in the expanded header for a past sacrament Sunday (AC7)', async () => {
+      await render();
+      await act(async () => {
+        (unifiedCards(null)[0].props.onPressStatus as (d: string) => void)(PAST);
       });
-      expect(byTestID(root, `agenda-attendance-${PAST}`).length).toBeGreaterThan(0);
+      expect(byTestID(null, `agenda-attendance-${PAST}`).length).toBeGreaterThan(0);
     });
   });
 
-  it('the expanded-header Play control navigates to /presentation (AC10)', () => {
-    const { root } = render();
-    act(() => {
-      (unifiedCards(root)[0].props.onPressStatus as (d: string) => void)(DATE);
+  it('the expanded-header Play control navigates to /presentation (AC10)', async () => {
+    await render();
+    await act(async () => {
+      (unifiedCards(null)[0].props.onPressStatus as (d: string) => void)(DATE);
     });
-    act(() => {
-      (byTestID(root, `agenda-play-${DATE}`)[0].props.onPress as () => void)();
-    });
+    await fireEvent.press(screen.getByTestId(`agenda-play-${DATE}`));
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: DATE } });
   });
 });

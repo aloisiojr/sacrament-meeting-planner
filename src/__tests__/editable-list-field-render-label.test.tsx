@@ -7,12 +7,10 @@
  * and `onItemPress` all operate on the RAW item.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 // jest.mock calls below are hoisted above this import.
 import { EditableListField } from '../components/EditableListField';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // DraggableFlatList: render each item through renderItem so rows appear in the tree.
 jest.mock('react-native-draggable-flatlist', () => {
@@ -37,7 +35,7 @@ jest.mock('react-native-draggable-flatlist', () => {
     );
   };
   const ScaleDecorator = (props: { children?: React.ReactNode }) => props.children;
-  return { default: DraggableFlatList, ScaleDecorator };
+  return { __esModule: true, default: DraggableFlatList, ScaleDecorator };
 });
 
 jest.mock('../contexts/ThemeContext', () => ({
@@ -59,17 +57,14 @@ interface Props {
   renderItemLabel?: (item: string) => string;
 }
 
-function render(props: Props) {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(EditableListField, props));
-  });
-  return renderer;
+async function render(props: Props) {
+  await rtlRender(React.createElement(EditableListField, props));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
 /** All rendered plain-text strings in the tree. */
-function allText(renderer: TestRenderer.ReactTestRenderer): string {
-  const texts = renderer.root.findAll(
+function allText(renderer: unknown): string {
+  const texts = screen.root!.queryAll(
     (n) => typeof n.type === 'string' && n.type === 'Text'
   );
   const flatten = (c: unknown): string =>
@@ -84,10 +79,10 @@ beforeEach(() => {
 });
 
 describe('EditableListField renderItemLabel', () => {
-  it('active (onItemPress) rows display the transformed label but pass the RAW item on press', () => {
+  it('active (onItemPress) rows display the transformed label but pass the RAW item on press', async () => {
     const onSave = jest.fn();
     const onItemPress = jest.fn();
-    const renderer = render({
+    const renderer = await render({
       value: 'Alice\nBob',
       onSave,
       disabled: false,
@@ -102,22 +97,22 @@ describe('EditableListField renderItemLabel', () => {
     expect(text).toContain('Bob — Bispo');
 
     // onItemPress receives the RAW item (no calling suffix).
-    const itemPressables = renderer.root.findAll(
+    const itemPressables = screen.root!.queryAll(
       (n) =>
         typeof n.type === 'string' &&
         n.type === 'Pressable' &&
         typeof n.props.onPress === 'function' &&
-        n.findAll((c) => typeof c.type === 'string' && c.type === 'Text').length > 0
+        n.queryAll((c: any) => typeof c.type === 'string' && c.type === 'Text').length > 0
     );
-    act(() => {
+    await act(async () => {
       (itemPressables[0].props.onPress as () => void)();
     });
     expect(onItemPress).toHaveBeenCalledWith(0, 'Alice');
   });
 
-  it('deleting a row saves the RAW remaining items (no label transform in stored data)', () => {
+  it('deleting a row saves the RAW remaining items (no label transform in stored data)', async () => {
     const onSave = jest.fn();
-    const renderer = render({
+    const renderer = await render({
       value: 'Alice\nBob',
       onSave,
       disabled: false,
@@ -127,22 +122,22 @@ describe('EditableListField renderItemLabel', () => {
     });
 
     // The delete control is the Pressable with onPress that contains an Svg (XIcon).
-    const deleteBtns = renderer.root.findAll(
+    const deleteBtns = screen.root!.queryAll(
       (n) =>
         typeof n.type === 'string' &&
         n.type === 'Pressable' &&
         typeof n.props.onPress === 'function' &&
-        n.findAll((c) => typeof c.type === 'string' && c.type === 'Svg').length > 0
+        n.queryAll((c: any) => typeof c.type === 'string' && c.type === 'Svg').length > 0
     );
-    act(() => {
+    await act(async () => {
       (deleteBtns[0].props.onPress as () => void)();
     });
     // Raw remaining item, not "Bob — Bispo".
     expect(onSave).toHaveBeenCalledWith('Bob');
   });
 
-  it('disabled rows display the transformed label (display-only)', () => {
-    const renderer = render({
+  it('disabled rows display the transformed label (display-only)', async () => {
+    const renderer = await render({
       value: 'Alice\nBob',
       onSave: jest.fn(),
       disabled: true,
@@ -154,8 +149,8 @@ describe('EditableListField renderItemLabel', () => {
     expect(text).toContain('Bob — Bispo');
   });
 
-  it('without renderItemLabel the raw item is displayed', () => {
-    const renderer = render({
+  it('without renderItemLabel the raw item is displayed', async () => {
+    const renderer = await render({
       value: 'Alice',
       onSave: jest.fn(),
       disabled: false,

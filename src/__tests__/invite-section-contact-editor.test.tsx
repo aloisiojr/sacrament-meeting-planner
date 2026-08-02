@@ -6,14 +6,12 @@
  * mocked openWhatsApp.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { Member, Speech } from '../types/database';
 
 import { InviteManagementSection } from '../components/InviteManagementSection';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Controlled data ---
 
@@ -27,7 +25,7 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 }
 
 const MEMBER = makeMember({ id: 'm-del', full_name: 'Delegate Person', informal_name: 'Del' });
-const MEMBERS = [MEMBER];
+const mockMEMBERS = [MEMBER];
 
 function makeSpeech(over: Partial<Speech>): Speech {
   return {
@@ -90,7 +88,7 @@ jest.mock('../components/PersonEditor', () => ({
   },
 }));
 
-jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockMEMBERS }) }));
 jest.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
 jest.mock('../hooks/useSpeeches', () => {
   const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
@@ -104,20 +102,14 @@ jest.mock('../hooks/useSpeeches', () => {
 
 // --- Helpers ---
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(InviteManagementSection));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(InviteManagementSection));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-async function pressSend(renderer: TestRenderer.ReactTestRenderer) {
-  const btn = renderer.root.findAll(
-    (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'WhatsApp' && typeof n.props.onPress === 'function'
-  )[0];
+async function pressSend(_renderer?: unknown) {
   await act(async () => {
-    await (btn.props.onPress as () => Promise<void>)();
+    await fireEvent.press(screen.getAllByLabelText('WhatsApp')[0]);
   });
 }
 
@@ -131,15 +123,12 @@ beforeEach(() => {
 });
 
 describe('InviteManagementSection — no-phone edit-contact → send-invite flow', () => {
-  it('no-phone Alert offers an "Editar Contato" button (member exists)', () => {
+  it('no-phone Alert offers an "Editar Contato" button (member exists)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
-    const renderer = render();
-    act(() => {
-      const btn = renderer.root.findAll(
-        (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'WhatsApp'
-      )[0];
-      (btn.props.onPress as () => void)();
+    const renderer = await render();
+    await act(async () => {
+      await fireEvent.press(screen.getAllByLabelText('WhatsApp')[0]);
     });
 
     expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -155,17 +144,14 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
   it('saving a contact with a phone triggers the send-invite confirm and sends', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
-    const renderer = render();
+    const renderer = await render();
 
     // 1) Press send → no-phone Alert → invoke "Editar Contato".
-    act(() => {
-      const btn = renderer.root.findAll(
-        (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'WhatsApp'
-      )[0];
-      (btn.props.onPress as () => void)();
+    await act(async () => {
+      await fireEvent.press(screen.getAllByLabelText('WhatsApp')[0]);
     });
     const noPhoneButtons = alertSpy.mock.calls[0][2] as AlertButton[];
-    act(() => {
+    await act(async () => {
       noPhoneButtons.find((b) => b.text === 'home.editContact')!.onPress!();
     });
 
@@ -175,7 +161,7 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
 
     // 3) Save the member (now with a phone) → send-invite confirm Alert appears.
     alertSpy.mockClear();
-    act(() => {
+    await act(async () => {
       mockEditorHolder.props!.onSaved!(makeMember({ id: 'm-del', full_name: 'Delegate Person', country_code: '+55', phone: '11999998888' }));
     });
     expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -196,7 +182,7 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
   it('sends immediately when a phone already exists (no Alert)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
-    const renderer = render();
+    const renderer = await render();
     await pressSend(renderer);
 
     expect(alertSpy).not.toHaveBeenCalled();
@@ -210,7 +196,7 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
     // openWhatsApp reports it could not open (not installed / launch failed).
     mockOpenWhatsAppMock.mockImplementationOnce(() => Promise.resolve(false));
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: '+15550009' })];
-    const renderer = render();
+    const renderer = await render();
     await pressSend(renderer);
 
     expect(mockOpenWhatsAppMock).toHaveBeenCalledTimes(1);

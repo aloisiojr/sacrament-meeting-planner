@@ -3,10 +3,8 @@
  * persists; import navigates to the members screen.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockState = { members: [] as unknown[], canManage: true };
 const mockPushMock = jest.fn();
@@ -17,19 +15,24 @@ jest.mock('../contexts/ThemeContext', () => ({ useTheme: () => ({ colors: { card
 jest.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ wardId: 'w1', hasPermission: () => mockState.canManage }) }));
 jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockState.members, isSuccess: true }) }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPushMock }) }));
-jest.mock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: mockAsyncStore }));
+// Getter: babel-jest hoists this factory above `const mockAsyncStore`, and it runs while the
+// component module is being imported — an eager read would capture undefined.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  get default() {
+    return mockAsyncStore;
+  },
+}));
 
 import { HomeMemberImportPrompt } from '../components/HomeMemberImportPrompt';
 
 async function render() {
-  let r!: TestRenderer.ReactTestRenderer;
-  await act(async () => {
-    r = TestRenderer.create(React.createElement(HomeMemberImportPrompt));
-    await Promise.resolve(); // flush AsyncStorage.getItem
-  });
-  return r;
+  await rtlRender(<HomeMemberImportPrompt />);
+  // Flush the AsyncStorage.getItem the prompt kicks off on mount.
+  await act(async () => { await Promise.resolve(); });
+  return null;
 }
-const find = (r: TestRenderer.ReactTestRenderer, id: string) => r.root.findAll((n) => n.props?.testID === id);
+const find = (r: unknown, id: string) => screen.root!.queryAll((n) => n.props?.testID === id);
 
 beforeEach(() => {
   mockState.members = [];
@@ -72,7 +75,7 @@ describe('HomeMemberImportPrompt (AC14)', () => {
 
   it('import navigates to the members screen', async () => {
     const r = await render();
-    act(() => { (find(r, 'home-import-prompt-action')[0].props.onPress as () => void)(); });
+    await act(async () => { (find(r, 'home-import-prompt-action')[0].props.onPress as () => void)(); });
     expect(mockPushMock).toHaveBeenCalledWith('/(tabs)/settings/members');
   });
 });

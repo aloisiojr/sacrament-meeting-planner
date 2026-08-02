@@ -68,7 +68,7 @@ const DIRECT = makeMember({
   phone: '5550002',
 });
 
-const MEMBERS = [RESPONSIBLE, DELEGATE, DIRECT];
+const mockMEMBERS = [RESPONSIBLE, DELEGATE, DIRECT];
 
 function makeSpeech(id: string, position: number) {
   return {
@@ -148,7 +148,7 @@ jest.mock('../components/PeoplePicker', () => ({
   },
 }));
 
-jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockMEMBERS }) }));
 
 jest.mock('../hooks/useAgenda', () => ({
   useAgenda: () => ({ data: { has_second_speech: true } }),

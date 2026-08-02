@@ -64,7 +64,7 @@ const DIRECT = makeMember({
   phone: '5550002',
 });
 
-const MEMBERS = [RESPONSIBLE, DELEGATE, DIRECT];
+const mockMEMBERS = [RESPONSIBLE, DELEGATE, DIRECT];
 
 const PENDING_ENTRY = {
   date: '2026-08-30',
@@ -142,7 +142,7 @@ jest.mock('../components/PeoplePicker', () => ({
   },
 }));
 
-jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockMEMBERS }) }));
 
 jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: [], isError: false, error: null, refetch: jest.fn() }),

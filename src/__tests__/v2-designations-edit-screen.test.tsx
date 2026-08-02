@@ -95,12 +95,12 @@ function nodes(_renderer: unknown, testID: string) {
   return screen.queryAllByTestId(testID);
 }
 
-async function press(_renderer: unknown, testID: string) {
+async async function press(__renderer: unknown, testID: string) {
   await fireEvent.press(screen.getByTestId(testID));
 }
 
 function selectPerson(member: Member) {
-  act(() => {
+  await act(async () => {
     mockState.pickerOnSelect?.(member);
   });
 }

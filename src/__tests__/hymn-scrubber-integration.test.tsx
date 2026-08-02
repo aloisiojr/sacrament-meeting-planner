@@ -112,6 +112,22 @@ async function renderAndOpenHymnModal() {
 const railOf = (r: unknown) =>
   screen.root!.queryAll((n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-scrubber-rail')[0] as any;
 
+/**
+ * Real PanResponder reads `event.touchHistory.touchBank`; the old stub returned the raw config so
+ * a bare `{ nativeEvent }` was enough. Build a minimally valid responder event instead.
+ */
+function touchEvent(pageY: number) {
+  return {
+    nativeEvent: {
+      pageY, pageX: 0, locationX: 0, locationY: 0, identifier: 1, target: 1,
+      timestamp: 0, touches: [], changedTouches: [],
+    },
+    touchHistory: {
+      touchBank: [], numberActiveTouches: 0, indexOfSingleActiveTouch: 0, mostRecentTimeStamp: 0,
+    },
+  };
+}
+
 beforeEach(() => {
   mockAuth.canWrite = true;
   mockH.scrollToOffset.mockClear();
@@ -143,7 +159,7 @@ describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
     // hymns 1/50/174 → decades {0,50,170} → anchors [1,50,170].
     const rail = railOf(r);
     // A touch well below the band clamps to the last anchor (170).
-    await act(async () => rail.props.onPanResponderGrant({ nativeEvent: { pageY: 100000 } }));
+    await act(async () => rail.props.onResponderGrant(touchEvent(100000)));
     // first hymn >= 170 is 174 at index 2 → offset 2*44.
     expect(mockH.scrollToOffset).toHaveBeenLastCalledWith({ offset: 88, animated: false });
   });

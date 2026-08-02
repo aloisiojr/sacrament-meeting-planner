@@ -63,12 +63,12 @@ describe('HymnScrubberRail', () => {
     const { tree } = render([1, 10, 20, 30, 40]);
     const r = rail(tree);
     // Claim on start + capture so we win over the FlatList underneath.
-    expect(r.props.onStartShouldSetPanResponder()).toBe(true);
-    expect(r.props.onStartShouldSetPanResponderCapture()).toBe(true);
-    expect(r.props.onMoveShouldSetPanResponder()).toBe(true);
-    expect(r.props.onMoveShouldSetPanResponderCapture()).toBe(true);
+    expect(r.props.onStartShouldSetResponder()).toBe(true);
+    expect(r.props.onStartShouldSetResponderCapture()).toBe(true);
+    expect(r.props.onMoveShouldSetResponder()).toBe(true);
+    expect(r.props.onMoveShouldSetResponderCapture()).toBe(true);
     // Do NOT let the list's ScrollView steal the responder once dragging (this was the bug).
-    expect(r.props.onPanResponderTerminationRequest()).toBe(false);
+    expect(r.props.onResponderTerminationRequest()).toBe(false);
     expect(r.props.onShouldBlockNativeResponder()).toBe(true);
   });
 
@@ -79,15 +79,15 @@ describe('HymnScrubberRail', () => {
     act(() => r.props.onLayout({ nativeEvent: { layout: { height: 200 } } }));
 
     // Tap at the position of "20" (index 2) → scrubs to 20 exactly (no mis-mapping).
-    act(() => r.props.onPanResponderGrant({ nativeEvent: { pageY: pageYForIndex(anchors, 2, 200) } }));
+    act(() => r.props.onResponderGrant({ nativeEvent: { pageY: pageYForIndex(anchors, 2, 200) } }));
     expect(onScrubToAnchor).toHaveBeenLastCalledWith(20);
 
     // Drag to the bottom → last anchor.
-    act(() => r.props.onPanResponderMove({ nativeEvent: { pageY: pageYForIndex(anchors, 4, 200) } }));
+    act(() => r.props.onResponderMove({ nativeEvent: { pageY: pageYForIndex(anchors, 4, 200) } }));
     expect(onScrubToAnchor).toHaveBeenLastCalledWith(40);
 
     // Drag to the top → first anchor.
-    act(() => r.props.onPanResponderMove({ nativeEvent: { pageY: pageYForIndex(anchors, 0, 200) } }));
+    act(() => r.props.onResponderMove({ nativeEvent: { pageY: pageYForIndex(anchors, 0, 200) } }));
     expect(onScrubToAnchor).toHaveBeenLastCalledWith(1);
   });
 
@@ -98,13 +98,13 @@ describe('HymnScrubberRail', () => {
     act(() => r.props.onLayout({ nativeEvent: { layout: { height: 200 } } }));
 
     expect(bubble(tree).length).toBe(0);
-    act(() => r.props.onPanResponderGrant({ nativeEvent: { pageY: pageYForIndex(anchors, 4, 200) } }));
+    act(() => r.props.onResponderGrant({ nativeEvent: { pageY: pageYForIndex(anchors, 4, 200) } }));
     const b = bubble(tree);
     expect(b.length).toBe(1);
     const label = b[0].findAll((n: any) => typeof n.type === 'string' && n.type === 'Text')[0];
     expect(label.props.children).toBe(40);
 
-    act(() => r.props.onPanResponderRelease());
+    act(() => r.props.onResponderRelease());
     expect(bubble(tree).length).toBe(0);
   });
 });

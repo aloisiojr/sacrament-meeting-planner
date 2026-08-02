@@ -145,7 +145,7 @@ function makeSpeech(position: number, over: Partial<Speech> = {}): Speech {
   };
 }
 
-function unifiedCards(root?: unknown): Node[] {
+function unifiedCards(_root?: unknown): Node[] {
   return screen.root!.queryAll((n) => n.type === 'UnifiedSundayCard');
 }
 function byTestID(root: unknown, testID: string): Node[] {

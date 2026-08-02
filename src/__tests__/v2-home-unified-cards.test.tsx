@@ -219,7 +219,7 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     expect(byTestID(null, 'invite-management').length).toBe(1);
 
     mockState.online = false;
-    const offline = await render();
+    await render();
     expect(byTestID(null, 'next-assignments').length).toBe(0);
     expect(byTestID(null, 'invite-management').length).toBe(0);
     // Cards remain visible offline (no online guard).

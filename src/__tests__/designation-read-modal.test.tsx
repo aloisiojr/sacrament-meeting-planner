@@ -107,13 +107,13 @@ describe('DesignationReadModal (step 2)', () => {
   });
 
   it('closes via the X button', async () => {
-    const { renderer, onClose } = await render();
+    const { onClose } = await render();
     await fireEvent.press(screen.getByTestId('designation-read-close-button'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('closes via the backdrop', async () => {
-    const { renderer, onClose } = await render();
+    const { onClose } = await render();
     await fireEvent.press(screen.getByTestId('designation-read-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });

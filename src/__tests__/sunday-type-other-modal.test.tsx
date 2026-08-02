@@ -6,7 +6,7 @@
  * propagation on web (mirroring AgendaForm's bottom sheet), so the modal stays open.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 
 // Force web so the stopPropagation guard branch is active. Mock the Platform submodule rather
 // than spreading `react-native` itself — the root module exports lazy getters, and spreading it
@@ -51,7 +51,7 @@ async function render(props: Partial<React.ComponentProps<typeof SundayTypeDropd
   return { tree: null, onSelect };
 }
 
-function findByType(_root: unknown, type: string): any[] {
+function _findByType(_root: unknown, type: string): any[] {
   return screen.root?.queryAll((n: any) => typeof n.type === 'string' && n.type === type) ?? [];
 }
 

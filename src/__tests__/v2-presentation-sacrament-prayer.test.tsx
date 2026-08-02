@@ -94,7 +94,7 @@ async function render() {
 }
 
 // Collect all string leaves in the rendered tree, concatenated per Text node.
-function allText(renderer: unknown): string {
+function allText(_renderer: unknown): string {
   const out: string[] = [];
   const walk = (node: unknown): void => {
     if (typeof node === 'string') {

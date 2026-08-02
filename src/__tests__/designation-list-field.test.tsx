@@ -83,19 +83,19 @@ describe('DesignationListField (step 3)', () => {
   });
 
   it('tapping a row calls onItemPress with its index', async () => {
-    const { renderer, onItemPress } = await render();
+    const { onItemPress } = await render();
     await fireEvent.press(screen.getByTestId('designation-row-1'));
     expect(onItemPress).toHaveBeenCalledWith(1);
   });
 
   it('tapping remove calls onRemove with its index', async () => {
-    const { renderer, onRemove } = await render();
+    const { onRemove } = await render();
     await fireEvent.press(screen.getByTestId('designation-remove-0'));
     expect(onRemove).toHaveBeenCalledWith(0);
   });
 
   it('tapping the add affordance calls onAddPress', async () => {
-    const { renderer, onAddPress } = await render();
+    const { onAddPress } = await render();
     await fireEvent.press(screen.getByTestId('designation-add'));
     expect(onAddPress).toHaveBeenCalledTimes(1);
   });

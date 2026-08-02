@@ -59,7 +59,7 @@ describe('WardInfoScreen (P2 gap B)', () => {
   });
 
   it('persists name and stake on save', async () => {
-    const renderer = await render();
+    await render();
     await fireEvent.changeText(screen.getByTestId('ward-info-name'), 'New Ward');
     await fireEvent.press(screen.getByTestId('ward-info-save'));
     expect(mockUpdateMock).toHaveBeenCalledTimes(1);
@@ -68,7 +68,7 @@ describe('WardInfoScreen (P2 gap B)', () => {
 
   it('blocks saving when a field is blank', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const renderer = await render();
+    await render();
     await fireEvent.changeText(screen.getByTestId('ward-info-stake'), '   ');
     await fireEvent.press(screen.getByTestId('ward-info-save'));
     expect(mockUpdateMock).not.toHaveBeenCalled();

@@ -109,7 +109,7 @@ async function renderAndOpenHymnModal() {
   return null; // call-site compatibility; the helpers query `screen`
 }
 
-const railOf = (r: unknown) =>
+const railOf = (_r: unknown) =>
   screen.root!.queryAll((n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-scrubber-rail')[0] as any;
 
 /**
@@ -165,7 +165,7 @@ describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
   });
 
   it('uses a fixed-height getItemLayout on the FlatList', async () => {
-    const r = await renderAndOpenHymnModal();
+    await renderAndOpenHymnModal();
     const list = screen.root!.queryAll((n: any) => typeof n.type === 'string' && n.type === 'FlatList')[0] as any;
     expect(list.props.getItemLayout(null, 3)).toEqual({ length: 44, offset: 132, index: 3 });
   });

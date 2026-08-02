@@ -126,7 +126,7 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
   it('no-phone Alert offers an "Editar Contato" button (member exists)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
-    const renderer = await render();
+    await render();
     await act(async () => {
       await fireEvent.press(screen.getAllByLabelText('WhatsApp')[0]);
     });
@@ -144,7 +144,7 @@ describe('InviteManagementSection — no-phone edit-contact → send-invite flow
   it('saving a contact with a phone triggers the send-invite confirm and sends', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockSPEECHES = [makeSpeech({ id: 'sp1', member_id: 'm-del', contact_phone: null, speaker_phone: null })];
-    const renderer = await render();
+    await render();
 
     // 1) Press send → no-phone Alert → invoke "Editar Contato".
     await act(async () => {

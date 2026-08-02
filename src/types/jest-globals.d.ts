@@ -4,7 +4,6 @@
  * ~115 test files on the bare global (`jest.mock`, `jest.fn`) without a per-file import.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var jest: (typeof import('@jest/globals'))['jest'];
 }
 

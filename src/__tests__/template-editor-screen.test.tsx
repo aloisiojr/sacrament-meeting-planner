@@ -45,7 +45,7 @@ async function render(props: Partial<React.ComponentProps<typeof TemplateEditorS
   await rtlRender(React.createElement(TemplateEditorScreen, { title: 'Templates', tabs: makeTabs(), onSave, ...props }));
   return { r: null, onSave };
 }
-function node(_r: unknown, testID: string) {
+function _node(_r: unknown, testID: string) {
   return screen.getByTestId(testID);
 }
 async function press(_r: unknown, testID: string) {
@@ -73,7 +73,7 @@ describe('TemplateEditorScreen', () => {
   });
 
   it('raw mode: editing + blur saves the text as typed', async () => {
-    const { r, onSave } = await render({ saveMode: 'raw' });
+    const { onSave } = await render({ saveMode: 'raw' });
     await fireEvent.changeText(screen.getByTestId('template-editor'), 'hello raw');
     await fireEvent(screen.getByTestId('template-editor'), 'blur');
     expect(onSave).toHaveBeenCalledWith('a', 'hello raw');
@@ -88,7 +88,7 @@ describe('TemplateEditorScreen', () => {
   });
 
   it('collapse mode: a real custom value is saved as text', async () => {
-    const { r, onSave } = await render({ saveMode: 'collapse' });
+    const { onSave } = await render({ saveMode: 'collapse' });
     await fireEvent.changeText(screen.getByTestId('template-editor'), 'custom text');
     await fireEvent(screen.getByTestId('template-editor'), 'blur');
     expect(onSave).toHaveBeenCalledWith('a', 'custom text');

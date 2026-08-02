@@ -32,7 +32,7 @@ describe('ThemeContext - Color Palettes', () => {
   describe('Light mode colors', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-      for (const [key, value] of Object.entries(lightColors)) {
+      for (const [_key, value] of Object.entries(lightColors)) {
         const vals = typeof value === 'string' ? [value] : Object.values(value);
         for (const v of vals) expect(v).toMatch(hexRegex);
       }
@@ -44,7 +44,7 @@ describe('ThemeContext - Color Palettes', () => {
 
     it('status dots meet ≥3:1 on the white card AND the hero (H2)', () => {
       for (const bg of lightSurfaces) {
-        for (const [k, v] of Object.entries(lightColors.status)) {
+        for (const [_k, v] of Object.entries(lightColors.status)) {
           const ratio = contrastRatio(v, bg);
           expect(ratio).toBeGreaterThanOrEqual(3);
         }
@@ -79,14 +79,14 @@ describe('ThemeContext - Color Palettes', () => {
   describe('Dark mode colors', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-      for (const [key, value] of Object.entries(darkColors)) {
+      for (const [_key, value] of Object.entries(darkColors)) {
         const vals = typeof value === 'string' ? [value] : Object.values(value);
         for (const v of vals) expect(v).toMatch(hexRegex);
       }
     });
 
     it('status dots meet ≥3:1 on the dark card (incl. gave_up, H2)', () => {
-      for (const [k, v] of Object.entries(darkColors.status)) {
+      for (const [_k, v] of Object.entries(darkColors.status)) {
         const ratio = contrastRatio(v, darkColors.card);
         expect(ratio).toBeGreaterThanOrEqual(3);
       }

@@ -134,7 +134,7 @@ beforeEach(() => {
 
 describe('PersonEditor', () => {
   it('creates a person with identity + capability flags (AC7)', async () => {
-    const { renderer, onSaved, onClose } = await render();
+    const { onSaved, onClose } = await render();
     await change(null, 'person-editor-full-name', 'New Person');
     await change(null, 'person-editor-phone', '11999');
     await toggleSwitch(null, 'person-editor-cap-switch-preside');
@@ -161,7 +161,7 @@ describe('PersonEditor', () => {
     mockCreateMock.mockImplementationOnce((_input: unknown, opts?: MutateOpts) =>
       opts?.onError?.(new Error('insert failed'))
     );
-    const { renderer, onClose } = await render();
+    const { onClose } = await render();
     await change(null, 'person-editor-full-name', 'New Person');
     await press(null, 'person-editor-save');
 
@@ -251,7 +251,7 @@ describe('PersonEditor', () => {
     expect(find(null, 'person-editor-delete').length).toBe(0);
 
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const editView = await render({ member });
+    await render({ member });
     expect(find(null, 'person-editor-delete').length).toBe(1);
   });
 
@@ -265,7 +265,7 @@ describe('PersonEditor', () => {
   it('E5: pressing delete confirms then deletes and closes', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const { renderer, onClose } = await render({ member });
+    const { onClose } = await render({ member });
     await press(null, 'person-editor-delete');
 
     // Alert was raised with a destructive confirm button; invoke it.

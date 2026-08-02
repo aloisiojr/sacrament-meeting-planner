@@ -7,7 +7,7 @@
  * and `onItemPress` all operate on the RAW item.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 // jest.mock calls below are hoisted above this import.
 import { EditableListField } from '../components/EditableListField';
 
@@ -63,7 +63,7 @@ async function render(props: Props) {
 }
 
 /** All rendered plain-text strings in the tree. */
-function allText(renderer: unknown): string {
+function allText(_renderer: unknown): string {
   const texts = screen.root!.queryAll(
     (n) => typeof n.type === 'string' && n.type === 'Text'
   );
@@ -104,7 +104,7 @@ describe('EditableListField renderItemLabel', () => {
 
   it('deleting a row saves the RAW remaining items (no label transform in stored data)', async () => {
     const onSave = jest.fn();
-    const renderer = await render({
+    await render({
       value: 'Alice\nBob',
       onSave,
       disabled: false,

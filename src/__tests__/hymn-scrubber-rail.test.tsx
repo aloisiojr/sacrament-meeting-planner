@@ -7,7 +7,7 @@
  * onLayout; railTop stays 0 because measureInWindow does not resolve under the test renderer.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, act } from '@testing-library/react-native';
 import { HymnScrubberRail, HYMN_RAIL_ROW_H } from '../components/HymnScrubberRail';
 
 

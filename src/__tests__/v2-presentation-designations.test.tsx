@@ -6,7 +6,7 @@
  * can drive the designations list.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 import enUS from '../i18n/locales/en-US.json';
 import PresentationScreen from '../app/presentation';
 import type { Designation } from '../types/database';
@@ -88,7 +88,7 @@ async function render() {
   await rtlRender(React.createElement(PresentationScreen));
   return null; // call-site compatibility; the helpers query `screen`
 }
-function allText(renderer: unknown): string {
+function allText(_renderer: unknown): string {
   const out: string[] = [];
   const walk = (node: unknown): void => {
     if (typeof node === 'string') out.push(node);

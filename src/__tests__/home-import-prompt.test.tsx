@@ -74,7 +74,7 @@ describe('HomeMemberImportPrompt (AC14)', () => {
   });
 
   it('import navigates to the members screen', async () => {
-    const r = await render();
+    await render();
     await fireEvent.press(screen.getByTestId('home-import-prompt-action'));
     expect(mockPushMock).toHaveBeenCalledWith('/(tabs)/settings/members');
   });

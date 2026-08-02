@@ -7,9 +7,8 @@
  */
 import React from 'react';
 import type { TestInstance as Node } from 'test-renderer';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react-native';
 import { UnifiedSundayCard, type UnifiedSundayCardProps, type UnifiedNameRow } from '../components/UnifiedSundayCard';
-import { AttendanceBlock } from '../components/AttendanceBlock';
 
 
 const GREEN = '#22c55e';

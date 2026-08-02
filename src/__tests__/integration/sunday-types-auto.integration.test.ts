@@ -280,7 +280,7 @@ describe('useAutoAssignMissingSundayTypes (wiring)', () => {
   });
 
   it('persists only TODAY-or-future missing dates (skips the past)', async () => {
-    let insertedEntries: Array<{ date: string; reason: string }> | null = null;
+    let insertedEntries: { date: string; reason: string }[] | null = null;
     let call = 0;
     mockedSupabase.from.mockImplementation(() => {
       call++;
@@ -291,7 +291,7 @@ describe('useAutoAssignMissingSundayTypes (wiring)', () => {
           if (p === 'then') return resolved.then.bind(resolved);
           if (p === 'catch') return resolved.catch.bind(resolved);
           if (p === 'finally') return resolved.finally.bind(resolved);
-          if (p === 'insert') return (entries: Array<{ date: string; reason: string }>) => {
+          if (p === 'insert') return (entries: { date: string; reason: string }[]) => {
             insertedEntries = entries;
             return chain;
           };

@@ -107,7 +107,11 @@ describe('HymnScrubberRail', () => {
     expect(onScrubToAnchor).toHaveBeenLastCalledWith(20);
 
     // Drag to the bottom → last anchor.
-    await act(async () => r.props.onResponderMove(touchEvent(pageYForIndex(anchors, 4, 200))));
+    await act(async () =>
+      r.props.onResponderMove(
+        moveEvent(pageYForIndex(anchors, 2, 200), pageYForIndex(anchors, 4, 200))
+      )
+    );
     expect(onScrubToAnchor).toHaveBeenLastCalledWith(40);
 
     // Drag to the top → first anchor.

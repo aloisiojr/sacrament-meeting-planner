@@ -7,11 +7,9 @@
  *  - the rail disappears once a search filter is active (AC5).
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { SundayAgenda, Hymn } from '../types/database';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockH = {
   scrollToOffset: jest.fn(),
@@ -105,22 +103,14 @@ jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
 
 import { AgendaForm } from '../components/AgendaForm';
 
-function renderAndOpenHymnModal() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(AgendaForm, { sundayDate: '2026-01-04', exceptionReason: null })
-    );
-  });
-  const opener = renderer.root.findAll(
-    (n: any) => typeof n.type === 'string' && n.props.testID === 'agenda-opening-hymn-selector'
-  )[0] as any;
-  act(() => opener.props.onPress());
-  return renderer;
+async function renderAndOpenHymnModal() {
+  await rtlRender(<AgendaForm sundayDate="2026-01-04" exceptionReason={null} />);
+  await fireEvent.press(screen.getByTestId('agenda-opening-hymn-selector'));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-const railOf = (r: TestRenderer.ReactTestRenderer) =>
-  r.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-scrubber-rail')[0] as any;
+const railOf = (r: unknown) =>
+  screen.root!.queryAll((n: any) => typeof n.type === 'string' && n.props.testID === 'hymn-scrubber-rail')[0] as any;
 
 beforeEach(() => {
   mockAuth.canWrite = true;
@@ -143,31 +133,31 @@ beforeEach(() => {
 });
 
 describe('Hymn scrubber ↔ AgendaForm HymnSelectorModal', () => {
-  it('renders the rail when the list has enough range and no search is active (AC1)', () => {
-    const r = renderAndOpenHymnModal();
+  it('renders the rail when the list has enough range and no search is active (AC1)', async () => {
+    const r = await renderAndOpenHymnModal();
     expect(railOf(r)).toBeTruthy();
   });
 
-  it('scrubbing the rail scrolls to the first hymn >= the target anchor, using fixed row height (AC2/AC3)', () => {
-    const r = renderAndOpenHymnModal();
+  it('scrubbing the rail scrolls to the first hymn >= the target anchor, using fixed row height (AC2/AC3)', async () => {
+    const r = await renderAndOpenHymnModal();
     // hymns 1/50/174 → decades {0,50,170} → anchors [1,50,170].
     const rail = railOf(r);
     // A touch well below the band clamps to the last anchor (170).
-    act(() => rail.props.onPanResponderGrant({ nativeEvent: { pageY: 100000 } }));
+    await act(async () => rail.props.onPanResponderGrant({ nativeEvent: { pageY: 100000 } }));
     // first hymn >= 170 is 174 at index 2 → offset 2*44.
     expect(mockH.scrollToOffset).toHaveBeenLastCalledWith({ offset: 88, animated: false });
   });
 
-  it('uses a fixed-height getItemLayout on the FlatList', () => {
-    const r = renderAndOpenHymnModal();
-    const list = r.root.findAll((n: any) => typeof n.type === 'string' && n.type === 'FlatList')[0] as any;
+  it('uses a fixed-height getItemLayout on the FlatList', async () => {
+    const r = await renderAndOpenHymnModal();
+    const list = screen.root!.queryAll((n: any) => typeof n.type === 'string' && n.type === 'FlatList')[0] as any;
     expect(list.props.getItemLayout(null, 3)).toEqual({ length: 44, offset: 132, index: 3 });
   });
 
-  it('hides the rail once a search filter is active (AC5)', () => {
-    const r = renderAndOpenHymnModal();
+  it('hides the rail once a search filter is active (AC5)', async () => {
+    const r = await renderAndOpenHymnModal();
     expect(railOf(r)).toBeTruthy();
-    act(() => mockH.searchProps!.onChangeText('50'));
+    await act(async () => mockH.searchProps!.onChangeText('50'));
     expect(railOf(r)).toBeUndefined();
   });
 });

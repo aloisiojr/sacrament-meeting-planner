@@ -10,13 +10,11 @@
  *  - prayers open PeoplePicker with NO capability and assign the member to the speech.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { Member, SundayAgenda, Speech } from '../types/database';
 // jest.mock calls below are hoisted above these imports, so the mocks still apply.
 import { AgendaForm } from '../components/AgendaForm';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Hoisted shared spies (referenced inside jest.mock factories) ---
 
@@ -150,21 +148,13 @@ jest.mock('../hooks/useMembers', () => ({
 
 // --- Helpers ---
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(AgendaForm, { sundayDate: '2026-01-04', exceptionReason: null })
-    );
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(AgendaForm, { sundayDate: '2026-01-04', exceptionReason: null }));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
-function press(root: TestRenderer.TestInstance, testID: string) {
-  const node = root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID)[0];
-  act(() => {
-    (node.props.onPress as () => void)();
-  });
+async function press(_root: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
 beforeEach(() => {
@@ -203,13 +193,13 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
   ];
 
   for (const { testID, context, nameField } of roleCases) {
-    it(`${nameField}: opens PeoplePicker with context='${context}' and writes only the name snapshot`, () => {
-      const renderer = render();
-      press(renderer.root, testID);
+    it(`${nameField}: opens PeoplePicker with context='${context}' and writes only the name snapshot`, async () => {
+      await render();
+      await press(null, testID);
       expect(mockH.lastPickerProps?.context).toBe(context);
       expect(mockH.lastPickerProps?.multiSelect).toBeFalsy();
 
-      act(() => mockH.lastPickerProps!.onSelect!(MEMBER));
+      await act(async () => mockH.lastPickerProps!.onSelect!(MEMBER));
       expect(mockUpdateAgendaMutate).toHaveBeenCalledTimes(1);
       const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
       expect(fields[nameField]).toBe('Alice Smith');
@@ -218,61 +208,61 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     });
   }
 
-  it('recognition: opens multiSelect (draft) and Save commits the selected names', () => {
-    const renderer = render();
-    press(renderer.root, 'mock-recognize-add');
+  it('recognition: opens multiSelect (draft) and Save commits the selected names', async () => {
+    await render();
+    await press(null, 'mock-recognize-add');
     expect(mockH.lastPickerProps?.context).toBe('be_recognized');
     expect(mockH.lastPickerProps?.multiSelect).toBe(true);
     expect(mockH.lastPickerProps?.selectedIds).toEqual([]);
 
-    act(() => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
+    await act(async () => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
     expect(mockUpdateAgendaMutate).toHaveBeenCalledTimes(1);
     const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Alice Smith');
   });
 
-  it('recognition: Save replaces the list with the full confirmed selection', () => {
+  it('recognition: Save replaces the list with the full confirmed selection', async () => {
     mockAGENDA.recognized_names = 'Bob Jones';
     mockMEMBERS = [MEMBER, makeMember({ id: 'm2', full_name: 'Bob Jones' })];
-    const renderer = render();
-    press(renderer.root, 'mock-recognize-add');
+    await render();
+    await press(null, 'mock-recognize-add');
     // Bob is already recognized → seeded into the draft via selectedIds.
     expect(mockH.lastPickerProps?.selectedIds).toEqual(['m2']);
 
-    act(() => mockH.lastPickerProps!.onConfirmMulti!([mockMEMBERS[1], MEMBER]));
+    await act(async () => mockH.lastPickerProps!.onConfirmMulti!([mockMEMBERS[1], MEMBER]));
     const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Bob Jones\nAlice Smith');
   });
 
-  it('recognition: Save preserves free-typed (non-member) names and replaces the member part', () => {
+  it('recognition: Save preserves free-typed (non-member) names and replaces the member part', async () => {
     mockAGENDA.recognized_names = 'Guest Speaker'; // free text, not a ward member
     mockMEMBERS = [MEMBER];
-    const renderer = render();
-    press(renderer.root, 'mock-recognize-add');
+    await render();
+    await press(null, 'mock-recognize-add');
     expect(mockH.lastPickerProps?.selectedIds).toEqual([]); // free text isn't a member → not seeded
-    act(() => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
+    await act(async () => mockH.lastPickerProps!.onConfirmMulti!([MEMBER]));
     const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBe('Guest Speaker\nAlice Smith');
   });
 
-  it('recognition: Save with an empty selection clears the list', () => {
+  it('recognition: Save with an empty selection clears the list', async () => {
     mockAGENDA.recognized_names = 'Alice Smith';
-    const renderer = render();
-    press(renderer.root, 'mock-recognize-add');
+    await render();
+    await press(null, 'mock-recognize-add');
     expect(mockH.lastPickerProps?.selectedIds).toEqual(['m1']);
-    act(() => mockH.lastPickerProps!.onConfirmMulti!([]));
+    await act(async () => mockH.lastPickerProps!.onConfirmMulti!([]));
     const { fields } = mockUpdateAgendaMutate.mock.calls[0][0] as { fields: Record<string, unknown> };
     expect(fields.recognized_names).toBeNull();
   });
 
-  it('prayers: open PeoplePicker with context opening_prayer and assign the member to the speech', () => {
-    const renderer = render();
-    press(renderer.root, 'agenda-opening-prayer-selector');
+  it('prayers: open PeoplePicker with context opening_prayer and assign the member to the speech', async () => {
+    await render();
+    await press(null, 'agenda-opening-prayer-selector');
     expect(mockH.lastPickerProps?.context).toBe('opening_prayer');
     expect(mockH.lastPickerProps?.capability).toBeUndefined();
     expect(mockH.lastPickerProps?.multiSelect).toBeFalsy();
 
-    act(() => mockH.lastPickerProps!.onSelect!(MEMBER));
+    await act(async () => mockH.lastPickerProps!.onSelect!(MEMBER));
     expect(mockAssignSpeakerMutate).toHaveBeenCalledTimes(1);
     const input = mockAssignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s0');
@@ -284,14 +274,14 @@ describe('AgendaForm → PeoplePicker (v2.0 phase 3b)', () => {
     expect(mockUpdateAgendaMutate).not.toHaveBeenCalled();
   });
 
-  it('prayers: delegation snapshot resolves the responsible contact', () => {
+  it('prayers: delegation snapshot resolves the responsible contact', async () => {
     const responsible = makeMember({ id: 'r1', full_name: 'Carol Boss', country_code: '+55', phone: '999' });
     const delegated = makeMember({ id: 'd1', full_name: 'Dan Dep', informal_name: 'Dan', contact_via_responsible: true, responsible_id: 'r1' });
     mockMEMBERS = [responsible, delegated];
-    const renderer = render();
-    press(renderer.root, 'agenda-closing-prayer-selector');
+    await render();
+    await press(null, 'agenda-closing-prayer-selector');
     expect(mockH.lastPickerProps?.context).toBe('closing_prayer');
-    act(() => mockH.lastPickerProps!.onSelect!(delegated));
+    await act(async () => mockH.lastPickerProps!.onSelect!(delegated));
     const input = mockAssignSpeakerMutate.mock.calls[0][0] as Record<string, unknown>;
     expect(input.speechId).toBe('s4');
     expect(input.isDelegated).toBe(true);

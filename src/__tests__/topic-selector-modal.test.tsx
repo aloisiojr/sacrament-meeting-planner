@@ -84,38 +84,38 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
   it('add button creates a custom topic prefilled from search (AC7)', async () => {
     const { r } = await render();
     await setText(r, 'topic-selector-search-input', 'Novo Tema');
-    press(r, 'topic-add-button');
+    await press(r, 'topic-add-button');
     expect(nodes(r, 'topic-editor').length).toBe(1);
     expect(nodes(r, 'topic-edit-title')[0].props.value).toBe('Novo Tema');
-    press(r, 'topic-edit-confirm');
+    await press(r, 'topic-edit-confirm');
     expect(mockState.create).toHaveBeenCalledWith({ title: 'Novo Tema', link: null });
   });
 
   it('editing a custom topic updates title + link (AC8)', async () => {
     const { r } = await render();
-    press(r, 'topic-edit-w1');
+    await press(r, 'topic-edit-w1');
     expect(nodes(r, 'topic-edit-title')[0].props.value).toBe('Fé');
     await setText(r, 'topic-edit-title', 'Fé em Cristo');
     await setText(r, 'topic-edit-link', 'http://y');
-    press(r, 'topic-edit-confirm');
+    await press(r, 'topic-edit-confirm');
     expect(mockState.update).toHaveBeenCalledWith({ id: 'w1', title: 'Fé em Cristo', link: 'http://y' });
   });
 
   it('clearing the title and confirming prompts to delete the shared topic (AC9)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { r } = await render();
-    press(r, 'topic-edit-w1');
+    await press(r, 'topic-edit-w1');
     await setText(r, 'topic-edit-title', '  ');
-    press(r, 'topic-edit-confirm');
+    await press(r, 'topic-edit-confirm');
     expect(alertSpy).toHaveBeenCalled();
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
-    act(() => buttons[1].onPress?.()); // confirm delete
+    await act(async () => buttons[1].onPress?.()); // confirm delete
     expect(mockState.del).toHaveBeenCalledWith({ topicId: 'w1', topicTitle: 'Fé' });
   });
 
   it('selecting a topic returns it via onSelect (AC10)', async () => {
     const { r, onSelect } = await render();
-    press(r, 'topic-row-g1');
+    await press(r, 'topic-row-g1');
     expect(onSelect).toHaveBeenCalledWith(GEN);
   });
 

@@ -82,6 +82,17 @@ for (const file of files) {
       `  await fireEvent.press(screen.getByTestId(${id}));\n}`
   );
 
+  // 3d. Generic tree access. RNTL 14 still exposes the rendered tree, but the traversal method
+  //      is `queryAll` on `screen.root` (test-renderer v1) rather than react-test-renderer's
+  //      `findAll`. Legitimate where a test asserts on a mocked child's props rather than on
+  //      user-visible output; events still go through fireEvent.
+  s = s.replace(/\b\w+\.root\s*\n?\s*\.findAll\(/g, 'screen.root!.queryAll(');
+  s = s.replace(/\b\w+\.root\.findAll\(/g, 'screen.root!.queryAll(');
+  s = s.replace(/\broot\.findAll\(/g, 'screen.root!.queryAll(');
+  // helper params that were typed to the old renderer/instance
+  s = s.replace(/\((\w+): Node\)/g, '(_$1?: unknown)');
+  s = s.replace(/\((\w+): Node, /g, '(_$1: unknown, ');
+
   // 4. direct prop invocation -> real events
   s = s.replace(
     /act\(\(\) => \((?:nodes|node)\([^,]+, '([^']+)'\)(?:\[0\])?\.props\.onPress as \(\) => void\)\(\)\);/g,
@@ -137,7 +148,25 @@ for (const file of files) {
   s = s.replace(/return \{ (renderer|r|tree)\s*\};/g, 'return { $1: null };');
 
   // 8. leftover type references to the removed renderer
-  s = s.replace(/^type Node = TestRenderer\.TestInstance;\n\n?/m, '');
+  s = s.replace(/^type Node = TestRenderer\.TestInstance;\n/m, '');
+
+  // 8b. `const { root } = await render()` — the helper no longer returns a renderer.
+  s = s.replace(/const \{ root \} = await render\(\);/g, 'await render();');
+  s = s.replace(/const \{ root, (\w+) \} = await render\(/g, 'const { $1 } = await render(');
+
+  // 8c. If the file still uses `Node` as a type, point it at test-renderer's TestInstance
+  //     (what screen.root.queryAll returns) instead of the deleted react-test-renderer alias.
+  if (/\bNode\b\s*(\[\]|\)|;|,|>)/.test(s) && !/type Node =/.test(s)) {
+    s = s.replace(
+      "import { render as rtlRender",
+      "import type { TestInstance as Node } from 'test-renderer';\nimport { render as rtlRender"
+    );
+  }
+
+  // 8d. RNTL 14's `act` is async. An unawaited `act(() => ...)` lets the next render race the
+  //      previous one, which shows up much later as `screen.root` being undefined.
+  s = s.replace(/(?<!await )\bact\(\(\) => \{/g, 'await act(async () => {');
+  s = s.replace(/\bawait await\b/g, 'await');
 
   // 9. `act` came from TestRenderer; re-import it from RNTL if the file still uses it.
   if (/\bact\(/.test(s) && !/fireEvent, act \}/.test(s)) {

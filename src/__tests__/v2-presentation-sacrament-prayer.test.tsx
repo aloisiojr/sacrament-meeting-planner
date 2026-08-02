@@ -5,12 +5,10 @@
  * dot-path lookup into the en-US locale JSON so we can assert the VERBATIM prayer strings.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import enUS from '../i18n/locales/en-US.json';
 import PresentationScreen from '../app/presentation';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DATE = '2026-08-02';
 
@@ -90,16 +88,13 @@ jest.mock('../hooks/usePresentationMode', () => {
   };
 });
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(PresentationScreen));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(PresentationScreen));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
 // Collect all string leaves in the rendered tree, concatenated per Text node.
-function allText(renderer: TestRenderer.ReactTestRenderer): string {
+function allText(renderer: unknown): string {
   const out: string[] = [];
   const walk = (node: unknown): void => {
     if (typeof node === 'string') {
@@ -114,21 +109,21 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
   return out.join('|');
 }
 
-function findByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return renderer.root.findAll((n) => n.props?.testID === testID);
+function findByTestID(renderer: unknown, testID: string) {
+  return screen.root!.queryAll((n) => n.props?.testID === testID);
 }
 
-function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
+function press(renderer: unknown, testID: string): void {
   const target = findByTestID(renderer, testID)[0];
   (target.props.onPress as () => void)();
 }
 
 // AccordionCard renders only the expanded card's body. The Sacrament Hymn field lives in the
 // second card (Designations & Sacrament), so expand it before asserting on its content.
-function expandCard(renderer: TestRenderer.ReactTestRenderer, index: number): void {
+function expandCard(renderer: unknown, index: number): void {
   // The RN stub renders each primitive as a function component wrapping a same-named host element,
   // so every header appears twice; keep only the component instances (non-string type) to index.
-  const headers = renderer.root.findAll(
+  const headers = screen.root!.queryAll(
     (n) =>
       typeof n.type !== 'string' &&
       typeof (n.props?.accessibilityState as { expanded?: boolean } | undefined)?.expanded ===
@@ -142,8 +137,8 @@ beforeEach(() => {
 });
 
 describe('Sacrament-prayer interstitial (P2/P3)', () => {
-  it('renders the "text to read" icon on the Sacrament Hymn row', () => {
-    const r = render();
+  it('renders the "text to read" icon on the Sacrament Hymn row', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     const buttons = findByTestID(r, 'sacrament-prayer-icon-button');
     // Doubled by the RN stub (component + host); at least one is present.
@@ -152,8 +147,8 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
   });
 
-  it('tapping the icon shows the interstitial with the exact bread + water prayers', () => {
-    const r = render();
+  it('tapping the icon shows the interstitial with the exact bread + water prayers', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     act(() => {
       press(r, 'sacrament-prayer-icon-button');
@@ -168,8 +163,8 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
     expect(text).toContain(enUS.presentation.sacramentPrayerWaterLabel);
   });
 
-  it('closing via the X button hides the interstitial', () => {
-    const r = render();
+  it('closing via the X button hides the interstitial', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     act(() => {
       press(r, 'sacrament-prayer-icon-button');
@@ -181,8 +176,8 @@ describe('Sacrament-prayer interstitial (P2/P3)', () => {
     expect(findByTestID(r, 'sacrament-prayer-panel').length).toBe(0);
   });
 
-  it('tapping the backdrop (outside the panel) hides the interstitial', () => {
-    const r = render();
+  it('tapping the backdrop (outside the panel) hides the interstitial', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     act(() => {
       press(r, 'sacrament-prayer-icon-button');

@@ -10,13 +10,12 @@
  * is mocked to pin the next 3 Sundays deterministically.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import type { TestInstance as Node } from 'test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { Speech, SundayAgenda, SundayException } from '../types/database';
 // Imported after the (hoisted) jest.mock calls below take effect.
 import HomeTab from '../app/(tabs)/index';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const D1 = '2026-08-02'; // hero (next Sunday)
 const D2 = '2026-08-09'; // próximos [0]
@@ -128,20 +127,16 @@ function makeSpeech(date: string, position: number, over: Partial<Speech> = {}):
   };
 }
 
-type Node = TestRenderer.TestInstance;
-function unifiedCards(root: Node): Node[] {
-  return root.findAll((n) => n.type === 'UnifiedSundayCard');
+function unifiedCards(_root?: unknown): Node[] {
+  return screen.root!.queryAll((n) => n.type === 'UnifiedSundayCard');
 }
-function byTestID(root: Node, testID: string): Node[] {
-  return root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function byTestID(_root: unknown, testID: string): Node[] {
+  return screen.root!.queryAll((n) => typeof n.type === 'string' && n.props.testID === testID);
 }
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(HomeTab));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(HomeTab));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
 beforeEach(() => {
@@ -155,13 +150,13 @@ beforeEach(() => {
 });
 
 describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
-  it('renders one highlighted hero card + exactly 2 cards in the próximos section', () => {
-    const { root } = render();
-    const cards = unifiedCards(root);
+  it('renders one highlighted hero card + exactly 2 cards in the próximos section', async () => {
+    await render();
+    const cards = unifiedCards(null);
     expect(cards.length).toBe(3);
 
     // Hero: the next Sunday, highlighted, with mapped data from buildUnifiedCardData (kept real).
-    const hero = byTestID(root, `home-hero-card-${D1}`);
+    const hero = byTestID(null, `home-hero-card-${D1}`);
     expect(hero.length).toBe(1);
     expect(hero[0].props.highlighted).toBe(true);
     expect((hero[0].props.roles as { preside: boolean }).preside).toBe(true);
@@ -183,54 +178,51 @@ describe('Home tab → UnifiedSundayCard (phase 5, H1)', () => {
     expect(hero[0].props.hideStatusBlock).toBeFalsy();
   });
 
-  it('appends the ward name to the agenda title, and shows the bare title when unknown', () => {
-    let r = render();
-    let title = byTestID(r.root, 'home-agenda-title')[0];
+  it('appends the ward name to the agenda title, and shows the bare title when unknown', async () => {
+    await render();
+    let title = byTestID(null, 'home-agenda-title')[0];
     expect(title.props.children).toBe('home.meetingAgendaTitle - Ala Modelo');
 
     mockState.wardName = null;
-    r = render();
-    title = byTestID(r.root, 'home-agenda-title')[0];
+    await render();
+    title = byTestID(null, 'home-agenda-title')[0];
     expect(title.props.children).toBe('home.meetingAgendaTitle');
   });
 
-  it('tapping a card speakers zone pushes the speeches edit route', () => {
-    const { root } = render();
-    const hero = byTestID(root, `home-hero-card-${D1}`)[0];
-    act(() => {
+  it('tapping a card speakers zone pushes the speeches edit route', async () => {
+    await render();
+    const hero = byTestID(null, `home-hero-card-${D1}`)[0];
+    await act(async () => {
       (hero.props.onPressSpeakers as (d: string) => void)(D1);
     });
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/speeches/[date]', params: { date: D1 } });
   });
 
-  it('tapping a card status zone pushes the Agendas tab expanded on that date', () => {
-    const { root } = render();
-    const upcoming = byTestID(root, `home-upcoming-card-${D2}`)[0];
-    act(() => {
+  it('tapping a card status zone pushes the Agendas tab expanded on that date', async () => {
+    await render();
+    const upcoming = byTestID(null, `home-upcoming-card-${D2}`)[0];
+    await act(async () => {
       (upcoming.props.onPressStatus as (d: string) => void)(D2);
     });
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/(tabs)/agenda', params: { expandDate: D2 } });
   });
 
-  it('Start Meeting button navigates to presentation with the hero date', () => {
-    const { root } = render();
-    const btn = byTestID(root, 'home-start-meeting-button')[0];
-    act(() => {
-      (btn.props.onPress as () => void)();
-    });
+  it('Start Meeting button navigates to presentation with the hero date', async () => {
+    await render();
+    await fireEvent.press(screen.getByTestId('home-start-meeting-button'));
     expect(mockRouterPush).toHaveBeenCalledWith({ pathname: '/presentation', params: { date: D1 } });
   });
 
-  it('shows role-gated sections only when online', () => {
-    const online = render();
-    expect(byTestID(online.root, 'next-assignments').length).toBe(1);
-    expect(byTestID(online.root, 'invite-management').length).toBe(1);
+  it('shows role-gated sections only when online', async () => {
+    await render();
+    expect(byTestID(null, 'next-assignments').length).toBe(1);
+    expect(byTestID(null, 'invite-management').length).toBe(1);
 
     mockState.online = false;
-    const offline = render();
-    expect(byTestID(offline.root, 'next-assignments').length).toBe(0);
-    expect(byTestID(offline.root, 'invite-management').length).toBe(0);
+    const offline = await render();
+    expect(byTestID(null, 'next-assignments').length).toBe(0);
+    expect(byTestID(null, 'invite-management').length).toBe(0);
     // Cards remain visible offline (no online guard).
-    expect(unifiedCards(offline.root).length).toBe(3);
+    expect(unifiedCards(null).length).toBe(3);
   });
 });

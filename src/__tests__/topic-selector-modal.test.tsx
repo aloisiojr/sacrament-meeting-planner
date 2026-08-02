@@ -5,13 +5,11 @@
  * select returns the topic, and topic:write gating.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { TopicSelectorModal } from '../components/TopicSelectorModal';
 import type { TopicWithCollection } from '../types/database';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockState = {
   topics: [] as TopicWithCollection[],
@@ -45,22 +43,19 @@ jest.mock('../hooks/useTopics', () => ({
 const WARD: TopicWithCollection = { id: 'w1', title: 'Fé', link: 'http://x', collection: 'topics.customTopics', type: 'ward' };
 const GEN: TopicWithCollection = { id: 'g1', title: 'Repentance', link: null, collection: 'General Conference April 2024', type: 'general' };
 
-function render() {
+async function render() {
   const onSelect = jest.fn();
-  let r!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    r = TestRenderer.create(React.createElement(TopicSelectorModal, { visible: true, onSelect, onClose: jest.fn() }));
-  });
-  return { r, onSelect };
+  await rtlRender(React.createElement(TopicSelectorModal, { visible: true, onSelect, onClose: jest.fn() }));
+  return { r: null, onSelect };
 }
-function nodes(r: TestRenderer.ReactTestRenderer, testID: string) {
-  return r.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function nodes(_r: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
-function setText(r: TestRenderer.ReactTestRenderer, testID: string, text: string) {
+function setText(r: unknown, testID: string, text: string) {
   act(() => (nodes(r, testID)[0].props.onChangeText as (t: string) => void)(text));
 }
-function press(r: TestRenderer.ReactTestRenderer, testID: string) {
-  act(() => (nodes(r, testID)[0].props.onPress as () => void)());
+async function press(_r: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
 beforeEach(() => {
@@ -73,21 +68,21 @@ beforeEach(() => {
 });
 
 describe('TopicSelectorModal (v2 overhaul)', () => {
-  it('search matches both the title and the library name', () => {
-    const { r } = render();
+  it('search matches both the title and the library name', async () => {
+    const { r } = await render();
     setText(r, 'topic-selector-search-input', 'april'); // matches GEN's collection
     expect(nodes(r, 'topic-row-g1').length).toBe(1);
     expect(nodes(r, 'topic-row-w1').length).toBe(0);
   });
 
-  it('only custom (ward) topics have a pencil edit affordance (AC6/AC11)', () => {
-    const { r } = render();
+  it('only custom (ward) topics have a pencil edit affordance (AC6/AC11)', async () => {
+    const { r } = await render();
     expect(nodes(r, 'topic-edit-w1').length).toBe(1);
     expect(nodes(r, 'topic-edit-g1').length).toBe(0);
   });
 
-  it('add button creates a custom topic prefilled from search (AC7)', () => {
-    const { r } = render();
+  it('add button creates a custom topic prefilled from search (AC7)', async () => {
+    const { r } = await render();
     setText(r, 'topic-selector-search-input', 'Novo Tema');
     press(r, 'topic-add-button');
     expect(nodes(r, 'topic-editor').length).toBe(1);
@@ -96,8 +91,8 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     expect(mockState.create).toHaveBeenCalledWith({ title: 'Novo Tema', link: null });
   });
 
-  it('editing a custom topic updates title + link (AC8)', () => {
-    const { r } = render();
+  it('editing a custom topic updates title + link (AC8)', async () => {
+    const { r } = await render();
     press(r, 'topic-edit-w1');
     expect(nodes(r, 'topic-edit-title')[0].props.value).toBe('Fé');
     setText(r, 'topic-edit-title', 'Fé em Cristo');
@@ -106,9 +101,9 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     expect(mockState.update).toHaveBeenCalledWith({ id: 'w1', title: 'Fé em Cristo', link: 'http://y' });
   });
 
-  it('clearing the title and confirming prompts to delete the shared topic (AC9)', () => {
+  it('clearing the title and confirming prompts to delete the shared topic (AC9)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { r } = render();
+    const { r } = await render();
     press(r, 'topic-edit-w1');
     setText(r, 'topic-edit-title', '  ');
     press(r, 'topic-edit-confirm');
@@ -118,37 +113,32 @@ describe('TopicSelectorModal (v2 overhaul)', () => {
     expect(mockState.del).toHaveBeenCalledWith({ topicId: 'w1', topicTitle: 'Fé' });
   });
 
-  it('selecting a topic returns it via onSelect (AC10)', () => {
-    const { r, onSelect } = render();
+  it('selecting a topic returns it via onSelect (AC10)', async () => {
+    const { r, onSelect } = await render();
     press(r, 'topic-row-g1');
     expect(onSelect).toHaveBeenCalledWith(GEN);
   });
 
-  it('without topic:write there is no add button and no pencil (AC12)', () => {
+  it('without topic:write there is no add button and no pencil (AC12)', async () => {
     mockState.canWrite = false;
-    const { r } = render();
+    const { r } = await render();
     expect(nodes(r, 'topic-add-button').length).toBe(0);
     expect(nodes(r, 'topic-edit-w1').length).toBe(0);
   });
 
   // item 1 — header consistent with the people selector: Cancel + title, then search + "+ Adicionar".
-  it('renders a Cancel button, a centered title, and the add button (item1 AC1.1/AC1.2)', () => {
-    const { r } = render();
+  it('renders a Cancel button, a centered title, and the add button (item1 AC1.1/AC1.2)', async () => {
+    const { r } = await render();
     expect(nodes(r, 'topic-selector-close-button').length).toBe(1); // Cancel (left)
     const title = nodes(r, 'topic-selector-title')[0];
     expect(String(title.props.children)).toBe('topics.pickerTitle');
     expect(nodes(r, 'topic-add-button').length).toBe(1); // "+ Adicionar" (topic:write)
   });
 
-  it('Cancel calls onClose (item1 AC1.3)', () => {
+  it('Cancel calls onClose (item1 AC1.3)', async () => {
     const onClose = jest.fn();
-    let r!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      r = TestRenderer.create(
-        React.createElement(TopicSelectorModal, { visible: true, onSelect: jest.fn(), onClose })
-      );
-    });
-    act(() => (nodes(r, 'topic-selector-close-button')[0].props.onPress as () => void)());
+    await rtlRender(React.createElement(TopicSelectorModal, { visible: true, onSelect: jest.fn(), onClose }));
+    await fireEvent.press(screen.getByTestId('topic-selector-close-button'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

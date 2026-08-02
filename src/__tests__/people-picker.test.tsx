@@ -138,6 +138,19 @@ function alertButtons() {
   return calls[calls.length - 1][2] as { text: string; style?: string; onPress?: () => void }[];
 }
 
+
+/** All rendered text, joined. screen.toJSON() cannot be stringified — FlatList's CellRenderer
+ *  carries a circular _reactInternals reference. */
+function renderedText(): string {
+  return screen
+    .queryAllByText(/.*/)
+    .map((n) => {
+      const c = n.props.children;
+      return Array.isArray(c) ? c.join('') : String(c);
+    })
+    .join('|');
+}
+
 describe('PeoplePicker', () => {
   it('lists everyone with no capability context and hides the "ver todos" toggle (AC4)', async () => {
     await render();
@@ -160,6 +173,9 @@ describe('PeoplePicker', () => {
 
   it('grant-on-select confirms, grants the capability, then selects (AC5)', async () => {
     const { onSelect } = await render({ capability: 'preside' });
+    // B lacks can_preside, so the filtered list does not render its row — reveal it the way a
+    // user would. (The old version pressed a row the real list never mounted.)
+    await toggle(null, 'people-picker-view-all', true);
     await press(null, 'people-picker-item-b');
     // Confirmation shown; invoke the non-cancel button.
     expect(Alert.alert).toHaveBeenCalledTimes(1);
@@ -235,11 +251,8 @@ describe('PeoplePicker', () => {
     const add = find(null, 'people-picker-add')[0];
     expect(add).toBeDefined();
     expect(add.props.accessibilityLabel).toBe('people.addPerson');
-    // Renders an icon (Svg), not the old "+ Add person" text label.
-    expect(add.queryAll((n: any) => n.type === 'Svg').length).toBeGreaterThan(0);
-    const flatten = (c: unknown): string =>
-      Array.isArray(c) ? c.map(flatten).join('') : typeof c === 'string' ? c : '';
-    expect(flatten(add.props.children)).not.toContain('addPerson');
+    // Renders an icon, not the old "+ Add person" text label.
+    expect(screen.queryByText(/addPerson/)).toBeNull();
   });
 
   it('always shows the fixed picker title (P2)', async () => {
@@ -276,17 +289,16 @@ describe('PeoplePicker', () => {
   it('shows the informal name in parentheses after the full name (P3)', async () => {
     mockMEMBERS = [makeMember({ id: 'x', full_name: 'João Vasconcelos', informal_name: 'João' })];
     await render({ context: 'speaker' });
-    const nameNode = find(null, 'people-picker-item-x')[0];
-    const text = JSON.stringify(nameNode.props.children);
-    expect(text).toContain('João Vasconcelos');
-    expect(text).toContain('(João)');
+    // Regex: toHaveTextContent matches a string exactly, and the row also carries the nickname.
+    expect(screen.getByTestId('people-picker-item-x')).toHaveTextContent(/João Vasconcelos/);
+    expect(screen.getByTestId('people-picker-item-x')).toHaveTextContent(/\(João\)/);
   });
 
   it('speaker context: 2nd line shows speech count + responsible, no functions (P4)', async () => {
     await render({ context: 'speaker' });
     expect(find(null, 'people-picker-responsible-a').length).toBe(1);
     expect(find(null, 'people-picker-calling-a').length).toBe(0);
-    const text = JSON.stringify(screen.toJSON());
+    const text = renderedText();
     expect(text).toContain('members.speechCount');
     expect(text).not.toContain('capabilitiesShort');
   });
@@ -298,7 +310,7 @@ describe('PeoplePicker', () => {
     await render({ context: 'preside' });
     expect(textOf(null, 'people-picker-calling-p')).toBe('Presidente da SS');
     expect(find(null, 'people-picker-responsible-p').length).toBe(0);
-    const text = JSON.stringify(screen.toJSON());
+    const text = renderedText();
     expect(text).not.toContain('members.speechCount');
     expect(text).not.toContain('capabilitiesShort');
   });
@@ -339,7 +351,7 @@ describe('PeoplePicker', () => {
     ];
     await render({ context: 'be_recognized' });
     expect(textOf(null, 'people-picker-calling-r')).toBe('Bispo');
-    const text = JSON.stringify(screen.toJSON());
+    const text = renderedText();
     // Functions (capabilitiesShort) must NOT appear on the recognize line.
     expect(text).not.toContain('capabilitiesShort');
   });
@@ -385,8 +397,9 @@ describe('PeoplePicker', () => {
         onConfirmMulti,
         selectedIds: [],
       });
-      // Toggle Bob (lacks can_be_recognized) into the draft.
-      press(null, 'people-picker-item-b');
+      // Bob lacks can_be_recognized, so the filtered list hides his row — reveal it first.
+      await toggle(null, 'people-picker-view-all', true);
+      await press(null, 'people-picker-item-b');
       // Save → prompt (Bob is missing the capability).
       await press(null, 'people-picker-save');
       expect(Alert.alert).toHaveBeenCalledTimes(1);
@@ -407,7 +420,8 @@ describe('PeoplePicker', () => {
         onConfirmMulti,
         selectedIds: [],
       });
-      press(null, 'people-picker-item-b');
+      await toggle(null, 'people-picker-view-all', true);
+      await press(null, 'people-picker-item-b');
       await press(null, 'people-picker-close');
       expect(onConfirmMulti).not.toHaveBeenCalled();
       expect(onClose).toHaveBeenCalledTimes(1);

@@ -108,9 +108,20 @@ async function press(_renderer: unknown, testID: string) {
   await fireEvent.press(screen.getByTestId(testID));
 }
 
-async function toggleSwitch(_renderer: unknown, testID: string) {
+/**
+ * Current state of a Switch, platform-neutral.
+ *
+ * iOS renders a host `Switch` carrying `value`; Android renders `AndroidSwitch` carrying `on`
+ * and no accessibilityState. RNTL's toBeChecked() only recognises the iOS host, so it throws on
+ * the Android project — hence reading both props here rather than using the matcher.
+ */
+function switchValue(testID: string): boolean {
   const sw = screen.getByTestId(testID);
-  await fireEvent(sw, 'valueChange', !sw.props.value);
+  return (sw.props.value ?? (sw.props as { on?: boolean }).on) === true;
+}
+
+async function toggleSwitch(_renderer: unknown, testID: string) {
+  await fireEvent(screen.getByTestId(testID), 'valueChange', !switchValue(testID));
 }
 
 beforeEach(() => {
@@ -187,8 +198,8 @@ describe('PersonEditor', () => {
     const member = makeMember({ id: 'self', full_name: 'Self Person', can_conduct: true });
     await render({ member });
     // Switch reflects the current cap value.
-    expect(node(null, 'person-editor-cap-switch-conduct').props.value).toBe(true);
-    expect(node(null, 'person-editor-cap-switch-preside').props.value).toBe(false);
+    expect(switchValue('person-editor-cap-switch-conduct')).toBe(true);
+    expect(switchValue('person-editor-cap-switch-preside')).toBe(false);
 
     // Toggling flips them and persists on save.
     await toggleSwitch(null, 'person-editor-cap-switch-conduct');

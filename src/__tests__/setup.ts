@@ -20,8 +20,11 @@ jest.mock('@react-native-community/netinfo', () =>
   require('@react-native-community/netinfo/jest/netinfo-mock')
 );
 
-// Reanimated: worklets require the native runtime. Official mock.
-jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
+// Reanimated is intentionally NOT mocked. Its shipped `react-native-reanimated/mock` is broken in
+// 4.5.1 — mock.js requires './src/mock', which the published package does not contain, and the
+// require dies on `loadUnpackers`. The real module works under babel-preset-expo (which carries
+// the reanimated plugin), and using it means Animated.View / LinearTransition actually exist, so
+// components like AccordionCard render instead of throwing "Element type is invalid".
 
 // Gesture Handler: installs its own jest globals.
 require('react-native-gesture-handler/jestSetup');

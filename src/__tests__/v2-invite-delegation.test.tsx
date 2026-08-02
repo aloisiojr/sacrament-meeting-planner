@@ -105,12 +105,10 @@ async function render() {
 }
 
 /** Press the not-invited WhatsApp action button (accessibilityLabel 'WhatsApp'). */
-async function pressSend(renderer: unknown) {
-  const btn = renderer.root.findAll(
-    (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'WhatsApp' && typeof n.props.onPress === 'function'
-  )[0];
+async function pressSend(_renderer?: unknown) {
+  const btn = screen.getAllByLabelText('WhatsApp')[0];
   await act(async () => {
-    await (btn.props.onPress as () => Promise<void>)();
+    await fireEvent.press(btn);
   });
 }
 

@@ -32,6 +32,7 @@ const common = {
   },
   transformIgnorePatterns,
   clearMocks: true,
+  resolver: '<rootDir>/jest.resolver.js',
 };
 
 module.exports = {

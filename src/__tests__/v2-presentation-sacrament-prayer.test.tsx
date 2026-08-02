@@ -32,16 +32,6 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, f?: string) => mockTLookup(k, f) }),
 }));
 
-jest.mock('react-native-reanimated', () => ({
-  default: {
-    View: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-      require('react').createElement('Animated.View', p, p.children),
-  },
-  SlideInDown: {},
-  SlideOutUp: {},
-  LinearTransition: { duration: () => ({}) },
-}));
-
 jest.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
     require('react').createElement('BlurView', p, p.children),

@@ -35,15 +35,6 @@ function mockTLookup(key: string, fallback?: string): string {
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, f?: string) => mockTLookup(k, f) }),
 }));
-jest.mock('react-native-reanimated', () => ({
-  default: {
-    View: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
-      require('react').createElement('Animated.View', p, p.children),
-  },
-  SlideInDown: {},
-  SlideOutUp: {},
-  LinearTransition: { duration: () => ({}) },
-}));
 jest.mock('expo-blur', () => ({
   BlurView: (p: Record<string, unknown> & { children?: React.ReactNode }) =>
     require('react').createElement('BlurView', p, p.children),
@@ -105,22 +96,21 @@ function allText(renderer: unknown): string {
     else if (node && typeof node === 'object' && 'children' in (node as Record<string, unknown>))
       walk((node as { children: unknown }).children);
   };
-  walk(renderer.toJSON() as unknown);
+  walk(screen.toJSON() as unknown);
   return out.join('|');
 }
-function findByTestID(renderer: unknown, testID: string) {
-  return renderer.root.findAll((n) => n.props?.testID === testID);
+function findByTestID(_renderer: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
-function press(renderer: unknown, testID: string): void {
-  (findByTestID(renderer, testID)[0].props.onPress as () => void)();
+async function press(_renderer: unknown, testID: string): Promise<void> {
+  await fireEvent.press(screen.getByTestId(testID));
 }
-function expandCard(renderer: unknown, index: number): void {
-  const headers = renderer.root.findAll(
-    (n) =>
-      typeof n.type !== 'string' &&
-      typeof (n.props?.accessibilityState as { expanded?: boolean } | undefined)?.expanded === 'boolean'
-  );
-  (headers[index].props.onPress as () => void)();
+/** Accordion headers are the buttons that expose accessibilityState.expanded; press the nth. */
+async function expandCard(_renderer: unknown, index: number): Promise<void> {
+  const headers = screen
+    .queryAllByRole('button')
+    .filter((n) => typeof n.props?.accessibilityState?.expanded === 'boolean');
+  await fireEvent.press(headers[index]);
 }
 
 beforeEach(() => {
@@ -134,15 +124,15 @@ beforeEach(() => {
 describe('Designations interstitial (Play)', () => {
   it('renders the "text to read" icon when there are designations (AC1), hidden until tapped', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
+    await expandCard(r, 1);
     expect(findByTestID(r, 'designations-read-icon-button').length).toBeGreaterThan(0);
     expect(findByTestID(r, 'designation-read-panel').length).toBe(0);
   });
 
   it('tapping the icon opens the interstitial with the substituted verbatim text (AC2/AC3)', async () => {
     const r = await render();
-    act(() => { expandCard(r, 1); });
-    act(() => { press(r, 'designations-read-icon-button'); });
+    await expandCard(r, 1);
+    await press(r, 'designations-read-icon-button');
     expect(findByTestID(r, 'designation-read-panel').length).toBeGreaterThan(0);
     expect(allText(r)).toContain('John Doe has been called as Elders Quorum President');
   });
@@ -150,8 +140,8 @@ describe('Designations interstitial (Play)', () => {
   it('uses the ward override template when set (AC7)', async () => {
     mockState.templates = { sustain: 'CUSTOM: {name} → {calling}.' };
     const r = await render();
-    act(() => { expandCard(r, 1); });
-    act(() => { press(r, 'designations-read-icon-button'); });
+    await expandCard(r, 1);
+    await press(r, 'designations-read-icon-button');
     const text = allText(r);
     expect(text).toContain('CUSTOM: John Doe → Elders Quorum President.');
     expect(text).not.toContain('has been called as');
@@ -160,7 +150,7 @@ describe('Designations interstitial (Play)', () => {
   it('shows no icon when there are no designations (AC8)', async () => {
     mockState.designations = [];
     const r = await render();
-    act(() => { expandCard(r, 1); });
+    await expandCard(r, 1);
     expect(findByTestID(r, 'designations-read-icon-button').length).toBe(0);
   });
 });

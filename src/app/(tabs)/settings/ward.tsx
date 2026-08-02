@@ -29,18 +29,14 @@ export default function WardInfoScreen() {
   const { data: wardInfo, isLoading } = useWardInfo();
   const updateWard = useUpdateWardInfo();
 
-  const [name, setName] = useState('');
-  const [stakeName, setStakeName] = useState('');
-  const [hydrated, setHydrated] = useState(false);
-
-  // Seed the fields once when the ward info first loads (don't clobber in-progress edits).
-  useEffect(() => {
-    if (wardInfo && !hydrated) {
-      setName(wardInfo.name);
-      setStakeName(wardInfo.stake_name);
-      setHydrated(true);
-    }
-  }, [wardInfo, hydrated]);
+  // Derived, not seeded by an effect: the field shows the loaded value until the user edits it,
+  // and the draft wins from then on. The old useEffect + `hydrated` flag existed only to avoid
+  // clobbering in-progress edits, at the cost of a second render pass on every load
+  // (react-hooks/set-state-in-effect).
+  const [nameDraft, setName] = useState<string | null>(null);
+  const [stakeDraft, setStakeName] = useState<string | null>(null);
+  const name = nameDraft ?? wardInfo?.name ?? '';
+  const stakeName = stakeDraft ?? wardInfo?.stake_name ?? '';
 
   const handleSave = useCallback(() => {
     const trimmedName = name.trim();

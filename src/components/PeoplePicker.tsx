@@ -116,11 +116,14 @@ export function PeoplePicker({
   // Draft multi-select: hold the selection locally so Cancel discards it and Save commits it once.
   const isDraft = multiSelect && !!onConfirmMulti;
   const [draftIds, setDraftIds] = useState<Set<string>>(() => new Set(selectedIds ?? []));
-  // Re-seed the draft from the incoming selection each time the picker opens.
-  useEffect(() => {
+  // Re-seed the draft from the incoming selection each time the picker opens. Adjusted during
+  // render (React's documented "changing state when a prop changes" pattern) rather than in an
+  // effect: React re-runs the component before committing, so there is no cascading render.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (visible) setDraftIds(new Set(selectedIds ?? []));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }
 
   const { data: allMembers } = useMembers();
   const { data: speechCounts } = useSpeechCounts();

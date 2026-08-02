@@ -39,15 +39,20 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
   const [blanks, setBlanks] = useState<BlankPhoneEntry[]>([]);
   const [countWarning, setCountWarning] = useState<{ expected: number; parsed: number } | null>(null);
 
-  // Reset to extraction whenever a new PDF is opened.
-  useEffect(() => {
-    if (visible && base64) {
+  // Reset to extraction whenever a new PDF is opened. Adjusted during render (React's documented
+  // "changing state when a prop changes" pattern) instead of in an effect, so the reset lands in
+  // the same commit rather than causing a second render pass.
+  const [lastOpened, setLastOpened] = useState<string | null>(null);
+  const openKey = visible && base64 ? base64 : null;
+  if (openKey !== lastOpened) {
+    setLastOpened(openKey);
+    if (openKey) {
       setStep('extracting');
       setPlan(null);
       setBlanks([]);
       setCountWarning(null);
     }
-  }, [visible, base64]);
+  }
 
   const onExtracted = (text: string) => {
     try {

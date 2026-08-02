@@ -36,21 +36,19 @@ export default function RegisterScreen() {
   const [wardName, setWardName] = useState('');
   const [role, setRole] = useState<'bishopric' | 'secretary'>('bishopric');
   const [language, setLanguage] = useState<SupportedLanguage>('en-US');
-  const [timezone, setTimezone] = useState('');
+  // Lazy initialiser, not an effect: the device timezone is known at first render, so setting it
+  // from useEffect only forced a second render pass (react-hooks/set-state-in-effect).
+  const [timezone, setTimezone] = useState(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIMEZONES['en-US'];
+    } catch {
+      return DEFAULT_TIMEZONES['en-US'];
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTimezonePicker, setShowTimezonePicker] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState('');
-
-  // Auto-detect timezone
-  useEffect(() => {
-    try {
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setTimezone(detectedTimezone || DEFAULT_TIMEZONES['en-US']);
-    } catch {
-      setTimezone(DEFAULT_TIMEZONES['en-US']);
-    }
-  }, []);
 
   const filteredTimezones = useMemo(() => {
     if (!timezoneSearch.trim()) return TIMEZONES;

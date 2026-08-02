@@ -138,40 +138,47 @@ export function PersonEditor({
   const updateMember = useUpdateMember();
   const deleteMember = useDeleteMember();
 
-  // (Re)initialize the form whenever the editor opens or the target member changes.
-  useEffect(() => {
-    if (!visible) return;
-    if (member) {
-      setFullName(member.full_name);
-      setInformalName(member.informal_name ?? '');
-      setCalling(member.calling ?? '');
-      setCountryCode(member.country_code ?? '');
-      setPhone(member.phone ?? '');
-      setCaps({
-        preside: member.can_preside,
-        conduct: member.can_conduct,
-        lead_music: member.can_lead_music,
-        play_piano: member.can_play_piano,
-        be_recognized: member.can_be_recognized,
-      });
-      setContactViaResponsible(member.contact_via_responsible);
-      setResponsibleId(member.responsible_id);
-    } else {
-      setFullName(initialName ?? '');
-      setInformalName('');
-      setCalling('');
-      setCountryCode('');
-      setPhone('');
-      setCaps(EMPTY_CAPS);
-      setContactViaResponsible(false);
-      setResponsibleId(null);
+  // (Re)initialize the form whenever the editor opens or the target member changes. Adjusted
+  // during render (React's documented "changing state when a prop changes" pattern) rather than
+  // in an effect: React re-runs the component before committing, so the seeded values are in the
+  // first painted frame instead of a second render pass.
+  const [initKey, setInitKey] = useState<string | null>(null);
+  const currentKey = visible ? `${member?.id ?? 'new'}:${initialName ?? ''}` : null;
+  if (currentKey !== initKey) {
+    setInitKey(currentKey);
+    if (visible) {
+      if (member) {
+        setFullName(member.full_name);
+        setInformalName(member.informal_name ?? '');
+        setCalling(member.calling ?? '');
+        setCountryCode(member.country_code ?? '');
+        setPhone(member.phone ?? '');
+        setCaps({
+          preside: member.can_preside,
+          conduct: member.can_conduct,
+          lead_music: member.can_lead_music,
+          play_piano: member.can_play_piano,
+          be_recognized: member.can_be_recognized,
+        });
+          setContactViaResponsible(member.contact_via_responsible);
+          setResponsibleId(member.responsible_id);
+      } else {
+        setFullName(initialName ?? '');
+        setInformalName('');
+        setCalling('');
+        setCountryCode('');
+        setPhone('');
+        setCaps(EMPTY_CAPS);
+        setContactViaResponsible(false);
+        setResponsibleId(null);
+      }
+      setError(null);
+      setResponsiblePickerVisible(false);
+      setResponsibleSearch('');
+      setCountryPickerVisible(false);
+      setCountrySearch('');
     }
-    setError(null);
-    setResponsiblePickerVisible(false);
-    setResponsibleSearch('');
-    setCountryPickerVisible(false);
-    setCountrySearch('');
-  }, [visible, member, initialName]);
+  }
 
   const responsibleMember = useMemo(
     () => (allMembers ?? []).find((m) => m.id === responsibleId) ?? null,

@@ -95,11 +95,8 @@ function nodes(_renderer: unknown, testID: string) {
   return screen.queryAllByTestId(testID);
 }
 
-function press(renderer: unknown, testID: string) {
-  const node = nodes(renderer, testID)[0];
-  act(() => {
-    (node.props.onPress as () => void)();
-  });
+async function press(_renderer: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
 function selectPerson(member: Member) {

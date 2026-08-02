@@ -8,13 +8,11 @@
  *    the responsible resolved LIVE from the member chain.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import type { Member, Speech } from '../types/database';
 
 import { InviteManagementSection } from '../components/InviteManagementSection';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Controlled data ---
 
@@ -101,16 +99,13 @@ jest.mock('../hooks/useSpeeches', () => {
 
 // --- Helpers ---
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(InviteManagementSection));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(InviteManagementSection));
+  return null; // call-site compatibility; the helpers query `screen`
 }
 
 /** Press the not-invited WhatsApp action button (accessibilityLabel 'WhatsApp'). */
-async function pressSend(renderer: TestRenderer.ReactTestRenderer) {
+async function pressSend(renderer: unknown) {
   const btn = renderer.root.findAll(
     (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'WhatsApp' && typeof n.props.onPress === 'function'
   )[0];
@@ -135,7 +130,7 @@ beforeEach(() => {
 describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
   it('non-delegated: sends the plain base message to contact_phone', async () => {
     mockSPEECHES = [makeSpeech({ id: 'sp1', is_delegated: false, contact_phone: '+15550009' })];
-    const renderer = render();
+    const renderer = await render();
     await pressSend(renderer);
 
     expect(mockOpenWhatsAppMock).toHaveBeenCalledTimes(1);
@@ -155,7 +150,7 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
         member_id: 'm-del',
       }),
     ];
-    const renderer = render();
+    const renderer = await render();
     await pressSend(renderer);
 
     const { phone, text } = lastSentText();
@@ -180,7 +175,7 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
         member_id: 'm-del',
       }),
     ];
-    const renderer = render();
+    const renderer = await render();
     await pressSend(renderer);
 
     const { phone, text } = lastSentText();

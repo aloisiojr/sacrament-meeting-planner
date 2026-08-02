@@ -6,13 +6,11 @@
  * can drive the designations list.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import enUS from '../i18n/locales/en-US.json';
 import PresentationScreen from '../app/presentation';
 import type { Designation } from '../types/database';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const DATE = '2026-08-02';
 
@@ -95,14 +93,11 @@ jest.mock('../hooks/usePresentationMode', () => {
   };
 });
 
-function render() {
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(PresentationScreen));
-  });
-  return renderer;
+async function render() {
+  await rtlRender(React.createElement(PresentationScreen));
+  return null; // call-site compatibility; the helpers query `screen`
 }
-function allText(renderer: TestRenderer.ReactTestRenderer): string {
+function allText(renderer: unknown): string {
   const out: string[] = [];
   const walk = (node: unknown): void => {
     if (typeof node === 'string') out.push(node);
@@ -113,13 +108,13 @@ function allText(renderer: TestRenderer.ReactTestRenderer): string {
   walk(renderer.toJSON() as unknown);
   return out.join('|');
 }
-function findByTestID(renderer: TestRenderer.ReactTestRenderer, testID: string) {
+function findByTestID(renderer: unknown, testID: string) {
   return renderer.root.findAll((n) => n.props?.testID === testID);
 }
-function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
+function press(renderer: unknown, testID: string): void {
   (findByTestID(renderer, testID)[0].props.onPress as () => void)();
 }
-function expandCard(renderer: TestRenderer.ReactTestRenderer, index: number): void {
+function expandCard(renderer: unknown, index: number): void {
   const headers = renderer.root.findAll(
     (n) =>
       typeof n.type !== 'string' &&
@@ -137,24 +132,24 @@ beforeEach(() => {
 });
 
 describe('Designations interstitial (Play)', () => {
-  it('renders the "text to read" icon when there are designations (AC1), hidden until tapped', () => {
-    const r = render();
+  it('renders the "text to read" icon when there are designations (AC1), hidden until tapped', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     expect(findByTestID(r, 'designations-read-icon-button').length).toBeGreaterThan(0);
     expect(findByTestID(r, 'designation-read-panel').length).toBe(0);
   });
 
-  it('tapping the icon opens the interstitial with the substituted verbatim text (AC2/AC3)', () => {
-    const r = render();
+  it('tapping the icon opens the interstitial with the substituted verbatim text (AC2/AC3)', async () => {
+    const r = await render();
     act(() => { expandCard(r, 1); });
     act(() => { press(r, 'designations-read-icon-button'); });
     expect(findByTestID(r, 'designation-read-panel').length).toBeGreaterThan(0);
     expect(allText(r)).toContain('John Doe has been called as Elders Quorum President');
   });
 
-  it('uses the ward override template when set (AC7)', () => {
+  it('uses the ward override template when set (AC7)', async () => {
     mockState.templates = { sustain: 'CUSTOM: {name} → {calling}.' };
-    const r = render();
+    const r = await render();
     act(() => { expandCard(r, 1); });
     act(() => { press(r, 'designations-read-icon-button'); });
     const text = allText(r);
@@ -162,9 +157,9 @@ describe('Designations interstitial (Play)', () => {
     expect(text).not.toContain('has been called as');
   });
 
-  it('shows no icon when there are no designations (AC8)', () => {
+  it('shows no icon when there are no designations (AC8)', async () => {
     mockState.designations = [];
-    const r = render();
+    const r = await render();
     act(() => { expandCard(r, 1); });
     expect(findByTestID(r, 'designations-read-icon-button').length).toBe(0);
   });

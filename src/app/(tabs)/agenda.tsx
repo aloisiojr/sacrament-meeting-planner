@@ -83,7 +83,7 @@ function AgendaTabContent() {
   // for upcoming Sundays that have no explicit exception yet — only for online editors.
   useAutoAssignMissingSundayTypes(sundays, exceptions, isOnline && canEditType);
 
-  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [expandedDateState, setExpandedDate] = useState<string | null>(null);
 
   // Build exception map
   const exceptionMap = useMemo(() => {
@@ -162,11 +162,18 @@ function AgendaTabContent() {
   }, [initialIndex, listItems.length]);
 
   // ADR-082: Handle expandDate query param from Presentation pencil / Home preview card pencil
+  /* Kept as an effect on purpose. This reacts to a NAVIGATION PARAM and its work is mostly
+   * non-state: it fires a lazy-create mutation, scrolls the list imperatively, and clears the
+   * param via router.setParams. Expanding the card is one step of that sequence, not state
+   * derivable from props — there is nothing to compute during render. */
   useEffect(() => {
     if (!params.expandDate || listItems.length === 0) return;
     const targetDate = params.expandDate;
 
     // Expand the card and lazy-create agenda
+    /* eslint-disable-next-line react-hooks/set-state-in-effect --
+     * See the note above the effect: this is one step of a navigation-driven sequence (mutation +
+     * imperative scroll + clearing the param), not state derivable during render. */
     setExpandedDate(targetDate);
     lazyCreate.mutate(targetDate);
 
@@ -191,12 +198,11 @@ function AgendaTabContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.expandDate, listItems.length]);
 
-  // Auto-collapse non-next-Sunday card when going offline
-  useEffect(() => {
-    if (!isOnline && expandedDate && expandedDate !== nextSunday) {
-      setExpandedDate(null);
-    }
-  }, [isOnline, expandedDate, nextSunday]);
+  // Auto-collapse a non-next-Sunday card while offline. Derived rather than written back from an
+  // effect: the offline rule is a function of the current state, so computing it during render
+  // avoids the extra pass (and the state can never be briefly wrong in a painted frame).
+  const expandedDate =
+    !isOnline && expandedDateState && expandedDateState !== nextSunday ? null : expandedDateState;
 
   const handleToggle = useCallback(
     (date: string) => {

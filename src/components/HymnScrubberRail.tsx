@@ -10,7 +10,7 @@
  *
  * Core PanResponder (not gesture-handler) so it works inside a RN Modal and on react-native-web.
  */
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,7 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
 
   // Keep the latest handler so the once-created PanResponder never uses a stale `anchors`.
   const scrubAtRef = useRef<(pageY: number) => void>(() => {});
-  scrubAtRef.current = useCallback(
+  const scrubAt = useCallback(
     (pageY: number) => {
       const { top, height } = geom.current;
       // The numbers are centered in the strip, so map over their band, not the full height.
@@ -56,6 +56,12 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
     },
     [anchors, onScrubToAnchor]
   );
+  // Assigned in an effect, not during render: writing a ref while rendering is unsafe under
+  // concurrent React (the render may be thrown away). The PanResponder handlers only fire on user
+  // interaction, which is always after effects have flushed, so they still see the latest closure.
+  useEffect(() => {
+    scrubAtRef.current = scrubAt;
+  }, [scrubAt]);
 
   const refreshTop = useCallback(() => {
     railRef.current?.measureInWindow?.((_x, y) => {
@@ -71,7 +77,14 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
     [refreshTop]
   );
 
-  const pan = useRef(
+  // useState lazy initialiser rather than useRef(...).current: the responder must be created once,
+  // but reading a ref during render is unsafe under concurrent React. useState gives the same
+  // create-once semantics with a value that is legal to read while rendering.
+  /* eslint-disable-next-line react-hooks/refs --
+   * False positive: the rule sees `scrubAtRef.current` / `geom.current` inside this initialiser,
+   * but those reads live in the PanResponder CALLBACKS, which fire on touch — long after render.
+   * The initialiser itself touches no ref. */
+  const [pan] = useState(() =>
     PanResponder.create({
       // Own the whole strip from the first touch — including the capture phase — so we win the
       // gesture over the FlatList underneath, and NEVER yield it mid-drag. Without
@@ -91,7 +104,7 @@ export function HymnScrubberRail({ anchors, colors, onScrubToAnchor, testID }: H
       onPanResponderRelease: () => setBubble(null),
       onPanResponderTerminate: () => setBubble(null),
     })
-  ).current;
+  );
 
   if (anchors.length === 0) return null;
 

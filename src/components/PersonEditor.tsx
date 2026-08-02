@@ -7,7 +7,7 @@
  * a responsible must be chosen. Persists via `useCreateMember` / `useUpdateMember`.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,

@@ -17,7 +17,7 @@
  *  - Selecting is gated by agenda:write / speech:assign; observers are view-only.
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,

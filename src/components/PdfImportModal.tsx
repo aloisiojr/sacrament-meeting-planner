@@ -7,7 +7,7 @@
  * The WebView extraction can't run under vitest; the tested logic lives in the pure S1–S5 modules
  * and PdfImportReview. Validate the extraction end-to-end on device.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal, View, Text, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';

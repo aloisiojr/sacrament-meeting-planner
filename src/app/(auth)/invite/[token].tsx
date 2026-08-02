@@ -55,17 +55,13 @@ export default function InviteRegistrationScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [loading, setLoading] = useState(true);
+  // Seeded from the token's presence: with no token there is nothing to validate, so the screen
+  // starts in its final state instead of flipping through a spinner via an effect.
+  const [loading, setLoading] = useState(!!token);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(token ? null : t('auth.inviteInvalid'));
 
   const validateToken = async () => {
-    if (!token) {
-      setError(t('auth.inviteInvalid'));
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await supabase.functions.invoke('register-invited-user', {
         body: { token },
@@ -98,6 +94,11 @@ export default function InviteRegistrationScreen() {
   // Validate token on mount and whenever the token changes. Declared after
   // validateToken so the call site is not a temporal-dead-zone reference.
   useEffect(() => {
+    if (!token) return; // handled by the initial state above
+    /* eslint-disable-next-line react-hooks/set-state-in-effect --
+     * False positive: validateToken is async and every setState in it runs after the first await
+     * (or in `finally`). Nothing is set synchronously, so there is no cascading render.
+     * Fetch-on-mount is what an effect is for. */
     validateToken();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);

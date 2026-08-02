@@ -5,14 +5,13 @@
  * mocked per-file; pure utils stay real via importOriginal.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { COUNTRY_CODES } from '../lib/countryCodes';
 import { Alert } from 'react-native';
 import type { Member } from '../types/database';
 // jest.mock calls below are hoisted above this import, so the mocks still apply.
 import { PersonEditor, type PersonEditorProps } from '../components/PersonEditor';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Controlled data + mutation spies ---
 
@@ -86,43 +85,32 @@ jest.mock('../contexts/ThemeContext', () => ({
 
 // --- Helpers ---
 
-function render(props: Partial<PersonEditorProps> = {}) {
+async function render(props: Partial<PersonEditorProps> = {}) {
   const onClose = jest.fn();
   const onSaved = jest.fn();
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(PersonEditor, { visible: true, onClose, onSaved, ...props })
-    );
-  });
-  return { renderer, onClose, onSaved };
+  await rtlRender(React.createElement(PersonEditor, { visible: true, onClose, onSaved, ...props }));
+  return { renderer: null, onClose, onSaved };
 }
 
-function find(root: TestRenderer.TestInstance, testID: string) {
-  return root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function find(_root: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
 
-function node(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  return find(renderer.root, testID)[0];
+function node(_renderer: unknown, testID: string) {
+  return screen.getByTestId(testID);
 }
 
-function change(renderer: TestRenderer.ReactTestRenderer, testID: string, value: string) {
-  act(() => {
-    (node(renderer, testID).props.onChangeText as (v: string) => void)(value);
-  });
+async function change(_renderer: unknown, testID: string, value: string) {
+  await fireEvent.changeText(screen.getByTestId(testID), value);
 }
 
-function press(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  act(() => {
-    (node(renderer, testID).props.onPress as () => void)();
-  });
+async function press(_renderer: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
-function toggleSwitch(renderer: TestRenderer.ReactTestRenderer, testID: string) {
-  const sw = node(renderer, testID);
-  act(() => {
-    (sw.props.onValueChange as (v: boolean) => void)(!sw.props.value);
-  });
+async function toggleSwitch(_renderer: unknown, testID: string) {
+  const sw = screen.getByTestId(testID);
+  await fireEvent(sw, 'valueChange', !sw.props.value);
 }
 
 beforeEach(() => {
@@ -134,13 +122,13 @@ beforeEach(() => {
 });
 
 describe('PersonEditor', () => {
-  it('creates a person with identity + capability flags (AC7)', () => {
-    const { renderer, onSaved, onClose } = render();
-    change(renderer, 'person-editor-full-name', 'New Person');
-    change(renderer, 'person-editor-phone', '11999');
-    toggleSwitch(renderer, 'person-editor-cap-switch-preside');
-    toggleSwitch(renderer, 'person-editor-cap-switch-play_piano');
-    press(renderer, 'person-editor-save');
+  it('creates a person with identity + capability flags (AC7)', async () => {
+    const { renderer, onSaved, onClose } = await render();
+    await change(null, 'person-editor-full-name', 'New Person');
+    await change(null, 'person-editor-phone', '11999');
+    await toggleSwitch(null, 'person-editor-cap-switch-preside');
+    await toggleSwitch(null, 'person-editor-cap-switch-play_piano');
+    await press(null, 'person-editor-save');
 
     expect(mockCreateMock).toHaveBeenCalledTimes(1);
     expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
@@ -157,55 +145,55 @@ describe('PersonEditor', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('shows an error and keeps the modal open when saving fails (P1 #7)', () => {
+  it('shows an error and keeps the modal open when saving fails (P1 #7)', async () => {
     // Drive the mutation's onError instead of onSuccess.
     mockCreateMock.mockImplementationOnce((_input: unknown, opts?: MutateOpts) =>
       opts?.onError?.(new Error('insert failed'))
     );
-    const { renderer, onClose } = render();
-    change(renderer, 'person-editor-full-name', 'New Person');
-    press(renderer, 'person-editor-save');
+    const { renderer, onClose } = await render();
+    await change(null, 'person-editor-full-name', 'New Person');
+    await press(null, 'person-editor-save');
 
-    const errorNode = node(renderer, 'person-editor-error');
+    const errorNode = node(null, 'person-editor-error');
     expect(errorNode.props.children).toBe('personEditor.saveFailed');
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('E1: shows a visible label above the informal-name field', () => {
-    const { renderer } = render();
-    const labels = renderer.root.findAll(
+  it('E1: shows a visible label above the informal-name field', async () => {
+    await render();
+    const labels = screen.root!.queryAll(
       (n) => typeof n.type === 'string' && n.props.children === 'personEditor.informalNameLabel'
     );
     expect(labels.length).toBe(1);
   });
 
-  it('E3b: saves the calling free-text field', () => {
-    const { renderer } = render();
-    change(renderer, 'person-editor-full-name', 'With Calling');
-    change(renderer, 'person-editor-calling', 'Bispo');
-    press(renderer, 'person-editor-save');
+  it('E3b: saves the calling free-text field', async () => {
+    await render();
+    await change(null, 'person-editor-full-name', 'With Calling');
+    await change(null, 'person-editor-calling', 'Bispo');
+    await press(null, 'person-editor-save');
 
     expect(mockCreateMock).toHaveBeenCalledTimes(1);
     expect(mockCreateMock.mock.calls[0][0]).toMatchObject({ full_name: 'With Calling', calling: 'Bispo' });
   });
 
-  it('E3b: prefills the calling from an edited member', () => {
+  it('E3b: prefills the calling from an edited member', async () => {
     const member = makeMember({ id: 'self', full_name: 'Self Person', calling: 'Bispo' });
-    const { renderer } = render({ member });
-    expect(node(renderer, 'person-editor-calling').props.value).toBe('Bispo');
+    await render({ member });
+    expect(node(null, 'person-editor-calling').props.value).toBe('Bispo');
   });
 
-  it('E3: permission switches reflect caps and toggle + persist on save', () => {
+  it('E3: permission switches reflect caps and toggle + persist on save', async () => {
     const member = makeMember({ id: 'self', full_name: 'Self Person', can_conduct: true });
-    const { renderer } = render({ member });
+    await render({ member });
     // Switch reflects the current cap value.
-    expect(node(renderer, 'person-editor-cap-switch-conduct').props.value).toBe(true);
-    expect(node(renderer, 'person-editor-cap-switch-preside').props.value).toBe(false);
+    expect(node(null, 'person-editor-cap-switch-conduct').props.value).toBe(true);
+    expect(node(null, 'person-editor-cap-switch-preside').props.value).toBe(false);
 
     // Toggling flips them and persists on save.
-    toggleSwitch(renderer, 'person-editor-cap-switch-conduct');
-    toggleSwitch(renderer, 'person-editor-cap-switch-preside');
-    press(renderer, 'person-editor-save');
+    await toggleSwitch(null, 'person-editor-cap-switch-conduct');
+    await toggleSwitch(null, 'person-editor-cap-switch-preside');
+    await press(null, 'person-editor-save');
     expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({
       id: 'self',
       can_conduct: false,
@@ -213,80 +201,67 @@ describe('PersonEditor', () => {
     });
   });
 
-  it('E2: country picker opens and selecting a country stores the dial code', () => {
-    const { renderer } = render();
-    change(renderer, 'person-editor-full-name', 'Country Person');
-    press(renderer, 'person-editor-country-code');
+  it('E2: country picker opens and selecting a country stores the dial code', async () => {
+    await render();
+    await change(null, 'person-editor-full-name', 'Country Person');
+    await press(null, 'person-editor-country-code');
 
-    // The country FlatList (the one whose rows carry a flag) lists COUNTRY_CODES.
-    const flats = renderer.root.findAll((n) => n.type === 'FlatList');
-    const countryFlat = flats.find(
-      (f) => Array.isArray(f.props.data) && (f.props.data as { flag?: string }[])[0]?.flag
-    )!;
-    const entry = (countryFlat.props.data as { code: string; label: string }[]).find(
-      (c) => c.code === '+1' && c.label.includes('United States')
-    )!;
-    const renderItem = countryFlat.props.renderItem as (info: {
-      item: { code: string; label: string; flag: string };
-    }) => React.ReactElement;
-    let row!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      row = TestRenderer.create(renderItem({ item: { ...entry, flag: 'US' } }));
-    });
-    act(() => {
-      (find(row.root, `person-editor-country-item-${entry.label}`)[0].props.onPress as () => void)();
-    });
+    // Real FlatList renders its own rows and virtualises, so filter first — as a user would —
+    // instead of invoking renderItem by hand.
+    const usEntry = COUNTRY_CODES.find((c) => c.code === '+1' && c.label.includes('United States'))!;
+    await fireEvent.changeText(screen.getByTestId('person-editor-country-search'), 'United States');
+    await fireEvent.press(await screen.findByTestId(`person-editor-country-item-${usEntry.label}`));
 
-    press(renderer, 'person-editor-save');
+    await press(null, 'person-editor-save');
     expect(mockCreateMock.mock.calls[0][0]).toMatchObject({ country_code: '+1' });
   });
 
-  it('E4: responsible-for list renders only when the member has dependents', () => {
+  it('E4: responsible-for list renders only when the member has dependents', async () => {
     // OTHER points at SELF via responsible_id → SELF is responsible for OTHER.
     const self = makeMember({ id: 'self', full_name: 'Self Person' });
     const dependent = makeMember({ id: 'other', full_name: 'Dependent Person', responsible_id: 'self' });
     mockMEMBERS = [self, dependent];
-    const { renderer } = render({ member: self });
-    expect(find(renderer.root, 'person-editor-responsible-for').length).toBe(1);
-    const names = renderer.root.findAll(
+    await render({ member: self });
+    expect(find(null, 'person-editor-responsible-for').length).toBe(1);
+    const names = screen.root!.queryAll(
       (n) => typeof n.type === 'string' && n.props.children === 'Dependent Person'
     );
     expect(names.length).toBeGreaterThan(0);
   });
 
-  it('E4: responsible-for list is absent when the member has no dependents', () => {
+  it('E4: responsible-for list is absent when the member has no dependents', async () => {
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const { renderer } = render({ member });
-    expect(find(renderer.root, 'person-editor-responsible-for').length).toBe(0);
+    await render({ member });
+    expect(find(null, 'person-editor-responsible-for').length).toBe(0);
   });
 
-  it('E5: delete button shows only when editing an existing member (not create)', () => {
-    const createView = render();
-    expect(find(createView.renderer.root, 'person-editor-delete').length).toBe(0);
+  it('E5: delete button shows only when editing an existing member (not create)', async () => {
+    await render();
+    expect(find(null, 'person-editor-delete').length).toBe(0);
 
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const editView = render({ member });
-    expect(find(editView.renderer.root, 'person-editor-delete').length).toBe(1);
+    const editView = await render({ member });
+    expect(find(null, 'person-editor-delete').length).toBe(1);
   });
 
-  it('E5: delete button hidden without member:write', () => {
+  it('E5: delete button hidden without member:write', async () => {
     mockHasPermissionResult = false;
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const { renderer } = render({ member });
-    expect(find(renderer.root, 'person-editor-delete').length).toBe(0);
+    await render({ member });
+    expect(find(null, 'person-editor-delete').length).toBe(0);
   });
 
-  it('E5: pressing delete confirms then deletes and closes', () => {
+  it('E5: pressing delete confirms then deletes and closes', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const { renderer, onClose } = render({ member });
-    press(renderer, 'person-editor-delete');
+    const { renderer, onClose } = await render({ member });
+    await press(null, 'person-editor-delete');
 
     // Alert was raised with a destructive confirm button; invoke it.
     expect(alertSpy).toHaveBeenCalledTimes(1);
     const buttons = alertSpy.mock.calls[0][2] as { style?: string; onPress?: () => void }[];
     const destructive = buttons.find((b) => b.style === 'destructive')!;
-    act(() => {
+    await act(async () => {
       destructive.onPress?.();
     });
 
@@ -296,12 +271,12 @@ describe('PersonEditor', () => {
     alertSpy.mockRestore();
   });
 
-  it('defaults an empty country code to +55 on save (P2 #4)', () => {
-    const { renderer } = render();
-    change(renderer, 'person-editor-full-name', 'No Country Code');
-    change(renderer, 'person-editor-phone', '11999');
+  it('defaults an empty country code to +55 on save (P2 #4)', async () => {
+    await render();
+    await change(null, 'person-editor-full-name', 'No Country Code');
+    await change(null, 'person-editor-phone', '11999');
     // country_code left empty
-    press(renderer, 'person-editor-save');
+    await press(null, 'person-editor-save');
 
     expect(mockCreateMock).toHaveBeenCalledTimes(1);
     expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
@@ -311,59 +286,48 @@ describe('PersonEditor', () => {
     });
   });
 
-  it('prefills fields from the edited member and updates via id (AC7)', () => {
+  it('prefills fields from the edited member and updates via id (AC7)', async () => {
     const member = makeMember({
       id: 'self', full_name: 'Self Person', informal_name: 'Selfie', can_conduct: true,
     });
-    const { renderer } = render({ member });
-    expect(node(renderer, 'person-editor-full-name').props.value).toBe('Self Person');
-    expect(node(renderer, 'person-editor-informal-name').props.value).toBe('Selfie');
+    await render({ member });
+    expect(node(null, 'person-editor-full-name').props.value).toBe('Self Person');
+    expect(node(null, 'person-editor-informal-name').props.value).toBe('Selfie');
 
-    change(renderer, 'person-editor-full-name', 'Renamed');
-    press(renderer, 'person-editor-save');
+    await change(null, 'person-editor-full-name', 'Renamed');
+    await press(null, 'person-editor-save');
     expect(mockUpdateMock).toHaveBeenCalledTimes(1);
     expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({ id: 'self', full_name: 'Renamed', can_conduct: true });
   });
 
-  it('requires a full name (AC7)', () => {
-    const { renderer } = render();
-    press(renderer, 'person-editor-save');
+  it('requires a full name (AC7)', async () => {
+    await render();
+    await press(null, 'person-editor-save');
     expect(mockCreateMock).not.toHaveBeenCalled();
-    expect(find(renderer.root, 'person-editor-error').length).toBe(1);
+    expect(find(null, 'person-editor-error').length).toBe(1);
   });
 
-  it('requires a responsible when contact-via-responsible is on (AC7)', () => {
-    const { renderer } = render();
-    change(renderer, 'person-editor-full-name', 'Needs Delegate');
-    press(renderer, 'person-editor-contact-via-responsible');
-    press(renderer, 'person-editor-save');
+  it('requires a responsible when contact-via-responsible is on (AC7)', async () => {
+    await render();
+    await change(null, 'person-editor-full-name', 'Needs Delegate');
+    await press(null, 'person-editor-contact-via-responsible');
+    await press(null, 'person-editor-save');
     expect(mockCreateMock).not.toHaveBeenCalled();
-    expect(find(renderer.root, 'person-editor-error').length).toBe(1);
+    expect(find(null, 'person-editor-error').length).toBe(1);
   });
 
-  it('responsible picker excludes self and delegation persists once chosen (AC7)', () => {
+  it('responsible picker excludes self and delegation persists once chosen (AC7)', async () => {
     const member = makeMember({ id: 'self', full_name: 'Self Person' });
-    const { renderer } = render({ member });
-    change(renderer, 'person-editor-full-name', 'Self Person');
-    press(renderer, 'person-editor-contact-via-responsible');
-    press(renderer, 'person-editor-responsible-select');
+    await render({ member });
+    await change(null, 'person-editor-full-name', 'Self Person');
+    await press(null, 'person-editor-contact-via-responsible');
+    await press(null, 'person-editor-responsible-select');
 
-    // The candidate FlatList excludes self and includes the other member.
-    const flat = renderer.root.findAll((n) => n.type === 'FlatList')[0];
-    const candidateIds = (flat.props.data as Member[]).map((m) => m.id);
-    expect(candidateIds).toEqual(['other']);
+    // Candidates render as rows: self is excluded, the other member is offered.
+    expect(screen.queryByTestId('person-editor-responsible-item-self')).toBeNull();
+    await fireEvent.press(await screen.findByTestId('person-editor-responsible-item-other'));
 
-    // Render the "other" row and pick it.
-    const renderItem = flat.props.renderItem as (info: { item: Member }) => React.ReactElement;
-    let row!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      row = TestRenderer.create(renderItem({ item: OTHER }));
-    });
-    act(() => {
-      (find(row.root, 'person-editor-responsible-item-other')[0].props.onPress as () => void)();
-    });
-
-    press(renderer, 'person-editor-save');
+    await press(null, 'person-editor-save');
     expect(mockUpdateMock).toHaveBeenCalledTimes(1);
     expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({
       id: 'self',

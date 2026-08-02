@@ -310,7 +310,9 @@ describe('UnifiedSundayCard — no-sacrament Sunday (U5)', () => {
     );
     // There is a single pressable, and it is the status zone (no separate speakers zone).
     const pressables = screen.root!.queryAll(
-      (n) => typeof n.type === 'string' && typeof n.props.onPress === 'function'
+      // Real Pressable maps onPress onto the responder handlers, so the host node exposes
+      // onStartShouldSetResponder rather than onPress.
+      (n) => typeof n.type === 'string' && typeof n.props.onStartShouldSetResponder === 'function'
     );
     expect(pressables.map((n) => n.props.testID)).toEqual(['unified-status-2026-08-02']);
     // That single pressable wraps the DateBlock too, so tapping anywhere on the card expands it.
@@ -335,15 +337,17 @@ describe('UnifiedSundayCard — attendance tile (past Sundays)', () => {
   // P0-2 (C): offline, the collapsed past-Sunday card must not allow attendance edits.
   it('passes attendanceDisabled through to the AttendanceBlock (read-only offline)', async () => {
     await render(baseProps({ isPast: true, onSetAttendance: jest.fn(), attendanceDisabled: true }));
-    const block = screen.root!.queryAll((n) => (n.type as unknown) === AttendanceBlock)[0];
-    expect(block).toBeDefined();
-    expect(block.props.disabled).toBe(true);
+    // Assert the outcome rather than the prop: a disabled tile must not open its inline editor.
+    const tile = screen.getByTestId('unified-attendance-2026-08-02');
+    await fireEvent.press(tile);
+    expect(screen.queryByTestId('unified-attendance-2026-08-02-input')).toBeNull();
   });
 
   it('attendance tile is editable when not disabled (online)', async () => {
     await render(baseProps({ isPast: true, onSetAttendance: jest.fn() }));
-    const block = screen.root!.queryAll((n) => (n.type as unknown) === AttendanceBlock)[0];
-    expect(block.props.disabled).toBe(false);
+    const tile = screen.getByTestId('unified-attendance-2026-08-02');
+    await fireEvent.press(tile);
+    expect(screen.getByTestId('unified-attendance-2026-08-02-input')).toBeOnTheScreen();
   });
 
   it('is hidden when isPast but no callback', async () => {
@@ -410,7 +414,9 @@ describe('UnifiedSundayCard — tap zones + chevron (U7)', () => {
   it('has exactly two pressable zones (DateBlock is not pressable)', async () => {
     await render(baseProps());
     const pressables = screen.root!.queryAll(
-      (n) => typeof n.type === 'string' && typeof n.props.onPress === 'function'
+      // Real Pressable maps onPress onto the responder handlers, so the host node exposes
+      // onStartShouldSetResponder rather than onPress.
+      (n) => typeof n.type === 'string' && typeof n.props.onStartShouldSetResponder === 'function'
     );
     const ids = pressables.map((n) => n.props.testID).sort();
     expect(ids).toEqual(['unified-speakers-2026-08-02', 'unified-status-2026-08-02']);

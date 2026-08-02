@@ -5,14 +5,12 @@
  * mocked per-file; pure utils (getResponsibleForMap/filterMembers) stay real via importOriginal.
  */
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { Member } from '../types/database';
 // jest.mock calls below are hoisted above this import, so the mocks still apply.
 import { PeoplePicker, type PeoplePickerProps } from '../components/PeoplePicker';
 
-const { act } = TestRenderer;
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // --- Controlled data + mutation spies ---
 
@@ -85,66 +83,46 @@ jest.mock('../contexts/AuthContext', () => ({
 
 // --- Helpers ---
 
-function render(props: Partial<PeoplePickerProps> = {}) {
+async function render(props: Partial<PeoplePickerProps> = {}) {
   const onSelect = jest.fn();
   const onClose = jest.fn();
-  let renderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(PeoplePicker, { visible: true, onSelect, onClose, ...props })
-    );
-  });
-  return { renderer, onSelect, onClose };
+  await rtlRender(React.createElement(PeoplePicker, { visible: true, onSelect, onClose, ...props }));
+  return { renderer: null, onSelect, onClose };
 }
 
 // The react-native stub's FlatList does not invoke renderItem, so we (a) read its `data` prop for
 // filtering assertions and (b) render a single row via `renderItem` for row-level behavior.
-function find(root: TestRenderer.TestInstance, testID: string) {
-  // Each RN stub primitive appears twice (component instance + host element); keep host nodes only.
-  return root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
+function find(_root: unknown, testID: string) {
+  return screen.queryAllByTestId(testID);
 }
 
-function press(root: TestRenderer.TestInstance, testID: string) {
-  const node = find(root, testID)[0];
-  act(() => {
-    (node.props.onPress as () => void)();
-  });
+async function press(_root: unknown, testID: string) {
+  await fireEvent.press(screen.getByTestId(testID));
 }
 
-/** Flip a Switch (e.g. the "Ver todos" toggle) via its onValueChange handler. */
-function toggle(root: TestRenderer.TestInstance, testID: string, value: boolean) {
-  const node = find(root, testID)[0];
-  act(() => {
-    (node.props.onValueChange as (v: boolean) => void)(value);
-  });
+/** Flip a Switch (e.g. the "Ver todos" toggle). */
+async function toggle(_root: unknown, testID: string, value: boolean) {
+  await fireEvent(screen.getByTestId(testID), 'valueChange', value);
 }
 
-/** Read the text content of the first host Text node carrying `testID`. */
-function textOf(root: TestRenderer.TestInstance, testID: string): string {
-  const node = find(root, testID)[0];
+/** Read the text content of the first node carrying `testID`. */
+function textOf(_root: unknown, testID: string): string {
   const flatten = (c: unknown): string =>
     Array.isArray(c) ? c.map(flatten).join('') : typeof c === 'string' ? c : '';
-  return flatten(node.props.children);
+  return flatten(screen.getByTestId(testID).props.children);
 }
 
-function listData(renderer: TestRenderer.ReactTestRenderer): Member[] {
-  const flat = renderer.root.findAll((n) => n.type === 'FlatList')[0];
-  return (flat.props.data as Member[]) ?? [];
-}
-
-function ids(renderer: TestRenderer.ReactTestRenderer): string[] {
-  return listData(renderer).map((m) => m.id);
-}
-
-/** Render one member's row (renderItem output) into its own renderer for row-level assertions. */
-function renderRow(renderer: TestRenderer.ReactTestRenderer, member: Member) {
-  const flat = renderer.root.findAll((n) => n.type === 'FlatList')[0];
-  const renderItem = flat.props.renderItem as (info: { item: Member }) => React.ReactElement;
-  let rowRenderer!: TestRenderer.ReactTestRenderer;
-  act(() => {
-    rowRenderer = TestRenderer.create(renderItem({ item: member }));
-  });
-  return rowRenderer;
+/**
+ * The ids of the rows the list ACTUALLY renders.
+ *
+ * The previous version read FlatList's `data` prop and, separately, rendered a chosen row into its
+ * own renderer to press it — so a test could exercise a row the real list never mounted. Reading
+ * the rendered rows means the filter and the row assertions can no longer disagree.
+ */
+function ids(_renderer?: unknown): string[] {
+  return screen
+    .queryAllByTestId(/^people-picker-item-/)
+    .map((n) => String(n.props.testID).replace('people-picker-item-', ''));
 }
 
 beforeEach(() => {
@@ -161,33 +139,32 @@ function alertButtons() {
 }
 
 describe('PeoplePicker', () => {
-  it('lists everyone with no capability context and hides the "ver todos" toggle (AC4)', () => {
-    const { renderer } = render();
-    expect(ids(renderer)).toEqual(['a', 'b', 'c']);
-    expect(find(renderer.root, 'people-picker-view-all').length).toBe(0);
+  it('lists everyone with no capability context and hides the "ver todos" toggle (AC4)', async () => {
+    await render();
+    expect(ids()).toEqual(['a', 'b', 'c']);
+    expect(find(null, 'people-picker-view-all').length).toBe(0);
   });
 
-  it('defaults to capability-filtered list with a "ver todos" toggle (AC4)', () => {
-    const { renderer } = render({ capability: 'preside' });
-    expect(ids(renderer)).toEqual(['a']); // only can_preside
-    expect(find(renderer.root, 'people-picker-view-all').length).toBe(1);
+  it('defaults to capability-filtered list with a "ver todos" toggle (AC4)', async () => {
+    await render({ capability: 'preside' });
+    expect(ids()).toEqual(['a']); // only can_preside
+    expect(find(null, 'people-picker-view-all').length).toBe(1);
   });
 
-  it('"ver todos" reveals members lacking the capability', () => {
-    const { renderer } = render({ capability: 'preside' });
-    expect(ids(renderer)).toEqual(['a']);
-    toggle(renderer.root, 'people-picker-view-all', true);
-    expect(ids(renderer)).toEqual(['a', 'b', 'c']);
+  it('"ver todos" reveals members lacking the capability', async () => {
+    await render({ capability: 'preside' });
+    expect(ids()).toEqual(['a']);
+    await toggle(null, 'people-picker-view-all', true);
+    expect(ids()).toEqual(['a', 'b', 'c']);
   });
 
-  it('grant-on-select confirms, grants the capability, then selects (AC5)', () => {
-    const { renderer, onSelect } = render({ capability: 'preside' });
-    const row = renderRow(renderer, MEMBER_B); // lacks can_preside
-    press(row.root, 'people-picker-item-b');
+  it('grant-on-select confirms, grants the capability, then selects (AC5)', async () => {
+    const { onSelect } = await render({ capability: 'preside' });
+    await press(null, 'people-picker-item-b');
     // Confirmation shown; invoke the non-cancel button.
     expect(Alert.alert).toHaveBeenCalledTimes(1);
     const confirm = alertButtons().find((b) => b.style !== 'cancel')!;
-    act(() => confirm.onPress?.());
+    await act(async () => confirm.onPress?.());
     expect(mockUpdateMock).toHaveBeenCalledWith(
       { id: 'b', can_preside: true },
       expect.objectContaining({ onSuccess: expect.any(Function) })
@@ -195,170 +172,162 @@ describe('PeoplePicker', () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'b', can_preside: true }));
   });
 
-  it('selects directly (no confirmation) when the member already has the capability', () => {
-    const { renderer, onSelect } = render({ capability: 'preside' });
-    const row = renderRow(renderer, MEMBER_A);
-    press(row.root, 'people-picker-item-a');
+  it('selects directly (no confirmation) when the member already has the capability', async () => {
+    const { onSelect } = await render({ capability: 'preside' });
+    await press(null, 'people-picker-item-a');
     expect(Alert.alert).not.toHaveBeenCalled();
     expect(onSelect).toHaveBeenCalledWith(MEMBER_A);
   });
 
-  it('shows a "Responsável por" label for a responsible member (AC6)', () => {
-    const { renderer } = render();
-    expect(find(renderRow(renderer, MEMBER_A).root, 'people-picker-responsible-a').length).toBe(1);
-    expect(find(renderRow(renderer, MEMBER_B).root, 'people-picker-responsible-b').length).toBe(0);
+  it('shows a "Responsável por" label for a responsible member (AC6)', async () => {
+    await render();
+    expect(find(null, 'people-picker-responsible-a').length).toBe(1);
+    expect(find(null, 'people-picker-responsible-b').length).toBe(0);
   });
 
-  it('exposes add + row edit and opens the editor with the member when member:write (AC6)', () => {
-    const { renderer } = render();
-    expect(find(renderer.root, 'people-picker-add').length).toBe(1);
-    const row = renderRow(renderer, MEMBER_A);
-    expect(find(row.root, 'people-picker-edit-a').length).toBe(1);
+  it('exposes add + row edit and opens the editor with the member when member:write (AC6)', async () => {
+    await render();
+    expect(find(null, 'people-picker-add').length).toBe(1);
+    expect(find(null, 'people-picker-edit-a').length).toBe(1);
     // Pressing edit loads the member into the (always-mounted) PersonEditor.
-    press(row.root, 'people-picker-edit-a');
-    const nameInput = find(renderer.root, 'person-editor-full-name')[0];
+    await press(null, 'people-picker-edit-a');
+    const nameInput = find(null, 'person-editor-full-name')[0];
     expect(nameInput.props.value).toBe('Alice Preside');
   });
 
-  it('never renders a per-row delete (trash) control — deletion lives in the editor (P1)', () => {
-    const { renderer } = render();
-    const row = renderRow(renderer, MEMBER_A);
-    expect(find(row.root, 'people-picker-delete-a').length).toBe(0);
+  it('never renders a per-row delete (trash) control — deletion lives in the editor (P1)', async () => {
+    await render();
+    expect(find(null, 'people-picker-delete-a').length).toBe(0);
   });
 
-  it('is view-only for observers: no add, no row controls, selection disabled (AC6)', () => {
+  it('is view-only for observers: no add, no row controls, selection disabled (AC6)', async () => {
     mockHasPermissionMock.mockImplementation(() => false);
-    const { renderer, onSelect } = render();
-    expect(find(renderer.root, 'people-picker-add').length).toBe(0);
-    const row = renderRow(renderer, MEMBER_A);
-    expect(find(row.root, 'people-picker-edit-a').length).toBe(0);
-    press(row.root, 'people-picker-item-a');
+    const { onSelect } = await render();
+    expect(find(null, 'people-picker-add').length).toBe(0);
+    expect(find(null, 'people-picker-edit-a').length).toBe(0);
+    await press(null, 'people-picker-item-a');
     expect(onSelect).not.toHaveBeenCalled();
   });
 
   // --- Context: title / subtitle / toggle (P2, P6) ---
 
-  it('top bar shows "Cancel" on the left (replaces Close) and still closes (A)', () => {
-    const { renderer, onClose } = render();
-    const closeBtn = find(renderer.root, 'people-picker-close')[0];
+  it('top bar shows "Cancel" on the left (replaces Close) and still closes (A)', async () => {
+    const { onClose } = await render();
+    const closeBtn = find(null, 'people-picker-close')[0];
     const label = closeBtn
-      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+      .queryAll((n: any) => typeof n.type === 'string' && typeof n.props.children === 'string')
       .map((n) => n.props.children as string)
       .join('');
     expect(label).toContain('common.cancel');
     expect(label).not.toContain('common.close');
-    press(renderer.root, 'people-picker-close');
+    await press(null, 'people-picker-close');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('title is centered in the top bar (A)', () => {
-    const { renderer } = render();
-    const title = find(renderer.root, 'people-picker-title')[0];
+  it('title is centered in the top bar (A)', async () => {
+    await render();
+    const title = find(null, 'people-picker-title')[0];
     expect(JSON.stringify(title.props.style)).toContain('center');
   });
 
-  it('add control is a compact icon button next to search — not a dashed text button (A)', () => {
-    const { renderer } = render();
-    const add = find(renderer.root, 'people-picker-add')[0];
+  it('add control is a compact icon button next to search — not a dashed text button (A)', async () => {
+    await render();
+    const add = find(null, 'people-picker-add')[0];
     expect(add).toBeDefined();
     expect(add.props.accessibilityLabel).toBe('people.addPerson');
     // Renders an icon (Svg), not the old "+ Add person" text label.
-    expect(add.findAll((n) => n.type === 'Svg').length).toBeGreaterThan(0);
+    expect(add.queryAll((n: any) => n.type === 'Svg').length).toBeGreaterThan(0);
     const flatten = (c: unknown): string =>
       Array.isArray(c) ? c.map(flatten).join('') : typeof c === 'string' ? c : '';
     expect(flatten(add.props.children)).not.toContain('addPerson');
   });
 
-  it('always shows the fixed picker title (P2)', () => {
+  it('always shows the fixed picker title (P2)', async () => {
     for (const ctx of [undefined, 'speaker', 'preside', 'be_recognized'] as const) {
-      const { renderer } = render(ctx ? { context: ctx } : {});
-      expect(textOf(renderer.root, 'people-picker-title')).toBe('people.pickerTitle');
+      await render(ctx ? { context: ctx } : {});
+      expect(textOf(null, 'people-picker-title')).toBe('people.pickerTitle');
     }
   });
 
-  it('shows the per-context subtitle matching the given context (P2)', () => {
-    const { renderer } = render({ context: 'preside' });
-    expect(textOf(renderer.root, 'people-picker-subtitle')).toBe('people.subtitles.preside');
-    const rec = render({ context: 'be_recognized' });
-    expect(textOf(rec.renderer.root, 'people-picker-subtitle')).toBe(
+  it('shows the per-context subtitle matching the given context (P2)', async () => {
+    await render({ context: 'preside' });
+    expect(textOf(null, 'people-picker-subtitle')).toBe('people.subtitles.preside');
+    await render({ context: 'be_recognized' });
+    expect(textOf(null, 'people-picker-subtitle')).toBe(
       'people.subtitles.be_recognized'
     );
   });
 
-  it('shows the "Ver todos" Switch in capability contexts and hides it in speaker/prayer (P6)', () => {
-    const preside = render({ context: 'preside' });
-    expect(find(preside.renderer.root, 'people-picker-view-all').length).toBe(1);
-    const recognize = render({ context: 'be_recognized' });
-    expect(find(recognize.renderer.root, 'people-picker-view-all').length).toBe(1);
+  it('shows the "Ver todos" Switch in capability contexts and hides it in speaker/prayer (P6)', async () => {
+    await render({ context: 'preside' });
+    expect(find(null, 'people-picker-view-all').length).toBe(1);
+    await render({ context: 'be_recognized' });
+    expect(find(null, 'people-picker-view-all').length).toBe(1);
     for (const ctx of ['speaker', 'opening_prayer', 'closing_prayer'] as const) {
-      const { renderer } = render({ context: ctx });
-      expect(find(renderer.root, 'people-picker-view-all').length).toBe(0);
+      await render({ context: ctx });
+      expect(find(null, 'people-picker-view-all').length).toBe(0);
       // …but the subtitle still shows.
-      expect(textOf(renderer.root, 'people-picker-subtitle')).toBe(`people.subtitles.${ctx}`);
+      expect(textOf(null, 'people-picker-subtitle')).toBe(`people.subtitles.${ctx}`);
     }
   });
 
   // --- Context: per-row secondary line (P3, P4, P5, P5b) ---
 
-  it('shows the informal name in parentheses after the full name (P3)', () => {
+  it('shows the informal name in parentheses after the full name (P3)', async () => {
     mockMEMBERS = [makeMember({ id: 'x', full_name: 'João Vasconcelos', informal_name: 'João' })];
-    const { renderer } = render({ context: 'speaker' });
-    const row = renderRow(renderer, mockMEMBERS[0]);
-    const nameNode = find(row.root, 'people-picker-item-x')[0];
+    await render({ context: 'speaker' });
+    const nameNode = find(null, 'people-picker-item-x')[0];
     const text = JSON.stringify(nameNode.props.children);
     expect(text).toContain('João Vasconcelos');
     expect(text).toContain('(João)');
   });
 
-  it('speaker context: 2nd line shows speech count + responsible, no functions (P4)', () => {
-    const { renderer } = render({ context: 'speaker' });
-    const row = renderRow(renderer, MEMBER_A); // speechCount a=2, responsible for c
-    expect(find(row.root, 'people-picker-responsible-a').length).toBe(1);
-    expect(find(row.root, 'people-picker-calling-a').length).toBe(0);
-    const text = JSON.stringify(row.toJSON());
+  it('speaker context: 2nd line shows speech count + responsible, no functions (P4)', async () => {
+    await render({ context: 'speaker' });
+    expect(find(null, 'people-picker-responsible-a').length).toBe(1);
+    expect(find(null, 'people-picker-calling-a').length).toBe(0);
+    const text = JSON.stringify(screen.toJSON());
     expect(text).toContain('members.speechCount');
     expect(text).not.toContain('capabilitiesShort');
   });
 
-  it('preside context: 2nd line shows calling (when set), no speech/responsible/functions', () => {
+  it('preside context: 2nd line shows calling (when set), no speech/responsible/functions', async () => {
     mockMEMBERS = [
       makeMember({ id: 'p', full_name: 'Ana Lima', calling: 'Presidente da SS', can_preside: true }),
     ];
-    const { renderer } = render({ context: 'preside' });
-    const row = renderRow(renderer, mockMEMBERS[0]);
-    expect(textOf(row.root, 'people-picker-calling-p')).toBe('Presidente da SS');
-    expect(find(row.root, 'people-picker-responsible-p').length).toBe(0);
-    const text = JSON.stringify(row.toJSON());
+    await render({ context: 'preside' });
+    expect(textOf(null, 'people-picker-calling-p')).toBe('Presidente da SS');
+    expect(find(null, 'people-picker-responsible-p').length).toBe(0);
+    const text = JSON.stringify(screen.toJSON());
     expect(text).not.toContain('members.speechCount');
     expect(text).not.toContain('capabilitiesShort');
   });
 
-  it('play_piano/lead_music context: never shows calling — name only', () => {
+  it('play_piano/lead_music context: never shows calling — name only', async () => {
     mockMEMBERS = [
       makeMember({ id: 'k', full_name: 'Beto Piano', calling: 'Organista', can_play_piano: true }),
     ];
     for (const ctx of ['play_piano', 'lead_music'] as const) {
-      const { renderer } = render({ context: ctx });
-      const row = renderRow(renderer, mockMEMBERS[0]);
-      expect(find(row.root, 'people-picker-calling-k').length).toBe(0);
+      await render({ context: ctx });
+      expect(find(null, 'people-picker-calling-k').length).toBe(0);
     }
   });
 
-  it('calling contexts: search also matches the calling text', () => {
+  it('calling contexts: search also matches the calling text', async () => {
     mockMEMBERS = [
       makeMember({ id: 'r', full_name: 'Ricardo Almeida', calling: 'Bispo', can_be_recognized: true }),
       makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: 'Secretário', can_be_recognized: true }),
     ];
-    const { renderer } = render({ context: 'be_recognized' });
-    act(() => {
-      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+    await render({ context: 'be_recognized' });
+    await act(async () => {
+      (find(null, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
         'Bispo'
       );
     });
-    expect(ids(renderer)).toEqual(['r']);
+    expect(ids()).toEqual(['r']);
   });
 
-  it('be_recognized context: 2nd line shows calling ONLY — no functions (P5b)', () => {
+  it('be_recognized context: 2nd line shows calling ONLY — no functions (P5b)', async () => {
     mockMEMBERS = [
       makeMember({
         id: 'r',
@@ -368,63 +337,61 @@ describe('PeoplePicker', () => {
         can_be_recognized: true,
       }),
     ];
-    const { renderer } = render({ context: 'be_recognized' });
-    const row = renderRow(renderer, mockMEMBERS[0]);
-    expect(textOf(row.root, 'people-picker-calling-r')).toBe('Bispo');
-    const text = JSON.stringify(row.toJSON());
+    await render({ context: 'be_recognized' });
+    expect(textOf(null, 'people-picker-calling-r')).toBe('Bispo');
+    const text = JSON.stringify(screen.toJSON());
     // Functions (capabilitiesShort) must NOT appear on the recognize line.
     expect(text).not.toContain('capabilitiesShort');
   });
 
-  it('be_recognized context: no calling → no secondary line (P5b)', () => {
+  it('be_recognized context: no calling → no secondary line (P5b)', async () => {
     mockMEMBERS = [
       makeMember({ id: 'r2', full_name: 'Paulo Santos', calling: null, can_be_recognized: true }),
     ];
-    const { renderer } = render({ context: 'be_recognized' });
-    const row = renderRow(renderer, mockMEMBERS[0]);
-    expect(find(row.root, 'people-picker-calling-r2').length).toBe(0);
+    await render({ context: 'be_recognized' });
+    expect(find(null, 'people-picker-calling-r2').length).toBe(0);
   });
 
   // --- Multi-select keep-selected (P7) ---
 
-  it('multiSelect: keeps a selected member visible when the search filters it out (P7)', () => {
+  it('multiSelect: keeps a selected member visible when the search filters it out (P7)', async () => {
     // Search "Alice" would drop Bob, but Bob is selected → he stays in the list.
-    const { renderer } = render({ multiSelect: true, selectedIds: ['b'] });
-    act(() => {
-      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+    await render({ multiSelect: true, selectedIds: ['b'] });
+    await act(async () => {
+      (find(null, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
         'Alice'
       );
     });
-    expect(ids(renderer)).toContain('b');
-    expect(ids(renderer)).toContain('a');
+    expect(ids()).toContain('b');
+    expect(ids()).toContain('a');
   });
 
-  it('single-select: does NOT force a non-matching member into the list (P7 scope)', () => {
-    const { renderer } = render({ selectedIds: ['b'] });
-    act(() => {
-      (find(renderer.root, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
+  it('single-select: does NOT force a non-matching member into the list (P7 scope)', async () => {
+    await render({ selectedIds: ['b'] });
+    await act(async () => {
+      (find(null, 'people-picker-search')[0].props.onChangeText as (v: string) => void)(
         'Alice'
       );
     });
-    expect(ids(renderer)).not.toContain('b');
+    expect(ids()).not.toContain('b');
   });
 
   describe('multiSelect draft (recognition)', () => {
-    it('Save grants the capability to selected + confirms the set; Cancel discards', () => {
+    it('Save grants the capability to selected + confirms the set; Cancel discards', async () => {
       const onConfirmMulti = jest.fn();
-      const { renderer, onClose } = render({
+      const { onClose } = await render({
         context: 'be_recognized',
         multiSelect: true,
         onConfirmMulti,
         selectedIds: [],
       });
       // Toggle Bob (lacks can_be_recognized) into the draft.
-      press(renderRow(renderer, MEMBER_B).root, 'people-picker-item-b');
+      press(null, 'people-picker-item-b');
       // Save → prompt (Bob is missing the capability).
-      press(renderer.root, 'people-picker-save');
+      await press(null, 'people-picker-save');
       expect(Alert.alert).toHaveBeenCalledTimes(1);
       const yes = alertButtons().find((b) => b.text === 'common.yes');
-      act(() => yes?.onPress?.());
+      await act(async () => yes?.onPress?.());
       expect(mockUpdateMock).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'b', can_be_recognized: true })
       );
@@ -432,16 +399,16 @@ describe('PeoplePicker', () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('Cancel does not commit the draft', () => {
+    it('Cancel does not commit the draft', async () => {
       const onConfirmMulti = jest.fn();
-      const { renderer, onClose } = render({
+      const { onClose } = await render({
         context: 'be_recognized',
         multiSelect: true,
         onConfirmMulti,
         selectedIds: [],
       });
-      press(renderRow(renderer, MEMBER_B).root, 'people-picker-item-b');
-      press(renderer.root, 'people-picker-close');
+      press(null, 'people-picker-item-b');
+      await press(null, 'people-picker-close');
       expect(onConfirmMulti).not.toHaveBeenCalled();
       expect(onClose).toHaveBeenCalledTimes(1);
     });

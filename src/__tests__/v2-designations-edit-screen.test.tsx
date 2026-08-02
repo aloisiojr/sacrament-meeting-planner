@@ -95,11 +95,11 @@ function nodes(_renderer: unknown, testID: string) {
   return screen.queryAllByTestId(testID);
 }
 
-async async function press(__renderer: unknown, testID: string) {
+async function press(__renderer: unknown, testID: string) {
   await fireEvent.press(screen.getByTestId(testID));
 }
 
-function selectPerson(member: Member) {
+async function selectPerson(member: Member) {
   await act(async () => {
     mockState.pickerOnSelect?.(member);
   });
@@ -120,18 +120,18 @@ describe('Designation edit screen (step 2)', () => {
   it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-type-sustain'); // AC6
-    selectPerson(makeMember({ calling: 'Presidente do Quórum de Élderes' })); // AC7 + AC8 prefill
+    await press(r, 'designation-type-sustain'); // AC6
+    await selectPerson(makeMember({ calling: 'Presidente do Quórum de Élderes' })); // AC7 + AC8 prefill
 
     // Calling prefilled from the member.
     expect(nodes(r, 'designation-calling-input')[0].props.value).toBe(
       'Presidente do Quórum de Élderes'
     );
 
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-edit-save-button');
     // Prompt shown (AC11); press "Atualizar" (2nd button).
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
-    act(() => buttons[1].onPress?.());
+    await act(async () => buttons[1].onPress?.());
 
     expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);
     const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
@@ -150,24 +150,24 @@ describe('Designation edit screen (step 2)', () => {
   it('does NOT save without agenda:write permission (observer deep-link)', async () => {
     mockState.canWrite = false;
     const r = await render();
-    press(r, 'designation-type-sustain');
-    selectPerson(makeMember());
+    await press(r, 'designation-type-sustain');
+    await selectPerson(makeMember());
 
     // Save is gated: the button is disabled and pressing it is a no-op.
-    expect(nodes(r, 'designation-edit-save-button')[0].props.disabled).toBe(true);
-    press(r, 'designation-edit-save-button');
+    expect(screen.getByTestId('designation-edit-save-button')).toBeDisabled();
+    await press(r, 'designation-edit-save-button');
     expect(mockState.updateAgenda).not.toHaveBeenCalled();
   });
 
   it('release: on decline saves snapshot but does NOT update member', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-type-release');
-    selectPerson(makeMember({ calling: 'Secretário da Ala' }));
+    await press(r, 'designation-type-release');
+    await selectPerson(makeMember({ calling: 'Secretário da Ala' }));
 
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-edit-save-button');
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
-    act(() => buttons[0].onPress?.()); // "Agora não"
+    await act(async () => buttons[0].onPress?.()); // "Agora não"
 
     expect(mockState.updateAgenda).toHaveBeenCalledTimes(1); // AC12 always saves
     expect(mockState.updateMember).not.toHaveBeenCalled(); // declined
@@ -176,11 +176,11 @@ describe('Designation edit screen (step 2)', () => {
   it('release: on confirm clears the member calling (sets null)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-type-release');
-    selectPerson(makeMember({ calling: 'Secretário da Ala' }));
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-type-release');
+    await selectPerson(makeMember({ calling: 'Secretário da Ala' }));
+    await press(r, 'designation-edit-save-button');
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
-    act(() => buttons[1].onPress?.());
+    await act(async () => buttons[1].onPress?.());
 
     expect(mockState.updateMember).toHaveBeenCalledWith({ id: 'm1', calling: null });
   });
@@ -188,13 +188,13 @@ describe('Designation edit screen (step 2)', () => {
   it('priesthood: shows office selector, no calling field, saves office and no prompt', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-type-priesthood'); // AC9
-    selectPerson(makeMember());
+    await press(r, 'designation-type-priesthood'); // AC9
+    await selectPerson(makeMember());
 
     // No calling field for priesthood (AC9).
     expect(nodes(r, 'designation-calling-input').length).toBe(0);
-    press(r, 'designation-office-deacon');
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-office-deacon');
+    await press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled(); // no member-calling prompt for priesthood
     const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
@@ -204,12 +204,12 @@ describe('Designation edit screen (step 2)', () => {
   it('new_member: no extra field, saves snapshot, no prompt', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-type-new_member'); // AC10
-    selectPerson(makeMember({ full_name: 'Maria Souza' }));
+    await press(r, 'designation-type-new_member'); // AC10
+    await selectPerson(makeMember({ full_name: 'Maria Souza' }));
 
     expect(nodes(r, 'designation-calling-input').length).toBe(0);
     expect(nodes(r, 'designation-office-deacon').length).toBe(0);
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled();
     const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
@@ -223,7 +223,7 @@ describe('Designation edit screen (step 2)', () => {
     ];
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();
-    press(r, 'designation-edit-save-button');
+    await press(r, 'designation-edit-save-button');
 
     expect(alertSpy).not.toHaveBeenCalled();
     expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);

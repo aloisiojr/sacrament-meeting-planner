@@ -27,7 +27,7 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 
 const RESPONSIBLE = makeMember({ id: 'm-resp', full_name: 'Resp Person', informal_name: 'Resp', country_code: '+55', phone: '11999998888' });
 const DELEGATE = makeMember({ id: 'm-del', full_name: 'Delegate Person', informal_name: 'Del', contact_via_responsible: true, responsible_id: 'm-resp' });
-const MEMBERS = [RESPONSIBLE, DELEGATE];
+const mockMEMBERS = [RESPONSIBLE, DELEGATE];
 
 function makeSpeech(over: Partial<Speech>): Speech {
   return {
@@ -85,7 +85,12 @@ jest.mock('../components/InviteActionDropdown', () => ({ InviteActionDropdown: (
 jest.mock('../components/PersonEditor', () => ({ PersonEditor: () => null }));
 jest.mock('../components/QueryErrorView', () => ({ QueryErrorView: () => null }));
 
-jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: MEMBERS }) }));
+// The `mock` prefix is load-bearing here. babel-plugin-jest-hoist HOISTS a declaration that a
+// factory references when it deems the initializer safe (an array literal qualifies), so an
+// unprefixed `const MEMBERS = [RESPONSIBLE, DELEGATE]` got lifted above the two consts it depends
+// on and evaluated to [undefined, undefined]. The mock-prefix escape hatch permits the reference
+// without hoisting the declaration.
+jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockMEMBERS }) }));
 jest.mock('../hooks/useAgenda', () => ({ useAgendaRange: () => ({ data: [] }) }));
 jest.mock('../hooks/useSpeeches', () => {
   const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;

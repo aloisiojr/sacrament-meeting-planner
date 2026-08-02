@@ -39,7 +39,7 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 
 let mockAGENDA: SundayAgenda;
 let mockMEMBERS: Member[] = [];
-const SPEECHES: Speech[] = [];
+const mockSPEECHES: Speech[] = [];
 
 // --- Mocks ---
 
@@ -100,7 +100,7 @@ jest.mock('../hooks/useAgenda', () => {
 });
 
 jest.mock('../hooks/useSpeeches', () => ({
-  useSpeeches: () => ({ data: SPEECHES }),
+  useSpeeches: () => ({ data: mockSPEECHES }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
   useAssignSpeaker: () => ({ mutate: jest.fn() }),
   useRemoveAssignment: () => ({ mutate: jest.fn() }),

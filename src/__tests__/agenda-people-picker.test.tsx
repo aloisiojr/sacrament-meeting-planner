@@ -61,7 +61,7 @@ const MEMBER = makeMember({ id: 'm1', full_name: 'Alice Smith', informal_name: '
 
 let mockAGENDA: SundayAgenda;
 let mockMEMBERS: Member[] = [];
-const SPEECHES: Speech[] = [
+const mockSPEECHES: Speech[] = [
   { id: 's0', ward_id: 'w1', sunday_date: '2026-01-04', position: 0, member_id: null, speaker_name: null, speaker_informal_name: null, speaker_phone: null, topic_title: null, topic_link: null, topic_collection: null, assigned_by_role: null, status: 'not_assigned', contact_phone: null, is_delegated: false, delegate_for_name: null, created_at: '', updated_at: '' },
   { id: 's4', ward_id: 'w1', sunday_date: '2026-01-04', position: 4, member_id: null, speaker_name: null, speaker_informal_name: null, speaker_phone: null, topic_title: null, topic_link: null, topic_collection: null, assigned_by_role: null, status: 'not_assigned', contact_phone: null, is_delegated: false, delegate_for_name: null, created_at: '', updated_at: '' },
 ];
@@ -130,7 +130,7 @@ jest.mock('../hooks/useAgenda', () => {
 });
 
 jest.mock('../hooks/useSpeeches', () => ({
-  useSpeeches: () => ({ data: SPEECHES }),
+  useSpeeches: () => ({ data: mockSPEECHES }),
   useWardManagePrayers: () => ({ managePrayers: false, isLoading: false }),
   useAssignSpeaker: () => ({ mutate: mockAssignSpeakerMutate }),
   useRemoveAssignment: () => ({ mutate: mockRemoveAssignmentMutate }),

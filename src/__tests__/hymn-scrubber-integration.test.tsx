@@ -21,7 +21,7 @@ const mockAuth = { canWrite: true };
 const mockUpdateAgendaMutate = jest.fn();
 
 let mockAGENDA: SundayAgenda;
-const HYMNS: Hymn[] = [
+const mockHYMNS: Hymn[] = [
   { id: 'h1', language: 'pt-BR', number: 1, title: 'Hino 1', is_sacramental: false },
   { id: 'h50', language: 'pt-BR', number: 50, title: 'Hino 50', is_sacramental: false },
   { id: 'h174', language: 'pt-BR', number: 174, title: 'Hino 174', is_sacramental: false },
@@ -96,7 +96,7 @@ jest.mock('../hooks/useSpeeches', () => ({
   useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
 }));
 jest.mock('../hooks/useHymns', () => ({
-  useHymns: () => ({ data: HYMNS }),
+  useHymns: () => ({ data: mockHYMNS }),
   useSacramentalHymns: () => ({ data: [] }),
   formatHymnDisplay: (h: Hymn) => `${h.number} - ${h.title}`,
   filterHymns: (h: Hymn[]) => h,

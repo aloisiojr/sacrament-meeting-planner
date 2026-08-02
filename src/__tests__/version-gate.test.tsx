@@ -17,6 +17,13 @@ jest.mock('../lib/supabase', () => ({
   supabase: { functions: { invoke: (...args: unknown[]) => mockInvokeMock(...args) } },
 }));
 
+// The gate reads Constants.expoConfig?.version and falls back to '0.0.0'. jest-expo does not
+// populate expoConfig, so without this every test would compare 0.0.0 and pass/fail for the
+// wrong reason. Pin it to the real app.json version.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { version: '2.0.0' } },
+}));
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 jest.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({
@@ -46,12 +53,13 @@ describe('useVersionGate', () => {
   beforeEach(() => mockInvokeMock.mockReset());
 
   it('blocks when the app version is below the minimum', async () => {
-    mockInvokeMock.mockResolvedValue({ data: { min_supported_version: '2.0.0' }, error: null });
+    // App is 2.0.0 (see the expo-constants mock above); the gate blocks only when STRICTLY below.
+    mockInvokeMock.mockResolvedValue({ data: { min_supported_version: '2.1.0' }, error: null });
     expect(await resolveStatus()).toBe('blocked');
   });
 
   it('allows when at or above the minimum', async () => {
-    mockInvokeMock.mockResolvedValue({ data: { min_supported_version: '1.0.0' }, error: null });
+    mockInvokeMock.mockResolvedValue({ data: { min_supported_version: '2.0.0' }, error: null });
     expect(await resolveStatus()).toBe('ok');
   });
 

@@ -93,9 +93,9 @@ function makeSpeech(id: string, position: number) {
   };
 }
 
-const SPEECHES = [0, 1, 2, 3, 4].map((p) => makeSpeech(`sp${p}`, p));
+const mockSPEECHES = [0, 1, 2, 3, 4].map((p) => makeSpeech(`sp${p}`, p));
 
-const assignSpeakerMock = jest.fn();
+const mockAssignSpeakerMock = jest.fn();
 
 // --- Mocks ---
 
@@ -163,9 +163,9 @@ jest.mock('../hooks/useSpeeches', () => {
   const actual = (jest.requireActual('../hooks/useSpeeches')) as Record<string, unknown>;
   return {
     ...actual,
-    useSpeeches: () => ({ data: SPEECHES, isError: false, error: null, refetch: jest.fn() }),
+    useSpeeches: () => ({ data: mockSPEECHES, isError: false, error: null, refetch: jest.fn() }),
     useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
-    useAssignSpeaker: () => ({ mutate: assignSpeakerMock }),
+    useAssignSpeaker: () => ({ mutate: mockAssignSpeakerMock }),
     useAssignTopic: () => ({ mutate: jest.fn() }),
     useChangeStatus: () => ({ mutate: jest.fn() }),
     useRemoveAssignment: () => ({ mutate: jest.fn() }),
@@ -196,7 +196,7 @@ function openSelectorForPosition(renderer: TestRenderer.ReactTestRenderer, posit
 }
 
 beforeEach(() => {
-  assignSpeakerMock.mockClear();
+  mockAssignSpeakerMock.mockClear();
   peoplePickerProps = null;
 });
 
@@ -216,8 +216,8 @@ describe('Speeches edit screen — delegation snapshot + picker context (N2)', (
 
     act(() => peoplePickerProps!.onSelect(DELEGATE));
 
-    expect(assignSpeakerMock).toHaveBeenCalledTimes(1);
-    expect(assignSpeakerMock).toHaveBeenCalledWith(
+    expect(mockAssignSpeakerMock).toHaveBeenCalledTimes(1);
+    expect(mockAssignSpeakerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         speechId: 'sp1',
         memberId: 'm-del',
@@ -246,7 +246,7 @@ describe('Speeches edit screen — delegation snapshot + picker context (N2)', (
 
     act(() => peoplePickerProps!.onSelect(DIRECT));
 
-    expect(assignSpeakerMock).toHaveBeenCalledWith(
+    expect(mockAssignSpeakerMock).toHaveBeenCalledWith(
       expect.objectContaining({
         memberId: 'm-dir',
         contactPhone: '+15550002',

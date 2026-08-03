@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * NOTE — five source-text describes were deleted from this file.
  *
  * They grepped app/(tabs)/agenda.tsx, hooks/useAgenda.ts and a migration file for literals such as
@@ -208,26 +230,8 @@ describe('F045 (CR-261): New User Language = Ward Language', () => {
 
   // --- AC-045-01 + AC-045-02: createUser includes user_metadata.language ---
   describe('AC-045-01 / AC-045-02: user_metadata.language pattern', () => {
-    it('user_metadata object includes language field', () => {
-      // Pattern from both edge functions:
-      //   user_metadata: { language: wardLanguage }
-      const wardLanguage = 'en-US';
-      const userMetadata = { language: wardLanguage };
-      expect(userMetadata).toEqual({ language: 'en-US' });
-    });
 
-    it('user_metadata with es-LA ward language', () => {
-      const wardLanguage = 'es-LA';
-      const userMetadata = { language: wardLanguage };
-      expect(userMetadata).toEqual({ language: 'es-LA' });
-    });
 
-    it('user_metadata with default en-US', () => {
-      const rawLanguage = undefined as string | undefined;
-      const wardLanguage = rawLanguage || 'en-US';
-      const userMetadata = { language: wardLanguage };
-      expect(userMetadata).toEqual({ language: 'en-US' });
-    });
   });
 
   // --- EC-045-01: Ward has null language -> fallback to en-US ---

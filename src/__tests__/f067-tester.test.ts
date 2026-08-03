@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * F067/F068 Tester Tests (CR-277, CR-278)
  *
  * Behavioral tests verifying EditableListField feature:
@@ -641,21 +663,7 @@ describe('F067 EC-067-04: External value sync', () => {
 // =============================================================================
 
 describe('F067: Reorder move-up/move-down comprehensive', () => {
-  it('move last item up results in swap with second-to-last', () => {
-    const items = ['A', 'B', 'C'];
-    const idx = 2;
-    const newItems = [...items];
-    [newItems[idx - 1], newItems[idx]] = [newItems[idx], newItems[idx - 1]];
-    expect(newItems).toEqual(['A', 'C', 'B']);
-  });
 
-  it('move first item down results in swap with second', () => {
-    const items = ['A', 'B', 'C'];
-    const idx = 0;
-    const newItems = [...items];
-    [newItems[idx], newItems[idx + 1]] = [newItems[idx + 1], newItems[idx]];
-    expect(newItems).toEqual(['B', 'A', 'C']);
-  });
 
   it('move middle item down then up returns to original', () => {
     const original = ['A', 'B', 'C'];
@@ -668,15 +676,6 @@ describe('F067: Reorder move-up/move-down comprehensive', () => {
     expect(items).toEqual(['A', 'B', 'C']);
   });
 
-  it('5-item list: move item from position 2 to 0 via two up moves', () => {
-    const items = ['A', 'B', 'C', 'D', 'E'];
-    // Move C (idx 2) up to idx 1
-    [items[1], items[2]] = [items[2], items[1]];
-    expect(items).toEqual(['A', 'C', 'B', 'D', 'E']);
-    // Move C (idx 1) up to idx 0
-    [items[0], items[1]] = [items[1], items[0]];
-    expect(items).toEqual(['C', 'A', 'B', 'D', 'E']);
-  });
 });
 
 // =============================================================================
@@ -700,19 +699,5 @@ describe('F067 AC-067-08: Inline edit saves trimmed text', () => {
 // =============================================================================
 
 describe('F067 AC-067-02/03: Adding items', () => {
-  it('adding first item to empty list (AC-067-02)', () => {
-    const items: string[] = [];
-    const addText = 'First announcement';
-    const newItems = [...items, addText.trim()];
-    expect(newItems).toEqual(['First announcement']);
-    expect(joinItems(newItems)).toBe('First announcement');
-  });
 
-  it('adding item with leading/trailing spaces trims it', () => {
-    const items = ['A'];
-    const addText = '  New item  ';
-    const newItems = [...items, addText.trim()];
-    expect(newItems).toEqual(['A', 'New item']);
-    expect(joinItems(newItems)).toBe('A\nNew item');
-  });
 });

@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * Tests for F064: Supabase Resource Optimization (CR-273)
  *
  * S1: send-reset-email paginated listUsers loop
@@ -339,19 +361,6 @@ describe('F064-S3: Ward cache in process-notifications', () => {
     expect(wardCache.get('ward-2')?.language).toBe('en-US');
   });
 
-  it('AC-064-07: unique ward_ids collected from entries before batch query', () => {
-    const entries = [
-      { ward_id: 'ward-1', type: 'designation' },
-      { ward_id: 'ward-1', type: 'designation' },
-      { ward_id: 'ward-2', type: 'speaker_confirmed' },
-      { ward_id: 'ward-1', type: 'speaker_withdrew' },
-    ];
-
-    const wardIds = [...new Set(entries.map((e) => e.ward_id))];
-
-    expect(wardIds).toEqual(['ward-1', 'ward-2']);
-    expect(wardIds).toHaveLength(2);
-  });
 
   it('AC-064-08: multiple entries for same ward result in only 1 cache lookup', () => {
     const wardCache = new Map<string, { language: string; timezone: string }>();
@@ -398,15 +407,6 @@ describe('F064-S3: Ward cache in process-notifications', () => {
 // =============================================================================
 
 describe('F064-S4: notification_queue 7-day retention cleanup', () => {
-  it('AC-064-09: cleanup targets entries with status sent or cancelled', () => {
-    // Replicate cleanup logic from process-notifications/index.ts (lines 376-386)
-    const cleanupStatuses = ['sent', 'cancelled'];
-
-    expect(cleanupStatuses).toContain('sent');
-    expect(cleanupStatuses).toContain('cancelled');
-    expect(cleanupStatuses).not.toContain('pending');
-    expect(cleanupStatuses).toHaveLength(2);
-  });
 
   it('AC-064-09: 7-day calculation is correct', () => {
     const now = new Date('2026-03-05T12:00:00Z').getTime();

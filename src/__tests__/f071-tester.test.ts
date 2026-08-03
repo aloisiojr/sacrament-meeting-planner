@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * F071 Tester Tests (CR-281, CR-282, CR-283)
  *
  * Behavioral tests verifying:
@@ -270,14 +292,6 @@ describe('CR-281 Tester EC-281-02: editing text shorter', () => {
 // =============================================================================
 
 describe('CR-282 Tester AC-282-01: page scroll on item text touch', () => {
-  it('activationDistance=9999 means touch-and-drag on item text scrolls page', () => {
-    // activationDistance=9999 makes DraggableFlatList require 9999px movement
-    // before activating drag - effectively impossible via normal touch
-    // Only onLongPress on grip icon triggers drag
-    const activationDistance = 9999;
-    expect(activationDistance).toBe(9999);
-    // This ensures normal touch events pass through to parent ScrollView
-  });
 });
 
 // =============================================================================

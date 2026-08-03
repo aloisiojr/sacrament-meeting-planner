@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * F068/F069/F070 Tester Tests (CR-278, CR-279, CR-280)
  *
  * Behavioral tests verifying:
@@ -822,13 +844,6 @@ describe('F069 Tester EC-069-03: Grip icon on single-item list', () => {
     // No conditional hiding when items.length === 1
   });
 
-  it('single-item drag-end produces same data (no reorder possible)', () => {
-    const items = ['Only'];
-    // Simulate onDragEnd with same data (drag cancelled or same position)
-    const data = [...items];
-    expect(data).toEqual(['Only']);
-    expect(joinItems(data)).toBe('Only');
-  });
 });
 
 // =============================================================================

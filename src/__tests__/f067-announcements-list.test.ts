@@ -1,4 +1,26 @@
 /**
+ * NOTE — some self-asserting it-blocks were deleted from this file. They declared local literals
+ * and then asserted those literals, e.g.
+ *
+ *     it('renders up/down arrow buttons on each item row', () => {
+ *       const items = ['A', 'B', 'C'];
+ *       const swapped = [...items];
+ *       [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+ *       expect(swapped).toEqual(['B', 'A', 'C']);
+ *     });
+ *
+ * — a JavaScript array swap, under a title describing a control the component does not have
+ * (EditableListField reorders by DRAG, not arrows). Others simulated the notification server's
+ * batching, or the user_metadata an edge function builds.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx          — add / edit / delete / reorder configuration
+ *   edge-process-notifications.test.ts    — the real batching, grouping and cleanup
+ *   edge-register-first-user.test.ts      — the real user_metadata, per ward language
+ *   edge-register-invited-user.test.ts
+ */
+
+/**
  * NOTE — three source-text describes were deleted from this file.
  *
  * They grepped icons/index.tsx, EditableListField.tsx, lib/theme.ts and app/presentation.tsx for
@@ -157,12 +179,6 @@ describe('F067 S014-02: EditableListField component behavior', () => {
     expect(afterDelete).toEqual(['A', 'C']);
   });
 
-  it('renders up/down arrow buttons on each item row', () => {
-    const items = ['A', 'B', 'C'];
-    const swapped = [...items];
-    [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
-    expect(swapped).toEqual(['B', 'A', 'C']);
-  });
 
   it('first item up button is disabled', () => {
     const canMoveUp = (index: number) => index > 0;
@@ -178,13 +194,6 @@ describe('F067 S014-02: EditableListField component behavior', () => {
   });
 
   // Add behavior
-  it('adding non-empty text creates new item and calls onSave', () => {
-    const items = parseItems('A\nB');
-    const addText = 'C';
-    const newItems = [...items, addText.trim()];
-    expect(newItems).toEqual(['A', 'B', 'C']);
-    expect(joinItems(newItems)).toBe('A\nB\nC');
-  });
 
   it('adding whitespace-only text does not save', () => {
     const addText = '   ';
@@ -239,23 +248,7 @@ describe('F067 S014-02: EditableListField component behavior', () => {
   });
 
   // Reorder behavior
-  it('pressing down arrow swaps item with next and calls onSave', () => {
-    const items = ['A', 'B', 'C'];
-    const idx = 0;
-    const newItems = [...items];
-    [newItems[idx], newItems[idx + 1]] = [newItems[idx + 1], newItems[idx]];
-    expect(newItems).toEqual(['B', 'A', 'C']);
-    expect(joinItems(newItems)).toBe('B\nA\nC');
-  });
 
-  it('pressing up arrow swaps item with previous and calls onSave', () => {
-    const items = ['A', 'B', 'C'];
-    const idx = 2;
-    const newItems = [...items];
-    [newItems[idx - 1], newItems[idx]] = [newItems[idx], newItems[idx - 1]];
-    expect(newItems).toEqual(['A', 'C', 'B']);
-    expect(joinItems(newItems)).toBe('A\nC\nB');
-  });
 
   // Disabled state
   it('disabled mode renders items as plain text with bullet prefix', () => {

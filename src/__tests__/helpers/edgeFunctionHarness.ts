@@ -32,6 +32,8 @@ export interface AdminRecorder {
   createdAuthUsers: Record<string, unknown>[];
   /** `{ fn, args }` for each rpc call. */
   rpcCalls: { fn: string; args: unknown }[];
+  /** `{ table, filters }` for each read, so query SCOPING can be asserted. */
+  selects: { table: string; filters: [string, unknown][] }[];
 }
 
 export function newRecorder(): AdminRecorder {
@@ -43,6 +45,7 @@ export function newRecorder(): AdminRecorder {
     updatedAuthUsers: [],
     createdAuthUsers: [],
     rpcCalls: [],
+    selects: [],
   };
 }
 
@@ -86,6 +89,7 @@ export function makeAdminClient(responses: AdminResponses, rec: AdminRecorder) {
         for (const [col, val] of filters) rec.tableDeletes.push(`${table}:${col}=${val}`);
         if (filters.length === 0) rec.tableDeletes.push(`${table}:*`);
       }
+      if (kind === 'select') rec.selects.push({ table, filters: [...filters] });
       // A plain read, or a write with `.select()` chained, yields a row; a bare write does not.
       if (kind === 'select' || returning) return responses.select?.(table) ?? ok;
       return responses.write?.(table) ?? ok;

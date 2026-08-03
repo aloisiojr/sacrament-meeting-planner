@@ -86,6 +86,23 @@ async function fillValid(over: Partial<Record<string, string>> = {}) {
 
 const errorText = () => screen.queryByTestId('register-error-text');
 
+/**
+ * Open the timezone picker, search, and choose an entry — the way a user does. The search step is
+ * required, not decoration: the list renders a window of ~10 rows, so most zones are unreachable
+ * without filtering.
+ */
+async function pickTimezone(tz: string) {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('register-timezone-input'));
+  });
+  await act(async () => {
+    fireEvent.changeText(screen.getByPlaceholderText('timezoneSelector.search'), tz);
+  });
+  await act(async () => {
+    fireEvent.press(screen.getByText(tz));
+  });
+}
+
 beforeEach(() => {
   mockInvoke.mockReset();
   mockInvoke.mockResolvedValue({ data: {}, error: null });
@@ -155,15 +172,57 @@ describe('RegisterScreen — payload', () => {
     });
   });
 
-  it('always sends a timezone, falling back to the language default', async () => {
+  it('defaults to a bishopric account in en-US at the device timezone', async () => {
+    // The first account MUST be bishopric: it is the only role that can then grant any other.
+    // toBeTruthy() would pass on "observer" just as happily.
     await renderRegister();
     await fillValid();
     await submit();
 
     const { body } = mockInvoke.mock.calls[0][1];
-    expect(body.timezone).toBeTruthy();
-    expect(body.language).toBeTruthy();
-    expect(body.role).toBeTruthy();
+    expect(body.role).toBe('bishopric');
+    expect(body.language).toBe('en-US');
+    expect(body.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it('sends the selected role and language, not the defaults', async () => {
+    await renderRegister();
+    await fillValid();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('register-role-secretary-radio'));
+      fireEvent.press(screen.getByTestId('register-language-pt-BR-radio'));
+    });
+    await submit();
+
+    const { body } = mockInvoke.mock.calls[0][1];
+    expect(body.role).toBe('secretary');
+    expect(body.language).toBe('pt-BR');
+  });
+
+  it('sends the timezone picked from the selector, not the device one', async () => {
+    // The timezone control is a Pressable that opens a picker, NOT a text input — an earlier
+    // version of this test used changeText on it, which is a no-op, and then "passed" only
+    // because the CI machine happened to sit in the timezone being asserted.
+    await renderRegister();
+    await fillValid();
+    await pickTimezone('America/Denver');
+    await submit();
+
+    expect(mockInvoke.mock.calls[0][1].body.timezone).toBe('America/Denver');
+  });
+
+  it('does not let a later language choice overwrite a picked timezone', async () => {
+    // A ward in Manaus that registers in pt-BR must not be silently moved to Sao Paulo; the
+    // meeting times of every future Sunday hang off this field.
+    await renderRegister();
+    await fillValid();
+    await pickTimezone('America/Manaus');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('register-language-pt-BR-radio'));
+    });
+    await submit();
+
+    expect(mockInvoke.mock.calls[0][1].body.timezone).toBe('America/Manaus');
   });
 });
 

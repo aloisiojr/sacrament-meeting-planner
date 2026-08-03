@@ -7,7 +7,7 @@
  * lockout, and the two navigation links.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
 const mockSignIn = jest.fn();
 const mockPush = jest.fn();
@@ -122,6 +122,68 @@ describe('LoginScreen — submission', () => {
     await submit();
 
     expect(screen.queryByTestId('login-error-text')).toBeNull();
+  });
+});
+
+describe('LoginScreen — the loading lockout', () => {
+  /** A signIn that stays pending until the test releases it. */
+  function deferredSignIn() {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mockSignIn.mockReturnValue(pending);
+    return release;
+  }
+
+  async function startSignIn() {
+    await renderLogin();
+    await type('login-email-input', 'bishop@ward.org');
+    await type('login-password-input', 'secret123');
+    await act(async () => {
+      submit();
+    });
+  }
+
+  it('disables the submit button while the request is in flight', async () => {
+    // The header of this file has always claimed to cover the loading lockout. It did not.
+    deferredSignIn();
+    await startSignIn();
+
+    expect(screen.getByTestId('login-submit-button')).toBeDisabled();
+  });
+
+  it('does not fire a second signIn when the button is pressed again mid-request', async () => {
+    // Double-submitting a login is how a user ends up with two sessions and a rate-limit block.
+    deferredSignIn();
+    await startSignIn();
+
+    await act(async () => {
+      submit();
+      submit();
+    });
+
+    expect(mockSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the lockout once the request settles', async () => {
+    const release = deferredSignIn();
+    await startSignIn();
+    expect(screen.getByTestId('login-submit-button')).toBeDisabled();
+
+    await act(async () => {
+      release();
+    });
+
+    expect(screen.getByTestId('login-submit-button')).toBeEnabled();
+  });
+
+  it('locks the inputs too, so the credentials cannot change under the request', async () => {
+    deferredSignIn();
+    await startSignIn();
+
+    expect(screen.getByTestId('login-email-input')).toBeDisabled();
+    expect(screen.getByTestId('login-password-input')).toBeDisabled();
   });
 });
 

@@ -1,4 +1,20 @@
 /**
+ * NOTE — the source-text blocks that lived in this file were deleted.
+ *
+ * They were ~20 `readFileSync(...)` + `toContain('multiline')` / `toContain('dragHitSlop')` /
+ * `toContain('startEdit(idx)')` assertions against EditableListField.tsx, AgendaForm.tsx and
+ * migration 032. They cannot tell whether typing two lines creates two items, and they break on a
+ * rename that changes nothing.
+ *
+ * Replaced by behaviour:
+ *   editable-list-field.test.tsx — add / paste-split / inline edit / delete / drag config /
+ *                                  onItemPress and onAddPress variants / disabled / legacy arrays
+ *   list-field.test.ts           — parseItems and joinItems, including the migration-032
+ *                                  TEXT[] -> TEXT compatibility branch
+ * What remains below imports from src/ and asserts real behaviour.
+ */
+
+/**
  * F071 Tests (CR-281, CR-282, CR-283)
  *
  * CR-281: Inline edit TextInput multiline/blurOnSubmit/paddingVertical
@@ -8,8 +24,6 @@
  * Tests import BEHAVIOR - no fs.readFileSync or string matching.
  */
 
-import fs from 'fs';
-import path from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
@@ -70,59 +84,11 @@ const tFn = (key: string) => key;
 // CR-281: S016-01 - Inline edit TextInput multiline, blurOnSubmit, editInput
 // =============================================================================
 
-describe('CR-281 S016-01: Inline edit TextInput props', () => {
-  it('Inline edit TextInput has multiline prop (code inspection)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    // The editingIndex === idx branch should have multiline
-    expect(src).toContain('multiline');
-  });
-
-  it('Inline edit TextInput has blurOnSubmit prop', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('blurOnSubmit');
-  });
-
-  it('Inline edit TextInput has editInput style with paddingVertical 0', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('styles.editInput');
-    expect(src).toContain('paddingVertical: 0');
-  });
-
-  it('Inline edit TextInput does not use autoFocus (removed for drag stability)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    // autoFocus was removed to prevent drag reorder revert issues
-    expect(src).not.toContain('autoFocus');
-  });
-});
 
 // =============================================================================
 // CR-282: S016-02 - DraggableFlatList activationDistance
 // =============================================================================
 
-describe('CR-282 S016-02: DraggableFlatList drag control', () => {
-  it('DraggableFlatList uses dragHitSlop (replaced activationDistance)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    // activationDistance={9999} was replaced by dragHitSlop for better drag control
-    expect(src).toContain('dragHitSlop');
-  });
-
-  it('DraggableFlatList preserves scrollEnabled={false}', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('scrollEnabled={false}');
-  });
-});
 
 // =============================================================================
 // CR-283: S016-03 - i18n key agenda.addPresence
@@ -153,134 +119,21 @@ describe('CR-283 S016-03: i18n key agenda.addPresence', () => {
 // CR-283: S016-04 - Migration 032 file exists
 // =============================================================================
 
-describe('CR-283 S016-04: Migration 032', () => {
-  it('Migration file 032_recognized_names_to_text.sql exists', () => {
-    const migrationPath = path.resolve(
-      __dirname, '../../supabase/migrations/032_recognized_names_to_text.sql'
-    );
-    expect(fs.existsSync(migrationPath)).toBe(true);
-  });
-
-  it('Migration uses array_to_string with E\'\\n\' separator', () => {
-    const sql = fs.readFileSync(
-      path.resolve(__dirname, '../../supabase/migrations/032_recognized_names_to_text.sql'),
-      'utf-8'
-    );
-    expect(sql).toContain("array_to_string");
-    expect(sql).toContain("E'\\n'");
-  });
-
-  it('Migration excludes NULL arrays (WHERE clause)', () => {
-    const sql = fs.readFileSync(
-      path.resolve(__dirname, '../../supabase/migrations/032_recognized_names_to_text.sql'),
-      'utf-8'
-    );
-    expect(sql).toContain('IS NOT NULL');
-  });
-
-  it('Migration excludes empty arrays (array_length check)', () => {
-    const sql = fs.readFileSync(
-      path.resolve(__dirname, '../../supabase/migrations/032_recognized_names_to_text.sql'),
-      'utf-8'
-    );
-    expect(sql).toContain('array_length');
-  });
-});
 
 // =============================================================================
 // CR-283: S016-05 - onItemPress/onAddPress callback props
 // =============================================================================
 
-describe('CR-283 S016-05: onItemPress/onAddPress callback props', () => {
-  it('onItemPress callback: EditableListField has onItemPress prop in interface', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('onItemPress');
-  });
-
-  it('onItemPress not provided: tap triggers inline edit (backward compat)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    // When onItemPress is not provided, startEdit should be called
-    expect(src).toContain('startEdit(idx)');
-  });
-
-  it('onAddPress callback: add area renders Pressable when provided', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('onAddPress');
-  });
-
-  it('onAddPress not provided: add area renders TextInput (backward compat)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    // TextInput for add area still exists for backward compat
-    expect(src).toContain('onSubmitEditing={handleAdd}');
-  });
-
-  it('onAddPress Pressable shows placeholder text', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/EditableListField.tsx'), 'utf-8'
-    );
-    expect(src).toContain('{placeholder}');
-  });
-});
 
 // =============================================================================
 // CR-283: S016-07 - AgendaForm recognized_names rework + usePresentationMode
 // =============================================================================
 
 describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
-  it('recognized_names renders EditableListField (not old Pressable)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    // Should import parseItems/joinItems from EditableListField
-    expect(src).toContain('parseItems');
-    expect(src).toContain('joinItems');
-  });
-
-  it('EditableListField has onItemPress prop for recognized_names', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    expect(src).toContain('onItemPress');
-  });
-
-  it('EditableListField has onAddPress prop for recognized_names', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    expect(src).toContain('onAddPress');
-  });
-
-  it('EditableListField has placeholder t(\'agenda.addPresence\')', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    expect(src).toContain("agenda.addPresence");
-  });
-
-  it('recognition opens the unified PeoplePicker (v2.0 migration)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    // v2.0: recognition now routes through the unified PeoplePicker; the old picker is gone.
-    expect(src).toContain('PeoplePicker');
-    expect(src).not.toContain('MemberSelectorModal');
-  });
-
-  it('recognition PeoplePicker uses capability be_recognized + multiSelect (v2.0)', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    expect(src).toContain('be_recognized');
-    expect(src).toContain('multiSelect');
-  });
+  // The six readFileSync assertions that were here (EditableListField present, onItemPress /
+  // onAddPress passed, the addPresence placeholder, PeoplePicker instead of MemberSelectorModal,
+  // be_recognized + multiSelect) are all covered behaviourally by agenda-people-picker.test.tsx,
+  // which renders AgendaForm and inspects the props the picker is actually opened with.
 
   it('recognition disabledNames: add mode = all current names', () => {
     // Test the logic: in add mode, all current items are disabled
@@ -292,7 +145,6 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
       : currentItems;
     expect(disabledNames).toEqual(['Alice', 'Bob']);
   });
-
   it('recognition disabledNames: edit mode = all except current', () => {
     // Test the logic: in edit mode, all except current are disabled
     const currentItems = ['Alice', 'Bob', 'Charlie'];
@@ -303,13 +155,11 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
       : currentItems;
     expect(disabledNames).toEqual(['Alice', 'Charlie']);
   });
-
   it('onSelect in add mode appends actor name to list', () => {
     const currentItems = ['Alice'];
     const newItems = [...currentItems, 'Bob'];
     expect(joinItems(newItems)).toBe('Alice\nBob');
   });
-
   it('onSelect in edit mode replaces name at editIndex', () => {
     const currentItems = ['Alice', 'Bob', 'Charlie'];
     const editIndex = 1;
@@ -317,20 +167,10 @@ describe('CR-283 S016-07: AgendaForm recognized_names rework', () => {
     newItems[editIndex] = 'David';
     expect(joinItems(newItems)).toBe('Alice\nDavid\nCharlie');
   });
-
   it('onClose clears recognizeSelector (name preserved)', () => {
     // When closing without selecting, original items stay unchanged
     const original = 'Alice\nBob';
     expect(parseItems(original)).toEqual(['Alice', 'Bob']);
-  });
-
-  it('Old recognizing styles removed from AgendaForm', () => {
-    const src = fs.readFileSync(
-      path.resolve(__dirname, '../components/AgendaForm.tsx'), 'utf-8'
-    );
-    expect(src).not.toContain('recognizingContent');
-    expect(src).not.toContain('recognizingNames');
-    expect(src).not.toContain('recognizingName');
   });
 });
 

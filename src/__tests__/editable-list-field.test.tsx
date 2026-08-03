@@ -48,6 +48,11 @@ jest.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
+// Icons render SVG; as named host elements they are findable by type.
+jest.mock('../components/icons', () => new Proxy({}, {
+  get: (_t, name: string) => (p: Record<string, unknown>) =>
+    require('react').createElement(String(name), p),
+}));
 
 import { EditableListField } from '../components/EditableListField';
 
@@ -271,6 +276,23 @@ describe('EditableListField — drag to reorder', () => {
   it('leaves scrolling to the parent, so the page is not fighting the list', async () => {
     await renderField({ value: 'Ana\nBruno' });
     expect(screen.getByTestId('dfl').props.scrollEnabled).toBe(false);
+  });
+
+  it('gives every row a grip handle', async () => {
+    // Replaces three source-text assertions in f067-announcements-list that grepped for the
+    // strings `GripIcon`, `DraggableFlatList` and `from './icons'`.
+    await renderField({ value: 'Ana\nBruno\nCarla' });
+
+    const grips = screen.root!.queryAll(
+      (n) => typeof n.type === 'string' && n.type === 'GripIcon'
+    );
+    expect(grips).toHaveLength(3);
+  });
+
+  it('does not truncate a long entry — the row grows instead', async () => {
+    // `numberOfLines` on the active row would hide the tail of a long name mid-edit.
+    await renderField({ value: 'A very long recognised name that would not fit on one line' });
+    expect(rowInput(0).props.numberOfLines).toBeUndefined();
   });
 });
 

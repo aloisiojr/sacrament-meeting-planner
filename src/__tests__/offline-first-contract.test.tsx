@@ -38,18 +38,24 @@ jest.mock('../contexts/AuthContext', () => ({
 import { useUpdateAgenda } from '../hooks/useAgenda';
 import { readQueue } from '../lib/offlineQueue';
 
-let lastMutate: ((args: { agendaId: string; fields: Record<string, unknown> }) => void) | null =
-  null;
+type Mutate = (args: { agendaId: string; fields: Record<string, unknown> }) => void;
+
+/** Ref object rather than a bare binding: the react-hooks lint forbids reassigning an outer
+ *  variable from render, and a ref is the sanctioned way to hand a handle back to the test. */
+const mutateRef: { current: Mutate | null } = { current: null };
 
 function Harness() {
   const m = useUpdateAgenda();
-  lastMutate = m.mutate as typeof lastMutate;
+  /* eslint-disable-next-line react-hooks/refs --
+   * Test harness, not production: capturing the mutate handle during render is how the test
+   * reaches into the hook. There is no user-visible render to corrupt. */
+  mutateRef.current = m.mutate as Mutate;
   return <Text testID="harness">ready</Text>;
 }
 
 beforeEach(async () => {
   await AsyncStorage.clear();
-  lastMutate = null;
+  mutateRef.current = null;
 });
 
 describe('offline-first contract', () => {
@@ -66,7 +72,7 @@ describe('offline-first contract', () => {
 
     // Perform a normal edit. The request fails because the device is offline.
     await act(async () => {
-      lastMutate?.({ agendaId: 'ag1', fields: { presiding_name: 'Bishop Silva' } });
+      mutateRef.current?.({ agendaId: 'ag1', fields: { presiding_name: 'Bishop Silva' } });
     });
     // Let react-query settle the rejected mutation before reading the queue.
     await act(async () => {

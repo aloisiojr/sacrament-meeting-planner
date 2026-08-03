@@ -16,15 +16,12 @@ import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
 import { lightColors, darkColors } from '../lib/theme';
 
-// Inline copies of parseItems/joinItems - exact replicas of the exported functions
-// Cannot import from EditableListField.tsx due to React Native runtime dependency
-function parseItems(value: string | null): string[] {
-  return (value ?? '').split('\n').filter((s) => s.trim() !== '');
-}
-
-function joinItems(items: string[]): string | null {
-  return items.length === 0 ? null : items.join('\n');
-}
+// parseItems/joinItems come from the real implementation. These files used to carry a
+// hand-written copy, justified by "cannot import from EditableListField (react-native runtime
+// dep)" — true of the component, but the logic itself has no such dependency and now lives in
+// lib/. Every copy had drifted the same way: none had the Array.isArray branch, so the
+// migration-032 shim could be deleted from production with all of these tests still green.
+import { parseItems, joinItems } from '../lib/listField';
 
 // --- Simulates handleAdd logic from EditableListField ---
 function simulateHandleAdd(existingItems: string[], addText: string) {

@@ -323,4 +323,50 @@ describe('settings menu — connectivity gates, not permission gates', () => {
     await renderAs('bishopric', false);
     expect(screen.queryByTestId('settings-ward-button')).not.toBeNull();
   });
+
+  // The three assertions below replace f052-settings-offline.test.ts, which was deleted. That file
+  // defined `function usersItemVisible(a, b) { return a && b }` and then asserted it — 20 blocks
+  // that never touched the screen. It also modelled the users entry as
+  // `hasPermission('settings:users') && isOnline`; production gates it on connectivity alone, so
+  // the file simultaneously proved nothing and described the wrong app.
+
+  it('disables the ward write-settings entries offline instead of hiding them', async () => {
+    // Visible-but-disabled is the deliberate choice: the user can see the setting exists and that
+    // it needs a connection, rather than wondering where it went.
+    await renderWith(['settings:access', 'settings:whatsapp', 'settings:designations'], false);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-text-templates-group'));
+    });
+
+    expect(screen.getByTestId('settings-whatsapp-item')).toBeDisabled();
+    expect(screen.getByTestId('settings-designations-item')).toBeDisabled();
+  });
+
+  it('enables those same entries when online', async () => {
+    await renderWith(['settings:access', 'settings:whatsapp', 'settings:designations'], true);
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-text-templates-group'));
+    });
+
+    expect(screen.getByTestId('settings-whatsapp-item')).toBeEnabled();
+    expect(screen.getByTestId('settings-designations-item')).toBeEnabled();
+  });
+
+  it('disables the ward-language control offline — it is a server write', async () => {
+    await renderWith(['settings:access', 'settings:language'], false);
+    expect(screen.getByText('settings.wardLanguage')).toBeDisabled();
+  });
+
+  it('keeps the purely local entries usable offline', async () => {
+    // App language, theme and sign-out touch nothing on the server.
+    await renderAs('bishopric', false);
+    expect(screen.getByTestId('settings-app-language-button')).toBeEnabled();
+    expect(screen.getByTestId('settings-theme-button')).toBeEnabled();
+    expect(screen.getByTestId('settings-sign-out-button')).toBeEnabled();
+  });
+
+  it('keeps the activity history reachable offline — it reads the cache', async () => {
+    await renderWith(['history:read'], false);
+    expect(screen.queryByText('settings.history')).not.toBeNull();
+  });
 });

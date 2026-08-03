@@ -25,13 +25,12 @@ import path from 'path';
 // --- Inline copies of parseItems/joinItems (component imports react-native) ---
 // These replicate the exported functions from EditableListField.tsx exactly.
 
-function parseItems(value: string | null): string[] {
-  return (value ?? '').split('\n').filter((s) => s.trim() !== '');
-}
-
-function joinItems(items: string[]): string | null {
-  return items.length === 0 ? null : items.join('\n');
-}
+// parseItems/joinItems come from the real implementation. These files used to carry a
+// hand-written copy, justified by "cannot import from EditableListField (react-native runtime
+// dep)" — true of the component, but the logic itself has no such dependency and now lives in
+// lib/. Every copy had drifted the same way: none had the Array.isArray branch, so the
+// migration-032 shim could be deleted from production with all of these tests still green.
+import { parseItems, joinItems } from '../lib/listField';
 
 // --- Agenda factory ---
 

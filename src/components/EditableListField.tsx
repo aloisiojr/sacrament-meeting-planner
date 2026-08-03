@@ -17,16 +17,11 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { useTheme } from '../contexts/ThemeContext';
 import { XIcon, GripIcon } from './icons';
 
-// --- Helpers (exported for testing) ---
-
-export function parseItems(value: string | string[] | null): string[] {
-  if (Array.isArray(value)) return value.filter((s) => s.trim() !== '');
-  return (value ?? '').split('\n').filter((s) => s.trim() !== '');
-}
-
-export function joinItems(items: string[]): string | null {
-  return items.length === 0 ? null : items.join('\n');
-}
+// --- Helpers ---
+// Pure logic lives in lib/. Re-exported here because existing call sites and tests import it from
+// this module.
+import { parseItems, joinItems } from '../lib/listField';
+export { parseItems, joinItems };
 
 // --- Props ---
 

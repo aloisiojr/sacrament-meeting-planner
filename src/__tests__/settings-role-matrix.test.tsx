@@ -29,6 +29,7 @@ const mockAuthState: { role: Role; permissions: Set<string> | null } = {
   permissions: null,
 };
 const mockOnline = { value: true };
+const mockPush = jest.fn();
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -73,7 +74,7 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: (...a: unknown[]) => mockPush(...a), replace: jest.fn(), back: jest.fn() }),
 }));
 jest.mock('../i18n', () => ({
   getCurrentLanguage: () => 'pt-BR',
@@ -104,6 +105,21 @@ async function renderWith(permissions: string[], online = true) {
 beforeEach(() => {
   mockAuthState.permissions = null;
   mockOnline.value = true;
+  mockPush.mockReset();
+});
+
+describe('settings menu — entries navigate where they say they do', () => {
+  it.each([
+    ['settings-users-button', '/(tabs)/settings/users'],
+    ['settings-ward-button', '/(tabs)/settings/ward'],
+    ['settings-members-button', '/(tabs)/settings/members'],
+  ])('%s pushes %s', async (testID, route) => {
+    await renderAs('bishopric');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId(testID));
+    });
+    expect(mockPush).toHaveBeenCalledWith(route);
+  });
 });
 
 // ---------------------------------------------------------------------------

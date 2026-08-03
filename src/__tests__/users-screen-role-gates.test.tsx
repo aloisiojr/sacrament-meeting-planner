@@ -406,6 +406,45 @@ describe('users screen — deleting an account', () => {
     expect(mockSignOut).toHaveBeenCalled();
   });
 
+  it('titles the self-deletion dialog as an account deletion, not a user removal', async () => {
+    await renderAs('observer', [OTHER_USERS[0]]);
+    await expandCard('Me');
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('users.deleteMyAccount'));
+    });
+
+    expect(lastAlert(alertSpy)[0]).toBe('users.deleteAccountTitle');
+  });
+
+  it('shows no success alert after self-deletion — the sign-out is the feedback', async () => {
+    // An alert here would land on a screen that is being torn down, and on some platforms blocks
+    // the redirect behind a dialog the user cannot dismiss meaningfully.
+    await renderAs('observer', [OTHER_USERS[0]]);
+    await expandCard('Me');
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('users.deleteMyAccount'));
+    });
+    const before = alertSpy.mock.calls.length;
+    await confirmLastAlert();
+
+    expect(alertSpy.mock.calls.length).toBe(before);
+    expect(mockSignOut).toHaveBeenCalled();
+  });
+
+  it('does show a success alert when deleting someone else', async () => {
+    await renderAs('bishopric');
+    await expandCard('Bishop Silva');
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('users.deleteUser'));
+    });
+    await confirmLastAlert();
+
+    expect(lastAlert(alertSpy)[1]).toBe('users.deleteSuccess');
+  });
+
   it('does not sign you out when you delete someone else', async () => {
     await renderAs('bishopric');
     await expandCard('Bishop Silva');

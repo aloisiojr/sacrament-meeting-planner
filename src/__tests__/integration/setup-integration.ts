@@ -241,9 +241,9 @@ export function mockSupabaseFrom(
 ) {
   supabaseMock.from.mockImplementation((requestedTable: string) => {
     if (requestedTable === table) {
-      return createChainFor(response);
+      return createChainFor(response, requestedTable);
     }
-    return createChainWithDefault();
+    return createChainWithDefault(requestedTable);
   });
 }
 
@@ -257,13 +257,54 @@ export function mockSupabaseFromMultiple(
   supabaseMock.from.mockImplementation((requestedTable: string) => {
     const response = tableResponses[requestedTable];
     if (response) {
-      return createChainFor(response);
+      return createChainFor(response, requestedTable);
     }
-    return createChainWithDefault();
+    return createChainWithDefault(requestedTable);
   });
 }
 
-function createChainFor(response: { data: any; error: any }) {
+/**
+ * Every call made on a query chain, in order, tagged with the table it started from.
+ *
+ * The previous chain was a Proxy that returned itself for every property and discarded the
+ * arguments. That made a whole class of bug undetectable: dropping `.eq('ward_id', wardId)` from a
+ * query still passed, in a multi-tenant app, in the layer everyone assumed covered it. Recording
+ * the calls costs nothing and makes scoping assertable.
+ */
+export interface RecordedCall {
+  table: string;
+  method: string;
+  args: unknown[];
+}
+
+const queryLog: RecordedCall[] = [];
+
+/** Clear the recorded query log. Call in beforeEach. */
+export function resetQueryLog(): void {
+  queryLog.length = 0;
+}
+
+/** All calls recorded so far, optionally filtered to one table. */
+export function getQueryLog(table?: string): RecordedCall[] {
+  return table ? queryLog.filter((c) => c.table === table) : [...queryLog];
+}
+
+/** The arguments of the first `method` call made against `table`, or undefined. */
+export function queryArgs(table: string, method: string): unknown[] | undefined {
+  return queryLog.find((c) => c.table === table && c.method === method)?.args;
+}
+
+/**
+ * True when the query against `table` was scoped by `column`. The common real-world failure is a
+ * missing ward_id filter, which leaks another ward's data.
+ */
+export function wasScopedBy(table: string, column: string): boolean {
+  return queryLog.some(
+    (c) => c.table === table && c.method === 'eq' && c.args[0] === column
+  );
+}
+
+function createChainFor(response: { data: any; error: any }, table = '(unknown)') {
   const resolvedPromise = Promise.resolve(response);
 
   const chain: any = new Proxy(
@@ -273,7 +314,10 @@ function createChainFor(response: { data: any; error: any }) {
         if (prop === 'then') return resolvedPromise.then.bind(resolvedPromise);
         if (prop === 'catch') return resolvedPromise.catch.bind(resolvedPromise);
         if (prop === 'finally') return resolvedPromise.finally.bind(resolvedPromise);
-        return (..._args: any[]) => chain;
+        return (...args: any[]) => {
+          queryLog.push({ table, method: prop, args });
+          return chain;
+        };
       },
     }
   );
@@ -281,8 +325,8 @@ function createChainFor(response: { data: any; error: any }) {
   return chain;
 }
 
-function createChainWithDefault() {
-  return createChainFor({ data: null, error: null });
+function createChainWithDefault(table = '(unknown)') {
+  return createChainFor({ data: null, error: null }, table);
 }
 
 // ---------------------------------------------------------------------------

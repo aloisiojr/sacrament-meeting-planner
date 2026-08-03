@@ -24,6 +24,7 @@ const mockUsers: { value: unknown[]; error: unknown } = { value: [], error: null
 const mockInvoke = jest.fn();
 const mockSignOut = jest.fn();
 const mockRefreshSession = jest.fn();
+const mockOnline = { value: true };
 
 const CURRENT_USER = { id: 'me', email: 'me@ward.org', app_metadata: {}, created_at: '2026-01-01' };
 
@@ -81,6 +82,9 @@ jest.mock('@tanstack/react-query', () => ({
   }),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
+jest.mock('../contexts/OnlineStatusContext', () => ({
+  useOnlineStatus: () => mockOnline.value,
+}));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }) }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 // Indirected through arrows on purpose: `import UsersScreen` below is hoisted above the `const
@@ -94,6 +98,11 @@ jest.mock('../lib/supabase', () => ({
     },
     from: jest.fn(),
   },
+}));
+// offlineGuard imports the i18n instance at module load, which would boot i18next for real.
+jest.mock('../i18n', () => ({
+  __esModule: true,
+  default: { t: (k: string) => k },
 }));
 jest.mock('../lib/activityLog', () => ({
   logAction: jest.fn(),
@@ -159,6 +168,7 @@ beforeEach(() => {
     error: null,
   });
   mockSignOut.mockReset();
+  mockOnline.value = true;
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -441,6 +451,135 @@ describe('users screen — deleting an account', () => {
     await confirmLastAlert();
 
     expect(lastAlert(alertSpy)[1]).toBe('users.deleteFailed');
+  });
+});
+
+describe('users screen — inviting a user', () => {
+  async function openInviteAndSubmit(email = 'new@ward.org') {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-button'));
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByTestId('users-invite-email-input'), email);
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-submit-button'));
+    });
+  }
+
+  it('creates the invitation with the typed email and the selected role', async () => {
+    mockInvoke.mockResolvedValue({
+      data: { invitation: { deepLink: 'smp://invite/abc' } },
+      error: null,
+    });
+    await renderAs('bishopric');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-button'));
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByTestId('users-invite-email-input'), 'new@ward.org');
+      fireEvent.press(screen.getByTestId('users-invite-role-secretary-radio'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-submit-button'));
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith('create-invitation', {
+      body: { email: 'new@ward.org', role: 'secretary' },
+    });
+  });
+
+  it('shows the deep link so it can be shared', async () => {
+    mockInvoke.mockResolvedValue({
+      data: { invitation: { deepLink: 'smp://invite/abc' } },
+      error: null,
+    });
+    await renderAs('bishopric');
+    await openInviteAndSubmit();
+
+    expect(screen.queryByTestId('users-invite-link-text')).toHaveTextContent('smp://invite/abc');
+  });
+
+  it('reports a failed invitation with the i18n key, never the raw server message', async () => {
+    // Raw messages leak internals and are untranslated. Replaces a source-text assertion in
+    // f060-f061-f062 that only checked the literal `t('users.inviteFailed')` appeared in the file.
+    mockInvoke.mockResolvedValue({ data: null, error: { message: 'PGRST301 jwt malformed' } });
+    await renderAs('bishopric');
+    await openInviteAndSubmit();
+
+    expect(lastAlert(alertSpy)[1]).toBe('users.inviteFailed');
+    expect(lastAlert(alertSpy)[1]).not.toContain('jwt malformed');
+    expect(screen.queryByTestId('users-invite-link-text')).toBeNull();
+  });
+
+  it('reports an expired session distinctly from a failed invitation', async () => {
+    mockRefreshSession.mockResolvedValue({ data: { session: null }, error: null });
+    await renderAs('bishopric');
+    await openInviteAndSubmit();
+
+    expect(lastAlert(alertSpy)[1]).toBe('users.sessionExpired');
+  });
+
+  it('does not call the server for an empty email', async () => {
+    await renderAs('bishopric');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-button'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('users-invite-submit-button'));
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+});
+
+describe('users screen — offline is reported as offline, not as a generic failure', () => {
+  // lib/offlineGuard shipped throwIfOffline and ONLINE_ONLY_OPERATIONS, and nothing called them:
+  // every user-management action offline produced "role change failed" / "delete failed", which
+  // sends the user looking for a permission problem instead of a connection.
+
+  it('does not even attempt a role change while offline', async () => {
+    mockOnline.value = false;
+    await renderAs('bishopric');
+    await expandCard('Bishop Silva');
+
+    await act(async () => {
+      fireEvent.press(roleOption('observer'));
+    });
+
+    expect(mockRefreshSession).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(lastAlert(alertSpy)[1]).toBe('auth.requiresConnection');
+  });
+
+  it('does not even attempt a delete while offline', async () => {
+    mockOnline.value = false;
+    await renderAs('bishopric');
+    await expandCard('Bishop Silva');
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('users.deleteUser'));
+    });
+    const buttons = lastAlert(alertSpy)[2] as { onPress?: () => void }[];
+    await act(async () => {
+      buttons[1].onPress?.();
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(lastAlert(alertSpy)[1]).toBe('auth.requiresConnection');
+  });
+
+  it('still says "failed" for a genuine server refusal, not "reconnect"', async () => {
+    // The counterpart: the offline branch must not swallow real errors.
+    mockInvoke.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    await renderAs('bishopric');
+    await expandCard('Bishop Silva');
+
+    await act(async () => {
+      fireEvent.press(roleOption('observer'));
+    });
+
+    expect(lastAlert(alertSpy)[1]).toBe('users.roleChangeFailed');
   });
 });
 

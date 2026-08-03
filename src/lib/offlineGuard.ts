@@ -32,13 +32,37 @@ export function requiresConnection(operation: string): boolean {
 }
 
 /**
+ * Stable identifier on the thrown error. Callers must branch on this, never on the message: the
+ * message is translated, so matching it would break in two of the three supported locales.
+ */
+export const REQUIRES_CONNECTION = 'requires_connection';
+
+/** An Error carrying the offline-guard code. */
+export interface RequiresConnectionError extends Error {
+  code: typeof REQUIRES_CONNECTION;
+}
+
+/** True when `err` was raised by throwIfOffline. */
+export function isRequiresConnectionError(err: unknown): err is RequiresConnectionError {
+  return (err as { code?: unknown } | null)?.code === REQUIRES_CONNECTION;
+}
+
+/**
  * Throw an error if the operation requires connection and device is offline.
+ *
+ * These operations are Edge Functions, so they cannot be queued for replay the way ordinary table
+ * writes can. Failing fast with "requires connection" is the honest outcome; without this guard
+ * the request goes out anyway and the user gets whichever generic failure the caller maps a raw
+ * transport error to ("role change failed"), which does not tell them to reconnect.
+ *
  * @param operation - The operation being attempted
  * @param isOnline - Whether the device is currently online
- * @throws Error with i18n message if offline and operation requires connection
+ * @throws Error with i18n message and code REQUIRES_CONNECTION
  */
 export function throwIfOffline(operation: string, isOnline: boolean): void {
   if (!isOnline && requiresConnection(operation)) {
-    throw new Error(i18n.t('auth.requiresConnection'));
+    const err = new Error(i18n.t('auth.requiresConnection')) as RequiresConnectionError;
+    err.code = REQUIRES_CONNECTION;
+    throw err;
   }
 }

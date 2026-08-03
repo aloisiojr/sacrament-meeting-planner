@@ -357,11 +357,12 @@ describe('CR-290: Account self-deletion', () => {
       expect(content).not.toContain('cannotDeleteSelf');
     });
 
-    // EC-022-05: onError still handles errors
-    it('EC-022-05: onError handler exists for deleteUserMutation', () => {
-      content = fs.readFileSync(usersPath, 'utf-8');
-      expect(content).toContain("t('users.deleteFailed')");
-    });
+    // EC-022-05 is now asserted behaviourally in users-screen-role-gates.test.tsx
+    // ("reports a failed deletion instead of pretending it worked"), which renders the screen,
+    // makes the delete fail, and reads the alert. The source-text version that lived here only
+    // checked that the literal `t('users.deleteFailed')` appeared somewhere in the file, so it
+    // broke on a refactor that routed the same key through a helper — a false alarm — while
+    // never having been able to catch the handler being wired to the wrong mutation.
 
     // EC-022-03: Observer cannot delete others (no other cards shown)
     it('EC-022-03: observer only sees self card (cannot delete others)', () => {

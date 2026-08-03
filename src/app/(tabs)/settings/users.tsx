@@ -18,8 +18,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
+import { throwIfOffline, isRequiresConnectionError } from '../../../lib/offlineGuard';
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons';
 import type { Role } from '../../../types/database';
@@ -41,8 +43,13 @@ export const userManagementKeys = {
 
 async function callEdgeFunction(
   functionName: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  isOnline = true
 ) {
+  // Edge Functions cannot be queued for offline replay, so fail fast with a message that tells the
+  // user to reconnect instead of letting the transport error become a generic "failed".
+  throwIfOffline(functionName, isOnline);
+
   // Guard: refresh session before calling invoke (ADR-028)
   const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
   if (refreshError || !session) {
@@ -72,7 +79,19 @@ export default function UserManagementScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user: currentUser, session, userName, hasPermission } = useAuth();
+  const isOnline = useOnlineStatus();
   const queryClient = useQueryClient();
+
+  /** Offline is its own failure: say "reconnect", not "the operation failed". */
+  const alertFailure = useCallback(
+    (err: unknown, fallbackKey: string) => {
+      Alert.alert(
+        t('common.error'),
+        isRequiresConnectionError(err) ? t('auth.requiresConnection') : t(fallbackKey)
+      );
+    },
+    [t]
+  );
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -102,7 +121,7 @@ export default function UserManagementScreen() {
   // Invite user mutation
   const inviteMutation = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: Role }) => {
-      return callEdgeFunction('create-invitation', { email, role });
+      return callEdgeFunction('create-invitation', { email, role }, isOnline);
     },
     meta: { suppressGlobalError: true },
     onSuccess: (data) => {
@@ -112,7 +131,7 @@ export default function UserManagementScreen() {
       if (err.message === 'auth/no-session') {
         Alert.alert(t('common.error'), t('users.sessionExpired'));
       } else {
-        Alert.alert(t('common.error'), t('users.inviteFailed'));
+        alertFailure(err, 'users.inviteFailed');
       }
     },
   });
@@ -126,7 +145,7 @@ export default function UserManagementScreen() {
       targetUserId: string;
       newRole: Role;
     }) => {
-      return callEdgeFunction('update-user-role', { targetUserId, newRole });
+      return callEdgeFunction('update-user-role', { targetUserId, newRole }, isOnline);
     },
     onSuccess: () => {
       // The edge function returns { success, previousRole, newRole } — there is no
@@ -141,7 +160,7 @@ export default function UserManagementScreen() {
       } else if (msg === 'cannot_demote_last_bishopric') {
         Alert.alert(t('common.error'), t('users.lastBishopricWarning'));
       } else {
-        Alert.alert(t('common.error'), t('users.roleChangeFailed'));
+        alertFailure(err, 'users.roleChangeFailed');
       }
     },
   });
@@ -149,7 +168,7 @@ export default function UserManagementScreen() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async ({ targetUserId, targetName, targetEmail }: { targetUserId: string; targetName: string; targetEmail: string }) => {
-      return callEdgeFunction('delete-user', { targetUserId });
+      return callEdgeFunction('delete-user', { targetUserId }, isOnline);
     },
     onSuccess: async (_data, variables) => {
       if (variables.targetUserId === currentUser?.id) {
@@ -170,8 +189,8 @@ export default function UserManagementScreen() {
         );
       }
     },
-    onError: () => {
-      Alert.alert(t('common.error'), t('users.deleteFailed'));
+    onError: (err) => {
+      alertFailure(err, 'users.deleteFailed');
     },
   });
 
@@ -180,7 +199,7 @@ export default function UserManagementScreen() {
     mutationFn: async (newName: string) => {
       return callEdgeFunction('update-user-name', {
         fullName: newName.trim(),
-      });
+      }, isOnline);
     },
     onSuccess: (_data, newName) => {
       queryClient.invalidateQueries({ queryKey: userManagementKeys.users });
@@ -197,8 +216,8 @@ export default function UserManagementScreen() {
         );
       }
     },
-    onError: (_err, _newName, _context) => {
-      Alert.alert(t('common.error'), t('users.nameUpdateFailed'));
+    onError: (err, _newName, _context) => {
+      alertFailure(err, 'users.nameUpdateFailed');
       // Revert editingName to the current user's full_name
       const currentFullName = users.find((u) => u.id === currentUser?.id)?.full_name ?? '';
       setEditingName(currentFullName);

@@ -11,6 +11,9 @@ import {
 import {
   requiresConnection,
   ONLINE_ONLY_OPERATIONS,
+  throwIfOffline,
+  isRequiresConnectionError,
+  REQUIRES_CONNECTION,
 } from '../lib/offlineGuard';
 
 describe('offlineQueue utilities', () => {
@@ -97,6 +100,45 @@ describe('offlineGuard utilities', () => {
       expect(requiresConnection('update-member')).toBe(false);
       expect(requiresConnection('create-speech')).toBe(false);
       expect(requiresConnection('')).toBe(false);
+    });
+  });
+
+  describe('throwIfOffline', () => {
+    it('throws for an online-only operation while offline', () => {
+      expect(() => throwIfOffline('delete-user', false)).toThrow();
+    });
+
+    it('tags the error with a stable code, not just a translated message', () => {
+      // Callers must branch on the code: the message is localised, so matching it would silently
+      // stop working in two of the three supported locales.
+      let thrown: unknown;
+      try {
+        throwIfOffline('delete-user', false);
+      } catch (err) {
+        thrown = err;
+      }
+      expect(isRequiresConnectionError(thrown)).toBe(true);
+      expect((thrown as { code: string }).code).toBe(REQUIRES_CONNECTION);
+    });
+
+    it('permits an online-only operation while online', () => {
+      expect(() => throwIfOffline('delete-user', true)).not.toThrow();
+    });
+
+    it('permits a queueable operation while offline', () => {
+      // Ordinary table writes go to the offline queue instead; blocking them here would defeat
+      // the offline-first design.
+      expect(() => throwIfOffline('update-member', false)).not.toThrow();
+    });
+
+    it.each([...ONLINE_ONLY_OPERATIONS])('blocks %s while offline', (op) => {
+      expect(() => throwIfOffline(op, false)).toThrow();
+    });
+
+    it('does not treat an unrelated error as a connection problem', () => {
+      expect(isRequiresConnectionError(new Error('boom'))).toBe(false);
+      expect(isRequiresConnectionError(null)).toBe(false);
+      expect(isRequiresConnectionError({ code: 'other' })).toBe(false);
     });
   });
 });

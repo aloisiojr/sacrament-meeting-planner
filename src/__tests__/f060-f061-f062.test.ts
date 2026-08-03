@@ -281,10 +281,10 @@ describe('F060: server process-notifications prayer designation', () => {
 describe('F061: users.tsx error i18n (STEP-04)', () => {
   const usersSource = readSource('src/app/(tabs)/settings/users.tsx');
 
-  // AC-061-1: Invite error uses i18n key, not raw error
-  it('inviteMutation.onError uses t(users.inviteFailed)', () => {
-    expect(usersSource).toContain("t('users.inviteFailed')");
-  });
+  // AC-061-1 is now asserted behaviourally in users-screen-role-gates.test.tsx ("reports a failed
+  // invitation with the i18n key, never the raw server message"), which drives the invite modal
+  // and reads the alert. The source-text version here only checked that the literal
+  // `t('users.inviteFailed')` appeared in the file.
 
   it('inviteMutation.onError does NOT show raw err.message in alert body', () => {
     // The old code had: Alert.alert(t('common.error'), err.message || t('users.inviteFailed'))

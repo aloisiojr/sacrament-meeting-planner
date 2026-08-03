@@ -20,6 +20,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import { hasPermission as realHasPermission } from '../lib/permissions';
 import type { Role } from '../types/database';
 
@@ -45,6 +46,8 @@ jest.mock('../contexts/ThemeContext', () => ({
     },
   }),
 }));
+const mockUpdateAppLanguage = jest.fn();
+
 jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
     hasPermission: (p: string) =>
@@ -58,7 +61,7 @@ jest.mock('../contexts/AuthContext', () => ({
     user: { id: 'u1', email: 'me@ward.org' },
     userName: 'Me',
     signOut: jest.fn(),
-    updateAppLanguage: jest.fn(),
+    updateAppLanguage: (...a: unknown[]) => mockUpdateAppLanguage(...a),
     setWardLanguage: jest.fn(),
   }),
 }));
@@ -106,6 +109,54 @@ beforeEach(() => {
   mockAuthState.permissions = null;
   mockOnline.value = true;
   mockPush.mockReset();
+  mockUpdateAppLanguage.mockReset();
+  mockUpdateAppLanguage.mockResolvedValue(undefined);
+});
+
+describe('settings menu — changing the app language', () => {
+  /** Open the app-language picker and choose `lang`. */
+  async function chooseLanguage(lang: string) {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('settings-app-language-button'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId(`settings-app-language-${lang}-option`));
+    });
+  }
+
+  it('persists a different language', async () => {
+    await renderAs('observer');
+    await chooseLanguage('en-US');
+
+    expect(mockUpdateAppLanguage).toHaveBeenCalledWith('en-US');
+  });
+
+  it('does nothing when the chosen language is the one already active', async () => {
+    // The mocked i18n reports pt-BR as current. Re-selecting it must not write to user_metadata:
+    // that is a pointless round-trip that can also raise a spurious "language change failed".
+    await renderAs('observer');
+    await chooseLanguage('pt-BR');
+
+    expect(mockUpdateAppLanguage).not.toHaveBeenCalled();
+  });
+
+  it('closes the picker either way', async () => {
+    await renderAs('observer');
+    await chooseLanguage('pt-BR');
+
+    expect(screen.queryByTestId('settings-app-language-en-US-option')).toBeNull();
+  });
+
+  it('reports a failed change instead of leaving the UI in the old language silently', async () => {
+    mockUpdateAppLanguage.mockRejectedValue(new Error('boom'));
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await renderAs('observer');
+    await chooseLanguage('en-US');
+    const call = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+    alertSpy.mockRestore();
+
+    expect(call?.[1]).toBe('settings.languageChangeFailed');
+  });
 });
 
 describe('settings menu — entries navigate where they say they do', () => {

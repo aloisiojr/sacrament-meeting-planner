@@ -225,6 +225,19 @@ describe('users screen — an observer sees only their own account', () => {
     expect(screen.queryByText('common.retry')).toBeNull();
   });
 
+  it('does not invent a synthetic row when the query merely returned nothing', async () => {
+    // The fallback is `!canManageUsers && usersError`. Both halves matter: with no error there is
+    // nothing to fall back FROM, and showing a card built from the session would mask a real
+    // "your account is gone" state.
+    await renderAs('observer', [], null);
+    expect(screen.queryByText('Me')).toBeNull();
+  });
+
+  it('does not fall back for a manager, who gets the error instead', async () => {
+    await renderAs('bishopric', [], { message: 'timeout' });
+    expect(screen.queryByText('users.loadError')).not.toBeNull();
+  });
+
   it('does surface the error to a manager, who was entitled to it', async () => {
     // The counterpart that makes the assertion above meaningful: deleting `canManageUsers` from
     // that condition must break something.

@@ -254,7 +254,10 @@ export function PeoplePicker({
                 updateMember.mutate(
                   { id: member.id, [capabilityField]: true },
                   {
-                    onSuccess: (saved) => commitSelect(saved),
+                    // Offline the write is queued and resolves null; select the member with the
+                    // capability applied locally so the picker still does what was asked.
+                    onSuccess: (saved) =>
+                      commitSelect(saved ?? { ...member, [capabilityField]: true }),
                   }
                 );
               },

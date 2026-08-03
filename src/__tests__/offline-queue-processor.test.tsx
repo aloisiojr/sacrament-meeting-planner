@@ -9,15 +9,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const calls: { op: string; table: string; payload?: unknown; eqArgs?: unknown[] }[] = [];
 const mockInvalidateQueries = jest.fn();
+/** Tables whose writes REJECT — a transport failure. */
 const mockFailTables = new Set<string>();
+/**
+ * Tables whose writes RESOLVE with `{ error }` — how supabase-js v2 actually reports an RLS
+ * denial, a foreign-key violation or a duplicate key. It does not throw. Modelling only the
+ * throwing mode is what let the original defect hide.
+ */
+const mockErrorTables = new Set<string>();
 
 /** Records what the processor asks Supabase to do, so replay can be asserted precisely. */
 function mockMakeChain(table: string) {
+  const result = () =>
+    mockErrorTables.has(table)
+      ? Promise.resolve({ error: { message: 'new row violates row-level security policy' } })
+      : Promise.resolve({ error: null });
+
   const chain = {
     insert: (payload: unknown) => {
       if (mockFailTables.has(table)) throw new Error('insert failed');
       calls.push({ op: 'insert', table, payload });
-      return Promise.resolve({ error: null });
+      return result();
     },
     update: (payload: unknown) => {
       if (mockFailTables.has(table)) throw new Error('update failed');
@@ -26,7 +38,7 @@ function mockMakeChain(table: string) {
       return {
         eq: (...args: unknown[]) => {
           rec.eqArgs = args;
-          return Promise.resolve({ error: null });
+          return result();
         },
       };
     },
@@ -37,7 +49,7 @@ function mockMakeChain(table: string) {
       return {
         eq: (...args: unknown[]) => {
           rec.eqArgs = args;
-          return Promise.resolve({ error: null });
+          return result();
         },
       };
     },
@@ -93,6 +105,7 @@ beforeEach(async () => {
   calls.length = 0;
   mockInvalidateQueries.mockReset();
   mockFailTables.clear();
+  mockErrorTables.clear();
 });
 
 describe('useOfflineQueueProcessor — when it runs', () => {
@@ -186,49 +199,81 @@ describe('useOfflineQueueProcessor — replay fidelity', () => {
 
   it('does not invalidate when there was nothing queued', async () => {
     await goOfflineThenOnline();
-    // An empty drain still reaches the invalidate call; assert the observable contract rather than
-    // guessing — this documents whichever behaviour ships.
-    expect(mockInvalidateQueries).toHaveBeenCalledTimes(1);
+    // A reconnect with an empty queue changed no server state, so refetching everything would be
+    // pure waste — and on a just-restored connection it is the most expensive moment to do it.
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
     expect(calls).toHaveLength(0);
   });
 });
 
 describe('useOfflineQueueProcessor — failure handling', () => {
-  it('keeps draining the rest of the queue when one mutation throws', async () => {
+  /** Reconnect n times; each one triggers one drain attempt. */
+  async function reconnectTimes(n: number) {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    for (let i = 0; i < n; i++) {
+      await goOfflineThenOnline();
+    }
+    warn.mockRestore();
+  }
+
+  it('stops the drain at a failing entry instead of replaying past it out of order', async () => {
+    // FIFO is the whole point of the queue: q2 may depend on q1. Skipping ahead would apply the
+    // dependent write against a state its author never saw.
     mockFailTables.add('broken');
     await enqueue(makeMutation({ id: 'q1', operation: 'INSERT', table: 'broken', data: { id: '1' } }));
     await enqueue(makeMutation({ id: 'q2', operation: 'INSERT', table: 'ok', data: { id: '2' } }));
 
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    await goOfflineThenOnline();
-    warn.mockRestore();
+    await reconnectTimes(1);
 
-    // The healthy mutation still lands.
-    expect(calls.map((c) => c.table)).toEqual(['ok']);
-    expect(await getQueueSize()).toBe(0);
+    expect(calls).toHaveLength(0);
+    // Both entries survive: nothing reached the server, so nothing may be discarded.
+    expect(await getQueueSize()).toBe(2);
+    expect((await peek())?.retryCount).toBe(1);
   });
 
-  /**
-   * KNOWN DEFECT — this test is expected to FAIL until the processor is fixed.
-   *
-   * offlineQueue ships a three-strikes retry budget (incrementRetry / MAX_RETRIES) and it works;
-   * see offline-queue-persistence.test.ts. But the processor never calls it: it dequeues BEFORE
-   * replaying and only console.warns on error. So a mutation that fails once is gone, and the
-   * user's offline edit is lost silently.
-   *
-   * Asserting the intended contract rather than the shipped behaviour, so the red mark tracks the
-   * defect instead of blessing it.
-   */
   it('retries a failed mutation instead of dropping it on the first failure', async () => {
     mockFailTables.add('broken');
     await enqueue(makeMutation({ id: 'q1', operation: 'INSERT', table: 'broken', data: { id: '1' } }));
 
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    await goOfflineThenOnline();
-    warn.mockRestore();
+    await reconnectTimes(1);
 
     // The entry must survive with its retry counter advanced, not vanish.
     expect(await getQueueSize()).toBe(1);
     expect((await peek())?.retryCount).toBe(1);
+  });
+
+  it('treats a resolved { error } as a failure, not a success', async () => {
+    // supabase-js v2 reports an RLS denial by RESOLVING with `{ error }`. The processor used to
+    // ignore that object entirely, so a rejected write was dequeued as if it had been accepted and
+    // the user's edit was lost with no trace.
+    mockErrorTables.add('speeches');
+    await enqueue(makeMutation({ id: 'q1', operation: 'UPDATE', table: 'speeches' }));
+
+    await reconnectTimes(1);
+
+    expect(calls).toHaveLength(1); // it was attempted...
+    expect(await getQueueSize()).toBe(1); // ...and kept, because the server refused it
+    expect((await peek())?.retryCount).toBe(1);
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
+  });
+
+  it('drops a permanently failing entry after the retry budget and then unblocks the queue', async () => {
+    // The stop-at-failure rule must not let one poison entry wedge the queue forever.
+    mockFailTables.add('broken');
+    await enqueue(makeMutation({ id: 'q1', operation: 'INSERT', table: 'broken', data: { id: '1' } }));
+    await enqueue(makeMutation({ id: 'q2', operation: 'INSERT', table: 'ok', data: { id: '2' } }));
+
+    await reconnectTimes(3); // MAX_RETRIES
+
+    // q1 is gone; q2 was never touched while q1 was ahead of it.
+    expect(await getQueueSize()).toBe(1);
+    expect((await peek())?.id).toBe('q2');
+    expect(calls).toHaveLength(0);
+
+    await reconnectTimes(1);
+
+    // With the poison cleared, the healthy mutation finally lands.
+    expect(calls.map((c) => c.table)).toEqual(['ok']);
+    expect(await getQueueSize()).toBe(0);
   });
 });

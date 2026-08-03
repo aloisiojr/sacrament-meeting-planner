@@ -3,11 +3,13 @@
  *
  * CLAUDE.md states: "Mutations must survive offline." lib/offlineQueue implements a durable FIFO
  * queue and useOfflineQueueProcessor implements the replay — both work, and both are covered by
- * their own suites. What is missing is the wiring between them: nothing ever puts a mutation INTO
- * the queue. `enqueue(` appears exactly once across src/ and supabase/: its own definition.
+ * their own suites. What used to be missing was the wiring between them: nothing ever put a
+ * mutation INTO the queue, so `enqueue(` appeared exactly once across src/ and supabase/ — its own
+ * definition — and every offline edit was lost.
  *
- * THE TEST BELOW IS EXPECTED TO FAIL until that wiring exists. It asserts the intended contract so
- * the red mark tracks a real product gap, instead of a green test blessing the gap.
+ * lib/offlineMutation now supplies that wiring. This test is the end-to-end guard on it: it drives
+ * a real screen-level hook, not the queue module, so removing the wiring from the hook fails here
+ * even though offline-mutation.test.ts would stay green.
  */
 import React from 'react';
 import { render, act } from '@testing-library/react-native';

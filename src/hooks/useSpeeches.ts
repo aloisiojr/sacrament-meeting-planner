@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
+import { withOfflineQueue } from '../lib/offlineMutation';
 import { formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import type {
@@ -252,29 +253,39 @@ export function useAssignSpeaker() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: AssignSpeakerInput): Promise<Speech> => {
-      const { data, error } = await supabase
-        .from('speeches')
-        .update({
-          member_id: input.memberId,
-          speaker_name: input.speakerName,
-          speaker_informal_name: input.speakerInformalName,
-          speaker_phone: input.speakerPhone,
-          contact_phone: input.contactPhone ?? null,
-          is_delegated: input.isDelegated ?? false,
-          delegate_for_name: input.delegateForName ?? null,
-          status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
-          assigned_by_role: role,
-        })
-        .eq('id', input.speechId)
-        .select()
-        .single();
+    mutationFn: async (input: AssignSpeakerInput): Promise<Speech | null> => {
+      const fields = {
+        member_id: input.memberId,
+        speaker_name: input.speakerName,
+        speaker_informal_name: input.speakerInformalName,
+        speaker_phone: input.speakerPhone,
+        contact_phone: input.contactPhone ?? null,
+        is_delegated: input.isDelegated ?? false,
+        delegate_for_name: input.delegateForName ?? null,
+        status: (input.status ?? 'assigned_not_invited') as SpeechStatus,
+        assigned_by_role: role,
+      };
 
-      if (error) throw error;
-      return data;
+      return withOfflineQueue(
+        { table: 'speeches', operation: 'UPDATE', data: { id: input.speechId, ...fields } },
+        async () => {
+          const { data, error } = await supabase
+            .from('speeches')
+            .update(fields)
+            .eq('id', input.speechId)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+      );
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      // null = queued offline. The activity log is server-side and takes the row's own values, so
+      // it is written when the queued mutation actually lands, not now.
+      if (!data) return;
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'speech:assign', buildLogDescription('speech:assign', { nome: data.speaker_name ?? '', N: data.position, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()) }), userName);
       }
@@ -291,24 +302,32 @@ export function useAssignTopic() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: AssignTopicInput): Promise<Speech> => {
-      const { data, error } = await supabase
-        .from('speeches')
-        .update({
-          topic_title: input.topicTitle,
-          topic_link: input.topicLink ?? null,
-          topic_collection: input.topicCollection,
-          assigned_by_role: role,
-        })
-        .eq('id', input.speechId)
-        .select()
-        .single();
+    mutationFn: async (input: AssignTopicInput): Promise<Speech | null> => {
+      const fields = {
+        topic_title: input.topicTitle,
+        topic_link: input.topicLink ?? null,
+        topic_collection: input.topicCollection,
+        assigned_by_role: role,
+      };
 
-      if (error) throw error;
-      return data;
+      return withOfflineQueue(
+        { table: 'speeches', operation: 'UPDATE', data: { id: input.speechId, ...fields } },
+        async () => {
+          const { data, error } = await supabase
+            .from('speeches')
+            .update(fields)
+            .eq('id', input.speechId)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+      );
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (!data) return; // queued offline — logged when it lands
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'speech:assign_theme', buildLogDescription('speech:assign_theme', { colecao: data.topic_collection ?? '', titulo: data.topic_title ?? '', N: data.position, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()) }), userName);
       }
@@ -376,29 +395,39 @@ export function useRemoveAssignment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ speechId, speakerName }: { speechId: string; speakerName?: string }): Promise<{ speech: Speech; previousSpeaker: string }> => {
-      const { data, error } = await supabase
-        .from('speeches')
-        .update({
-          member_id: null,
-          speaker_name: null,
-          speaker_informal_name: null,
-          speaker_phone: null,
-          contact_phone: null,
-          is_delegated: false,
-          delegate_for_name: null,
-          status: 'not_assigned' as SpeechStatus,
-          assigned_by_role: role,
-        })
-        .eq('id', speechId)
-        .select()
-        .single();
+    mutationFn: async ({ speechId, speakerName }: { speechId: string; speakerName?: string }): Promise<{ speech: Speech | null; previousSpeaker: string }> => {
+      const fields = {
+        member_id: null,
+        speaker_name: null,
+        speaker_informal_name: null,
+        speaker_phone: null,
+        contact_phone: null,
+        is_delegated: false,
+        delegate_for_name: null,
+        status: 'not_assigned' as SpeechStatus,
+        assigned_by_role: role,
+      };
 
-      if (error) throw error;
-      return { speech: data, previousSpeaker: speakerName ?? 'N/A' };
+      const speech = await withOfflineQueue(
+        { table: 'speeches', operation: 'UPDATE', data: { id: speechId, ...fields } },
+        async () => {
+          const { data, error } = await supabase
+            .from('speeches')
+            .update(fields)
+            .eq('id', speechId)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+      );
+
+      return { speech, previousSpeaker: speakerName ?? 'N/A' };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (!result.speech) return; // queued offline — logged when it lands
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'speech:unassign', buildLogDescription('speech:unassign', { nome: result.previousSpeaker, data: formatDateHumanReadable(result.speech.sunday_date, getCurrentLanguage()), N: result.speech.position }), userName);
       }

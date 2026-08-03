@@ -203,9 +203,11 @@ describe('Assign speaker lifecycle', () => {
         speakerInformalName: null,
         speakerPhone: '+5511999999999',
       });
-      expect(speech.status).toBe('assigned_not_invited');
-      expect(speech.member_id).toBe('member-1');
-      expect(speech.speaker_name).toBe('John Doe');
+      // Non-null proves the write went to the server: null would mean it was queued offline.
+      expect(speech).not.toBeNull();
+      expect(speech?.status).toBe('assigned_not_invited');
+      expect(speech?.member_id).toBe('member-1');
+      expect(speech?.speaker_name).toBe('John Doe');
     });
   });
 
@@ -228,7 +230,8 @@ describe('Assign speaker lifecycle', () => {
         topicLink: 'https://example.com',
         topicCollection: 'Ward Topics',
       });
-      expect(speech.topic_title).toBe('Faith in Action');
+      expect(speech).not.toBeNull();
+      expect(speech?.topic_title).toBe('Faith in Action');
     });
   });
 
@@ -250,8 +253,9 @@ describe('Assign speaker lifecycle', () => {
         speechId: 's1',
         speakerName: 'John Doe',
       });
-      expect(speech.status).toBe('not_assigned');
-      expect(speech.member_id).toBeNull();
+      expect(speech).not.toBeNull();
+      expect(speech?.status).toBe('not_assigned');
+      expect(speech?.member_id).toBeNull();
     });
   });
 });

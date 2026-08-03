@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
 import { resolveContactSnapshot } from '../lib/contact';
+import { withOfflineQueue } from '../lib/offlineMutation';
 import { speechKeys } from './useSpeeches';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
@@ -161,20 +162,28 @@ export function useUpdateMember() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: UpdateMemberInput): Promise<Member> => {
+    mutationFn: async (input: UpdateMemberInput): Promise<Member | null> => {
       const { id, ...fields } = input;
-      const { data, error } = await supabase
-        .from('members')
-        .update(fields)
-        .eq('id', id)
-        .select()
-        .single();
+      return withOfflineQueue(
+        { table: 'members', operation: 'UPDATE', data: { id, ...fields } },
+        async () => {
+          const { data, error } = await supabase
+            .from('members')
+            .update(fields)
+            .eq('id', id)
+            .select()
+            .single();
 
-      if (error) throw error;
-      return data;
+          if (error) throw error;
+          return data;
+        }
+      );
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      // null = queued offline. The speech-snapshot cascade below needs the stored row and its own
+      // network round-trip, so it is deferred until the queued update actually lands.
+      if (!data) return;
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
       }
@@ -238,8 +247,14 @@ export function useDeleteMember() {
 
   return useMutation({
     mutationFn: async ({ memberId, memberName }: { memberId: string; memberName: string }): Promise<string> => {
-      const { error } = await supabase.from('members').delete().eq('id', memberId);
-      if (error) throw error;
+      await withOfflineQueue(
+        { table: 'members', operation: 'DELETE', data: { id: memberId } },
+        async () => {
+          const { error } = await supabase.from('members').delete().eq('id', memberId);
+          if (error) throw error;
+          return true;
+        }
+      );
       return memberName;
     },
     onSuccess: (memberName) => {

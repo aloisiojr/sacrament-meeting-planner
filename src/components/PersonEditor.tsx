@@ -260,8 +260,10 @@ export function PersonEditor({
       responsible_id: contactViaResponsible ? responsibleId : null,
     };
 
-    const onSuccess = (saved: Member) => {
-      onSaved?.(saved);
+    // `saved` is null when the device was offline and the write was queued for replay. The edit is
+    // not lost, so the modal still closes — but there is no stored row to hand to onSaved.
+    const onSuccess = (saved: Member | null) => {
+      if (saved) onSaved?.(saved);
       onClose();
     };
 

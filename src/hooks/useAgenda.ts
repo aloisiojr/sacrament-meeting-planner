@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { withOfflineQueue } from '../lib/offlineMutation';
 import type { SundayAgenda } from '../types/database';
 
 // --- Query Keys ---
@@ -150,18 +151,31 @@ export function useUpdateAgenda() {
     }: {
       agendaId: string;
       fields: AgendaUpdateInput;
-    }): Promise<SundayAgenda> => {
-      const { data, error } = await supabase
-        .from('sunday_agendas')
-        .update(fields)
-        .eq('id', agendaId)
-        .select()
-        .single();
+    }): Promise<SundayAgenda | null> =>
+      // Offline: persisted for replay on reconnect instead of being lost. Resolves null, which the
+      // auto-save UI treats as "saved locally".
+      withOfflineQueue(
+        {
+          table: 'sunday_agendas',
+          operation: 'UPDATE',
+          data: { id: agendaId, ...fields },
+        },
+        async () => {
+          const { data, error } = await supabase
+            .from('sunday_agendas')
+            .update(fields)
+            .eq('id', agendaId)
+            .select()
+            .single();
 
-      if (error) throw error;
-      return data;
-    },
+          if (error) throw error;
+          return data;
+        }
+      ),
     onSuccess: (data) => {
+      // null means the write was queued offline — there is no server row to key an invalidation
+      // on, and the local cache already holds the user's value.
+      if (!data) return;
       queryClient.invalidateQueries({
         queryKey: agendaKeys.bySunday(wardId, data.sunday_date),
       });

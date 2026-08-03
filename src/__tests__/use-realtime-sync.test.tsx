@@ -11,14 +11,18 @@ import { Text } from 'react-native';
 
 type SubscribeCb = (status: string) => void;
 type ChangeHandler = (payload: { table: string }) => void;
+/** `type` is channel.on()'s first argument; `event` is the field inside its config object. */
+type ChannelFilterCfg = { type?: string; event?: string; schema?: string; table: string; filter?: string };
 
 const mockChannelState: {
   name: string | null;
   tables: string[];
+  /** Full postgres_changes config per subscription, so the ward filter can be asserted. */
+  configs: ChannelFilterCfg[];
   handlers: ChangeHandler[];
   subscribeCb: SubscribeCb | null;
   removed: number;
-} = { name: null, tables: [], handlers: [], subscribeCb: null, removed: 0 };
+} = { name: null, tables: [], configs: [], handlers: [], subscribeCb: null, removed: 0 };
 
 const mockInvalidated: unknown[][] = [];
 const mockWardId = { value: 'w1' };
@@ -28,8 +32,9 @@ jest.mock('../lib/supabase', () => ({
     channel: (name: string) => {
       mockChannelState.name = name;
       const channel = {
-        on: (_event: string, cfg: { table: string }, handler: ChangeHandler) => {
+        on: (type: string, cfg: ChannelFilterCfg, handler: ChangeHandler) => {
           mockChannelState.tables.push(cfg.table);
+          mockChannelState.configs.push({ ...cfg, type });
           mockChannelState.handlers.push(handler);
           return channel;
         },
@@ -63,6 +68,9 @@ import { SYNCED_TABLES, POLLING_INTERVAL_MS, getQueryKeysForTable } from '../lib
 
 const setWebSocketConnected = jest.fn();
 
+/** How many invalidations one full refresh across every synced table produces. */
+const KEYS_PER_FULL_REFRESH = SYNCED_TABLES.flatMap(getQueryKeysForTable).length;
+
 function Harness({ isOnline }: { isOnline: boolean }) {
   useRealtimeSync({ isOnline, setWebSocketConnected });
   return <Text testID="harness">{String(isOnline)}</Text>;
@@ -85,6 +93,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockChannelState.name = null;
   mockChannelState.tables = [];
+  mockChannelState.configs = [];
   mockChannelState.handlers = [];
   mockChannelState.subscribeCb = null;
   mockChannelState.removed = 0;
@@ -105,6 +114,23 @@ describe('useRealtimeSync — subscription', () => {
     expect(mockChannelState.tables).toEqual([...SYNCED_TABLES]);
   });
 
+  it('scopes every subscription to this ward — the tenancy boundary', async () => {
+    // Without `filter`, Postgres broadcasts every ward's row changes to every connected client.
+    // RLS protects the REST reads; it does not retroactively unsend a realtime payload. This is
+    // the single most important assertion in the file: dropping the filter leaks other wards'
+    // speaker names and phone numbers, and nothing else here would notice.
+    mockWardId.value = 'ward-abc';
+    await render(<Harness isOnline />);
+
+    expect(mockChannelState.configs).toHaveLength(SYNCED_TABLES.length);
+    for (const cfg of mockChannelState.configs) {
+      expect(cfg.filter).toBe('ward_id=eq.ward-abc');
+      expect(cfg.type).toBe('postgres_changes');
+      expect(cfg.event).toBe('*'); // INSERT, UPDATE and DELETE all invalidate
+      expect(cfg.schema).toBe('public');
+    }
+  });
+
   it('does not open a channel while offline', async () => {
     await render(<Harness isOnline={false} />);
     expect(mockChannelState.name).toBeNull();
@@ -114,6 +140,18 @@ describe('useRealtimeSync — subscription', () => {
     mockWardId.value = '';
     await render(<Harness isOnline />);
     expect(mockChannelState.name).toBeNull();
+  });
+
+  it('does not poll when there is no ward — every synced query is ward-scoped', async () => {
+    // There used to be an `if (isOnline && wardId) startPolling()` here, nested inside
+    // `if (!wardId || !isOnline)` — unreachable by construction. Removing it, rather than
+    // "repairing" it to `!wardId`, is deliberate: with no ward there is nothing to refetch, so a
+    // live timer would only wake the device.
+    mockWardId.value = '';
+    await render(<Harness isOnline />);
+
+    await advance(POLLING_INTERVAL_MS * 3);
+    expect(mockInvalidated).toHaveLength(0);
   });
 });
 
@@ -152,8 +190,8 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
     await status('SUBSCRIBED');
 
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(true);
-    // One immediate refresh across all synced tables, so a reconnect shows fresh data.
-    expect(mockInvalidated.length).toBeGreaterThan(0);
+    // Exactly one full refresh — not zero, and not one per table on top of it.
+    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
   });
 
   it('does not poll while the socket is healthy', async () => {
@@ -175,8 +213,8 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
 
       mockInvalidated.length = 0;
       await advance(POLLING_INTERVAL_MS);
-      // Polling refreshes every synced table.
-      expect(mockInvalidated.length).toBeGreaterThan(0);
+      // One tick refreshes every synced table exactly once.
+      expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
     }
   );
 
@@ -190,7 +228,7 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(false);
     mockInvalidated.length = 0;
     await advance(POLLING_INTERVAL_MS);
-    expect(mockInvalidated.length).toBeGreaterThan(0);
+    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
   });
 
   it('stops polling once the socket comes back', async () => {
@@ -212,7 +250,7 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
     mockInvalidated.length = 0;
     await advance(POLLING_INTERVAL_MS);
     // One interval's worth of work, not three.
-    expect(mockInvalidated).toHaveLength(SYNCED_TABLES.flatMap(getQueryKeysForTable).length);
+    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
   });
 });
 
@@ -223,7 +261,7 @@ describe('useRealtimeSync — teardown', () => {
 
     await view.unmount();
 
-    expect(mockChannelState.removed).toBeGreaterThan(0);
+    expect(mockChannelState.removed).toBe(1);
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(false);
   });
 
@@ -235,7 +273,7 @@ describe('useRealtimeSync — teardown', () => {
       await view.rerender(<Harness isOnline={false} />);
     });
 
-    expect(mockChannelState.removed).toBeGreaterThan(0);
+    expect(mockChannelState.removed).toBe(1);
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(false);
   });
 

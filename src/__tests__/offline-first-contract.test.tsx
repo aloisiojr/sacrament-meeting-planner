@@ -42,16 +42,16 @@ import { readQueue } from '../lib/offlineQueue';
 
 type Mutate = (args: { agendaId: string; fields: Record<string, unknown> }) => void;
 
-/** Ref object rather than a bare binding: the react-hooks lint forbids reassigning an outer
- *  variable from render, and a ref is the sanctioned way to hand a handle back to the test. */
+/** How the test gets a handle on the hook's mutate function. */
 const mutateRef: { current: Mutate | null } = { current: null };
 
 function Harness() {
   const m = useUpdateAgenda();
-  /* eslint-disable-next-line react-hooks/refs --
-   * Test harness, not production: capturing the mutate handle during render is how the test
-   * reaches into the hook. There is no user-visible render to corrupt. */
-  mutateRef.current = m.mutate as Mutate;
+  // Published from an effect, not during render: writing to module state while rendering is what
+  // react-hooks/immutability forbids, and the effect has run by the time render() resolves.
+  React.useEffect(() => {
+    mutateRef.current = m.mutate as Mutate;
+  }, [m.mutate]);
   return <Text testID="harness">ready</Text>;
 }
 

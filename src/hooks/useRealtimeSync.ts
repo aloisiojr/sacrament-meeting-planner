@@ -81,10 +81,10 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
         channelRef.current = null;
         setWebSocketConnected(false);
       }
-      // Start polling if online but no ward (shouldn't happen in practice)
-      if (isOnline && wardId) {
-        startPolling();
-      }
+      // No polling fallback here on purpose. Reaching this point means there is no ward or no
+      // connection, and every synced query is ward-scoped — a poll would refetch nothing while
+      // still waking the device on a timer. (There used to be an `if (isOnline && wardId)` branch
+      // here, which was unreachable inside `if (!wardId || !isOnline)`.)
       return;
     }
 

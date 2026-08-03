@@ -151,6 +151,10 @@ export function makeAdminClient(responses: AdminResponses, rec: AdminRecorder) {
         filters.push([c, v]);
         return chain;
       },
+      or: (expr: string) => {
+        filters.push(['or', expr]);
+        return chain;
+      },
       order: () => chain,
       limit: () => chain,
       single: () => Promise.resolve(result()),

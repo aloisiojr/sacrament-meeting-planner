@@ -16,13 +16,21 @@ import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 import { useVersionGate } from '../hooks/useVersionGate';
 import i18n from '../i18n';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
-const SEVEN_DAYS_MS = 1000 * 60 * 60 * 24 * 7;
+import {
+  CACHE_GC_TIME_MS,
+  CACHE_MAX_AGE_MS,
+  CACHE_STORAGE_KEY,
+  CACHE_THROTTLE_MS,
+  STALE_TIME_MS,
+  cacheBuster,
+  shouldAlertMutationError,
+  shouldRetryQuery,
+} from '../lib/queryConfig';
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: '@query_cache',
-  throttleTime: 1000,
+  key: CACHE_STORAGE_KEY,
+  throttleTime: CACHE_THROTTLE_MS,
 });
 
 const queryClient = new QueryClient({
@@ -33,12 +41,9 @@ const queryClient = new QueryClient({
   }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
-      if ((mutation as any).meta?.suppressGlobalError) return;
-      const isOffline = !onlineManager.isOnline();
-      const isNetworkError = error?.message?.includes('network') ||
-                             error?.message?.includes('fetch') ||
-                             error?.message?.includes('Failed to fetch');
-      if (isOffline || isNetworkError) return;
+      if (!shouldAlertMutationError(error, onlineManager.isOnline(), (mutation as any).meta)) {
+        return;
+      }
       if (__DEV__) {
         console.error('[MutationCache] Error:', error.message);
       }
@@ -50,14 +55,11 @@ const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: SEVEN_DAYS_MS,
+      staleTime: STALE_TIME_MS,
+      gcTime: CACHE_GC_TIME_MS,
       networkMode: 'offlineFirst' as const,
-      retry: (failureCount: number, error: any) => {
-        if (!onlineManager.isOnline()) return false;
-        if (error?.status >= 400 && error?.status < 500) return false;
-        return failureCount < 2;
-      },
+      retry: (failureCount: number, error: any) =>
+        shouldRetryQuery(failureCount, error, onlineManager.isOnline()),
     },
     mutations: {
       retry: 0,
@@ -144,8 +146,8 @@ export default function RootLayout() {
           client={queryClient}
           persistOptions={{
             persister: asyncStoragePersister,
-            maxAge: SEVEN_DAYS_MS,
-            buster: Constants.expoConfig?.version ?? '1.0.0',
+            maxAge: CACHE_MAX_AGE_MS,
+            buster: cacheBuster(Constants.expoConfig?.version),
           }}
         >
           <I18nextProvider i18n={i18n}>

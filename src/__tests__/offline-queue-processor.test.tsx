@@ -58,7 +58,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 
 import { useOfflineQueueProcessor } from '../hooks/useOfflineQueueProcessor';
-import { enqueue, getQueueSize } from '../lib/offlineQueue';
+import { enqueue, getQueueSize, peek } from '../lib/offlineQueue';
 
 function Harness({ isOnline }: { isOnline: boolean }) {
   useOfflineQueueProcessor(isOnline);
@@ -208,11 +208,18 @@ describe('useOfflineQueueProcessor — failure handling', () => {
     expect(await getQueueSize()).toBe(0);
   });
 
-  it('DISCARDS a failed mutation instead of retrying it — the retry budget is never used', async () => {
-    // Documents real, shipped behaviour, and it is a gap worth naming: offlineQueue exposes
-    // incrementRetry() with a three-strikes budget, but the processor dequeues BEFORE replaying
-    // and only logs on failure. A mutation that fails once is gone — the user's offline edit is
-    // lost silently, and MAX_RETRIES is dead code on this path.
+  /**
+   * KNOWN DEFECT — this test is expected to FAIL until the processor is fixed.
+   *
+   * offlineQueue ships a three-strikes retry budget (incrementRetry / MAX_RETRIES) and it works;
+   * see offline-queue-persistence.test.ts. But the processor never calls it: it dequeues BEFORE
+   * replaying and only console.warns on error. So a mutation that fails once is gone, and the
+   * user's offline edit is lost silently.
+   *
+   * Asserting the intended contract rather than the shipped behaviour, so the red mark tracks the
+   * defect instead of blessing it.
+   */
+  it('retries a failed mutation instead of dropping it on the first failure', async () => {
     mockFailTables.add('broken');
     await enqueue(makeMutation({ id: 'q1', operation: 'INSERT', table: 'broken', data: { id: '1' } }));
 
@@ -220,7 +227,8 @@ describe('useOfflineQueueProcessor — failure handling', () => {
     await goOfflineThenOnline();
     warn.mockRestore();
 
-    expect(await getQueueSize()).toBe(0);
-    expect(calls).toHaveLength(0);
+    // The entry must survive with its retry counter advanced, not vanish.
+    expect(await getQueueSize()).toBe(1);
+    expect((await peek())?.retryCount).toBe(1);
   });
 });

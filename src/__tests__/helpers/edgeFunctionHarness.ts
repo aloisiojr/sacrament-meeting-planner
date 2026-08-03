@@ -54,6 +54,7 @@ export interface AdminResponses {
   createUser?: () => { data: { user: unknown }; error: unknown };
   updateUserById?: () => { error: unknown };
   deleteUser?: () => { error: unknown };
+  signInWithPassword?: () => { data: { session: unknown }; error: unknown };
   rpc?: (fn: string, args: unknown) => { data: unknown; error: unknown };
   /** Result of a terminal select, keyed by table. */
   select?: (table: string) => { data: unknown; error: unknown };
@@ -159,6 +160,8 @@ export function makeAdminClient(responses: AdminResponses, rec: AdminRecorder) {
   return {
     auth: {
       getUser: async () => responses.getUser?.() ?? { data: { user: null }, error: null },
+      signInWithPassword: async () =>
+        responses.signInWithPassword?.() ?? { data: { session: null }, error: null },
       admin: {
         getUserById: async () =>
           responses.getUserById?.() ?? { data: { user: null }, error: null },

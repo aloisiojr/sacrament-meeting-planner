@@ -12,6 +12,9 @@
  * captures the handler so it can be invoked with real Request objects.
  */
 
+import { hasPermission } from '../lib/permissions';
+import type { Role } from '../types/database';
+
 type Handler = (req: Request) => Promise<Response>;
 
 const mockCreateClient = jest.fn();
@@ -190,13 +193,50 @@ describe('delete-user — authentication', () => {
   });
 });
 
-describe('delete-user — deleting someone else requires bishopric', () => {
-  it.each(['secretary', 'observer'])('refuses a %s with 403', async (role) => {
-    state.caller = { id: 'me', app_metadata: { ward_id: 'w1', role } };
+describe('delete-user — deleting someone else follows settings:users', () => {
+  /**
+   * Driven by the CLIENT's permission map on purpose.
+   *
+   * This assertion used to read "refuses a secretary with 403", transcribed from the server. It
+   * passed, and so did the client test saying a secretary lists the whole ward — and neither could
+   * see that the two disagreed. The client renders a "Delete user" button for anyone holding
+   * settings:users, which PERMISSIONS_MAP grants to secretary; the server allowed only bishopric.
+   * A secretary got a destructive confirmation dialog followed by "delete failed", every time.
+   *
+   * Comparing the two descriptions is the only thing that catches that class of defect, so the
+   * comparison is now the test: change either side alone and this goes red.
+   */
+  it.each(['bishopric', 'secretary', 'observer'] as Role[])(
+    '%s: the server agrees with PERMISSIONS_MAP',
+    async (role) => {
+      state.caller = { id: 'me', app_metadata: { ward_id: 'w1', role } };
+      const clientWouldOfferIt = hasPermission(role, 'settings:users' as never);
+      const res = await call({ targetUserId: 'u2' });
+
+      if (clientWouldOfferIt) {
+        expect(res.status).toBe(200);
+        expect(state.deletedAuthUsers).toEqual(['u2']);
+      } else {
+        expect(res.status).toBe(403);
+        expect(res.body).toMatchObject({ error: 'Insufficient permissions' });
+        expect(state.deletedAuthUsers).toEqual([]);
+      }
+    }
+  );
+
+  it('refuses an observer outright', async () => {
+    state.caller = { id: 'me', app_metadata: { ward_id: 'w1', role: 'observer' } };
     const res = await call({ targetUserId: 'u2' });
 
     expect(res.status).toBe(403);
-    expect(res.body).toMatchObject({ error: 'Insufficient permissions' });
+    expect(state.deletedAuthUsers).toEqual([]);
+  });
+
+  it('refuses an unrecognised role rather than treating it as privileged', async () => {
+    state.caller = { id: 'me', app_metadata: { ward_id: 'w1', role: 'superuser' } };
+    const res = await call({ targetUserId: 'u2' });
+
+    expect(res.status).toBe(403);
     expect(state.deletedAuthUsers).toEqual([]);
   });
 

@@ -108,8 +108,13 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
-      // Non-self deletion: requires Bishopric role
-      if (callerRole !== 'bishopric') {
+      // Non-self deletion: requires the settings:users permission, which the client's
+      // PERMISSIONS_MAP grants to bishopric AND secretary. This list must stay in step with that
+      // map and with the other user-management functions (update-user-role, create-invitation,
+      // list-users), which already allow both: a role that can grant and revoke roles, and can
+      // invite, but cannot remove, produced a "Delete user" button that always failed.
+      const ALLOWED_ROLES = ['bishopric', 'secretary'];
+      if (!ALLOWED_ROLES.includes(callerRole)) {
         return new Response(
           JSON.stringify({ error: 'Insufficient permissions' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

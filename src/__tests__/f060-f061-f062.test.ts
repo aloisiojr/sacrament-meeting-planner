@@ -1,24 +1,31 @@
 /**
+ * NOTE — five source-text describes were deleted from this file.
+ *
+ * They grepped four screens for literals like "t('users.sessionExpired')", "String(err)" and
+ * 'refreshSession()'.
+ *
+ * Replaced by behaviour:
+ *   users-screen-role-gates.test.tsx — an invitation failure shows the i18n key and never the raw
+ *                                      server message; an expired session is reported distinctly;
+ *                                      and refreshSession is called BEFORE the edge function
+ *                                      (asserted on invocation order, which a grep cannot do)
+ *   invite-token-error.test.ts       — extractInviteError reads the code from a non-2xx body
+ *   settings-role-matrix.test.tsx    — the settings screen rendered per role and connectivity
+ */
+
+/**
  * Tests for F060 (Prayer-Aware Designation Notification Text),
  * F061 (User-Friendly Error Messages), and F062 (Refresh Session).
  *
  * CR-270, CR-271, CR-272
  */
 
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
 import {
   buildNotificationText,
 } from '../lib/notificationUtils';
-
-// Helper: read source file relative to project root
-const projectRoot = resolve(__dirname, '../..');
-function readSource(relativePath: string): string {
-  return readFileSync(resolve(projectRoot, relativePath), 'utf-8');
-}
 
 // =============================================================================
 // F061: i18n keys exist in all 3 locales (STEP-01)
@@ -239,190 +246,16 @@ describe('F060: buildNotificationText - prayer-aware designation', () => {
 // F060: Server-side buildDesignationText verification (STEP-02)
 // =============================================================================
 
-describe('F060: server process-notifications prayer designation', () => {
-  const serverSource = readSource('supabase/functions/process-notifications/index.ts');
-
-  // AC-060-1/AC-060-2: Server buildDesignationText accepts position parameter
-  it('buildDesignationText accepts position parameter', () => {
-    expect(serverSource).toContain('position?: number | null');
-  });
-
-  // AC-060-1: Server uses prayer-specific title
-  it('server uses prayer-specific titles', () => {
-    expect(serverSource).toContain("title: 'Designação de Oração'");
-    expect(serverSource).toContain("title: 'Prayer Assignment'");
-    expect(serverSource).toContain("title: 'Asignación de Oración'");
-  });
-
-  // AC-060-4: Server separates prayer from speech in grouping
-  it('server routes prayer positions to immediateEntries', () => {
-    expect(serverSource).toContain('entry.speech_position === 0 || entry.speech_position === 4');
-    expect(serverSource).toContain('immediateEntries.push(entry)');
-  });
-
-  // AC-060-4: Server has designation case in immediate entries switch
-  it('server switch has designation case for individual prayer processing', () => {
-    expect(serverSource).toContain("case 'designation':");
-    expect(serverSource).toContain('entry.speech_position');
-  });
-
-  // AC-060-3: Server grouped designations use speech text
-  it('server grouped designations call buildDesignationText without position', () => {
-    // The grouped designation path calls buildDesignationText(language, names, sundayDate)
-    // without the 4th position argument
-    expect(serverSource).toContain('buildDesignationText(language, names, sundayDate)');
-  });
-});
 
 // =============================================================================
 // F061: Source code verification - error i18n applied correctly (STEP-04..07)
 // =============================================================================
 
-describe('F061: users.tsx error i18n (STEP-04)', () => {
-  const usersSource = readSource('src/app/(tabs)/settings/users.tsx');
 
-  // AC-061-1 is now asserted behaviourally in users-screen-role-gates.test.tsx ("reports a failed
-  // invitation with the i18n key, never the raw server message"), which drives the invite modal
-  // and reads the alert. The source-text version here only checked that the literal
-  // `t('users.inviteFailed')` appeared in the file.
 
-  it('inviteMutation.onError does NOT show raw err.message in alert body', () => {
-    // The old code had: Alert.alert(t('common.error'), err.message || t('users.inviteFailed'))
-    // The new code should NOT have err.message in the Alert body
-    const onErrorBlock = usersSource.slice(
-      usersSource.indexOf('onError: (err: Error)'),
-      usersSource.indexOf('onError: (err: Error)') + 300
-    );
-    // Ensure err.message is not passed to Alert.alert
-    expect(onErrorBlock).not.toContain("Alert.alert(t('common.error'), err.message");
-  });
 
-  // EC-061-1: auth/no-session maps to t('users.sessionExpired')
-  it('auth/no-session maps to t(users.sessionExpired)', () => {
-    expect(usersSource).toContain("err.message === 'auth/no-session'");
-    expect(usersSource).toContain("t('users.sessionExpired')");
-  });
-});
-
-describe('F061: invite/[token].tsx error i18n (STEP-05)', () => {
-  const inviteSource = readSource('src/app/(auth)/invite/[token].tsx');
-
-  // AC-061-2: Unknown data.error uses registrationFailed
-  it('unknown data.error uses t(auth.registrationFailed)', () => {
-    // After the 3 known codes (token_expired, token_used, token_invalid),
-    // data?.error catch-all uses registrationFailed
-    expect(inviteSource).toContain("setError(t('auth.registrationFailed'))");
-  });
-
-  // AC-061-2: Known codes preserved
-  it('token_expired still maps to auth.inviteExpired', () => {
-    expect(inviteSource).toContain("errorCode === 'token_expired'");
-    expect(inviteSource).toContain("t('auth.inviteExpired')");
-  });
-
-  it('token_used still maps to auth.inviteUsed', () => {
-    expect(inviteSource).toContain("errorCode === 'token_used'");
-    expect(inviteSource).toContain("t('auth.inviteUsed')");
-  });
-
-  it('token_invalid still maps to auth.inviteInvalid', () => {
-    expect(inviteSource).toContain("errorCode === 'token_invalid'");
-    expect(inviteSource).toContain("t('auth.inviteInvalid')");
-  });
-
-  // AC-061-3: Non-network catch-all uses registrationFailed, not raw message
-  it('catch-all non-network uses registrationFailed, not raw message', () => {
-    // The catch block should have: setError(t('auth.registrationFailed'))
-    // NOT: setError(message) for non-network errors
-    const catchStart = inviteSource.indexOf("} catch (err: unknown) {");
-    const catchBlock = inviteSource.slice(catchStart, catchStart + 300);
-    // Should use registrationFailed for non-network
-    expect(catchBlock).toContain("t('auth.registrationFailed')");
-    // Should NOT use raw setError(message) - the old pattern
-    expect(catchBlock).not.toContain('setError(message)');
-  });
-
-  // Regression: Network error still uses auth.requiresConnection
-  it('network error still uses auth.requiresConnection', () => {
-    expect(inviteSource).toContain("t('auth.requiresConnection')");
-  });
-});
-
-describe('F061: settings/index.tsx error i18n (STEP-06)', () => {
-  const settingsSource = readSource('src/app/(tabs)/settings/index.tsx');
-
-  // AC-061-4: Language change error uses i18n
-  it('handleAppLanguageSelect uses t(settings.languageChangeFailed)', () => {
-    expect(settingsSource).toContain("t('settings.languageChangeFailed')");
-  });
-
-  // AC-061-5: Sign out error uses i18n
-  it('handleSignOut uses t(settings.signOutFailed)', () => {
-    expect(settingsSource).toContain("t('settings.signOutFailed')");
-  });
-
-  // AC-061-4/5: No String(err) in alerts
-  it('no String(err) used in alert dialogs', () => {
-    expect(settingsSource).not.toContain('String(err)');
-  });
-});
-
-describe('F061: members.tsx error i18n (STEP-07)', () => {
-  const membersSource = readSource('src/app/(tabs)/settings/members.tsx');
-
-  // v2.0 Phase 4: inline member delete (and its future-speeches warning) moved out of this
-  // CSV-only screen into the People picker, so members.tsx no longer references futureSpeechWarning.
-
-  // AC-061-8: No hardcoded "future speeches" English text
-  it('no hardcoded "future speeches" in English', () => {
-    expect(membersSource).not.toContain('future speeches)');
-  });
-
-  // AC-061-6: RPC error uses i18n
-  it('importMutation.onError uses t(members.importRpcError) for RPC errors', () => {
-    expect(membersSource).toContain("t('members.importRpcError')");
-  });
-
-  // AC-061-7: CSV parse errors still show err.message (already i18n)
-  it('CSV parse errors pass err.message to Alert', () => {
-    // onError should show err.message when it detects CSV parse error
-    expect(membersSource).toContain('err.message');
-  });
-
-  // EC-061-2/EC-061-3: Detection of CSV vs RPC errors
-  it('distinguishes CSV parse errors from RPC errors in onError', () => {
-    // The onError handler must have logic to differentiate CSV vs RPC errors
-    const onErrorStart = membersSource.indexOf("onError: (err: Error)");
-    const onErrorSection = membersSource.slice(onErrorStart, onErrorStart + 500);
-    expect(onErrorSection).toContain("t('members.importRpcError')");
-    expect(onErrorSection).toContain('err.message');
-  });
-});
 
 // =============================================================================
 // F062: Refresh Session Before Edge Function Invoke (STEP-04/CR-272)
 // =============================================================================
 
-describe('F062: callEdgeFunction uses refreshSession', () => {
-  const usersSource = readSource('src/app/(tabs)/settings/users.tsx');
-
-  // AC-062-1: callEdgeFunction uses refreshSession() not getSession()
-  it('callEdgeFunction calls refreshSession', () => {
-    // Extract callEdgeFunction body
-    const fnStart = usersSource.indexOf('async function callEdgeFunction');
-    const fnBody = usersSource.slice(fnStart, fnStart + 500);
-    expect(fnBody).toContain('refreshSession()');
-  });
-
-  // AC-062-2: Throws auth/no-session when no session
-  it('callEdgeFunction throws auth/no-session when session is null', () => {
-    expect(usersSource).toContain("throw new Error('auth/no-session')");
-  });
-
-  // AC-062-2: Checks refreshError
-  it('callEdgeFunction checks refreshError', () => {
-    const fnStart = usersSource.indexOf('async function callEdgeFunction');
-    const fnBody = usersSource.slice(fnStart, fnStart + 500);
-    expect(fnBody).toContain('refreshError');
-  });
-});

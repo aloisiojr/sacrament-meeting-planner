@@ -1,0 +1,55 @@
+/**
+ * Dynamic app config: builds a STAGING variant with its own bundle identifier.
+ *
+ * Why this exists
+ * ---------------
+ * Staging and production builds used to share `com.sacramentmeetingmanager.app`, which meant a
+ * TestFlight build pointed at the staging database installed OVER the real App Store app on a
+ * tester's phone. Internal TestFlight groups receive every build automatically — there is no
+ * per-group gating — so a staging build reaches every internal tester, including real bishops
+ * using the app for their ward. That happened on 2026-08-04.
+ *
+ * A separate bundle id makes it structurally impossible: staging builds go to their own App Store
+ * Connect record with its own tester list, and the two apps sit side by side on a device, so
+ * testing 2.0.0 no longer costs anyone their production app.
+ *
+ * This cannot be done in eas.json — its build-profile schema has no `bundleIdentifier` field
+ * (verified against @expo/eas-json in eas-cli 18.0.3). It has to be a dynamic config keyed off an
+ * env var, which EAS sets per build profile.
+ *
+ * How it is selected
+ * ------------------
+ * `APP_VARIANT=staging` in the eas.json profile env. Anything else — including a local `npx expo`
+ * run with no env — yields the production identity unchanged, so this file is inert by default.
+ *
+ * Android is deliberately NOT varied
+ * ----------------------------------
+ * `google-services.json` declares only `com.sacramentmeetingmanager.app`; changing the Android
+ * package without a matching Firebase app would fail the build. Android is not published to any
+ * store yet, so the collision risk there is limited to internal APKs. To vary it later: create a
+ * second Firebase Android app for `...app.staging`, merge it into google-services.json, then add
+ * `android: { ...config.android, package: androidPackage }` below.
+ */
+
+const STAGING_SUFFIX = '.staging';
+
+/** @param {{ config: import('@expo/config-types').ExpoConfig }} params */
+module.exports = ({ config }) => {
+  if (process.env.APP_VARIANT !== 'staging') {
+    // Production identity, untouched. Keeping this path a no-op means a mistake in the variant
+    // logic cannot alter a production build.
+    return config;
+  }
+
+  return {
+    ...config,
+    // Shown under the icon, so the two apps are distinguishable on the home screen.
+    name: `${config.name} (Staging)`,
+    // Two apps must not claim the same URL scheme; whichever iOS resolves last would win.
+    scheme: `${config.scheme}staging`,
+    ios: {
+      ...config.ios,
+      bundleIdentifier: `${config.ios.bundleIdentifier}${STAGING_SUFFIX}`,
+    },
+  };
+};

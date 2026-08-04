@@ -126,3 +126,19 @@ the tag `archive/UX-2.0-2026-06-07` are archive only.
   deploy via Supabase CLI. Secrets live in `.claude/settings.local.json` (gitignored) — never
   commit them.
 - EAS builds are controlled by the user externally — do not track or trigger them.
+
+### Staging builds have their OWN bundle identifier
+
+`app.config.js` turns `APP_VARIANT=staging` (set in the development/staging/testflight/appetize
+profiles) into `com.sacramentmeetingmanager.app.staging`, a distinct app name and a distinct URL
+scheme. Production is untouched. Do not remove this: without it a staging build installs OVER the
+real App Store app.
+
+**Internal TestFlight groups receive EVERY build automatically.** There is no per-group gating —
+`groups` in `eas.json` only fails (`Cannot add internal group to a build`), builds cannot be
+removed from a group, and the only retraction is expiring the build. This is why the identity must
+be separated at the bundle level rather than managed in App Store Connect. Learned the hard way on
+2026-08-04, when a staging build reached every internal tester.
+
+Android is deliberately NOT varied: `google-services.json` declares only the production package,
+so changing it would fail the build. See the note in `app.config.js`.

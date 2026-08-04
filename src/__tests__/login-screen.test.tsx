@@ -101,7 +101,13 @@ describe('LoginScreen — submission', () => {
   });
 
   it('surfaces a message when signIn rejects, and does not strand the user in loading', async () => {
-    mockSignIn.mockRejectedValue(new Error('invalid credentials'));
+    // The shape Supabase actually returns for a rejected password.
+    mockSignIn.mockRejectedValue(
+      Object.assign(new Error('Invalid login credentials'), {
+        status: 400,
+        code: 'invalid_credentials',
+      })
+    );
     await renderLogin();
     await type('login-email-input', 'bishop@ward.org');
     await type('login-password-input', 'wrong');
@@ -122,6 +128,54 @@ describe('LoginScreen — submission', () => {
     await submit();
 
     expect(screen.queryByTestId('login-error-text')).toBeNull();
+  });
+});
+
+describe('LoginScreen — a failure is described truthfully', () => {
+  // It used to be `catch { setError(t('auth.loginFailed')) }`: every failure, of any kind, reported
+  // as "Incorrect email or password". Telling someone their password is wrong when they are
+  // offline sends them to reset a password that was never wrong.
+
+  async function attempt() {
+    await renderLogin();
+    await type('login-email-input', 'bishop@ward.org');
+    await type('login-password-input', 'secret123');
+    await act(async () => {
+      submit();
+    });
+  }
+
+  it.each([
+    ['code', Object.assign(new Error('x'), { code: 'invalid_credentials' })],
+    ['message', Object.assign(new Error('Invalid login credentials'), { status: 400 })],
+  ])('a rejected password (by %s) says the credentials are wrong', async (_l, err) => {
+    mockSignIn.mockRejectedValue(err);
+    await attempt();
+    expect(screen.getByTestId('login-error-text')).toHaveTextContent(/auth.loginFailed/);
+  });
+
+  it.each([
+    'Network request failed',
+    'Failed to fetch',
+    'Load failed',
+  ])('being offline (%s) says so instead of blaming the password', async (message) => {
+    mockSignIn.mockRejectedValue(new TypeError(message));
+    await attempt();
+
+    const text = screen.getByTestId('login-error-text');
+    expect(text).toHaveTextContent(/auth.requiresConnection/);
+    expect(text).not.toHaveTextContent(/auth.loginFailed/);
+  });
+
+  it('an unexpected failure shows its own message rather than a wrong claim', async () => {
+    // "Invalid API key" means the build is misconfigured. Reporting that as a bad password is how
+    // an afternoon disappears.
+    mockSignIn.mockRejectedValue(Object.assign(new Error('Invalid API key'), { status: 401 }));
+    await attempt();
+
+    const text = screen.getByTestId('login-error-text');
+    expect(text).toHaveTextContent(/Invalid API key/);
+    expect(text).not.toHaveTextContent(/auth.loginFailed/);
   });
 });
 

@@ -12,6 +12,21 @@ if (SUPABASE_URL === 'https://placeholder.supabase.co') {
 }
 
 /**
+ * Which backend this build talks to, for display. `null` when it is production — the badge exists
+ * to make a NON-production build obvious, and labelling the real one would just be noise.
+ *
+ * Exists because a staging build once shipped to real testers under the production app's identity:
+ * from inside the app there was no way to tell which database you were looking at.
+ */
+export function backendLabel(): string | null {
+  if (SUPABASE_URL === 'https://placeholder.supabase.co') return 'NOT CONFIGURED';
+  const ref = SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0];
+  if (ref === 'poizgglzdjqwrhsnhkke') return null; // production
+  if (ref === 'nfraidzguordqmbpqkcf') return 'STAGING';
+  return ref;
+}
+
+/**
  * Storage adapter that wraps AsyncStorage with error resilience.
  * On Android, AsyncStorage uses SQLite internally and can throw
  * "unable to open database file" (code 14) if the native module

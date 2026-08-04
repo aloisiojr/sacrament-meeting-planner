@@ -13,6 +13,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { describeSignInError } from '../../lib/authErrors';
+import { backendLabel } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function LoginScreen() {
@@ -42,8 +44,10 @@ export default function LoginScreen() {
     try {
       await signIn(email.trim(), password);
       // Navigation handled by auth state change in root layout
-    } catch {
-      setError(t('auth.loginFailed'));
+    } catch (err) {
+      // Not a blanket "wrong password": offline and misconfiguration are different failures, and
+      // saying otherwise sends the user to reset a password that was never wrong.
+      setError(describeSignInError(err, t));
     } finally {
       setLoading(false);
     }
@@ -69,6 +73,14 @@ export default function LoginScreen() {
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {t('auth.loginSubtitle')}
           </Text>
+          {backendLabel() && (
+            <Text
+              testID="login-backend-badge"
+              style={[styles.backendBadge, { color: colors.error }]}
+            >
+              {backendLabel()}
+            </Text>
+          )}
         </View>
 
         <View style={styles.formContainer}>
@@ -234,6 +246,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     marginBottom: 6,
+  },
+  backendBadge: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textAlign: 'center',
   },
   input: {
     height: 48,

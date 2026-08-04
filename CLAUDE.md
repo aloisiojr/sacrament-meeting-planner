@@ -19,12 +19,13 @@ first (security). Prefer built-ins or a reviewed project-local skill over anythi
 
 ## Commands
 
-- Tests (one-shot): `npm run test:run` · watch: `npm test` · single file: `npx vitest run <path>`
+- Tests (one-shot): `npx jest --ci` · single project: `npx jest --selectProjects ios` · single file: `npx jest --testPathPattern <name>`
 - Typecheck: `npx tsc --noEmit`
 - Lint: `npm run lint`
 - Dev server: `npm start` (or `npm run ios` / `npm run android`)
 
-Baseline (2026-07-27, main): 67 test files, 1832 tests green.
+Baseline (2026-08-03, chore/test-strategy-jest-expo): 276 suites, 4940 tests green
+(2470 per platform × 2 projects). Runner is jest-expo; vitest was removed.
 
 ## Directory map & placement rules
 
@@ -62,7 +63,10 @@ logic into `src/lib/`.
   (see mobile-release-advisor).
 - **Types:** import DB types from `src/types/database.ts`; don't redeclare.
 - **Tests:** behavioral only — test what code does, never read source with fs/string-matching.
-  All React hooks must run before any early return (vitest won't catch this — watch for it).
+  All React hooks must run before any early return (the test runner won't catch this — watch for it).
+  Never assert on source text (`readFileSync` + `toContain`): it cannot tell a working screen from a
+  broken one and breaks on renames. Where a rule is written in two places (client permission map vs
+  server check, a duplicated helper), assert that the two AGREE — that is what finds real defects.
 
 ## Domain glossary
 
@@ -72,9 +76,37 @@ logic into `src/lib/`.
   **invitations** / user management; **presentation mode**; activity log/history; WhatsApp
   messaging; push notifications.
 
+## Release & versioning — READ BEFORE TOUCHING MIGRATIONS
+
+Shipped versions, as of 2026-08-03:
+
+| Version | State | Why it matters |
+|---------|-------|----------------|
+| **1.0.0** | live in the stores | **has no version gate** |
+| **1.1.0** | in store review | introduces the version gate (`useVersionGate`, `app-config` edge function, `app_config.min_supported_version`) |
+| **2.0.0** | in development | needs migrations that **break 1.x.x clients** |
+
+**The cutover order is not negotiable — the gate goes live BEFORE the breaking migrations:**
+
+1. 1.1.0 reaches users, so clients have a gate at all.
+2. 2.0.0 ships to the stores.
+3. Raise `app_config.min_supported_version` to `2.0.0` → gated clients hard-block and force update.
+4. **Only then** apply the 2.0-breaking migrations.
+
+Applying a breaking migration before step 3 breaks every client in the field with no message.
+Migrations carrying a "Apply at the v2 cutover" annotation (e.g. `043_drop_collection_config.sql`)
+belong to step 4 and must not be applied early.
+
+Known consequence: **users still on 1.0.0 have no gate and cannot be told to update** — at cutover
+they simply break. The size of that tail is a release risk worth measuring before step 4.
+
+**UX-2.0 is discarded permanently and will never be merged into `main`.** The branch `UX-2.0` and
+the tag `archive/UX-2.0-2026-06-07` are archive only.
+
 ## Deploy notes
 
-- Supabase migrations in `supabase/migrations/` (35 on baseline). Edge functions in
-  `supabase/functions/` deploy via Supabase CLI. Secrets live in `.claude/settings.local.json`
-  (gitignored) — never commit them.
+- Supabase migrations in `supabase/migrations/` (46 in repo). **The applied set is not tracked
+  here — verify against the database before assuming.** Edge functions in `supabase/functions/`
+  deploy via Supabase CLI. Secrets live in `.claude/settings.local.json` (gitignored) — never
+  commit them.
 - EAS builds are controlled by the user externally — do not track or trigger them.

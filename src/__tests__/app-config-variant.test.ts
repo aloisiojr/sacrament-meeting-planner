@@ -63,6 +63,20 @@ describe('the staging variant', () => {
 
   it('is distinguishable on the home screen', () => {
     expect(staging().name).toContain('Staging');
+    expect(staging().name).not.toBe(resolveConfig(undefined).name);
+  });
+
+  it.each([
+    ['staging', () => staging().name],
+    ['production', () => resolveConfig(undefined).name],
+  ])('the %s name fits the App Store Connect limit', (_label, get) => {
+    // EAS uses expo.name when it creates the app record, and App Store Connect caps it at 30.
+    // "Sacrament Meeting Planner (Staging)" was 35 and failed the submit outright.
+    expect(get().length).toBeLessThanOrEqual(30);
+  });
+
+  it('stays short enough for the home screen, where iOS truncates around 12', () => {
+    expect(staging().name.length).toBeLessThanOrEqual(14);
   });
 
   it('claims a different URL scheme', () => {

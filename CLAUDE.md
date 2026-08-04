@@ -150,7 +150,7 @@ automatically — against a production database that does not have those migrati
 ### Staging builds have their OWN bundle identifier
 
 `app.config.js` turns `APP_VARIANT=staging` (set in the development/staging/testflight/appetize
-profiles) into `com.sacramentmeetingmanager.app.staging`, a distinct app name and a distinct URL
+profiles) into `com.sacramentmeetingmanager.app.staging`, the app name `SMP Staging` and a distinct URL
 scheme. Production is untouched. Do not remove this: without it a staging build installs OVER the
 real App Store app.
 

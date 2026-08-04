@@ -33,6 +33,16 @@
 
 const STAGING_SUFFIX = '.staging';
 
+/**
+ * App Store Connect caps an app name at 30 characters, and EAS uses `expo.name` when it creates
+ * the app record — `Sacrament Meeting Planner (Staging)` is 35 and fails the submit with
+ * "An attribute value is too long. - App name is too long."
+ *
+ * Short is right for the home screen anyway: iOS truncates around 12 characters.
+ */
+const STAGING_NAME = 'SMP Staging';
+const APP_STORE_NAME_LIMIT = 30;
+
 /** @param {{ config: import('@expo/config-types').ExpoConfig }} params */
 module.exports = ({ config }) => {
   if (process.env.APP_VARIANT !== 'staging') {
@@ -41,10 +51,18 @@ module.exports = ({ config }) => {
     return config;
   }
 
+  if (STAGING_NAME.length > APP_STORE_NAME_LIMIT) {
+    // Fail at config time with the real reason, rather than 15 minutes into a build.
+    throw new Error(
+      `Staging app name "${STAGING_NAME}" is ${STAGING_NAME.length} characters; ` +
+        `App Store Connect allows ${APP_STORE_NAME_LIMIT}.`
+    );
+  }
+
   return {
     ...config,
     // Shown under the icon, so the two apps are distinguishable on the home screen.
-    name: `${config.name} (Staging)`,
+    name: STAGING_NAME,
     // Two apps must not claim the same URL scheme; whichever iOS resolves last would win.
     scheme: `${config.scheme}staging`,
     ios: {

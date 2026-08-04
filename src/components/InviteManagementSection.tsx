@@ -39,10 +39,6 @@ import { getInviteItems } from '../lib/speechUtils';
 import { supabase } from '../lib/supabase';
 import type { Member, Speech, SpeechStatus } from '../types/database';
 
-// Re-export for backward compatibility
-export { getInviteItems } from '../lib/speechUtils';
-export type { InviteItem } from '../lib/speechUtils';
-
 // Look ahead window for invite management
 const LOOK_AHEAD_SUNDAYS = 12;
 

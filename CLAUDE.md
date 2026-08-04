@@ -100,6 +100,22 @@ belong to step 4 and must not be applied early.
 Known consequence: **users still on 1.0.0 have no gate and cannot be told to update** — at cutover
 they simply break. The size of that tail is a release risk worth measuring before step 4.
 
+**No further 1.x releases are planned**, so v2 code does not carry backward compatibility with
+1.x clients. Two things that look similar are NOT the same and must be treated differently:
+
+- **Client-version compatibility** (shims for older app builds) — remove it.
+- **Data compatibility** (rows already in the database that survive the cutover) — KEEP it.
+  Production data is not being wiped. `lib/activityLog`'s `can_preside`/`can_conduct` mapping and
+  the legacy own-phone fallback in `InviteManagementSection` are data compat and must stay, or
+  historical rows render wrong.
+
+`SundayCard`'s "legacy behavior" around `managePrayers` is neither — it is live behaviour for wards
+with that setting off.
+
+**Development runs against STAGING** (`nfraidzguordqmbpqkcf`); production (`poizgglzdjqwrhsnhkke`)
+is untouched until the cutover. Staging has all migrations applied, so it is the authoritative
+answer to "does this table/policy exist" — check the database, not the migration files.
+
 **UX-2.0 is discarded permanently and will never be merged into `main`.** The branch `UX-2.0` and
 the tag `archive/UX-2.0-2026-06-07` are archive only.
 

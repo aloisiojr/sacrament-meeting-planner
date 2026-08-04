@@ -135,7 +135,9 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
     }
 
     const getPositionsToDelete = (): number[] | undefined => {
-      if (!managePrayers) return undefined; // delete all (legacy behavior)
+      // Wards with the manage-prayers setting OFF delete every position. Not a version
+      // leftover — this is live behaviour for those wards.
+      if (!managePrayers) return undefined;
 
       if (currentType === SUNDAY_TYPE_SPEECHES) {
         if (isTestimonyOrPrimary(type)) return [1, 2, 3]; // preserve 0,4

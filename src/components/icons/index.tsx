@@ -616,3 +616,33 @@ export const WhatsAppIcon = ({ size = 24, color = '#25D366' }: IconProps) => (
     />
   </Svg>
 );
+
+/** Share / export — a box with an arrow leaving it. Used by the agenda PDF export. */
+export const ShareIcon = ({ size = 24, color = 'currentColor' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 3v12"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M8 7l4-4 4 4"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+    <Path
+      d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
+  </Svg>
+);

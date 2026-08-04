@@ -27,6 +27,7 @@ import { useSundayList } from '../../hooks/useSundayList';
 import { useSundayExceptions, useSetSundayType, useRemoveSundayException, useAutoAssignMissingSundayTypes, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
 import { useSpeeches, useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
 import { useLazyCreateAgenda, useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
+import { AgendaExportPdfButton } from '../../components/AgendaExportPdfButton';
 import { AgendaForm } from '../../components/AgendaForm';
 import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
 import { DateBlock } from '../../components/DateBlock';
@@ -404,6 +405,7 @@ function AgendaSundayCard({
     [date, onSetAttendance]
   );
 
+
   const currentType = exception?.reason ?? SUNDAY_TYPE_SPEECHES;
   // No-sacrament Sundays (general/stake/ward conference, "other") still expand — but only to the
   // type dropdown, so the type can be changed; the welcome/hymns AgendaForm + Play don't apply.
@@ -479,6 +481,14 @@ function AgendaSundayCard({
               )}
             </View>
             <View style={styles.compactSpacer} />
+            {!noSacrament && (
+              <AgendaExportPdfButton
+                date={date}
+                agenda={agenda}
+                speeches={speeches}
+                exception={exception}
+              />
+            )}
             {!noSacrament && (
               <Pressable
                 testID={`agenda-play-${date}`}

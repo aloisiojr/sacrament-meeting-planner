@@ -69,7 +69,16 @@ jest.mock('../components/AgendaForm', () => ({
 jest.mock('../components/SundayCard', () => ({
   SundayTypeDropdown: () => require('react').createElement('SundayTypeDropdown', { testID: 'mock-type-dropdown' }),
 }));
-jest.mock('../components/icons', () => ({ PlayIcon: () => null, ChevronUpIcon: () => null }));
+// agenda.tsx now reaches i18n transitively (AgendaExportPdfButton -> useAgendaPdfExport ->
+// usePresentationMode), and importing the real module boots i18next.
+jest.mock('../i18n', () => ({
+  __esModule: true,
+  default: { t: (k: string) => k },
+  getCurrentLanguage: () => 'pt-BR',
+  changeLanguage: jest.fn(),
+  SUPPORTED_LANGUAGES: ['pt-BR', 'en-US', 'es-LA'],
+}));
+jest.mock('../components/icons', () => ({ PlayIcon: () => null, ChevronUpIcon: () => null, ShareIcon: () => null }));
 
 // UnifiedSundayCard seam: render a host node carrying every prop for inspection + tap invocation.
 jest.mock('../components/UnifiedSundayCard', () => ({
@@ -104,6 +113,11 @@ jest.mock('../hooks/useSpeeches', () => ({
   useSpeeches: () => ({ data: mockState.speeches }),
   useDeleteSpeechesByDate: () => ({ mutate: jest.fn() }),
   useWardManagePrayers: () => ({ managePrayers: mockState.managePrayers, isLoading: false }),
+}));
+// This suite is about the card, not about PDF plumbing. Without this, the export button would
+// pull useHymns/useMembers/useWardName — real React Query reads — into every card under test.
+jest.mock('../hooks/useAgendaPdfExport', () => ({
+  useAgendaPdfExport: () => ({ exportAgenda: jest.fn(), isExporting: false }),
 }));
 jest.mock('../hooks/useAgenda', () => {
   const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;

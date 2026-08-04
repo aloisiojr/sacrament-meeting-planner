@@ -127,6 +127,26 @@ the tag `archive/UX-2.0-2026-06-07` are archive only.
   commit them.
 - EAS builds are controlled by the user externally — do not track or trigger them.
 
+### Build profiles
+
+| Profile | Identity | Database | Distribution |
+|---------|----------|----------|--------------|
+| `development` | staging | staging | dev client |
+| `staging` | staging | staging | internal (ad-hoc) |
+| `appetize` | staging | staging | simulator / apk |
+| `testflight-staging` | staging | staging | store → TestFlight |
+| `production` | **production** | **production** | store |
+
+There is deliberately no `testflight-production`: every App Store release passes through TestFlight
+first, so `production` already serves both roles. What turns a TestFlight build into a release is
+attaching it to a version and submitting for review in App Store Connect — a separate action, not a
+build profile. Two profiles emitting the same artefact would only raise "which one did I use?".
+
+**Do not build `production` before the v2 cutover.** It would upload a 2.0.0 build that expects the
+v2 migrations to an App Store Connect record whose internal testers receive every build
+automatically — against a production database that does not have those migrations yet. Use
+`testflight-staging` until step 3 of the cutover is done.
+
 ### Staging builds have their OWN bundle identifier
 
 `app.config.js` turns `APP_VARIANT=staging` (set in the development/staging/testflight/appetize

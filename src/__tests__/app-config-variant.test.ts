@@ -100,7 +100,7 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     return profile.env ?? (profile.extends ? envFor(profile.extends) : {});
   }
 
-  it.each(['development', 'staging', 'testflight', 'appetize'])(
+  it.each(['development', 'staging', 'testflight-staging', 'appetize'])(
     '%s builds the staging variant',
     (profile) => {
       expect(envFor(profile).APP_VARIANT).toBe('staging');
@@ -109,6 +109,23 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
 
   it('production does NOT', () => {
     expect(envFor('production').APP_VARIANT).toBeUndefined();
+  });
+
+  it('exactly one profile builds the production identity', () => {
+    // There is no separate "testflight-production": every App Store release passes through
+    // TestFlight, so `production` already serves both. Two profiles emitting the same artefact
+    // would only raise the question of which one was used.
+    const productionIdentity = Object.keys(eas.build).filter(
+      (p) => envFor(p).APP_VARIANT !== 'staging'
+    );
+    expect(productionIdentity).toEqual(['production']);
+  });
+
+  it('only the production profile can reach the production database', () => {
+    for (const profile of Object.keys(eas.build)) {
+      const url = envFor(profile).EXPO_PUBLIC_SUPABASE_URL ?? '';
+      if (url.includes('poizgglzdjqwrhsnhkke')) expect(profile).toBe('production');
+    }
   });
 
   it('every profile carrying the variant also points at the staging database', () => {

@@ -2,21 +2,16 @@
  * Serialisation for \n-joined TEXT list fields (announcements, recognised names, …).
  *
  * Pure logic, so it lives in lib/ per CLAUDE.md rather than inside the component that renders it.
- * Five test files used to carry their own hand-written copy of these two functions and assert
- * against that copy — 134 it-blocks that could not fail whatever the app did, and which had all
- * drifted from the real implementation in the same way: they omitted the Array.isArray branch.
+ *
+ * There used to be an `Array.isArray(value)` branch here — the migration-032 shim, for rows written
+ * while `recognized_names` was still TEXT[]. It is gone: 032 is applied (verified against staging),
+ * `src/types/database.ts` types all three columns `string | null`, and the persisted React Query
+ * cache is busted by app version, so a 2.x client can never be handed a 1.x array. v2 does not
+ * carry 1.x compatibility.
  */
 
-/**
- * Split a stored value into list items, dropping blanks.
- *
- * The Array.isArray branch is the migration-032 shim: `recognized_names` was TEXT[] before that
- * migration and TEXT after, so a client reading a row written by a pre-migration app — or a cache
- * persisted before the upgrade — still receives an array. Removing it silently turns those rows
- * into a single item, or into nothing.
- */
-export function parseItems(value: string | string[] | null): string[] {
-  if (Array.isArray(value)) return value.filter((s) => s.trim() !== '');
+/** Split a stored value into list items, dropping blanks. */
+export function parseItems(value: string | null): string[] {
   return (value ?? '').split('\n').filter((s) => s.trim() !== '');
 }
 

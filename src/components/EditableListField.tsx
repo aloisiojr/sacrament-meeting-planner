@@ -26,7 +26,7 @@ export { parseItems, joinItems };
 // --- Props ---
 
 interface EditableListFieldProps {
-  value: string | string[] | null;
+  value: string | null;
   onSave: (value: string | null) => void;
   disabled: boolean;
   placeholder: string;

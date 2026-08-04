@@ -27,8 +27,6 @@ const handlerRef = installDeno();
 
 /** Row returned by the stake+ward existence probe. null = the ward is free. */
 let existingWard: Record<string, unknown> | null;
-/** Rows returned for general_collections. */
-let generalCollections: { id: string; name: string }[];
 let createUserError: { message: string } | null;
 /** The `wards` table is read twice: the existence probe, then the insert's RETURNING. */
 let wardSelectCall = 0;
@@ -43,7 +41,6 @@ beforeAll(() => {
 beforeEach(() => {
   rec = newRecorder();
   existingWard = null;
-  generalCollections = [];
   createUserError = null;
   wardSelectCall = 0;
   responses = {
@@ -55,7 +52,6 @@ beforeEach(() => {
           ? { data: existingWard, error: null }
           : { data: CREATED_WARD, error: null };
       }
-      if (table === 'general_collections') return { data: generalCollections, error: null };
       return { data: null, error: null };
     },
     createUser: () =>
@@ -66,7 +62,8 @@ beforeEach(() => {
   };
 });
 
-const call = (body: unknown) => callEdge(handlerRef.current!, body, { auth: null });
+const call = (body: unknown, opts: { method?: string } = {}) =>
+  callEdge(handlerRef.current!, body, { auth: null, ...opts });
 
 function quiet() {
   return jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -88,8 +85,11 @@ const wardInsert = () =>
   rec.inserts.find((i) => i.table === 'wards')?.payload as Record<string, unknown> | undefined;
 
 describe('register-first-user — input validation', () => {
-  it('answers the CORS preflight', async () => {
-    expect((await call(null)).raw).not.toBe('');
+  it('answers the CORS preflight without touching anything', async () => {
+    const res = await call(null, { method: 'OPTIONS' });
+    expect(res.raw).toBe('ok');
+    expect(wardInsert()).toBeUndefined();
+    expect(rec.createdAuthUsers).toEqual([]);
   });
 
   it.each([
@@ -327,59 +327,12 @@ describe('register-first-user — the account it creates', () => {
   });
 });
 
-describe('register-first-user — default topic collections', () => {
-  it('activates the standard collections and the newest conference, and no others', async () => {
-    generalCollections = [
-      { id: 'c1', name: 'Para a Forca da Juventude' },
-      { id: 'c2', name: 'Principios do Evangelho' },
-      { id: 'c3', name: 'Conferencia Geral 2024-04' },
-      { id: 'c4', name: 'Conferencia Geral 2025-10' },
-    ];
-    await call({ ...VALID, language: 'pt-BR' });
+// The 'default topic collections' describe was deleted along with the code it covered.
+// register-first-user used to query general_collections and INSERT into ward_collection_config —
+// a table migration 043 drops. All 46 migrations are applied on staging, so that block was
+// erroring on every ward creation and doing nothing. Four tests asserted it worked: written by
+// reading the implementation, they recorded dead code as intended behaviour.
 
-    const cfg = rec.inserts.find((i) => i.table === 'ward_collection_config')?.payload as {
-      collection_id: string;
-      active: boolean;
-      ward_id: string;
-    }[];
-    const active = cfg.filter((c) => c.active).map((c) => c.collection_id).sort();
-
-    expect(active).toEqual(['c1', 'c2', 'c4']);
-    expect(cfg.every((c) => c.ward_id === 'ward-1')).toBe(true);
-  });
-
-  it('writes a config row for every collection, active or not', async () => {
-    generalCollections = [
-      { id: 'c1', name: 'Gospel Principles' },
-      { id: 'c2', name: 'General Conference 2020-04' },
-      { id: 'c3', name: 'General Conference 2025-10' },
-    ];
-    await call({ ...VALID, language: 'en-US' });
-
-    const cfg = rec.inserts.find((i) => i.table === 'ward_collection_config')?.payload as unknown[];
-    expect(cfg).toHaveLength(3);
-  });
-
-  it('writes nothing when the language has no collections', async () => {
-    generalCollections = [];
-    await call(VALID);
-    expect(rec.inserts.find((i) => i.table === 'ward_collection_config')).toBeUndefined();
-  });
-
-  it('still succeeds when the collection config cannot be written', async () => {
-    // Non-fatal by design: the ward and the account exist, and collections can be set up later.
-    generalCollections = [{ id: 'c1', name: 'Gospel Principles' }];
-    responses.write = (table) =>
-      table === 'ward_collection_config'
-        ? { data: null, error: { message: 'boom' } }
-        : { data: null, error: null };
-    const spy = quiet();
-    const res = await call(VALID);
-    spy.mockRestore();
-
-    expect(res.status).toBe(201);
-  });
-});
 
 describe('register-first-user — the session', () => {
   it('returns the ward and a session so the user lands signed in', async () => {

@@ -352,20 +352,7 @@ describe('EditableListField — disabled', () => {
 });
 
 describe('EditableListField — external updates', () => {
-  it('accepts a legacy TEXT[] value, not just the joined string', async () => {
-    // migration-032 compatibility: rows written before it, and caches persisted before it, are
-    // arrays. See list-field.test.ts for the parse layer.
-    await renderField({ value: ['Ana', 'Bruno'] });
 
-    expect(screen.queryByDisplayValue('Ana')).not.toBeNull();
-    expect(screen.queryByDisplayValue('Bruno')).not.toBeNull();
-  });
-
-  it('does not render a legacy array as one mangled row', async () => {
-    // Without the Array.isArray branch the value reaches `.split('\n')` as an array.
-    await renderField({ value: ['Ana', 'Bruno'] });
-    expect(screen.queryByDisplayValue('Ana,Bruno')).toBeNull();
-  });
 
   it('drops blank entries coming from the stored value', async () => {
     await renderField({ value: 'Ana\n\n   \nBruno', disabled: true });

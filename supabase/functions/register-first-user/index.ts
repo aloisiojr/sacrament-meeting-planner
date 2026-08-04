@@ -193,50 +193,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create ward_collection_config entries for all general collections
-    // matching the ward's language.
-    // "For the Strength of Youth", "Gospel Principles", and the latest
-    // general conference collection are active by default.
-    const { data: generalCollections } = await supabaseAdmin
-      .from('general_collections')
-      .select('id, name')
-      .eq('language', input.language || 'en-US');
-
-    if (generalCollections && generalCollections.length > 0) {
-      // Collections that should be active by default (per language)
-      const defaultActiveNames: Record<string, Set<string>> = {
-        'pt-BR': new Set(['Para a Forca da Juventude', 'Principios do Evangelho']),
-        'en-US': new Set(['For the Strength of Youth', 'Gospel Principles']),
-        'es-LA': new Set(['Para la Fortaleza de la Juventud', 'Principios del Evangelio']),
-      };
-      const knownNames = new Set([
-        'Para a Forca da Juventude', 'Principios do Evangelho',
-        'For the Strength of Youth', 'Gospel Principles',
-        'Para la Fortaleza de la Juventud', 'Principios del Evangelio',
-      ]);
-      const activeNames = defaultActiveNames[wardLanguage] ?? defaultActiveNames['en-US'];
-
-      // Find the latest conference collection (not in knownNames, highest name = newest)
-      const conferenceCollections = generalCollections
-        .filter((col: { id: string; name: string }) => !knownNames.has(col.name))
-        .sort((a: { name: string }, b: { name: string }) => b.name.localeCompare(a.name));
-      const latestConferenceId = conferenceCollections.length > 0 ? conferenceCollections[0].id : null;
-
-      const configEntries = generalCollections.map((col: { id: string; name: string }) => ({
-        ward_id: ward.id,
-        collection_id: col.id,
-        active: activeNames.has(col.name) || col.id === latestConferenceId,
-      }));
-
-      const { error: configError } = await supabaseAdmin
-        .from('ward_collection_config')
-        .insert(configEntries);
-
-      if (configError) {
-        console.error('ward_collection_config creation error:', configError);
-        // Non-fatal: ward and user are created, collections can be configured later
-      }
-    }
+    // v2: no per-ward collection seeding. Migration 043 dropped ward_collection_config — every
+    // general collection is always available and the topic list simply refetches for the ward's
+    // locale. The seeding block that used to be here queried general_collections and inserted into
+    // a table that no longer exists, so on every ward creation it logged an error and did nothing.
 
     // v2: the old "auto-create bishopric presider actor" step was removed with meeting_actors.
     // Presiders now come from members with can_preside (managed in the People picker).

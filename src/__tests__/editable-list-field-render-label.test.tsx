@@ -49,7 +49,7 @@ jest.mock('../contexts/ThemeContext', () => ({
 // --- Helpers ---
 
 interface Props {
-  value: string | string[] | null;
+  value: string | null;
   onSave: (v: string | null) => void;
   disabled: boolean;
   placeholder: string;

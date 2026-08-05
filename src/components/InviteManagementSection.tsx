@@ -156,7 +156,8 @@ export function InviteManagementSection() {
         const customTemplate = ward?.[templateField as keyof typeof ward] as string | null;
         const template = customTemplate ?? getDefaultPrayerTemplate(locale, prayerType);
         baseMessage = resolveTemplate(template, {
-          speakerName: speech.speaker_informal_name || speech.speaker_name || '',
+          speakerName: speech.speaker_name || '',
+          speakerInformalName: speech.speaker_informal_name || '',
           date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
           topic: '',
         });
@@ -170,7 +171,8 @@ export function InviteManagementSection() {
         const selectedTemplate =
           speechTemplateMap[speech.position] || getDefaultSpeechTemplate(locale, speech.position as 1 | 2 | 3);
         baseMessage = resolveTemplate(selectedTemplate, {
-          speakerName: speech.speaker_informal_name || speech.speaker_name || '',
+          speakerName: speech.speaker_name || '',
+          speakerInformalName: speech.speaker_informal_name || '',
           date: formatDateHumanReadable(speech.sunday_date, locale as SupportedLanguage),
           topic: speech.topic_title ?? '',
           collection: speech.topic_collection ?? '',

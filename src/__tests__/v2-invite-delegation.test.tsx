@@ -41,7 +41,8 @@ function makeSpeech(over: Partial<Speech>): Speech {
   };
 }
 
-const WARD = {
+// Mutable so a test can install a ward-custom template; reset in beforeEach.
+const WARD: Record<string, string | null> = {
   whatsapp_template_speech_1: null, whatsapp_template_speech_2: null, whatsapp_template_speech_3: null,
   whatsapp_template_opening_prayer: null, whatsapp_template_closing_prayer: null,
   whatsapp_template_delegation_wrapper: null,
@@ -145,6 +146,47 @@ beforeEach(() => {
   mockOpenWhatsAppMock.mockClear();
   mockChangeStatusMock.mockClear();
   mockSPEECHES = [];
+  WARD.whatsapp_template_speech_1 = null;
+});
+
+describe('the message distinguishes the full name from the informal one', () => {
+  it('{nome} is the full name and {nome informal} the informal one', () => {
+    WARD.whatsapp_template_speech_1 = 'Olá {nome informal}, convite para {nome}.';
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp1',
+        member_id: 'm-plain',
+        contact_phone: '+15550009',
+        speaker_name: 'Plain Person',
+        speaker_informal_name: 'Plain',
+      }),
+    ];
+
+    return render()
+      .then(pressSend)
+      .then(() => {
+        expect(lastSentText().text).toBe('Olá Plain, convite para Plain Person.');
+      });
+  });
+
+  it('greets with the full name when the member has no informal name', () => {
+    WARD.whatsapp_template_speech_1 = 'Olá {nome informal}, convite para {nome}.';
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp1',
+        member_id: 'm-plain',
+        contact_phone: '+15550009',
+        speaker_name: 'Plain Person',
+        speaker_informal_name: null,
+      }),
+    ];
+
+    return render()
+      .then(pressSend)
+      .then(() => {
+        expect(lastSentText().text).toBe('Olá Plain Person, convite para Plain Person.');
+      });
+  });
 });
 
 describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {

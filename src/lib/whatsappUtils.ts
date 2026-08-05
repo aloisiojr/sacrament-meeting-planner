@@ -174,8 +174,9 @@ const WA_TOKEN_ALIASES: Record<WaTokenField, readonly string[]> = {
   link: ['link', 'enlace'],
 };
 
-// Order matters: `informalName` is resolved BEFORE `name`, so a substituted full name can never
-// leave "{nome informal}" half-eaten behind.
+// Substitution matches the whole brace-delimited token, so `{nome}` is never found inside
+// `{nome informal}` and the order below is not load-bearing. It still resolves the informal token
+// first, so the pair reads in the order a template author thinks about them.
 const WA_TOKEN_FIELDS: readonly WaTokenField[] = [
   'informalName',
   'name',

@@ -149,7 +149,6 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     ['development', 'development'],
     ['development-testflight', 'development'],
     ['staging', 'staging'],
-    ['testflight-staging', 'staging'],
     ['appetize', 'staging'],
   ])('%s builds the %s variant', (profile, variant) => {
     expect(envFor(profile).APP_VARIANT).toBe(variant);
@@ -165,6 +164,14 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
 
   it('production does NOT', () => {
     expect(envFor('production').APP_VARIANT).toBeUndefined();
+  });
+
+  it('exactly one profile can be submitted with the production identity', () => {
+    // The submit profiles are the ones that can reach App Store Connect. Only `production` may
+    // carry the real bundle id there.
+    for (const profile of Object.keys(eas.submit)) {
+      if (envFor(profile).APP_VARIANT === undefined) expect(profile).toBe('production');
+    }
   });
 
   it('exactly one profile builds the production identity', () => {

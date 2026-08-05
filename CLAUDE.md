@@ -133,18 +133,18 @@ the tag `archive/UX-2.0-2026-06-07` are archive only.
 |---------|----------|----------|--------------|
 | `development` | `SMP Dev` | staging | dev client, internal (ad-hoc) |
 | `development-testflight` | `SMP Dev` | staging | dev client, store → TestFlight |
-| `staging` | `SMP Staging` | staging | internal (ad-hoc) |
+| `staging` | `SMP Staging` | staging | internal (ad-hoc) — unused on the MDM device |
 | `appetize` | `SMP Staging` | staging | simulator / apk |
-| `testflight-staging` | `SMP Staging` | staging | store → TestFlight |
 | `production` | **production** | **production** | store |
 
-Three distinct apps, installable side by side. `development-testflight` exists because the test
-device is MDM-supervised and cannot install an ad-hoc provisioning profile — a dev client has to
-arrive through TestFlight. Build it once, then iterate with `npx expo start --dev-client`; only a
-NATIVE change needs another build.
+**The working loop is `development-testflight`.** It exists because the test device is
+MDM-supervised and cannot install an ad-hoc provisioning profile, so a dev client has to arrive
+through TestFlight. Build it ONCE, then `npx expo start --dev-client` reloads JS on save. Only a
+NATIVE change (new native dependency, or an app.config.js change touching native fields) needs
+another build.
 
-For a JS-only change to an installed release build, prefer `eas update --channel staging` over a
-rebuild.
+There is no `testflight-staging`: a release build on TestFlight added nothing the dev client does
+not cover, and it was one more app to keep in sync.
 
 There is deliberately no `testflight-production`: every App Store release passes through TestFlight
 first, so `production` already serves both roles. What turns a TestFlight build into a release is

@@ -74,6 +74,69 @@ describe('resolveTemplate', () => {
   });
 });
 
+describe('resolveTemplate — {nome} vs {nome informal}', () => {
+  const both = 'Olá {nome informal}, aqui é para {nome}.';
+
+  it('{nome informal} resolves to the informal name and {nome} to the full name', () => {
+    const result = resolveTemplate(both, {
+      speakerName: 'Maria Silva',
+      speakerInformalName: 'Maria',
+      date: '15 FEV',
+      topic: 'Fé',
+    });
+
+    expect(result).toBe('Olá Maria, aqui é para Maria Silva.');
+  });
+
+  it('falls back to the full name when the member has no informal name', () => {
+    const empty = resolveTemplate(both, {
+      speakerName: 'Maria Silva',
+      speakerInformalName: '',
+      date: '15 FEV',
+      topic: 'Fé',
+    });
+    const missing = resolveTemplate(both, {
+      speakerName: 'Maria Silva',
+      date: '15 FEV',
+      topic: 'Fé',
+    });
+
+    expect(empty).toBe('Olá Maria Silva, aqui é para Maria Silva.');
+    expect(missing).toBe('Olá Maria Silva, aqui é para Maria Silva.');
+  });
+
+  it('{nome} is the full name — no longer the informal one', () => {
+    const result = resolveTemplate('Olá {nome}!', {
+      speakerName: 'Maria Silva',
+      speakerInformalName: 'Maria',
+      date: '',
+      topic: '',
+    });
+
+    expect(result).toBe('Olá Maria Silva!');
+  });
+
+  it('substitutes the English and Spanish aliases of the informal token', () => {
+    const vars = { speakerName: 'John Doe', speakerInformalName: 'Johnny', date: '', topic: '' };
+
+    expect(resolveTemplate('Hi {informal name}, {name}', vars)).toBe('Hi Johnny, John Doe');
+    expect(resolveTemplate('Hola {nombre informal}, {nombre}', vars)).toBe('Hola Johnny, John Doe');
+  });
+
+  it('resolving one name token never corrupts the other', () => {
+    // {nome} is a prefix of {nome informal} up to the brace — substituting in the wrong order
+    // would leave "Maria Silva informal}" behind.
+    const result = resolveTemplate('{nome informal} {nome} {nome informal}', {
+      speakerName: 'Maria Silva',
+      speakerInformalName: 'Maria',
+      date: '',
+      topic: '',
+    });
+
+    expect(result).toBe('Maria Maria Silva Maria');
+  });
+});
+
 describe('buildWhatsAppUrl', () => {
   it('builds URL with phone starting with +', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', {

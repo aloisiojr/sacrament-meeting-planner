@@ -1,6 +1,6 @@
 /**
  * WhatsApp URL building utilities (pure functions, no React Native deps).
- * Template placeholders: {nome}, {data}, {colecao}, {titulo}, {link}
+ * Template placeholders: {nome} (full name), {nome informal}, {data}, {colecao}, {titulo}, {link}
  */
 
 // --- Default Speech Templates (3 positions x 3 languages) ---
@@ -148,7 +148,10 @@ export function getDefaultPrayerTemplate(language: string, type: 'opening' | 'cl
 // --- Types ---
 
 export interface WhatsAppVariables {
+  /** Full name — what `{nome}` resolves to. */
   speakerName: string;
+  /** Informal name — what `{nome informal}` resolves to; falls back to `speakerName` when absent. */
+  speakerInformalName?: string;
   date: string;
   topic: string;
   collection?: string;
@@ -160,7 +163,10 @@ export interface WhatsAppVariables {
 // Placeholder tokens are shown/typed in the app language, so each field accepts its localized
 // aliases across the 3 supported locales (incl. accented forms shown by the template editor chips).
 // Substitution replaces any of them — mirrors designations.ts TOKEN_ALIASES.
-const WA_TOKEN_ALIASES: Record<'name' | 'date' | 'collection' | 'title' | 'link', readonly string[]> = {
+type WaTokenField = 'informalName' | 'name' | 'date' | 'collection' | 'title' | 'link';
+
+const WA_TOKEN_ALIASES: Record<WaTokenField, readonly string[]> = {
+  informalName: ['nome informal', 'informal name', 'nombre informal'],
   name: ['nome', 'name', 'nombre'],
   date: ['data', 'date', 'fecha'],
   collection: ['colecao', 'coleção', 'collection', 'colección'],
@@ -168,12 +174,25 @@ const WA_TOKEN_ALIASES: Record<'name' | 'date' | 'collection' | 'title' | 'link'
   link: ['link', 'enlace'],
 };
 
+// Order matters: `informalName` is resolved BEFORE `name`, so a substituted full name can never
+// leave "{nome informal}" half-eaten behind.
+const WA_TOKEN_FIELDS: readonly WaTokenField[] = [
+  'informalName',
+  'name',
+  'date',
+  'collection',
+  'title',
+  'link',
+];
+
 /**
  * Resolve template placeholders with actual values. Accepts each field's pt/en/es token aliases so
  * a template typed (or a chip tapped) in any language substitutes correctly.
  */
 export function resolveTemplate(template: string, vars: WhatsAppVariables): string {
-  const values: Record<'name' | 'date' | 'collection' | 'title' | 'link', string> = {
+  const values: Record<WaTokenField, string> = {
+    // No informal name on record => greet with the full name rather than nothing.
+    informalName: vars.speakerInformalName || vars.speakerName,
     name: vars.speakerName,
     date: vars.date,
     collection: vars.collection ?? '',
@@ -181,7 +200,7 @@ export function resolveTemplate(template: string, vars: WhatsAppVariables): stri
     link: vars.link ?? '',
   };
   let result = template;
-  for (const field of ['name', 'date', 'collection', 'title', 'link'] as const) {
+  for (const field of WA_TOKEN_FIELDS) {
     for (const alias of WA_TOKEN_ALIASES[field]) {
       result = result.split(`{${alias}}`).join(values[field]);
     }

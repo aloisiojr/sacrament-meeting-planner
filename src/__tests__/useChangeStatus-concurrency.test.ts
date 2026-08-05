@@ -78,6 +78,28 @@ describe('useChangeStatus concurrency guard', () => {
     expect((out as { status: string }).status).toBe('assigned_invited');
   });
 
+  it('treats a change to the status it already has as nothing to do', async () => {
+    // Reported 2026-08-05: re-sending an invite ("Re-enviar convite") to a speech already marked
+    // invited raised "Invalid status transition: assigned_invited -> assigned_invited". Re-sending
+    // is supported, so asking for the current status must be a no-op — not an error, not a write,
+    // and not an activity-log entry claiming a change that never happened.
+    mockChain('assigned_invited', createMockSpeech({ id: 's1', status: 'assigned_invited' }));
+    const { logAction } = jest.requireMock<{ logAction: jest.Mock }>('../lib/activityLog');
+    const wrapper = createWrapper({ role: 'secretary' }, queryClient);
+    const { result } = renderHook(() => useChangeStatus(), { wrapper });
+
+    let out: unknown = 'unset';
+    await act(async () => {
+      out = await result.current.mutateAsync({ speechId: 's1', status: 'assigned_invited' });
+    });
+
+    expect(out).toBeNull();
+    const from = mockedSupabase.from as ReturnType<typeof jest.fn>;
+    const updateCalled = from.mock.results.some((r) => (r.value as { update: jest.Mock }).update.mock.calls.length > 0);
+    expect(updateCalled).toBe(false);
+    expect(logAction).not.toHaveBeenCalled();
+  });
+
   it('throws a retry error when the status changed concurrently (0 rows updated)', async () => {
     // Guard matched no row → maybeSingle resolves null.
     mockChain('assigned_not_invited', null);

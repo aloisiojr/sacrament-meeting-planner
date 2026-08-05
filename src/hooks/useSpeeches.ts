@@ -345,7 +345,7 @@ export function useChangeStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: ChangeStatusInput): Promise<Speech> => {
+    mutationFn: async (input: ChangeStatusInput): Promise<Speech | null> => {
       // Fetch current speech to validate transition
       const { data: current, error: fetchErr } = await supabase
         .from('speeches')
@@ -354,6 +354,15 @@ export function useChangeStatus() {
         .single();
 
       if (fetchErr) throw fetchErr;
+
+      // Already there: nothing to do. Re-sending an invite to someone already marked invited is a
+      // real, supported action ("Re-enviar convite"), and it asked for the status it already had —
+      // which the transition table rejects, surfacing "Invalid status transition:
+      // assigned_invited -> assigned_invited" as an error alert. A no-op is not an invalid
+      // transition; returning null skips the write AND the activity-log entry, so the history does
+      // not fill with status changes that never happened.
+      if (current.status === input.status) return null;
+
       if (!isValidTransition(current.status as SpeechStatus, input.status)) {
         throw new Error(`Invalid status transition: ${current.status} -> ${input.status}`);
       }
@@ -376,6 +385,7 @@ export function useChangeStatus() {
       return data;
     },
     onSuccess: (data) => {
+      if (!data) return; // no-op: the status was already the requested one
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'speech:status_change', buildLogDescription('speech:status_change', { nome: data.speaker_name ?? 'N/A', status: data.status, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()), N: data.position }), userName);

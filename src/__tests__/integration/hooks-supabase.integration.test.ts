@@ -233,7 +233,9 @@ describe('useSpeeches integration', () => {
         speechId: 's1',
         status: 'assigned_confirmed',
       });
-      expect(speech.status).toBe('assigned_confirmed');
+      // Non-null proves a write happened: null means the status was already the requested one.
+      expect(speech).not.toBeNull();
+      expect(speech?.status).toBe('assigned_confirmed');
     });
   });
 

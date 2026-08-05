@@ -174,3 +174,21 @@ describe('groupSpeechesBySunday', () => {
     expect(result[0].exception).toBeNull();
   });
 });
+
+describe('a status change to the SAME status', () => {
+  // Reported 2026-08-05: re-sending an invite to someone already marked invited raised
+  // "Invalid status transition: assigned_invited -> assigned_invited" as an error alert.
+  // Re-sending is a supported action ("Re-enviar convite"); it asks for the status the speech
+  // already has. The transition TABLE is right to exclude self-transitions — a self-transition is
+  // not a legal move — but the mutation must treat it as nothing to do, not as an error.
+
+  it.each([
+    'not_assigned',
+    'assigned_not_invited',
+    'assigned_invited',
+    'assigned_confirmed',
+    'gave_up',
+  ] as const)('is not a listed transition from %s', (status) => {
+    expect(isValidTransition(status, status)).toBe(false);
+  });
+});

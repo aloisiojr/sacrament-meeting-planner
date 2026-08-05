@@ -19,8 +19,12 @@
   - Suíte **284 suites / 5202 tests** verde (base `main`: 282/5170). tsc 0, lint 0 erros.
   - Sem migração, sem deploy. **Decisão aceita pelo usuário:** alas que já personalizaram com
     `{nome}` passam a enviar o nome completo — sem migração de texto nem aviso in-app.
+  - Step 5 ✅ (após verify-change reprovar) `register-first-user` semeia `{nome informal}`.
+    **REQUER REDEPLOY** de `register-first-user` — sem ele, alas novas saúdam pelo nome completo.
   - Achado registrado e FORA do escopo: `whatsapp_template_delegation_wrapper` é usado em
     `InviteManagementSection` mas não tem aba na tela de configurações — ninguém consegue editá-lo.
+  - Débito conhecido: os textos semeados pela edge function divergem dos defaults do código
+    (duração "5 / 7-10 / 15-20 minutos" vs. `{colecao}`); unificar foi oferecido e recusado.
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
   - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).

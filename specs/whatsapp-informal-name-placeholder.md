@@ -20,7 +20,9 @@ nome informal.
 - **Out:** aba de edição do **wrapper de delegação** (`whatsapp_template_delegation_wrapper`) —
   achado real registrado abaixo, tratado em mudança separada.
 - **Out:** texto padrão do wrapper de delegação (permanece como está).
-- **Out:** qualquer alteração de schema, migração ou edge function.
+- **In (adicionado 2026-08-05, após a verificação):** os textos que a edge function
+  `register-first-user` semeia em cada ala nova passam a usar `{nome informal}` na saudação.
+- **Out:** qualquer alteração de schema ou migração. Nenhuma outra edge function muda.
 - **Out:** os templates de Assuntos da Ala (`settings/designations.tsx`), que passam pelo mesmo
   `TemplateEditorScreen` mas têm seu próprio conjunto de tokens.
 
@@ -90,6 +92,9 @@ e ninguém consegue editá-lo pelo app. A coluna já existe no banco.
 - AC13: WHEN um convite delegado é enviado, the system SHALL manter o wrapper de delegação
   inalterado, com `{responsavel}`, `{nome}` (= `delegate_for_name`) e `{mensagem}` resolvidos como
   hoje.
+- AC14: WHEN uma ala nova é criada pelo registro do primeiro usuário, the system SHALL semear os 5
+  templates de WhatsApp com `{nome informal}` na saudação e sem nenhum `{nome}`, em qualquer das 3
+  línguas.
 
 ## Open questions
 
@@ -103,8 +108,24 @@ Nenhuma.
 
 **Offline:** inalterado — a gravação usa a mesma mutation da tela.
 
-**Banco / release:** nenhuma migração, nenhuma mudança de schema ou de edge function. Os dois
-valores já estão em `speeches`. Não há implicação de versão de app (não há release 1.x adiante).
+**Banco / release:** nenhuma migração, nenhuma mudança de schema. Os dois valores já estão em
+`speeches`. Não há implicação de versão de app (não há release 1.x adiante).
+
+**DEPLOY NECESSÁRIO:** a edge function `register-first-user` mudou e precisa ser reimplantada
+(`supabase functions deploy register-first-user`). Sem o redeploy, alas criadas depois do release
+continuam semeadas com `{nome}` e passam a saudar pelo nome completo.
+
+**Reversão de decisão (2026-08-05).** O spec original declarava edge functions fora do escopo. A
+verificação adversarial mostrou que `register-first-user` (`index.ts:101-134`) grava textos
+próprios nas 5 colunas `whatsapp_template_*` de toda ala nova — logo essas colunas nunca ficam
+NULL, os defaults do código são inalcançáveis para elas, e a mudança de semântica de `{nome}`
+atingiria alas que nunca personalizaram nada. O usuário optou por trocar `{nome}` →
+`{nome informal}` também lá (decisão de 2026-08-05), o que gerou AC14.
+
+**Débito conhecido, deliberadamente não tratado:** os textos semeados pela edge function são
+DIFERENTES dos defaults do código (mencionam duração — "5 / 7-10 / 15-20 minutos" — e não citam
+`{colecao}`). Continuam existindo dois conjuntos de "padrão" divergentes: o que a ala recebe ao
+nascer e o que "restaurar padrão" devolve. Unificá-los foi oferecido e recusado nesta mudança.
 
 **Mudança visível assumida pelo usuário (decisão de 2026-08-05):** a semântica de `{nome}` muda
 para alas que já personalizaram seus templates. Quem escreveu `{nome}` esperando "Maria" passará a

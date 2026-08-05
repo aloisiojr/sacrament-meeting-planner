@@ -25,6 +25,7 @@ import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
 import { PersonEditor } from './PersonEditor';
 import { buildFullPhone } from '../lib/phone';
+import { resolveInvitePhone } from '../lib/contact';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
@@ -136,7 +137,15 @@ export function InviteManagementSection() {
   // Recipient: phoneOverride (e.g. a freshly edited contact) ?? contact snapshot ?? legacy own phone.
   const sendInvite = useCallback(
     async (speech: Speech, phoneOverride?: string) => {
-      const phone = phoneOverride ?? speech.contact_phone ?? speech.speaker_phone;
+      // Normalise on read: snapshots written before buildFullPhone existed (and anything seeded
+      // straight into the database) hold a bare national number, which produced a wa.me link with
+      // no country code. The code comes from whoever owns the number.
+      const member = speech.member_id ? memberMap.get(speech.member_id) : null;
+      const responsible = member?.responsible_id ? memberMap.get(member.responsible_id) : null;
+      const phone = resolveInvitePhone(
+        phoneOverride ?? speech.contact_phone ?? speech.speaker_phone,
+        { isDelegated: speech.is_delegated, member, responsible }
+      );
       if (!phone) return;
 
       // Build the normal per-position base message.
@@ -198,7 +207,7 @@ export function InviteManagementSection() {
         });
       }
     },
-    [changeStatus, locale, ward, resolveResponsibleName]
+    [changeStatus, locale, ward, resolveResponsibleName, memberMap]
   );
 
   // Open the contact (PersonEditor) for the speech's member. `thenSend` remembers whether to offer

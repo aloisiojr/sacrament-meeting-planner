@@ -49,3 +49,30 @@ export function resolveContactSnapshot(
     delegate_for_name: null,
   };
 }
+
+
+/**
+ * The number to actually dial for an invite.
+ *
+ * `buildFullPhone` is applied when the snapshot is WRITTEN, but rows written before that fix — and
+ * any row seeded straight into the database — still hold a bare national number. The send path
+ * used the snapshot verbatim, producing `wa.me/11987650026` with no country code: WhatsApp then
+ * guesses, or fails. Normalising on READ makes those rows work without a migration, and costs
+ * nothing for rows that are already correct.
+ *
+ * The country code comes from whoever the number BELONGS to: the responsible for a delegated
+ * invite, the speaker otherwise. Using the wrong one would fabricate a valid-looking wrong number.
+ *
+ * Falls back to the raw digits when no country code can be found — no worse than before.
+ */
+export function resolveInvitePhone(
+  raw: string | null | undefined,
+  opts: { isDelegated?: boolean; member?: Member | null; responsible?: Member | null } = {}
+): string | null {
+  const digits = (raw ?? '').replace(/[\s\-()]/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('+')) return digits; // already international
+
+  const owner = opts.isDelegated ? opts.responsible : opts.member;
+  return buildFullPhone(owner?.country_code, digits) ?? digits;
+}

@@ -2,7 +2,7 @@
  * Tests for contact-delegation resolution (src/lib/contact.ts) — v2.0.
  */
 
-import { resolveContactSnapshot } from '../lib/contact';
+import { resolveContactSnapshot, resolveInvitePhone } from '../lib/contact';
 import type { Member } from '../types/database';
 
 function makeMember(overrides: Partial<Member> & { full_name: string }): Member {
@@ -122,5 +122,76 @@ describe('resolveContactSnapshot', () => {
       is_delegated: false,
       delegate_for_name: null,
     });
+  });
+});
+
+
+describe('resolveInvitePhone — the number actually dialled', () => {
+  // Reported 2026-08-05: an invite sent via the responsible produced a wa.me link with no country
+  // code. buildFullPhone was applied when the snapshot is WRITTEN, but rows written before that
+  // fix — and rows seeded straight into the database — still hold a bare national number, and the
+  // send path used the snapshot verbatim.
+  const roberto = { country_code: '+55', phone: '11987650026' } as never;
+  const sofia = { country_code: '+55', phone: null, responsible_id: 'r' } as never;
+
+  it('repairs the exact case reported', () => {
+    expect(
+      resolveInvitePhone('11987650026', { isDelegated: true, member: sofia, responsible: roberto })
+    ).toBe('+5511987650026');
+  });
+
+  it('takes the code from the RESPONSIBLE when delegated — the number is theirs', () => {
+    // Using the speaker's code would fabricate a valid-looking WRONG number.
+    const speakerAbroad = { country_code: '+1', phone: null } as never;
+    expect(
+      resolveInvitePhone('11987650026', {
+        isDelegated: true,
+        member: speakerAbroad,
+        responsible: roberto,
+      })
+    ).toBe('+5511987650026');
+  });
+
+  it('takes the code from the speaker when NOT delegated', () => {
+    const speaker = { country_code: '+1', phone: '2025550123' } as never;
+    expect(resolveInvitePhone('2025550123', { isDelegated: false, member: speaker })).toBe(
+      '+12025550123'
+    );
+  });
+
+  it('leaves an already-international number alone', () => {
+    expect(
+      resolveInvitePhone('+5511987650026', { isDelegated: true, responsible: roberto })
+    ).toBe('+5511987650026');
+  });
+
+  it('does not double the country code on a correct snapshot', () => {
+    const out = resolveInvitePhone('+5511987650026', { isDelegated: true, responsible: roberto });
+    expect(out).toBe('+5511987650026');
+    expect(out).not.toContain('+55+55');
+  });
+
+  it('strips separators before deciding', () => {
+    expect(
+      resolveInvitePhone('(11) 98765-0026', { isDelegated: true, responsible: roberto })
+    ).toBe('+5511987650026');
+  });
+
+  it.each([null, undefined, '', '   ', '()- '])('returns null for %p', (raw) => {
+    expect(resolveInvitePhone(raw, { isDelegated: false })).toBeNull();
+  });
+
+  it('falls back to the raw digits when no country code can be found', () => {
+    // No worse than the old behaviour; better than refusing to send at all.
+    expect(resolveInvitePhone('11987650026', { isDelegated: true, responsible: null })).toBe(
+      '11987650026'
+    );
+  });
+
+  it('does not invent a code from the wrong person when the responsible is missing', () => {
+    const speaker = { country_code: '+1', phone: null } as never;
+    expect(
+      resolveInvitePhone('11987650026', { isDelegated: true, member: speaker, responsible: null })
+    ).toBe('11987650026');
   });
 });

@@ -186,3 +186,60 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
     expect(text).toContain('Olá Resp Person, tudo bom?');
   });
 });
+
+
+describe('a legacy snapshot without a country code still dials correctly', () => {
+  // Reported 2026-08-05 against staging: sending an invite via the responsible produced
+  // wa.me/11987650026 — no country code. buildFullPhone was applied when the snapshot is WRITTEN,
+  // but rows written before that fix (and rows seeded straight into the database) hold a bare
+  // national number, and the send path used the snapshot verbatim.
+
+  it('prepends the RESPONSIBLE country code for a delegated invite', async () => {
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp-legacy',
+        is_delegated: true,
+        delegate_for_name: 'Del',
+        speaker_phone: null,
+        contact_phone: '11999998888', // stored without +55
+      }),
+    ];
+    await render();
+    await pressSend();
+
+    expect(lastSentText().phone).toBe('5511999998888');
+  });
+
+  it('does not double the code when the snapshot is already international', async () => {
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp-ok',
+        is_delegated: true,
+        delegate_for_name: 'Del',
+        speaker_phone: null,
+        contact_phone: '+5511999998888',
+      }),
+    ];
+    await render();
+    await pressSend();
+
+    expect(lastSentText().phone).toBe('5511999998888');
+  });
+
+  it('still sends when no country code can be resolved, rather than refusing', async () => {
+    // Better a possibly-local number than a button that does nothing.
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp-unknown',
+        member_id: 'nobody',
+        is_delegated: true,
+        speaker_phone: null,
+        contact_phone: '11999998888',
+      }),
+    ];
+    await render();
+    await pressSend();
+
+    expect(lastSentText().phone).toBe('11999998888');
+  });
+});

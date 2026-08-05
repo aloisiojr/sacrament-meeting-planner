@@ -210,7 +210,9 @@ describe('register-first-user — the ward it creates', () => {
   });
 
   it('seeds every speech template with the placeholders the sender substitutes', async () => {
-    // A template missing {nome} or {data} silently sends "Hi , ... on Sunday".
+    // A template missing the name or {data} silently sends "Hi , ... on Sunday". The greeting must
+    // be {nome informal}, not {nome}: {nome} is the FULL name, so a seeded ward that never
+    // customized anything would greet "Hi Maria Silva" instead of "Hi Maria".
     await call(VALID);
     const w = wardInsert() as Record<string, string>;
 
@@ -219,11 +221,15 @@ describe('register-first-user — the ward it creates', () => {
       'whatsapp_template_speech_2',
       'whatsapp_template_speech_3',
     ]) {
-      expect(w[key]).toContain('{nome}');
+      expect(w[key]).toContain('{nome informal}');
+      expect(w[key]).not.toContain('{nome}');
       expect(w[key]).toContain('{data}');
       expect(w[key]).toContain('{titulo}');
     }
-    expect(w.whatsapp_template_opening_prayer).toContain('{nome}');
+    expect(w.whatsapp_template_opening_prayer).toContain('{nome informal}');
+    expect(w.whatsapp_template_opening_prayer).not.toContain('{nome}');
+    expect(w.whatsapp_template_closing_prayer).toContain('{nome informal}');
+    expect(w.whatsapp_template_closing_prayer).not.toContain('{nome}');
     expect(w.whatsapp_template_closing_prayer).toContain('{data}');
   });
 

@@ -98,25 +98,25 @@ Deno.serve(async (req) => {
     switch (wardLanguage) {
       case 'en-US':
       default:
-        defaultSpeech1Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
-        defaultSpeech2Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
-        defaultSpeech3Template = 'Hi {nome}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
-        defaultOpeningPrayerTemplate = 'Hi {nome}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
-        defaultClosingPrayerTemplate = 'Hi {nome}, you have been assigned to give the closing prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
+        defaultSpeech1Template = 'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 1st speech on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultSpeech2Template = 'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 2nd speech on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultSpeech3Template = 'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 3rd speech on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your speech?';
+        defaultOpeningPrayerTemplate = 'Hi {nome informal}, you have been assigned to give the opening prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
+        defaultClosingPrayerTemplate = 'Hi {nome informal}, you have been assigned to give the closing prayer at Sacrament Meeting on {data}.\n\nCan we count on you?';
         break;
       case 'es-LA':
-        defaultSpeech1Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
-        defaultSpeech2Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
-        defaultSpeech3Template = 'Hola {nome}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
-        defaultOpeningPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de apertura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
-        defaultClosingPrayerTemplate = 'Hola {nome}, has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
+        defaultSpeech1Template = 'Hola {nome informal}, ¿cómo estás? El Obispado te quiere invitar a dar el 1er discurso el domingo {data}! Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultSpeech2Template = 'Hola {nome informal}, ¿cómo estás? El Obispado te quiere invitar a dar el 2do discurso el domingo {data}! Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultSpeech3Template = 'Hola {nome informal}, ¿cómo estás? El Obispado te quiere invitar a dar el 3er discurso el domingo {data}! Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+        defaultOpeningPrayerTemplate = 'Hola {nome informal}, has sido asignado(a) para hacer la oración de apertura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
+        defaultClosingPrayerTemplate = 'Hola {nome informal}, has sido asignado(a) para hacer la oración de clausura de la Reunión Sacramental del día {data}.\n\n¿Podemos contar contigo?';
         break;
       case 'pt-BR':
-        defaultSpeech1Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
-        defaultSpeech2Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
-        defaultSpeech3Template = 'Oi {nome}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
-        defaultOpeningPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
-        defaultClosingPrayerTemplate = 'Oi {nome}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+        defaultSpeech1Template = 'Oi {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso no domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultSpeech2Template = 'Oi {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso no domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultSpeech3Template = 'Oi {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 3º discurso no domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+        defaultOpeningPrayerTemplate = 'Oi {nome informal}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+        defaultClosingPrayerTemplate = 'Oi {nome informal}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
         break;
     }
 

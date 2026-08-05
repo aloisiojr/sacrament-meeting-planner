@@ -131,11 +131,20 @@ the tag `archive/UX-2.0-2026-06-07` are archive only.
 
 | Profile | Identity | Database | Distribution |
 |---------|----------|----------|--------------|
-| `development` | staging | staging | dev client |
-| `staging` | staging | staging | internal (ad-hoc) |
-| `appetize` | staging | staging | simulator / apk |
-| `testflight-staging` | staging | staging | store → TestFlight |
+| `development` | `SMP Dev` | staging | dev client, internal (ad-hoc) |
+| `development-testflight` | `SMP Dev` | staging | dev client, store → TestFlight |
+| `staging` | `SMP Staging` | staging | internal (ad-hoc) |
+| `appetize` | `SMP Staging` | staging | simulator / apk |
+| `testflight-staging` | `SMP Staging` | staging | store → TestFlight |
 | `production` | **production** | **production** | store |
+
+Three distinct apps, installable side by side. `development-testflight` exists because the test
+device is MDM-supervised and cannot install an ad-hoc provisioning profile — a dev client has to
+arrive through TestFlight. Build it once, then iterate with `npx expo start --dev-client`; only a
+NATIVE change needs another build.
+
+For a JS-only change to an installed release build, prefer `eas update --channel staging` over a
+rebuild.
 
 There is deliberately no `testflight-production`: every App Store release passes through TestFlight
 first, so `production` already serves both roles. What turns a TestFlight build into a release is

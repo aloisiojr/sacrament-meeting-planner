@@ -54,6 +54,37 @@ describe('production identity is never altered', () => {
   });
 });
 
+describe('the dev-client variant', () => {
+  const dev = () => resolveConfig('development');
+
+  it('is a THIRD app, not a second name for staging', () => {
+    // If the dev client shared staging's bundle id it would overwrite the build under test on the
+    // device, and getting that build back costs a full rebuild.
+    expect(dev().ios.bundleIdentifier).toBe(`${PROD_BUNDLE}.dev`);
+    expect(dev().ios.bundleIdentifier).not.toBe(resolveConfig('staging').ios.bundleIdentifier);
+  });
+
+  it('has its own name and scheme', () => {
+    expect(dev().name).toBe('SMP Dev');
+    expect(dev().scheme).not.toBe(resolveConfig('staging').scheme);
+    expect(dev().scheme).not.toBe(resolveConfig(undefined).scheme);
+  });
+
+  it('fits the App Store Connect name limit', () => {
+    expect(dev().name.length).toBeLessThanOrEqual(30);
+  });
+});
+
+describe('the three identities are mutually distinct', () => {
+  it('no two variants share a bundle id, name or scheme', () => {
+    const all = [resolveConfig(undefined), resolveConfig('staging'), resolveConfig('development')];
+    for (const field of ['name', 'scheme'] as const) {
+      expect(new Set(all.map((c) => c[field])).size).toBe(3);
+    }
+    expect(new Set(all.map((c) => c.ios.bundleIdentifier)).size).toBe(3);
+  });
+});
+
 describe('the staging variant', () => {
   const staging = () => resolveConfig('staging');
 
@@ -114,12 +145,23 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     return profile.env ?? (profile.extends ? envFor(profile.extends) : {});
   }
 
-  it.each(['development', 'staging', 'testflight-staging', 'appetize'])(
-    '%s builds the staging variant',
-    (profile) => {
-      expect(envFor(profile).APP_VARIANT).toBe('staging');
-    }
-  );
+  it.each([
+    ['development', 'development'],
+    ['development-testflight', 'development'],
+    ['staging', 'staging'],
+    ['testflight-staging', 'staging'],
+    ['appetize', 'staging'],
+  ])('%s builds the %s variant', (profile, variant) => {
+    expect(envFor(profile).APP_VARIANT).toBe(variant);
+  });
+
+  it('the dev client is reachable without an ad-hoc provisioning profile', () => {
+    // The device is MDM-supervised, so `distribution: internal` cannot be installed on it. A dev
+    // client has to arrive through TestFlight, which is what `store` gives.
+    const p = eas.build['development-testflight'];
+    expect(p.distribution).toBe('store');
+    expect(eas.build[p.extends].developmentClient).toBe(true);
+  });
 
   it('production does NOT', () => {
     expect(envFor('production').APP_VARIANT).toBeUndefined();
@@ -130,7 +172,7 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     // TestFlight, so `production` already serves both. Two profiles emitting the same artefact
     // would only raise the question of which one was used.
     const productionIdentity = Object.keys(eas.build).filter(
-      (p) => envFor(p).APP_VARIANT !== 'staging'
+      (p) => envFor(p).APP_VARIANT === undefined
     );
     expect(productionIdentity).toEqual(['production']);
   });
@@ -142,14 +184,14 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     }
   });
 
-  it('every profile carrying the variant also points at the staging database', () => {
-    // The two must never disagree: a staging identity against the production database, or the
-    // reverse, is the exact confusion this variant exists to prevent.
+  it('every non-production identity points at the staging database, and only production at production', () => {
+    // The two must never disagree: a non-production identity against the production database, or
+    // the reverse, is the exact confusion these variants exist to prevent.
     for (const profile of Object.keys(eas.build)) {
       const env = envFor(profile);
-      const isStagingIdentity = env.APP_VARIANT === 'staging';
+      const isNonProdIdentity = env.APP_VARIANT !== undefined;
       const isStagingDb = (env.EXPO_PUBLIC_SUPABASE_URL ?? '').includes('nfraidzguordqmbpqkcf');
-      expect(isStagingIdentity).toBe(isStagingDb);
+      expect(isNonProdIdentity).toBe(isStagingDb);
     }
   });
 });

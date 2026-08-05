@@ -31,43 +31,51 @@
  * `android: { ...config.android, package: androidPackage }` below.
  */
 
-const STAGING_SUFFIX = '.staging';
+/**
+ * One entry per non-production identity. Each is a SEPARATE app: separate App Store Connect
+ * record, separate tester list, separate install on the device. That is the point — they coexist,
+ * so installing the dev client does not overwrite the build you are testing.
+ */
+const VARIANTS = {
+  staging: { suffix: '.staging', name: 'SMP Staging' },
+  development: { suffix: '.dev', name: 'SMP Dev' },
+};
 
 /**
  * App Store Connect caps an app name at 30 characters, and EAS uses `expo.name` when it creates
- * the app record — `Sacrament Meeting Planner (Staging)` is 35 and fails the submit with
+ * the app record — `Sacrament Meeting Planner (Staging)` is 35 and failed the submit with
  * "An attribute value is too long. - App name is too long."
  *
  * Short is right for the home screen anyway: iOS truncates around 12 characters.
  */
-const STAGING_NAME = 'SMP Staging';
 const APP_STORE_NAME_LIMIT = 30;
 
 /** @param {{ config: import('@expo/config-types').ExpoConfig }} params */
 module.exports = ({ config }) => {
-  if (process.env.APP_VARIANT !== 'staging') {
-    // Production identity, untouched. Keeping this path a no-op means a mistake in the variant
-    // logic cannot alter a production build.
+  const variant = VARIANTS[process.env.APP_VARIANT];
+  if (!variant) {
+    // Production identity, untouched. Keeping this path a no-op — returning `config` itself, not a
+    // rebuilt copy — means a mistake in the variant logic cannot alter a production build.
     return config;
   }
 
-  if (STAGING_NAME.length > APP_STORE_NAME_LIMIT) {
+  if (variant.name.length > APP_STORE_NAME_LIMIT) {
     // Fail at config time with the real reason, rather than 15 minutes into a build.
     throw new Error(
-      `Staging app name "${STAGING_NAME}" is ${STAGING_NAME.length} characters; ` +
+      `App name "${variant.name}" is ${variant.name.length} characters; ` +
         `App Store Connect allows ${APP_STORE_NAME_LIMIT}.`
     );
   }
 
   return {
     ...config,
-    // Shown under the icon, so the two apps are distinguishable on the home screen.
-    name: STAGING_NAME,
-    // Two apps must not claim the same URL scheme; whichever iOS resolves last would win.
-    scheme: `${config.scheme}staging`,
+    // Shown under the icon, so the apps are distinguishable on the home screen.
+    name: variant.name,
+    // Two installed apps must not claim the same URL scheme; whichever iOS resolves last wins.
+    scheme: `${config.scheme}${variant.suffix.replace('.', '')}`,
     ios: {
       ...config.ios,
-      bundleIdentifier: `${config.ios.bundleIdentifier}${STAGING_SUFFIX}`,
+      bundleIdentifier: `${config.ios.bundleIdentifier}${variant.suffix}`,
     },
   };
 };

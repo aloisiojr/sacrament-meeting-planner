@@ -14,6 +14,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { buildAgendaPdfHtml, type AgendaPdfBranding, type AgendaPdfLabels } from './agendaPdf';
 import { publishedStoreLinks } from './storeLinks';
+import { A4_WIDTH_PT, A4_HEIGHT_PT, NATIVE_MARGINS } from './pdfPage';
 import type { PresentationCard } from '../hooks/usePresentationMode';
 
 /**
@@ -85,7 +86,14 @@ export async function exportAgendaPdf(input: ExportAgendaPdfInput): Promise<Expo
   };
 
   const html = buildAgendaPdfHtml(input.cards, branding, input.labels);
-  const { uri } = await Print.printToFileAsync({ html });
+  // A4 explicitly: expo-print defaults to US Letter, and the CSS `@page { size: A4 }` does not
+  // reach the native formatter. Margins zeroed — the white border is CSS padding.
+  const { uri } = await Print.printToFileAsync({
+    html,
+    width: A4_WIDTH_PT,
+    height: A4_HEIGHT_PT,
+    margins: NATIVE_MARGINS,
+  });
 
   // printToFileAsync names the file with a random uuid; rename so the share sheet and the user's
   // Files app show something meaningful.

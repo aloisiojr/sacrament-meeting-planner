@@ -52,6 +52,16 @@ baptism/confirmation, stake announcements, special presentation.
 A toggle that is ON with an empty description (e.g. `has_special_presentation` with no text) still
 prints its label as a fill-in line: the event is happening, the wording just is not decided.
 
+## Page geometry
+
+**A4, explicitly.** expo-print defaults to US Letter (612x792pt) and ignores the CSS
+`@page { size: A4 }`, so the size is passed to `printToFileAsync` as points: 595x842.
+
+The white border is **CSS padding on the body**, not a `@page` margin and not the native
+`margins` option: `@page` margins are unreliable across the two print paths and `margins` is
+iOS-only. Native margins are pinned to zero so the two cannot stack. 10mm — thin, but not inside
+the ~5mm a desktop printer physically cannot reach.
+
 ## Branding
 
 Header: app icon (a 192px print copy — the 1024px original is 1.7 MB and would be base64-inlined

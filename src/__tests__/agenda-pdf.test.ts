@@ -12,6 +12,12 @@
 import { buildPresentationCards } from '../hooks/usePresentationMode';
 import { buildAgendaPdfHtml, escapeHtml, type AgendaPdfBranding } from '../lib/agendaPdf';
 import { publishedStoreLinks, type StoreLink } from '../lib/storeLinks';
+import {
+  A4_WIDTH_PT,
+  A4_HEIGHT_PT,
+  NATIVE_MARGINS,
+  PAGE_PADDING_MM,
+} from '../lib/pdfPage';
 import type { Speech, SundayAgenda, SundayException } from '../types/database';
 
 const t = (key: string, fallback?: string) => fallback ?? key;
@@ -326,5 +332,49 @@ describe('storeLinks', () => {
     const ios = publishedStoreLinks().find((s) => s.id === 'ios');
     expect(ios?.url).toContain('apps.apple.com');
     expect(ios?.url).toContain('id6759450448');
+  });
+});
+
+
+describe('the page is A4 with a thin white border', () => {
+  // expo-print defaults to US LETTER and ignores the CSS `@page { size: A4 }` — asking for A4 means
+  // passing point dimensions. Nobody notices a Letter-sized PDF until it prints wrong.
+
+  it('is A4 in points at 72 PPI, not US Letter', () => {
+    expect([A4_WIDTH_PT, A4_HEIGHT_PT]).toEqual([595, 842]);
+    expect([A4_WIDTH_PT, A4_HEIGHT_PT]).not.toEqual([612, 792]); // the default it replaces
+  });
+
+  it('is portrait', () => {
+    expect(A4_HEIGHT_PT).toBeGreaterThan(A4_WIDTH_PT);
+  });
+
+  it('leaves the native margins at zero, so they cannot stack with the CSS padding', () => {
+    expect(NATIVE_MARGINS).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+  });
+
+  it('puts the border in CSS padding, which both print paths honour', () => {
+    const doc = html(makeAgenda(), []);
+    expect(doc).toContain(`padding: ${PAGE_PADDING_MM}mm`);
+  });
+
+  it('zeroes the @page margin so the page box adds nothing on top', () => {
+    expect(html(makeAgenda(), [])).toMatch(/@page\s*\{[^}]*margin:\s*0/);
+  });
+
+  it('keeps the border thin but outside a printer unprintable edge', () => {
+    // Below ~5mm most desktop printers physically cannot reach; content there is clipped.
+    expect(PAGE_PADDING_MM).toBeGreaterThanOrEqual(6);
+    expect(PAGE_PADDING_MM).toBeLessThanOrEqual(15);
+  });
+
+  it('paints the page white rather than relying on the viewer', () => {
+    const doc = html(makeAgenda(), []);
+    expect(doc).toMatch(/html,\s*body\s*\{[^}]*background:\s*#ffffff/);
+  });
+
+  it('keeps colours when printing', () => {
+    // Without this the print engine may drop the header rule and the section underlines.
+    expect(html(makeAgenda(), [])).toContain('print-color-adjust: exact');
   });
 });

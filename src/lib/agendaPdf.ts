@@ -16,6 +16,7 @@
  */
 
 import type { PresentationCard, PresentationField } from '../hooks/usePresentationMode';
+import { PAGE_PADDING_MM } from './pdfPage';
 
 export interface AgendaPdfStore {
   /** Printed under the QR code, e.g. "App Store". */
@@ -138,11 +139,18 @@ export function buildAgendaPdfHtml(
 <meta charset="utf-8"/>
 <title>${escapeHtml(labels.documentTitle)}</title>
 <style>
-  @page { size: A4; margin: 14mm 14mm 12mm; }
+  /* The page is sized in points by printToFileAsync (A4). Zero margin here so the native page
+     box adds nothing on top of the padding below — otherwise the two stack. */
+  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
   body {
     font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: #1a1a1a; font-size: 11pt; line-height: 1.35; margin: 0;
+    color: #1a1a1a; font-size: 11pt; line-height: 1.35;
+    /* The printable white border. Padding rather than a @page margin: it is ordinary layout, so it
+       renders the same on both print paths, and it repeats on every page. */
+    padding: ${PAGE_PADDING_MM}mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   header { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1a1a1a;
            padding-bottom: 8px; margin-bottom: 14px; }

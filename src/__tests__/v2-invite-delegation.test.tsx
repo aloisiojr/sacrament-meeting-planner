@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import type { Member, Speech } from '../types/database';
 
 import { InviteManagementSection } from '../components/InviteManagementSection';
@@ -27,7 +28,8 @@ function makeMember(over: Partial<Member> & { id: string; full_name: string }): 
 
 const RESPONSIBLE = makeMember({ id: 'm-resp', full_name: 'Resp Person', informal_name: 'Resp', country_code: '+55', phone: '11999998888' });
 const DELEGATE = makeMember({ id: 'm-del', full_name: 'Delegate Person', informal_name: 'Del', contact_via_responsible: true, responsible_id: 'm-resp' });
-const mockMEMBERS = [RESPONSIBLE, DELEGATE];
+const PLAIN = makeMember({ id: 'm-plain', full_name: 'Plain Person', informal_name: 'Plain', country_code: '+1', phone: '5550009' });
+const mockMEMBERS = [RESPONSIBLE, DELEGATE, PLAIN];
 
 function makeSpeech(over: Partial<Speech>): Speech {
   return {
@@ -52,12 +54,26 @@ const WARD = {
 let mockSPEECHES: Speech[] = [];
 const mockOpenWhatsAppMock = jest.fn((..._args: unknown[]) => Promise.resolve(true));
 const mockChangeStatusMock = jest.fn();
+const mockUpdateContactMock = jest.fn();
 
 // --- Mocks ---
 
 jest.mock('react-i18next', () => {
   const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
-  return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
+  return {
+    ...actual,
+    useTranslation: () => ({
+      // Returns the key, but SUBSTITUTES {{placeholders}} — otherwise a message built from
+      // interpolated values is untestable, and the divergence dialog is exactly that.
+      t: (k: string, vars?: Record<string, unknown>) =>
+        vars && typeof vars === 'object'
+          ? Object.entries(vars).reduce(
+              (acc, [name, v]) => acc + ` ${name}=${String(v)}`,
+              k
+            )
+          : k,
+    }),
+  };
 });
 
 jest.mock('../contexts/ThemeContext', () => ({
@@ -98,6 +114,7 @@ jest.mock('../hooks/useSpeeches', () => {
     ...actual,
     useSpeeches: () => ({ data: mockSPEECHES, isError: false, error: null, refetch: jest.fn() }),
     useChangeStatus: () => ({ mutate: mockChangeStatusMock }),
+    useUpdateSpeechContact: () => ({ mutate: mockUpdateContactMock }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });
@@ -132,7 +149,11 @@ beforeEach(() => {
 
 describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
   it('non-delegated: sends the plain base message to contact_phone', async () => {
-    mockSPEECHES = [makeSpeech({ id: 'sp1', is_delegated: false, contact_phone: '+15550009' })];
+    // member_id points at a member whose record AGREES with the snapshot; a mismatch is a
+    // divergence and now raises the "which number?" dialog instead of sending.
+    mockSPEECHES = [
+      makeSpeech({ id: 'sp1', is_delegated: false, contact_phone: '+15550009', member_id: 'm-plain' }),
+    ];
     const renderer = await render();
     await pressSend(renderer);
 
@@ -167,7 +188,10 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
     expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
   });
 
-  it('orphaned delegation (no contact_phone): still wraps, falls back to the assignee phone', async () => {
+  it('orphaned delegation (no contact_phone): offers the record number, and still wraps', async () => {
+    // The snapshot never captured a contact, but the record has a responsible with a phone. That
+    // is a real divergence: the sender is asked rather than quietly falling back to the assignee's
+    // own number, which is what used to happen.
     mockSPEECHES = [
       makeSpeech({
         id: 'sp1',
@@ -178,11 +202,18 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
         member_id: 'm-del',
       }),
     ];
-    const renderer = await render();
-    await pressSend(renderer);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await render();
+    await pressSend();
+    const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    alertSpy.mockRestore();
+
+    await act(async () => {
+      buttons[2].onPress?.(); // "use the record"
+    });
 
     const { phone, text } = lastSentText();
-    expect(phone).toBe('15550009'); // fell back to own phone
+    expect(phone).toBe('5511999998888'); // the responsible's number, from the record
     expect(text).toContain('Olá Resp Person, tudo bom?');
   });
 });
@@ -241,5 +272,125 @@ describe('a legacy snapshot without a country code still dials correctly', () =>
     await pressSend();
 
     expect(lastSentText().phone).toBe('11999998888');
+  });
+});
+
+
+describe('the snapshot diverged from the member record — the sender chooses', () => {
+  // The snapshot is frozen at assignment time so a later edit cannot silently redirect an
+  // invitation. But silently sending to a number the person no longer uses is the same failure
+  // from the other side. So when the two genuinely differ, ask.
+
+  /** A speech whose stored contact is a number the record no longer has. */
+  function divergedSpeech() {
+    return makeSpeech({
+      id: 'sp-div',
+      member_id: 'm-del',
+      is_delegated: true,
+      delegate_for_name: 'Del',
+      speaker_phone: null,
+      contact_phone: '+5511000000000', // record says +5511999998888
+    });
+  }
+
+  async function pressAndCaptureDialog() {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await render();
+    await pressSend();
+    const call = alertSpy.mock.calls[0];
+    alertSpy.mockRestore();
+    return {
+      message: call?.[1] as string,
+      buttons: call[2] as { text: string; style?: string; onPress?: () => void }[],
+    };
+  }
+
+  it('does not send anything until the question is answered', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    await pressAndCaptureDialog();
+
+    expect(mockOpenWhatsAppMock).not.toHaveBeenCalled();
+    expect(mockChangeStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('shows both numbers so the choice is informed', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    const { message } = await pressAndCaptureDialog();
+
+    // The mock t appends the interpolated values, so both numbers reach the dialog.
+    expect(message).toContain('stored=+5511000000000');
+    expect(message).toContain('current=+5511999998888');
+  });
+
+  it('offers cancel, and cancelling sends nothing', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    const { buttons } = await pressAndCaptureDialog();
+
+    expect(buttons[0].style).toBe('cancel');
+    expect(buttons).toHaveLength(3);
+    expect(mockOpenWhatsAppMock).not.toHaveBeenCalled();
+  });
+
+  it('keeping the assignment number sends there and leaves the snapshot alone', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    const { buttons } = await pressAndCaptureDialog();
+    await act(async () => {
+      buttons[1].onPress?.();
+    });
+
+    expect(lastSentText().phone).toBe('5511000000000');
+    expect(mockUpdateContactMock).not.toHaveBeenCalled();
+  });
+
+  it('choosing the record sends there AND refreshes the snapshot, so it is asked once', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    const { buttons } = await pressAndCaptureDialog();
+    await act(async () => {
+      buttons[2].onPress?.();
+    });
+
+    expect(lastSentText().phone).toBe('5511999998888');
+    expect(mockUpdateContactMock).toHaveBeenCalledWith({
+      speechId: 'sp-div',
+      contactPhone: '+5511999998888',
+      isDelegated: true,
+      delegateForName: 'Del',
+    });
+  });
+
+  it('marks the invite sent only after the chosen number actually opened WhatsApp', async () => {
+    mockSPEECHES = [divergedSpeech()];
+    const { buttons } = await pressAndCaptureDialog();
+    await act(async () => {
+      buttons[2].onPress?.();
+    });
+
+    expect(mockChangeStatusMock).toHaveBeenCalledWith({
+      speechId: 'sp-div',
+      status: 'assigned_invited',
+    });
+  });
+
+  it('asks nothing when the snapshot only lacks the country code', async () => {
+    // Same number, written before buildFullPhone existed. A dialog here would appear on every
+    // legacy row and train the user to dismiss it.
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp-legacy2',
+        member_id: 'm-del',
+        is_delegated: true,
+        delegate_for_name: 'Del',
+        speaker_phone: null,
+        contact_phone: '11999998888',
+      }),
+    ];
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await render();
+    await pressSend();
+    const alerts = alertSpy.mock.calls.length;
+    alertSpy.mockRestore();
+
+    expect(alerts).toBe(0);
+    expect(lastSentText().phone).toBe('5511999998888');
   });
 });

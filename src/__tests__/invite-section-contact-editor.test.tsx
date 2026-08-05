@@ -50,6 +50,7 @@ const WARD = {
 let mockSPEECHES: Speech[] = [];
 const mockOpenWhatsAppMock = jest.fn((..._args: unknown[]) => Promise.resolve(true));
 const mockChangeStatusMock = jest.fn();
+const mockUpdateContactMock = jest.fn();
 
 // Capture PersonEditor props so the test can drive onSaved / inspect visibility + member.
 const mockEditorHolder = { props: null as null | { visible: boolean; member?: Member | null; onSaved?: (m: Member) => void; onClose?: () => void } };
@@ -96,6 +97,7 @@ jest.mock('../hooks/useSpeeches', () => {
     ...actual,
     useSpeeches: () => ({ data: mockSPEECHES, isError: false, error: null, refetch: jest.fn() }),
     useChangeStatus: () => ({ mutate: mockChangeStatusMock }),
+    useUpdateSpeechContact: () => ({ mutate: mockUpdateContactMock }),
     useWardManagePrayers: () => ({ managePrayers: true, isLoading: false }),
   };
 });

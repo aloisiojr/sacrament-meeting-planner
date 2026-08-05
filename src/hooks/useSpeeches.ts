@@ -385,6 +385,50 @@ export function useChangeStatus() {
 }
 
 /**
+ * Refresh a speech's contact snapshot from the member's current record.
+ *
+ * The snapshot is deliberately frozen at assignment time, so this is only used when the sender is
+ * shown the divergence and explicitly chooses the record over the snapshot.
+ */
+export function useUpdateSpeechContact() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      speechId: string;
+      speakerPhone?: string | null;
+      contactPhone: string | null;
+      isDelegated: boolean;
+      delegateForName: string | null;
+    }): Promise<Speech | null> => {
+      const fields = {
+        contact_phone: input.contactPhone,
+        is_delegated: input.isDelegated,
+        delegate_for_name: input.delegateForName,
+        ...(input.speakerPhone !== undefined ? { speaker_phone: input.speakerPhone } : {}),
+      };
+
+      return withOfflineQueue(
+        { table: 'speeches', operation: 'UPDATE', data: { id: input.speechId, ...fields } },
+        async () => {
+          const { data, error } = await supabase
+            .from('speeches')
+            .update(fields)
+            .eq('id', input.speechId)
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        }
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: speechKeys.all });
+    },
+  });
+}
+
+/**
  * Remove a speaker assignment.
  * Resets speaker fields + status = not_assigned.
  * Topic remains assigned.

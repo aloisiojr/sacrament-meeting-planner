@@ -18,14 +18,19 @@ import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { WhatsAppIcon, MoreVerticalIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useSpeeches, useChangeStatus, useWardManagePrayers } from '../hooks/useSpeeches';
+import {
+  useSpeeches,
+  useChangeStatus,
+  useWardManagePrayers,
+  useUpdateSpeechContact,
+} from '../hooks/useSpeeches';
 import { useAgendaRange } from '../hooks/useAgenda';
 import { QueryErrorView } from './QueryErrorView';
 import { StatusLED } from './StatusLED';
 import { InviteActionDropdown } from './InviteActionDropdown';
 import { PersonEditor } from './PersonEditor';
 import { buildFullPhone } from '../lib/phone';
-import { resolveInvitePhone } from '../lib/contact';
+import { resolveInvitePhone, detectContactDivergence } from '../lib/contact';
 import { getNextSundays, toISODateString, formatDate, formatDateHumanReadable } from '../lib/dateUtils';
 import { getCurrentLanguage, type SupportedLanguage } from '../i18n';
 import { buildWhatsAppConversationUrl, openWhatsApp } from '../lib/whatsapp';
@@ -49,6 +54,7 @@ export function InviteManagementSection() {
   const { hasPermission, wardId, wardLanguage } = useAuth();
   const locale = (wardLanguage as SupportedLanguage) || getCurrentLanguage();
   const changeStatus = useChangeStatus();
+  const updateSpeechContact = useUpdateSpeechContact();
   const [dropdownSpeech, setDropdownSpeech] = useState<Speech | null>(null);
 
   // Contact editor (PersonEditor) state: the member being edited, the originating speech, and
@@ -135,18 +141,9 @@ export function InviteManagementSection() {
 
   // Build the per-position/delegation invite message, open WhatsApp, then mark as invited.
   // Recipient: phoneOverride (e.g. a freshly edited contact) ?? contact snapshot ?? legacy own phone.
-  const sendInvite = useCallback(
-    async (speech: Speech, phoneOverride?: string) => {
-      // Normalise on read: snapshots written before buildFullPhone existed (and anything seeded
-      // straight into the database) hold a bare national number, which produced a wa.me link with
-      // no country code. The code comes from whoever owns the number.
-      const member = speech.member_id ? memberMap.get(speech.member_id) : null;
-      const responsible = member?.responsible_id ? memberMap.get(member.responsible_id) : null;
-      const phone = resolveInvitePhone(
-        phoneOverride ?? speech.contact_phone ?? speech.speaker_phone,
-        { isDelegated: speech.is_delegated, member, responsible }
-      );
-      if (!phone) return;
+  /** Send to an exact, already-resolved number. */
+  const sendInviteTo = useCallback(
+    async (speech: Speech, phone: string) => {
 
       // Build the normal per-position base message.
       let baseMessage: string;
@@ -207,7 +204,79 @@ export function InviteManagementSection() {
         });
       }
     },
-    [changeStatus, locale, ward, resolveResponsibleName, memberMap]
+    [changeStatus, locale, ward, resolveResponsibleName]
+  );
+
+  /**
+   * Send an invite, asking first when the stored snapshot no longer matches the member's record.
+   *
+   * The snapshot is frozen at assignment time so a later edit cannot silently redirect an
+   * invitation — but sending to a number the person no longer uses, with nothing said, is the same
+   * failure from the other side. So when the two genuinely differ, the sender chooses; picking the
+   * record also refreshes the snapshot, so the question is asked once, not every time.
+   *
+   * A snapshot that merely lacks the country code is NOT a divergence: it is the same number,
+   * repaired silently by resolveInvitePhone.
+   */
+  const sendInvite = useCallback(
+    async (speech: Speech, phoneOverride?: string) => {
+      const member = speech.member_id ? memberMap.get(speech.member_id) : null;
+      const responsible = member?.responsible_id ? memberMap.get(member.responsible_id) : null;
+
+      const stored = resolveInvitePhone(speech.contact_phone ?? speech.speaker_phone, {
+        isDelegated: speech.is_delegated,
+        member,
+        responsible,
+      });
+
+      // An override is a deliberate choice the user just made in the editor; do not second-guess it.
+      if (phoneOverride) {
+        await sendInviteTo(speech, phoneOverride);
+        return;
+      }
+
+      const divergence = detectContactDivergence(
+        speech.contact_phone ?? speech.speaker_phone,
+        member,
+        responsible
+      );
+
+      if (!divergence) {
+        if (stored) await sendInviteTo(speech, stored);
+        return;
+      }
+
+      Alert.alert(
+        t('home.contactChangedTitle'),
+        t('home.contactChangedMessage', {
+          stored: divergence.storedPhone,
+          current: divergence.currentPhone,
+        }),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('home.useStoredContact'),
+            onPress: () => {
+              void sendInviteTo(speech, divergence.storedPhone);
+            },
+          },
+          {
+            text: t('home.useCurrentContact'),
+            onPress: () => {
+              // Refresh the snapshot so the question is not asked again for this assignment.
+              updateSpeechContact.mutate({
+                speechId: speech.id,
+                contactPhone: divergence.current.contact_phone,
+                isDelegated: divergence.current.is_delegated,
+                delegateForName: divergence.current.delegate_for_name,
+              });
+              void sendInviteTo(speech, divergence.currentPhone);
+            },
+          },
+        ]
+      );
+    },
+    [memberMap, sendInviteTo, t, updateSpeechContact]
   );
 
   // Open the contact (PersonEditor) for the speech's member. `thenSend` remembers whether to offer

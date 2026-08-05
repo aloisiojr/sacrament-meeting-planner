@@ -76,3 +76,51 @@ export function resolveInvitePhone(
   const owner = opts.isDelegated ? opts.responsible : opts.member;
   return buildFullPhone(owner?.country_code, digits) ?? digits;
 }
+
+
+/** A stored snapshot that no longer matches the member's record. */
+export interface ContactDivergence {
+  /** The snapshot as stored, normalised for display and sending. */
+  storedPhone: string;
+  /** What the member's record says today. */
+  currentPhone: string;
+  /** The full snapshot to write if the current record is chosen. */
+  current: ContactSnapshot;
+}
+
+/**
+ * Detect a snapshot that has drifted from the member's record.
+ *
+ * The snapshot is frozen at assignment time on purpose — a later edit to the member must not
+ * silently redirect an invitation. But the opposite is also wrong: sending to a number the person
+ * no longer uses, with nothing said. So the send path asks.
+ *
+ * Both sides are compared NORMALISED. A snapshot written before buildFullPhone existed holds a
+ * bare national number, which is the same number as the record's — asking about that would put a
+ * dialog in front of every legacy row and train the user to dismiss it. Only a genuinely different
+ * number is worth a question.
+ *
+ * Returns null when there is nothing to ask: no member to compare against, no current phone, or
+ * the two agree.
+ */
+export function detectContactDivergence(
+  storedPhone: string | null | undefined,
+  member: Member | null | undefined,
+  responsible: Member | null | undefined
+): ContactDivergence | null {
+  if (!member) return null;
+
+  const current = resolveContactSnapshot(member, responsible);
+  if (!current.contact_phone) return null; // nothing better to offer
+
+  const stored = resolveInvitePhone(storedPhone, {
+    isDelegated: !!responsible && member.contact_via_responsible,
+    member,
+    responsible,
+  });
+  if (!stored) return null; // no snapshot at all — the caller falls back to the record
+
+  if (stored === current.contact_phone) return null;
+
+  return { storedPhone: stored, currentPhone: current.contact_phone, current };
+}

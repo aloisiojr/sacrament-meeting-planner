@@ -30,14 +30,16 @@ const LOG_DESC: Record<string, string> = {
   closing_prayer: 'Modelo WhatsApp oração encerramento atualizado',
 };
 
+// Order matters: the prayer tabs take the leading slice, so the name/date tokens come first.
 const SPEECH_PLACEHOLDERS = [
   { token: '{nome}', i18n: 'whatsapp.placeholderName', sample: 'Maria Silva' },
+  { token: '{nome informal}', i18n: 'whatsapp.placeholderInformalName', sample: 'Maria' },
   { token: '{data}', i18n: 'whatsapp.placeholderDate', sample: '2026-03-01' },
   { token: '{colecao}', i18n: 'whatsapp.placeholderCollection', sample: 'Temas da Ala' },
   { token: '{titulo}', i18n: 'whatsapp.placeholderTitle', sample: 'Fé em Jesus Cristo' },
   { token: '{link}', i18n: 'whatsapp.placeholderLink', sample: 'https://example.com/topic' },
 ] as const;
-const PRAYER_PLACEHOLDERS = SPEECH_PLACEHOLDERS.slice(0, 2);
+const PRAYER_PLACEHOLDERS = SPEECH_PLACEHOLDERS.slice(0, 3);
 
 export default function WhatsAppTemplateScreen() {
   const { t } = useTranslation();

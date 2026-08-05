@@ -6,6 +6,7 @@ import {
   resolveTemplate,
   buildWhatsAppUrl,
   getDefaultSpeechTemplate,
+  getDefaultPrayerTemplate,
   DEFAULT_TEMPLATE_SPEECH_1_PT_BR,
   DEFAULT_TEMPLATE_SPEECH_1_EN,
   DEFAULT_TEMPLATE_SPEECH_1_ES,
@@ -221,6 +222,47 @@ describe('getDefaultSpeechTemplate', () => {
 
   it('ES template contains Obispado', () => {
     expect(DEFAULT_TEMPLATE_SPEECH_1_ES).toContain('Obispado');
+  });
+});
+
+describe('the shipped default templates greet by the informal name', () => {
+  const LANGS = ['pt-BR', 'en-US', 'es-LA'];
+
+  it('every speech default in every language greets with {nome informal}', () => {
+    for (const lang of LANGS) {
+      for (const position of [1, 2, 3] as const) {
+        const template = getDefaultSpeechTemplate(lang, position);
+        expect(template).toContain('{nome informal}');
+        expect(template).not.toContain('{nome}');
+      }
+    }
+  });
+
+  it('every prayer default in every language greets with {nome informal}, not the full name', () => {
+    for (const lang of LANGS) {
+      for (const type of ['opening', 'closing'] as const) {
+        const template = getDefaultPrayerTemplate(lang, type);
+        expect(template).toContain('{nome informal}');
+        expect(template).not.toContain('{nome}');
+      }
+    }
+  });
+
+  it('the pt-BR speech defaults still say which speech it is', () => {
+    expect(getDefaultSpeechTemplate('pt-BR', 1)).toContain('primeiro discurso');
+    expect(getDefaultSpeechTemplate('pt-BR', 2)).toContain('segundo discurso');
+    expect(getDefaultSpeechTemplate('pt-BR', 3)).toContain('terceiro discurso');
+  });
+
+  it('a member with no informal name is still greeted, by the full name', () => {
+    const message = resolveTemplate(getDefaultPrayerTemplate('pt-BR', 'opening'), {
+      speakerName: 'Maria Silva',
+      speakerInformalName: '',
+      date: '1 MAR',
+      topic: '',
+    });
+
+    expect(message).toContain('Olá Maria Silva, você foi designado(a)');
   });
 });
 

@@ -127,41 +127,38 @@ the tag `archive/UX-2.0-2026-06-07` are archive only.
   commit them.
 - EAS builds are controlled by the user externally — do not track or trigger them.
 
-### Build profiles
+### Build profiles — there are exactly two
 
-| Profile | Identity | Database | Distribution |
-|---------|----------|----------|--------------|
-| `development` | `SMP Dev` | staging | dev client, internal (ad-hoc) |
-| `development-testflight` | `SMP Dev` | staging | dev client, store → TestFlight |
-| `staging` | `SMP Staging` | staging | internal (ad-hoc) — unused on the MDM device |
-| `appetize` | `SMP Staging` | staging | simulator / apk |
-| `production` | **production** | **production** | store |
+| Profile | App | Database | Distribution |
+|---------|-----|----------|--------------|
+| `development-testflight` | `SMP Dev` (`…app.dev`) | staging | dev client, store → TestFlight |
+| `production` | `Sacrament Meeting Planner` (`…app`) | **production** | store |
 
-**The working loop is `development-testflight`.** It exists because the test device is
-MDM-supervised and cannot install an ad-hoc provisioning profile, so a dev client has to arrive
-through TestFlight. Build it ONCE, then `npx expo start --dev-client` reloads JS on save. Only a
-NATIVE change (new native dependency, or an app.config.js change touching native fields) needs
-another build.
+```bash
+# only when something NATIVE changes (new native dep, or app.config.js native fields)
+eas build -p ios --profile development-testflight \
+  --auto-submit-with-profile development-testflight
 
-There is no `testflight-staging`: a release build on TestFlight added nothing the dev client does
-not cover, and it was one more app to keep in sync.
+# every day — JS/TSX reloads on save
+npx expo start --dev-client        # --tunnel if the device cannot reach the Mac
+```
 
-There is deliberately no `testflight-production`: every App Store release passes through TestFlight
-first, so `production` already serves both roles. What turns a TestFlight build into a release is
-attaching it to a version and submitting for review in App Store Connect — a separate action, not a
-build profile. Two profiles emitting the same artefact would only raise "which one did I use?".
+The dev client is delivered through TestFlight, not ad-hoc, because the test device is
+MDM-supervised and cannot install an ad-hoc provisioning profile.
 
 **Do not build `production` before the v2 cutover.** It would upload a 2.0.0 build that expects the
-v2 migrations to an App Store Connect record whose internal testers receive every build
-automatically — against a production database that does not have those migrations yet. Use
-`testflight-staging` until step 3 of the cutover is done.
+v2 migrations to the record whose internal testers receive every build automatically — against a
+production database that does not have them.
 
-### Staging builds have their OWN bundle identifier
+### The dev build has its OWN bundle identifier
 
-`app.config.js` turns `APP_VARIANT=staging` (set in the development/staging/testflight/appetize
-profiles) into `com.sacramentmeetingmanager.app.staging`, the app name `SMP Staging` and a distinct URL
-scheme. Production is untouched. Do not remove this: without it a staging build installs OVER the
-real App Store app.
+`app.config.js` turns `APP_VARIANT=development` into `com.sacramentmeetingmanager.app.dev`, the app
+name `SMP Dev` and a distinct URL scheme, so it installs ALONGSIDE the real app instead of over it.
+Production is untouched. Do not remove this.
+
+An **unknown** `APP_VARIANT` throws rather than falling through to production: a stale value —
+`staging` was real until 2026-08-05 — would otherwise silently build under the real bundle
+identifier. App Store Connect also caps `expo.name` at 30 characters, asserted at config time.
 
 **Internal TestFlight groups receive EVERY build automatically.** There is no per-group gating —
 `groups` in `eas.json` only fails (`Cannot add internal group to a build`), builds cannot be

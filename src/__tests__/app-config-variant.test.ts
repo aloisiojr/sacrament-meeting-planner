@@ -30,10 +30,19 @@ function resolveConfig(variant?: string) {
 const PROD_BUNDLE = 'com.sacramentmeetingmanager.app';
 
 describe('production identity is never altered', () => {
-  it.each([undefined, '', 'production', 'anything-else'])(
+  it.each([undefined, '', 'production'])(
     'APP_VARIANT=%p leaves the bundle identifier alone',
     (variant) => {
       expect(resolveConfig(variant).ios.bundleIdentifier).toBe(PROD_BUNDLE);
+    }
+  );
+
+  it.each(['staging', 'anything-else', 'Development', 'dev'])(
+    'APP_VARIANT=%p THROWS rather than falling through to production',
+    (variant) => {
+      // The worst possible default. A stale APP_VARIANT — "staging" was a real value until
+      // 2026-08-05 — would otherwise silently build under the REAL bundle identifier.
+      expect(() => resolveConfig(variant)).toThrow(/Unknown APP_VARIANT/);
     }
   );
 
@@ -57,16 +66,13 @@ describe('production identity is never altered', () => {
 describe('the dev-client variant', () => {
   const dev = () => resolveConfig('development');
 
-  it('is a THIRD app, not a second name for staging', () => {
-    // If the dev client shared staging's bundle id it would overwrite the build under test on the
-    // device, and getting that build back costs a full rebuild.
+  it('is a separate app from production, so it never overwrites the real one', () => {
     expect(dev().ios.bundleIdentifier).toBe(`${PROD_BUNDLE}.dev`);
-    expect(dev().ios.bundleIdentifier).not.toBe(resolveConfig('staging').ios.bundleIdentifier);
+    expect(dev().ios.bundleIdentifier).not.toBe(resolveConfig(undefined).ios.bundleIdentifier);
   });
 
   it('has its own name and scheme', () => {
     expect(dev().name).toBe('SMP Dev');
-    expect(dev().scheme).not.toBe(resolveConfig('staging').scheme);
     expect(dev().scheme).not.toBe(resolveConfig(undefined).scheme);
   });
 
@@ -75,66 +81,16 @@ describe('the dev-client variant', () => {
   });
 });
 
-describe('the three identities are mutually distinct', () => {
+describe('the identities are mutually distinct', () => {
   it('no two variants share a bundle id, name or scheme', () => {
-    const all = [resolveConfig(undefined), resolveConfig('staging'), resolveConfig('development')];
+    const all = [resolveConfig(undefined), resolveConfig('development')];
     for (const field of ['name', 'scheme'] as const) {
-      expect(new Set(all.map((c) => c[field])).size).toBe(3);
+      expect(new Set(all.map((c) => c[field])).size).toBe(all.length);
     }
-    expect(new Set(all.map((c) => c.ios.bundleIdentifier)).size).toBe(3);
+    expect(new Set(all.map((c) => c.ios.bundleIdentifier)).size).toBe(all.length);
   });
 });
 
-describe('the staging variant', () => {
-  const staging = () => resolveConfig('staging');
-
-  it('gets its own bundle identifier', () => {
-    expect(staging().ios.bundleIdentifier).toBe(`${PROD_BUNDLE}.staging`);
-  });
-
-  it('is distinguishable on the home screen', () => {
-    expect(staging().name).toContain('Staging');
-    expect(staging().name).not.toBe(resolveConfig(undefined).name);
-  });
-
-  it.each([
-    ['staging', () => staging().name],
-    ['production', () => resolveConfig(undefined).name],
-  ])('the %s name fits the App Store Connect limit', (_label, get) => {
-    // EAS uses expo.name when it creates the app record, and App Store Connect caps it at 30.
-    // "Sacrament Meeting Planner (Staging)" was 35 and failed the submit outright.
-    expect(get().length).toBeLessThanOrEqual(30);
-  });
-
-  it('stays short enough for the home screen, where iOS truncates around 12', () => {
-    expect(staging().name.length).toBeLessThanOrEqual(14);
-  });
-
-  it('claims a different URL scheme', () => {
-    // Two installed apps registering the same scheme is a coin flip over which one a deep link
-    // opens.
-    const prod = resolveConfig(undefined);
-    expect(staging().scheme).not.toBe(prod.scheme);
-  });
-
-  it('keeps every other iOS setting', () => {
-    // Spreading config.ios must not drop the export-compliance flag; losing it makes every
-    // TestFlight upload prompt for encryption details.
-    expect(staging().ios.infoPlist.ITSAppUsesNonExemptEncryption).toBe(false);
-    expect(staging().ios.supportsTablet).toBe(true);
-  });
-
-  it('keeps the EAS project id, so both variants stay one project', () => {
-    const prod = resolveConfig(undefined);
-    expect(staging().extra.eas.projectId).toBe(prod.extra.eas.projectId);
-  });
-
-  it('leaves the Android package alone', () => {
-    // google-services.json declares only the production package; varying it without a matching
-    // Firebase app would fail the Android build. Documented in app.config.js.
-    expect(staging().android.package).toBe(PROD_BUNDLE);
-  });
-});
 
 describe('eas.json wires the variant to exactly the staging-facing profiles', () => {
   const eas = require('../../eas.json');
@@ -145,13 +101,21 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     return profile.env ?? (profile.extends ? envFor(profile.extends) : {});
   }
 
-  it.each([
-    ['development', 'development'],
-    ['development-testflight', 'development'],
-    ['staging', 'staging'],
-    ['appetize', 'staging'],
-  ])('%s builds the %s variant', (profile, variant) => {
-    expect(envFor(profile).APP_VARIANT).toBe(variant);
+  it('there are exactly two profiles', () => {
+    // One loop for development, one for release. Anything else was an app to keep in sync.
+    expect(Object.keys(eas.build).sort()).toEqual(['development-testflight', 'production']);
+  });
+
+  it('development-testflight builds the dev variant', () => {
+    expect(envFor('development-testflight').APP_VARIANT).toBe('development');
+  });
+
+  it('every APP_VARIANT in eas.json is one app.config.js knows', () => {
+    // A profile naming a variant the config does not define now fails the BUILD, so catch it here.
+    for (const profile of Object.keys(eas.build)) {
+      const v = envFor(profile).APP_VARIANT;
+      if (v !== undefined) expect(() => resolveConfig(v)).not.toThrow();
+    }
   });
 
   it('the dev client is reachable without an ad-hoc provisioning profile', () => {
@@ -159,7 +123,7 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     // client has to arrive through TestFlight, which is what `store` gives.
     const p = eas.build['development-testflight'];
     expect(p.distribution).toBe('store');
-    expect(eas.build[p.extends].developmentClient).toBe(true);
+    expect(p.developmentClient).toBe(true);
   });
 
   it('production does NOT', () => {

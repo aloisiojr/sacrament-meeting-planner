@@ -3,11 +3,11 @@
  *
  * Why this exists
  * ---------------
- * Staging and production builds used to share `com.sacramentmeetingmanager.app`, which meant a
- * TestFlight build pointed at the staging database installed OVER the real App Store app on a
- * tester's phone. Internal TestFlight groups receive every build automatically — there is no
- * per-group gating — so a staging build reaches every internal tester, including real bishops
- * using the app for their ward. That happened on 2026-08-04.
+ * Non-production and production builds used to share `com.sacramentmeetingmanager.app`, which
+ * meant a TestFlight build pointed at the staging database installed OVER the real App Store app
+ * on a tester's phone. Internal TestFlight groups receive every build automatically — there is no
+ * per-group gating — so it reached every internal tester, including real bishops using the app for
+ * their ward. That happened on 2026-08-04.
  *
  * A separate bundle id makes it structurally impossible: staging builds go to their own App Store
  * Connect record with its own tester list, and the two apps sit side by side on a device, so
@@ -37,7 +37,6 @@
  * so installing the dev client does not overwrite the build you are testing.
  */
 const VARIANTS = {
-  staging: { suffix: '.staging', name: 'SMP Staging' },
   development: { suffix: '.dev', name: 'SMP Dev' },
 };
 
@@ -52,11 +51,22 @@ const APP_STORE_NAME_LIMIT = 30;
 
 /** @param {{ config: import('@expo/config-types').ExpoConfig }} params */
 module.exports = ({ config }) => {
-  const variant = VARIANTS[process.env.APP_VARIANT];
+  const requested = process.env.APP_VARIANT;
+
+  // Unset (or an explicit "production") means the production identity, untouched. Returning
+  // `config` itself rather than a rebuilt copy means a mistake in the variant logic below cannot
+  // alter a production build.
+  if (!requested || requested === 'production') return config;
+
+  const variant = VARIANTS[requested];
   if (!variant) {
-    // Production identity, untouched. Keeping this path a no-op — returning `config` itself, not a
-    // rebuilt copy — means a mistake in the variant logic cannot alter a production build.
-    return config;
+    // Fail loudly. Falling through to production here would be the worst possible default: a
+    // stale APP_VARIANT (e.g. "staging", removed on 2026-08-05) would silently build under the
+    // REAL bundle identifier and could ship to real users.
+    throw new Error(
+      `Unknown APP_VARIANT "${requested}". Known variants: ${Object.keys(VARIANTS).join(', ')}. ` +
+        `Leave it unset for a production build.`
+    );
   }
 
   if (variant.name.length > APP_STORE_NAME_LIMIT) {

@@ -7,6 +7,20 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **IN FLIGHT — `specs/whatsapp-informal-name-placeholder.md`: placeholder "Nome Informal".**
+  Branch `feat/whatsapp-informal-name` (a partir de `main`, após o merge de `export-pdf`).
+  Stage: **build COMPLETE, aguardando verify-change**. Plan: `.plan.md` (4 passos, todos ✅).
+  - Step 1 ✅ `whatsappUtils`: campo `speakerInformalName` + alias `informalName` (resolvido ANTES
+    de `name`). `{nome}` passa a ser o nome COMPLETO; `{nome informal}` cai no completo se vazio.
+  - Step 2 ✅ `InviteManagementSection`: passa os dois nomes separados (antes colapsava em um).
+  - Step 3 ✅ chip nas 5 abas (orações: `slice(0,2)` → `slice(0,3)`) + chave i18n nos 3 locales +
+    teste novo `settings-whatsapp-templates.test.tsx` (a tela não tinha teste).
+  - Step 4 ✅ 15 textos padrão reescritos (3 discursos + 2 orações × 3 línguas).
+  - Suíte **284 suites / 5202 tests** verde (base `main`: 282/5170). tsc 0, lint 0 erros.
+  - Sem migração, sem deploy. **Decisão aceita pelo usuário:** alas que já personalizaram com
+    `{nome}` passam a enviar o nome completo — sem migração de texto nem aviso in-app.
+  - Achado registrado e FORA do escopo: `whatsapp_template_delegation_wrapper` é usado em
+    `InviteManagementSection` mas não tem aba na tela de configurações — ninguém consegue editá-lo.
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
   - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).

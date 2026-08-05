@@ -209,29 +209,34 @@ describe('register-first-user — the ward it creates', () => {
     expect(w.whatsapp_template_closing_prayer).toBeTruthy();
   });
 
-  it('seeds every speech template with the placeholders the sender substitutes', async () => {
-    // A template missing the name or {data} silently sends "Hi , ... on Sunday". The greeting must
-    // be {nome informal}, not {nome}: {nome} is the FULL name, so a seeded ward that never
-    // customized anything would greet "Hi Maria Silva" instead of "Hi Maria".
-    await call(VALID);
-    const w = wardInsert() as Record<string, string>;
+  // Every language branch, plus the unknown-language fallback: each one is a separate block of
+  // hardcoded strings, so pinning only pt-BR lets the other two regress silently.
+  it.each([['pt-BR'], ['en-US'], ['es-LA'], ['fr-FR']])(
+    'seeds %s templates that greet by the informal name, with the placeholders the sender substitutes',
+    async (language) => {
+      // A template missing the name or {data} silently sends "Hi , ... on Sunday". The greeting
+      // must be {nome informal}, not {nome}: {nome} is the FULL name, so a seeded ward that never
+      // customized anything would greet "Hi Maria Silva" instead of "Hi Maria".
+      await call({ ...VALID, language });
+      const w = wardInsert() as Record<string, string>;
 
-    for (const key of [
-      'whatsapp_template_speech_1',
-      'whatsapp_template_speech_2',
-      'whatsapp_template_speech_3',
-    ]) {
-      expect(w[key]).toContain('{nome informal}');
-      expect(w[key]).not.toContain('{nome}');
-      expect(w[key]).toContain('{data}');
-      expect(w[key]).toContain('{titulo}');
+      for (const key of [
+        'whatsapp_template_speech_1',
+        'whatsapp_template_speech_2',
+        'whatsapp_template_speech_3',
+      ]) {
+        expect(w[key]).toContain('{nome informal}');
+        expect(w[key]).not.toContain('{nome}');
+        expect(w[key]).toContain('{data}');
+        expect(w[key]).toContain('{titulo}');
+      }
+      for (const key of ['whatsapp_template_opening_prayer', 'whatsapp_template_closing_prayer']) {
+        expect(w[key]).toContain('{nome informal}');
+        expect(w[key]).not.toContain('{nome}');
+        expect(w[key]).toContain('{data}');
+      }
     }
-    expect(w.whatsapp_template_opening_prayer).toContain('{nome informal}');
-    expect(w.whatsapp_template_opening_prayer).not.toContain('{nome}');
-    expect(w.whatsapp_template_closing_prayer).toContain('{nome informal}');
-    expect(w.whatsapp_template_closing_prayer).not.toContain('{nome}');
-    expect(w.whatsapp_template_closing_prayer).toContain('{data}');
-  });
+  );
 
   it('gives each speech position its own template', async () => {
     await call(VALID);

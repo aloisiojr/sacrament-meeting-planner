@@ -13,6 +13,7 @@ import {
   type AdminResponses,
   type AdminRecorder,
 } from './helpers/edgeFunctionHarness';
+import { getDefaultSpeechTemplate, getDefaultPrayerTemplate } from '../lib/whatsappUtils';
 
 const mockCreateClient = jest.fn();
 jest.mock(
@@ -192,7 +193,7 @@ describe('register-first-user — the ward it creates', () => {
 
   it.each([
     ['pt-BR', 'Podemos confirmar o seu discurso?'],
-    ['en-US', 'Can we confirm your speech?'],
+    ['en-US', 'Can we confirm your talk?'],
     ['es-LA', '¿Podemos confirmar tu discurso?'],
   ])('seeds %s WhatsApp templates in that language', async (language, marker) => {
     await call({ ...VALID, language });
@@ -208,6 +209,24 @@ describe('register-first-user — the ward it creates', () => {
     expect(w.whatsapp_template_opening_prayer).toBeTruthy();
     expect(w.whatsapp_template_closing_prayer).toBeTruthy();
   });
+
+  // The seeded text and the app's "restore default" text used to be two independently maintained
+  // sets of strings that had silently drifted apart. They are now one source, and this is the
+  // contract that keeps them one: exact equality, not a marker phrase. An unknown language must
+  // fall back to en-US on BOTH sides.
+  it.each([['pt-BR'], ['en-US'], ['es-LA'], ['fr-FR']])(
+    'seeds %s wards with exactly the app default — the two can never drift apart',
+    async (language) => {
+      await call({ ...VALID, language });
+      const w = wardInsert() as Record<string, string>;
+
+      expect(w.whatsapp_template_speech_1).toBe(getDefaultSpeechTemplate(language, 1));
+      expect(w.whatsapp_template_speech_2).toBe(getDefaultSpeechTemplate(language, 2));
+      expect(w.whatsapp_template_speech_3).toBe(getDefaultSpeechTemplate(language, 3));
+      expect(w.whatsapp_template_opening_prayer).toBe(getDefaultPrayerTemplate(language, 'opening'));
+      expect(w.whatsapp_template_closing_prayer).toBe(getDefaultPrayerTemplate(language, 'closing'));
+    }
+  );
 
   // Every language branch, plus the unknown-language fallback: each one is a separate block of
   // hardcoded strings, so pinning only pt-BR lets the other two regress silently.

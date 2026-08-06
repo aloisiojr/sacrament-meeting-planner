@@ -135,7 +135,7 @@ Hi {nome informal}, how are you? The bishopric would like to invite you to give 
 Can we count on you?
 ```
 
-**es-LA** — discurso N (`1er` / `2do` / `último`, com `5` / `7-10` / `15-20` minutos):
+**es-LA** — discurso N (`primer` / `segundo` / `último`, com `5` / `7-10` / `15-20` minutos):
 ```
 Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el primer discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}". {link}
 

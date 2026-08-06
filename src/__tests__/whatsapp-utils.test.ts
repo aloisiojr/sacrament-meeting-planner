@@ -303,11 +303,11 @@ describe('the approved wording of the default templates', () => {
       topic: 'Fé',
     });
 
-    // Known cosmetic artifact, unchanged by this spec: the empty {link} leaves a single space
-    // before the period ('sobre "Fé" .'). What must not happen is a double space or a blank line
-    // opening up where the link was.
-    expect(message).toContain('sobre "Fé"');
-    expect(message).toContain('Podemos confirmar o seu discurso?');
+    // The link now trails the sentence, so an absent one must leave the period flush against the
+    // text and the blank line intact — no dangling space, no extra line. Asserting the exact
+    // junction is what makes this bite: the trailing-space strip in resolveTemplate is the only
+    // thing producing it.
+    expect(message).toContain('sobre "Fé".\n\nPodemos confirmar o seu discurso?');
     expect(message).not.toMatch(/ {2}/);
     expect(message).not.toMatch(/\n{3}/);
   });
@@ -373,7 +373,7 @@ describe('buildWhatsAppUrl language parameter', () => {
 
   it('uses pt-BR template when language=pt-BR and no custom template', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'pt-BR');
-    expect(url).toContain(encodeURIComponent('bispado'));
+    expect(url).toContain(encodeURIComponent('O bispado'));
   });
 
   it('custom template overrides language default', () => {

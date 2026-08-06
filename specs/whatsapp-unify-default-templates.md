@@ -88,7 +88,7 @@ sem depender do bundler.
   *talk*; *speech* é discurso secular. Código, tipos e tabela `speeches` NÃO mudam.
 - es-LA: `oración de cierre` / `oración de clausura` → **oración final** (par usado nos manuais é
   *oración de apertura* / *oración final*).
-- As orações passaram a convidar ("O Bispado gostaria de te convidar para fazer a oração…") em
+- As orações passaram a convidar ("O bispado gostaria de te convidar para fazer a oração…") em
   vez de designar ("você foi designado(a) para fazer…"), por reescrita do usuário em 2026-08-05
   durante o build. Efeito colateral bem-vindo: some o `(a)` de gênero, e a saudação das orações
   passa a ser a mesma dos discursos (`Olá … tudo bom?`).
@@ -111,39 +111,39 @@ sem depender do bundler.
 
 **pt-BR** — discurso N (`1º` / `2º` / `último`, com `5` / `7-10` / `15-20` minutos):
 ```
-Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.
+Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}". {link}
 
 Podemos confirmar o seu discurso?
 ```
 orações (`abertura` / `encerramento`):
 ```
-Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.
+Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.
 
 Podemos contar com você?
 ```
 
 **en-US** — talk N (`1st` / `2nd` / `last`, com `5` / `7-10` / `15-20` minutes):
 ```
-Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.
+Hi {nome informal}, how are you? The bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}". {link}
 
-Can we confirm your talk?
+Can we count on you?
 ```
 orações (`opening` / `closing`):
 ```
-Hi {nome informal}, how are you? The Bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.
+Hi {nome informal}, how are you? The bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.
 
 Can we count on you?
 ```
 
 **es-LA** — discurso N (`1er` / `2do` / `último`, com `5` / `7-10` / `15-20` minutos):
 ```
-Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 1er discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}" {link}.
+Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el primer discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}". {link}
 
 ¿Podemos confirmar tu discurso?
 ```
 orações (`de apertura` / `final`):
 ```
-Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración de apertura en la reunión sacramental del día {data}.
+Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a ofrecer la oración de apertura en la reunión sacramental del día {data}.
 
 ¿Podemos contar contigo?
 ```

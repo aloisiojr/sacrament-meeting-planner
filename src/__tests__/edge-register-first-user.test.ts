@@ -193,7 +193,7 @@ describe('register-first-user — the ward it creates', () => {
 
   it.each([
     ['pt-BR', 'Podemos confirmar o seu discurso?'],
-    ['en-US', 'Can we confirm your talk?'],
+    ['en-US', 'Can we count on you?'],
     ['es-LA', '¿Podemos confirmar tu discurso?'],
   ])('seeds %s WhatsApp templates in that language', async (language, marker) => {
     await call({ ...VALID, language });

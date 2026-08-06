@@ -179,29 +179,29 @@ describe('F040: getDefaultSpeechTemplate (AC-011, AC-012, AC-014)', () => {
   it('returns English template for en-US position 1 (AC-011)', () => {
     const template = getDefaultSpeechTemplate('en-US', 1);
     expect(template).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
-    expect(template).toContain('Bishopric');
+    expect(template).toContain('bishopric');
   });
 
   it('returns Spanish template for es-LA position 1 (AC-012)', () => {
     const template = getDefaultSpeechTemplate('es-LA', 1);
     expect(template).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
-    expect(template).toContain('Obispado');
+    expect(template).toContain('obispado');
   });
 
   it('falls back to en-US for unknown language (AC-014)', () => {
     const template = getDefaultSpeechTemplate('fr', 1);
     expect(template).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
-    expect(template).toContain('Bishopric');
+    expect(template).toContain('bishopric');
   });
 
   it('returns English template for all positions with en-US', () => {
-    expect(getDefaultSpeechTemplate('en-US', 2)).toContain('Bishopric');
-    expect(getDefaultSpeechTemplate('en-US', 3)).toContain('Bishopric');
+    expect(getDefaultSpeechTemplate('en-US', 2)).toContain('bishopric');
+    expect(getDefaultSpeechTemplate('en-US', 3)).toContain('bishopric');
   });
 
   it('returns Spanish template for all positions with es-LA', () => {
-    expect(getDefaultSpeechTemplate('es-LA', 2)).toContain('Obispado');
-    expect(getDefaultSpeechTemplate('es-LA', 3)).toContain('Obispado');
+    expect(getDefaultSpeechTemplate('es-LA', 2)).toContain('obispado');
+    expect(getDefaultSpeechTemplate('es-LA', 3)).toContain('obispado');
   });
 });
 

@@ -10,51 +10,51 @@
 // "restore default" gives back can no longer drift apart.
 
 export const DEFAULT_TEMPLATE_SPEECH_1_PT_BR =
-  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+  'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?';
 
 export const DEFAULT_TEMPLATE_SPEECH_2_PT_BR =
-  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+  'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 2º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?';
 
 export const DEFAULT_TEMPLATE_SPEECH_3_PT_BR =
-  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o último discurso na Reunião Sacramental do domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?';
+  'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o último discurso na Reunião Sacramental do domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?';
 
 export const DEFAULT_TEMPLATE_SPEECH_1_EN =
-  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?';
+  'Hi {nome informal}, how are you? The bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}". {link}\n\nCan we count on you?';
 
 export const DEFAULT_TEMPLATE_SPEECH_2_EN =
-  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 2nd talk in sacrament meeting on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?';
+  'Hi {nome informal}, how are you? The bishopric would like to invite you to give the 2nd talk in sacrament meeting on Sunday {data}! You will speak for 7-10 minutes about "{titulo}". {link}\n\nCan we count on you?';
 
 export const DEFAULT_TEMPLATE_SPEECH_3_EN =
-  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the last talk in sacrament meeting on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?';
+  'Hi {nome informal}, how are you? The bishopric would like to invite you to give the last talk in sacrament meeting on Sunday {data}! You will speak for 15-20 minutes about "{titulo}". {link}\n\nCan we count on you?';
 
 export const DEFAULT_TEMPLATE_SPEECH_1_ES =
-  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 1er discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+  'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el primer discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?';
 
 export const DEFAULT_TEMPLATE_SPEECH_2_ES =
-  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 2do discurso en la reunión sacramental del domingo {data}. Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+  'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el segundo discurso en la reunión sacramental del domingo {data}. Hablarás por 7-10 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?';
 
 export const DEFAULT_TEMPLATE_SPEECH_3_ES =
-  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el último discurso en la reunión sacramental del domingo {data}. Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?';
+  'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el último discurso en la reunión sacramental del domingo {data}. Hablarás por 15-20 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?';
 
 // --- Default Prayer Templates ---
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR =
-  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+  'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_EN =
-  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?';
+  'Hi {nome informal}, how are you? The bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?';
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_ES =
-  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
+  'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a ofrecer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR =
-  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+  'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_EN =
-  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?';
+  'Hi {nome informal}, how are you? The bishopric would like to invite you to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
-  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
+  'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a ofrecer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
 
 // --- Default Delegation Wrapper Templates (v2.0) ---
 

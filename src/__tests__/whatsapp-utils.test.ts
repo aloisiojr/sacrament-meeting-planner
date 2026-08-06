@@ -188,7 +188,7 @@ describe('buildWhatsAppUrl', () => {
     });
 
     // Should contain encoded default template content (en-US fallback)
-    expect(url).toContain(encodeURIComponent('Bishopric'));
+    expect(url).toContain(encodeURIComponent('bishopric'));
   });
 
   it('default template contains proper accents', () => {
@@ -217,11 +217,11 @@ describe('getDefaultSpeechTemplate', () => {
   });
 
   it('EN template contains Bishopric', () => {
-    expect(DEFAULT_TEMPLATE_SPEECH_1_EN).toContain('Bishopric');
+    expect(DEFAULT_TEMPLATE_SPEECH_1_EN).toContain('bishopric');
   });
 
   it('ES template contains Obispado', () => {
-    expect(DEFAULT_TEMPLATE_SPEECH_1_ES).toContain('Obispado');
+    expect(DEFAULT_TEMPLATE_SPEECH_1_ES).toContain('obispado');
   });
 });
 
@@ -231,55 +231,55 @@ describe('the approved wording of the default templates', () => {
   // failing test.
   it('pt-BR reads exactly as approved', () => {
     expect(getDefaultSpeechTemplate('pt-BR', 1)).toBe(
-      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+      'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?'
     );
     expect(getDefaultSpeechTemplate('pt-BR', 2)).toBe(
-      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+      'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 2º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?'
     );
     expect(getDefaultSpeechTemplate('pt-BR', 3)).toBe(
-      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o último discurso na Reunião Sacramental do domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+      'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o último discurso na Reunião Sacramental do domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?'
     );
     expect(getDefaultPrayerTemplate('pt-BR', 'opening')).toBe(
-      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
+      'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
     );
     expect(getDefaultPrayerTemplate('pt-BR', 'closing')).toBe(
-      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
+      'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
     );
   });
 
   it('en-US reads exactly as approved, using the Church term "talk"', () => {
     expect(getDefaultSpeechTemplate('en-US', 1)).toBe(
-      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+      'Hi {nome informal}, how are you? The bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}". {link}\n\nCan we count on you?'
     );
     expect(getDefaultSpeechTemplate('en-US', 2)).toBe(
-      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 2nd talk in sacrament meeting on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+      'Hi {nome informal}, how are you? The bishopric would like to invite you to give the 2nd talk in sacrament meeting on Sunday {data}! You will speak for 7-10 minutes about "{titulo}". {link}\n\nCan we count on you?'
     );
     expect(getDefaultSpeechTemplate('en-US', 3)).toBe(
-      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the last talk in sacrament meeting on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+      'Hi {nome informal}, how are you? The bishopric would like to invite you to give the last talk in sacrament meeting on Sunday {data}! You will speak for 15-20 minutes about "{titulo}". {link}\n\nCan we count on you?'
     );
     expect(getDefaultPrayerTemplate('en-US', 'opening')).toBe(
-      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?'
+      'Hi {nome informal}, how are you? The bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?'
     );
     expect(getDefaultPrayerTemplate('en-US', 'closing')).toBe(
-      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?'
+      'Hi {nome informal}, how are you? The bishopric would like to invite you to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?'
     );
   });
 
   it('es-LA reads exactly as approved', () => {
     expect(getDefaultSpeechTemplate('es-LA', 1)).toBe(
-      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 1er discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+      'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el primer discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?'
     );
     expect(getDefaultSpeechTemplate('es-LA', 2)).toBe(
-      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 2do discurso en la reunión sacramental del domingo {data}. Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+      'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el segundo discurso en la reunión sacramental del domingo {data}. Hablarás por 7-10 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?'
     );
     expect(getDefaultSpeechTemplate('es-LA', 3)).toBe(
-      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el último discurso en la reunión sacramental del domingo {data}. Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+      'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a dar el último discurso en la reunión sacramental del domingo {data}. Hablarás por 15-20 minutos sobre "{titulo}". {link}\n\n¿Podemos confirmar tu discurso?'
     );
     expect(getDefaultPrayerTemplate('es-LA', 'opening')).toBe(
-      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
+      'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a ofrecer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
     );
     expect(getDefaultPrayerTemplate('es-LA', 'closing')).toBe(
-      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
+      'Hola {nome informal}, ¿cómo estás? El obispado quisiera invitarte a ofrecer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
     );
   });
 
@@ -292,7 +292,7 @@ describe('the approved wording of the default templates', () => {
       link: 'https://x',
     });
 
-    expect(message).toContain('.\n\nPodemos confirmar o seu discurso?');
+    expect(message).toContain('https://x\n\nPodemos confirmar o seu discurso?');
   });
 
   it('leaves no double space or orphan line when the speech has no link', () => {
@@ -350,7 +350,7 @@ describe('the shipped default templates greet by the informal name', () => {
       topic: '',
     });
 
-    expect(message).toContain('Olá Maria Silva, tudo bom? O Bispado gostaria de te convidar');
+    expect(message).toContain('Olá Maria Silva, tudo bom? O bispado gostaria de te convidar');
   });
 });
 
@@ -363,28 +363,28 @@ describe('buildWhatsAppUrl language parameter', () => {
 
   it('uses EN template when language=en-US and no custom template', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'en-US');
-    expect(url).toContain(encodeURIComponent('Bishopric'));
+    expect(url).toContain(encodeURIComponent('bishopric'));
   });
 
   it('uses ES template when language=es-LA and no custom template', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'es-LA');
-    expect(url).toContain(encodeURIComponent('Obispado'));
+    expect(url).toContain(encodeURIComponent('obispado'));
   });
 
   it('uses pt-BR template when language=pt-BR and no custom template', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars, 'pt-BR');
-    expect(url).toContain(encodeURIComponent('Bispado'));
+    expect(url).toContain(encodeURIComponent('bispado'));
   });
 
   it('custom template overrides language default', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', 'Hello {nome}!', vars, 'es-LA');
     expect(url).toContain(encodeURIComponent('Hello John!'));
-    expect(url).not.toContain(encodeURIComponent('Obispado'));
+    expect(url).not.toContain(encodeURIComponent('obispado'));
   });
 
   it('defaults to en-US when language omitted', () => {
     const url = buildWhatsAppUrl('+5511987654321', '', '', vars);
-    expect(url).toContain(encodeURIComponent('Bishopric'));
+    expect(url).toContain(encodeURIComponent('bishopric'));
   });
 });
 

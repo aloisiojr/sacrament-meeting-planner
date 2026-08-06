@@ -23,8 +23,22 @@
     **REQUER REDEPLOY** de `register-first-user` — sem ele, alas novas saúdam pelo nome completo.
   - Achado registrado e FORA do escopo: `whatsapp_template_delegation_wrapper` é usado em
     `InviteManagementSection` mas não tem aba na tela de configurações — ninguém consegue editá-lo.
-  - Débito conhecido: os textos semeados pela edge function divergem dos defaults do código
-    (duração "5 / 7-10 / 15-20 minutos" vs. `{colecao}`); unificar foi oferecido e recusado.
+  - Débito RESOLVIDO pela mudança seguinte (era: textos semeados divergiam dos defaults do código).
+- **IN FLIGHT — `specs/whatsapp-unify-default-templates.md`: texto padrão num lugar só.**
+  Mesma branch, empilhado. Stage: **build COMPLETE, verify APPROVED, i18n audit APPROVED**;
+  re-verificação pendente porque a redação mudou depois do verdict.
+  - A edge function `register-first-user` NÃO tem mais strings próprias: importa
+    `getDefaultSpeechTemplate`/`getDefaultPrayerTemplate` de `../../../src/lib/whatsappUtils.ts`.
+    Funciona porque esse arquivo tem ZERO imports e `supabase/functions` está fora do tsc.
+  - Redação nova escrita pelo usuário + auditoria de terminologia da Igreja (zero P1).
+  - **PENDENTE E NÃO VERIFICÁVEL AQUI:** o bundler do `supabase functions deploy` precisa aceitar
+    um import para fora de `supabase/`. Sem deno/Docker/dry-run nesta máquina. **Plano B** (no
+    spec): a edge function para de semear e grava NULL — verificado que 1.x trata NULL bem
+    (`v1.x:…/settings/whatsapp.tsx:121`, `v1.x:…/whatsappUtils.ts:178`).
+  - **P2 aberto:** o invariante "whatsappUtils não pode ganhar imports" só existe em comentário.
+    Se alguém importar algo ali, tsc/lint/jest seguem verdes e só quebra no Deno. Guarda possível
+    sem violar a regra de não assertar texto-fonte: inspecionar `require.cache[...].children`.
+  - **REQUER REDEPLOY** de `register-first-user`.
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
   - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).

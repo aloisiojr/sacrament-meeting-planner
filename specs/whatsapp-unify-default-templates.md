@@ -11,11 +11,12 @@ prende a igualdade em teste para que não voltem a divergir.
 
 ## In scope / Out of scope
 
-- **In:** nova redação dos 5 templates (3 discursos + 2 orações) nas 3 línguas, aplicada às 15
-  constantes de `src/lib/whatsappUtils.ts` E às 15 strings semeadas em
-  `supabase/functions/register-first-user/index.ts`.
-- **In:** teste de contrato afirmando que o que a edge function semeia é exatamente o que
-  `getDefaultSpeechTemplate` / `getDefaultPrayerTemplate` devolvem, para as 3 línguas.
+- **In:** nova redação dos 5 templates (3 discursos + 2 orações) nas 3 línguas, nas 15 constantes
+  de `src/lib/whatsappUtils.ts` — o ÚNICO lugar onde o texto passa a existir.
+- **In:** `supabase/functions/register-first-user/index.ts` deixa de ter strings próprias e passa
+  a importar `getDefaultSpeechTemplate` / `getDefaultPrayerTemplate` do mesmo arquivo.
+- **In:** teste de contrato afirmando que o que a edge function semeia é exatamente o que os
+  getters devolvem, nas 3 línguas mais um idioma desconhecido.
 - **In:** correções de terminologia da Igreja aprovadas pelo usuário (ver Notes).
 - **Out:** a edge function continuar semeando (mantido — NÃO passa a gravar NULL).
 - **Out:** renomear `speech`/`speeches` em código, tipos, tabelas ou testIDs. Só muda texto
@@ -62,11 +63,25 @@ Nenhuma.
 
 ## Notes
 
-**Decisão estrutural.** A edge function CONTINUA semeando (não passa a gravar NULL). Fazê-la parar
-deixaria as colunas nulas para alas novas, o que muda o comportamento de clientes 1.x ainda em
-campo sem necessidade. A igualdade é garantida por AC3 — um teste de contrato — em vez de por
-eliminação da duplicata. Isso segue a regra do CLAUDE.md: quando a mesma regra existe em dois
-lugares, o teste afirma que os dois CONCORDAM.
+**Decisão estrutural (revista em 2026-08-05, a pedido do usuário).** O primeiro plano era manter
+o texto duplicado nos dois lugares e defender a igualdade com um teste. O usuário questionou por
+que não pode ficar num lugar só, e estava certo: a duplicata foi ELIMINADA. A edge function
+importa `../../../src/lib/whatsappUtils.ts` — o arquivo é TypeScript puro, sem um único `import`,
+e `supabase/functions` está fora do `tsc`, então o Deno o carrega direto e o jest também
+(o teste já fazia `require` de um caminho `.ts`).
+
+A edge function CONTINUA semeando (não grava NULL), para que todo cliente — inclusive 1.x — leia
+o mesmo texto do banco. Verificado que 1.x trataria NULL corretamente
+(`v1.x:…/settings/whatsapp.tsx:121`, `v1.x:…/whatsappUtils.ts:178`), mas semear mantém o texto
+igual entre versões do app durante a cauda 1.x.
+
+O teste de contrato (AC3) permanece: ele não protege mais contra duas cópias divergirem, e sim
+contra alguém reintroduzir strings literais na edge function.
+
+**Verificação de deploy pendente:** o bundler do `supabase functions deploy` precisa aceitar um
+import para fora de `supabase/`. Isso NÃO é verificável nesta máquina; confirmar no deploy. Se
+falhar, o plano B é a edge function parar de semear (gravar NULL), que dá o mesmo lugar único
+sem depender do bundler.
 
 **Terminologia da Igreja — mudanças aprovadas pelo usuário em 2026-08-05:**
 - en-US: `speech` → **talk** no texto voltado ao membro. Em inglês eclesiástico o membro faz um

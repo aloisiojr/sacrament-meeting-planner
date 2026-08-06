@@ -73,8 +73,10 @@ lugares, o teste afirma que os dois CONCORDAM.
   *talk*; *speech* é discurso secular. Código, tipos e tabela `speeches` NÃO mudam.
 - es-LA: `oración de cierre` / `oración de clausura` → **oración final** (par usado nos manuais é
   *oración de apertura* / *oración final*).
-- es-LA: `has sido asignado(a)` → **se te ha asignado**, evitando o `(a)` de gênero, que os
-  materiais em espanhol não usam.
+- As orações passaram a convidar ("O Bispado gostaria de te convidar para fazer a oração…") em
+  vez de designar ("você foi designado(a) para fazer…"), por reescrita do usuário em 2026-08-05
+  durante o build. Efeito colateral bem-vindo: some o `(a)` de gênero, e a saudação das orações
+  passa a ser a mesma dos discursos (`Olá … tudo bom?`).
 - en-US / es-LA: `Sacrament Meeting` / `Reunión Sacramental` → minúsculas (`sacrament meeting`,
   `reunión sacramental`), grafia dos manuais. **pt-BR mantém `Reunião Sacramental` maiúsculo**, por
   escolha explícita do usuário.
@@ -100,7 +102,7 @@ Podemos confirmar o seu discurso?
 ```
 orações (`abertura` / `encerramento`):
 ```
-Oi {nome informal}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.
+Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.
 
 Podemos contar com você?
 ```
@@ -113,7 +115,7 @@ Can we confirm your talk?
 ```
 orações (`opening` / `closing`):
 ```
-Hi {nome informal}, you have been assigned to give the opening prayer in sacrament meeting on {data}.
+Hi {nome informal}, how are you? The Bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.
 
 Can we count on you?
 ```
@@ -126,7 +128,7 @@ Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 1e
 ```
 orações (`de apertura` / `final`):
 ```
-Hola {nome informal}, se te ha asignado hacer la oración de apertura en la reunión sacramental del día {data}.
+Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración de apertura en la reunión sacramental del día {data}.
 
 ¿Podemos contar contigo?
 ```

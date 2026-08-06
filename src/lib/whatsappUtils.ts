@@ -39,22 +39,22 @@ export const DEFAULT_TEMPLATE_SPEECH_3_ES =
 // --- Default Prayer Templates ---
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_PT_BR =
-  'Oi {nome informal}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_EN =
-  'Hi {nome informal}, you have been assigned to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?';
+  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?';
 
 export const DEFAULT_OPENING_PRAYER_TEMPLATE_ES =
-  'Hola {nome informal}, se te ha asignado hacer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
+  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_PT_BR =
-  'Oi {nome informal}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
+  'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_EN =
-  'Hi {nome informal}, you have been assigned to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?';
+  'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?';
 
 export const DEFAULT_CLOSING_PRAYER_TEMPLATE_ES =
-  'Hola {nome informal}, se te ha asignado hacer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
+  'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a hacer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?';
 
 // --- Default Delegation Wrapper Templates (v2.0) ---
 

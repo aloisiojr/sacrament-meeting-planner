@@ -31,14 +31,12 @@
     `getDefaultSpeechTemplate`/`getDefaultPrayerTemplate` de `../../../src/lib/whatsappUtils.ts`.
     Funciona porque esse arquivo tem ZERO imports e `supabase/functions` está fora do tsc.
   - Redação nova escrita pelo usuário + auditoria de terminologia da Igreja (zero P1).
-  - **PENDENTE E NÃO VERIFICÁVEL AQUI:** o bundler do `supabase functions deploy` precisa aceitar
-    um import para fora de `supabase/`. Sem deno/Docker/dry-run nesta máquina. **Plano B** (no
-    spec): a edge function para de semear e grava NULL — verificado que 1.x trata NULL bem
-    (`v1.x:…/settings/whatsapp.tsx:121`, `v1.x:…/whatsappUtils.ts:178`).
+  - **RESOLVIDO 2026-08-06:** o deploy rodou e passou — o bundler aceita o import para fora de
+    `supabase/`. O plano B (semear NULL) fica só como alternativa se uma CLI futura recusar.
   - **P2 aberto:** o invariante "whatsappUtils não pode ganhar imports" só existe em comentário.
     Se alguém importar algo ali, tsc/lint/jest seguem verdes e só quebra no Deno. Guarda possível
     sem violar a regra de não assertar texto-fonte: inspecionar `require.cache[...].children`.
-  - **REQUER REDEPLOY** de `register-first-user`.
+  - Deploy de `register-first-user` **já feito** (2026-08-06).
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
   - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).

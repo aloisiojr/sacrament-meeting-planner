@@ -78,10 +78,13 @@ igual entre versões do app durante a cauda 1.x.
 O teste de contrato (AC3) permanece: ele não protege mais contra duas cópias divergirem, e sim
 contra alguém reintroduzir strings literais na edge function.
 
-**Verificação de deploy pendente:** o bundler do `supabase functions deploy` precisa aceitar um
-import para fora de `supabase/`. Isso NÃO é verificável nesta máquina; confirmar no deploy. Se
-falhar, o plano B é a edge function parar de semear (gravar NULL), que dá o mesmo lugar único
-sem depender do bundler.
+**Verificação de deploy: FEITA em 2026-08-06 — o bundler ACEITA o import para fora de
+`supabase/`.** O `supabase functions deploy register-first-user` rodou sem erro com a edge function
+importando `../../../src/lib/whatsappUtils.ts`. O plano B (parar de semear e gravar NULL) fica
+registrado apenas como alternativa caso um upgrade futuro da CLI passe a recusar o caminho.
+
+**Consequência: o invariante fica mais crítico.** A função implantada agora depende de
+`whatsappUtils.ts` continuar sem nenhum `import`. Ver o P2 aberto abaixo.
 
 **Terminologia da Igreja — mudanças aprovadas pelo usuário em 2026-08-05:**
 - en-US: `speech` → **talk** no texto voltado ao membro. Em inglês eclesiástico o membro faz um
@@ -105,7 +108,7 @@ sem depender do bundler.
 - `{colecao}` deixa de aparecer em qualquer texto padrão. O chip continua disponível.
 - Alas que hoje usam o padrão do código (coluna NULL) verão o texto mudar. É o objetivo.
 
-**DEPLOY NECESSÁRIO:** `supabase functions deploy register-first-user`.
+**DEPLOY: já executado em 2026-08-06** (`supabase functions deploy register-first-user`).
 
 ### Textos aprovados
 

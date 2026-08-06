@@ -226,7 +226,7 @@ describe('InviteManagementSection — v2.0 delegation send (AC9)', () => {
     expect(text).toContain('Olá Resp Person, tudo bom?');
     expect(text).toContain('Temos um convite para Del:');
     // base per-position message still embedded inside the wrapper
-    expect(text).toContain('primeiro discurso');
+    expect(text).toContain('1º discurso');
     expect(mockChangeStatusMock).toHaveBeenCalledWith({ speechId: 'sp1', status: 'assigned_invited' });
   });
 

@@ -195,7 +195,7 @@ describe('buildWhatsAppUrl', () => {
     expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('Olá');
     expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('Você');
     expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('falará');
-    expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('título');
+    expect(DEFAULT_TEMPLATE_SPEECH_1_PT_BR).toContain('Reunião');
   });
 });
 
@@ -225,6 +225,94 @@ describe('getDefaultSpeechTemplate', () => {
   });
 });
 
+describe('the approved wording of the default templates', () => {
+  // The copy is the deliverable here (specs/whatsapp-unify-default-templates.md), so it is pinned
+  // verbatim: a "harmless" reword is a product decision, not a refactor, and must show up as a
+  // failing test.
+  it('pt-BR reads exactly as approved', () => {
+    expect(getDefaultSpeechTemplate('pt-BR', 1)).toBe(
+      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+    );
+    expect(getDefaultSpeechTemplate('pt-BR', 2)).toBe(
+      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o 2º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 7-10 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+    );
+    expect(getDefaultSpeechTemplate('pt-BR', 3)).toBe(
+      'Olá {nome informal}, tudo bom? O Bispado gostaria de te convidar para fazer o último discurso na Reunião Sacramental do domingo dia {data}! Você falará por 15-20 minutos sobre "{titulo}" {link}.\n\nPodemos confirmar o seu discurso?'
+    );
+    expect(getDefaultPrayerTemplate('pt-BR', 'opening')).toBe(
+      'Oi {nome informal}, você foi designado(a) para fazer a oração de abertura da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
+    );
+    expect(getDefaultPrayerTemplate('pt-BR', 'closing')).toBe(
+      'Oi {nome informal}, você foi designado(a) para fazer a oração de encerramento da Reunião Sacramental do dia {data}.\n\nPodemos contar com você?'
+    );
+  });
+
+  it('en-US reads exactly as approved, using the Church term "talk"', () => {
+    expect(getDefaultSpeechTemplate('en-US', 1)).toBe(
+      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 1st talk in sacrament meeting on Sunday {data}! You will speak for 5 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+    );
+    expect(getDefaultSpeechTemplate('en-US', 2)).toBe(
+      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the 2nd talk in sacrament meeting on Sunday {data}! You will speak for 7-10 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+    );
+    expect(getDefaultSpeechTemplate('en-US', 3)).toBe(
+      'Hi {nome informal}, how are you? The Bishopric would like to invite you to give the last talk in sacrament meeting on Sunday {data}! You will speak for 15-20 minutes about "{titulo}" {link}.\n\nCan we confirm your talk?'
+    );
+    expect(getDefaultPrayerTemplate('en-US', 'opening')).toBe(
+      'Hi {nome informal}, you have been assigned to give the opening prayer in sacrament meeting on {data}.\n\nCan we count on you?'
+    );
+    expect(getDefaultPrayerTemplate('en-US', 'closing')).toBe(
+      'Hi {nome informal}, you have been assigned to give the closing prayer in sacrament meeting on {data}.\n\nCan we count on you?'
+    );
+  });
+
+  it('es-LA reads exactly as approved', () => {
+    expect(getDefaultSpeechTemplate('es-LA', 1)).toBe(
+      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 1er discurso en la reunión sacramental del domingo {data}. Hablarás por 5 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+    );
+    expect(getDefaultSpeechTemplate('es-LA', 2)).toBe(
+      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el 2do discurso en la reunión sacramental del domingo {data}. Hablarás por 7-10 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+    );
+    expect(getDefaultSpeechTemplate('es-LA', 3)).toBe(
+      'Hola {nome informal}, ¿cómo estás? El Obispado quisiera invitarte a dar el último discurso en la reunión sacramental del domingo {data}. Hablarás por 15-20 minutos sobre "{titulo}" {link}.\n\n¿Podemos confirmar tu discurso?'
+    );
+    expect(getDefaultPrayerTemplate('es-LA', 'opening')).toBe(
+      'Hola {nome informal}, se te ha asignado hacer la oración de apertura en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
+    );
+    expect(getDefaultPrayerTemplate('es-LA', 'closing')).toBe(
+      'Hola {nome informal}, se te ha asignado hacer la oración final en la reunión sacramental del día {data}.\n\n¿Podemos contar contigo?'
+    );
+  });
+
+  it('keeps the blank line before the closing question when resolved', () => {
+    const message = resolveTemplate(getDefaultSpeechTemplate('pt-BR', 1), {
+      speakerName: 'Maria Silva',
+      speakerInformalName: 'Maria',
+      date: '1 MAR',
+      topic: 'Fé',
+      link: 'https://x',
+    });
+
+    expect(message).toContain('.\n\nPodemos confirmar o seu discurso?');
+  });
+
+  it('leaves no double space or orphan line when the speech has no link', () => {
+    const message = resolveTemplate(getDefaultSpeechTemplate('pt-BR', 1), {
+      speakerName: 'Maria Silva',
+      speakerInformalName: 'Maria',
+      date: '1 MAR',
+      topic: 'Fé',
+    });
+
+    // Known cosmetic artifact, unchanged by this spec: the empty {link} leaves a single space
+    // before the period ('sobre "Fé" .'). What must not happen is a double space or a blank line
+    // opening up where the link was.
+    expect(message).toContain('sobre "Fé"');
+    expect(message).toContain('Podemos confirmar o seu discurso?');
+    expect(message).not.toMatch(/ {2}/);
+    expect(message).not.toMatch(/\n{3}/);
+  });
+});
+
 describe('the shipped default templates greet by the informal name', () => {
   const LANGS = ['pt-BR', 'en-US', 'es-LA'];
 
@@ -249,9 +337,9 @@ describe('the shipped default templates greet by the informal name', () => {
   });
 
   it('the pt-BR speech defaults still say which speech it is', () => {
-    expect(getDefaultSpeechTemplate('pt-BR', 1)).toContain('primeiro discurso');
-    expect(getDefaultSpeechTemplate('pt-BR', 2)).toContain('segundo discurso');
-    expect(getDefaultSpeechTemplate('pt-BR', 3)).toContain('terceiro discurso');
+    expect(getDefaultSpeechTemplate('pt-BR', 1)).toContain('1º discurso');
+    expect(getDefaultSpeechTemplate('pt-BR', 2)).toContain('2º discurso');
+    expect(getDefaultSpeechTemplate('pt-BR', 3)).toContain('último discurso');
   });
 
   it('a member with no informal name is still greeted, by the full name', () => {
@@ -262,7 +350,7 @@ describe('the shipped default templates greet by the informal name', () => {
       topic: '',
     });
 
-    expect(message).toContain('Olá Maria Silva, você foi designado(a)');
+    expect(message).toContain('Oi Maria Silva, você foi designado(a)');
   });
 });
 

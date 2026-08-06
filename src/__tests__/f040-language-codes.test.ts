@@ -231,7 +231,7 @@ describe('F040: getDefaultPrayerTemplate (AC-013)', () => {
   it('returns Spanish closing prayer for es-LA', () => {
     const template = getDefaultPrayerTemplate('es-LA', 'closing');
     expect(template).toBe(DEFAULT_CLOSING_PRAYER_TEMPLATE_ES);
-    expect(template).toContain('oración de cierre');
+    expect(template).toContain('oración final');
   });
 
   it('returns Portuguese opening prayer for pt-BR', () => {

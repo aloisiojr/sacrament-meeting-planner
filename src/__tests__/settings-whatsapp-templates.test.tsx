@@ -13,6 +13,8 @@ import ptBR from '../i18n/locales/pt-BR.json';
 import enUS from '../i18n/locales/en-US.json';
 import esLA from '../i18n/locales/es-LA.json';
 
+import { getDefaultSpeechTemplate, getDefaultPrayerTemplate } from '../lib/whatsappUtils';
+
 import WhatsAppTemplateScreen from '../app/(tabs)/settings/whatsapp';
 
 const INFORMAL_TOKEN = '{nome informal}';
@@ -84,6 +86,23 @@ describe('Settings → WhatsApp templates: the informal-name placeholder', () =>
     await fireEvent.changeText(screen.getByTestId('template-editor'), `${FULL_NAME_TOKEN}/${INFORMAL_TOKEN}`);
     const preview = screen.getByTestId('template-preview');
     expect(preview).toHaveTextContent('Maria Silva/Maria');
+  });
+});
+
+describe('a ward with nothing saved sees the real default text', () => {
+  // useQuery is mocked to `data: null`, i.e. a ward whose columns are NULL — the birth state now
+  // that the edge function stopped seeding. The editor must show the wording the app would send,
+  // not an empty box.
+  it.each([
+    ['speech_1', () => getDefaultSpeechTemplate('pt-BR', 1)],
+    ['speech_2', () => getDefaultSpeechTemplate('pt-BR', 2)],
+    ['speech_3', () => getDefaultSpeechTemplate('pt-BR', 3)],
+    ['opening_prayer', () => getDefaultPrayerTemplate('pt-BR', 'opening')],
+    ['closing_prayer', () => getDefaultPrayerTemplate('pt-BR', 'closing')],
+  ])('the %s tab is prefilled with the ward-language default', async (tab, expected) => {
+    await render();
+    await fireEvent.press(screen.getByTestId(`template-tab-${tab}`));
+    expect(editorValue()).toBe(expected());
   });
 });
 

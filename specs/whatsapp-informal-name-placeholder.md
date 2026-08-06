@@ -92,9 +92,12 @@ e ninguém consegue editá-lo pelo app. A coluna já existe no banco.
 - AC13: WHEN um convite delegado é enviado, the system SHALL manter o wrapper de delegação
   inalterado, com `{responsavel}`, `{nome}` (= `delegate_for_name`) e `{mensagem}` resolvidos como
   hoje.
-- AC14: WHEN uma ala nova é criada pelo registro do primeiro usuário, the system SHALL semear os 5
-  templates de WhatsApp com `{nome informal}` na saudação e sem nenhum `{nome}`, em qualquer das 3
-  línguas.
+- ~~AC14: WHEN uma ala nova é criada pelo registro do primeiro usuário, the system SHALL semear os
+  5 templates de WhatsApp com `{nome informal}` na saudação e sem nenhum `{nome}`, em qualquer das
+  3 línguas.~~ **SUPERADO em 2026-08-06 por `specs/whatsapp-stop-seeding-templates.md`:** a ala nova
+  não recebe mais nenhum texto semeado — as colunas nascem NULL e o app cai no padrão do código.
+  A saudação por `{nome informal}` continua garantida, agora pelos literais exatos de
+  `whatsapp-utils.test.ts` em vez de pela semeadura.
 
 ## Open questions
 

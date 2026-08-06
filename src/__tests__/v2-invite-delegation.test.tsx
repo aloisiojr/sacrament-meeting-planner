@@ -149,6 +149,60 @@ beforeEach(() => {
   WARD.whatsapp_template_speech_1 = null;
 });
 
+describe('a ward that never configured anything still sends real text', () => {
+  // Since the edge function stopped seeding, the five template columns are NULL the day a ward is
+  // created. The fallback to the app's default IS the message — if it ever returns '', a brand-new
+  // ward sends an empty WhatsApp invite. Prayers are covered here because nothing else exercises
+  // positions 0 and 4 through this component.
+  it.each([
+    [0, 'oração de abertura'],
+    [4, 'oração de encerramento'],
+  ])('position %i sends the default prayer text with every column NULL', (position, phrase) => {
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp1',
+        position,
+        member_id: 'm-plain',
+        contact_phone: '+15550009',
+        speaker_name: 'Plain Person',
+        speaker_informal_name: 'Plain',
+        topic_title: null,
+        topic_collection: null,
+      }),
+    ];
+
+    return render()
+      .then(pressSend)
+      .then(() => {
+        const { text } = lastSentText();
+        expect(text).toContain(`Olá Plain, tudo bom? O bispado gostaria de te convidar para fazer a ${phrase}`);
+        expect(text).toContain('Podemos contar com você?');
+        expect(text).not.toContain('{');
+      });
+  });
+
+  it('a speech sends the default text with every column NULL', () => {
+    mockSPEECHES = [
+      makeSpeech({
+        id: 'sp1',
+        position: 1,
+        member_id: 'm-plain',
+        contact_phone: '+15550009',
+        speaker_name: 'Plain Person',
+        speaker_informal_name: 'Plain',
+      }),
+    ];
+
+    return render()
+      .then(pressSend)
+      .then(() => {
+        const { text } = lastSentText();
+        expect(text).toContain('Olá Plain, tudo bom? O bispado gostaria de te convidar para fazer o 1º discurso');
+        expect(text).not.toContain('{');
+      });
+  });
+});
+
 describe('the message distinguishes the full name from the informal one', () => {
   it('{nome} is the full name and {nome informal} the informal one', () => {
     WARD.whatsapp_template_speech_1 = 'Olá {nome informal}, convite para {nome}.';

@@ -37,6 +37,18 @@
     Se alguém importar algo ali, tsc/lint/jest seguem verdes e só quebra no Deno. Guarda possível
     sem violar a regra de não assertar texto-fonte: inspecionar `require.cache[...].children`.
   - Deploy de `register-first-user` **já feito** (2026-08-06).
+- **IN FLIGHT — `specs/whatsapp-stop-seeding-templates.md` (plano B): ala nova nasce com NULL.**
+  Branch `feat/stop-seeding-templates`, a partir de `main` em `3558d59`.
+  - REVERTE o mecanismo dos dois specs anteriores: a edge function não importa mais o
+    `whatsappUtils` nem semeia as 5 colunas. Motivo: o deploy empacotava uma CÓPIA CONGELADA do
+    texto, que envelhecia em silêncio com o teste de contrato verde.
+  - Removida a guarda `whatsapp-utils-dependency-free.test.ts` (existia só pelo import;
+    recuperável em `3558d59`). `whatsapp-informal-name-placeholder.md` AC14 marcado como superado.
+  - Verify reprovou com 2 P1 de cobertura, ambos corrigidos e provados por mutação: o fallback da
+    ORAÇÃO não tinha teste nenhum (trocá-lo por '' deixava 2606 testes verdes) e o AC4 do editor
+    idem. Também coberto o fallback de idioma desconhecido nas posições 2 e 3.
+  - **REQUER DEPLOY** de `register-first-user` — a última vez; depois disso mudar redação nunca
+    mais exige deploy.
 - **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
   Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
   - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).

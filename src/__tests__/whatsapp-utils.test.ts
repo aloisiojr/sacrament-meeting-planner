@@ -212,8 +212,15 @@ describe('getDefaultSpeechTemplate', () => {
     expect(getDefaultSpeechTemplate('es-LA', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_ES);
   });
 
-  it('falls back to en-US for unknown language', () => {
+  it('falls back to en-US for unknown language, in every position', () => {
+    // Position 1 alone used to be pinned here; the fr-FR contract case that covered 2 and 3 went
+    // away with the seeding tests. `register-first-user` does not validate `language`, so an
+    // unsupported code really can reach this.
     expect(getDefaultSpeechTemplate('fr', 1)).toBe(DEFAULT_TEMPLATE_SPEECH_1_EN);
+    expect(getDefaultSpeechTemplate('fr', 2)).toBe(getDefaultSpeechTemplate('en-US', 2));
+    expect(getDefaultSpeechTemplate('fr', 3)).toBe(getDefaultSpeechTemplate('en-US', 3));
+    expect(getDefaultPrayerTemplate('fr', 'opening')).toBe(getDefaultPrayerTemplate('en-US', 'opening'));
+    expect(getDefaultPrayerTemplate('fr', 'closing')).toBe(getDefaultPrayerTemplate('en-US', 'closing'));
   });
 
   it('EN template contains Bishopric', () => {

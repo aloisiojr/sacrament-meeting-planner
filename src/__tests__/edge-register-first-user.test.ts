@@ -13,7 +13,6 @@ import {
   type AdminResponses,
   type AdminRecorder,
 } from './helpers/edgeFunctionHarness';
-import { getDefaultSpeechTemplate, getDefaultPrayerTemplate } from '../lib/whatsappUtils';
 
 const mockCreateClient = jest.fn();
 jest.mock(
@@ -191,81 +190,36 @@ describe('register-first-user — the ward it creates', () => {
     expect(wardInsert()).toMatchObject({ timezone: 'America/Sao_Paulo' });
   });
 
-  it.each([
-    ['pt-BR', 'Podemos confirmar o seu discurso?'],
-    ['en-US', 'Can we count on you?'],
-    ['es-LA', '¿Podemos confirmar tu discurso?'],
-  ])('seeds %s WhatsApp templates in that language', async (language, marker) => {
-    await call({ ...VALID, language });
-    const w = wardInsert() as Record<string, string>;
-
-    for (const key of [
-      'whatsapp_template_speech_1',
-      'whatsapp_template_speech_2',
-      'whatsapp_template_speech_3',
-    ]) {
-      expect(w[key]).toContain(marker);
-    }
-    expect(w.whatsapp_template_opening_prayer).toBeTruthy();
-    expect(w.whatsapp_template_closing_prayer).toBeTruthy();
-  });
-
-  // The seeded text and the app's "restore default" text used to be two independently maintained
-  // sets of strings that had silently drifted apart. They are now one source, and this is the
-  // contract that keeps them one: exact equality, not a marker phrase. An unknown language must
-  // fall back to en-US on BOTH sides.
+  // The edge function no longer seeds any template: the columns are born NULL and the app falls
+  // back to the wording in whatsappUtils. That removes the frozen copy a deploy used to bake in.
+  // The wording itself is pinned in whatsapp-utils.test.ts; the NULL fallback in
+  // v2-invite-delegation.test.tsx, which sends with every template column null.
   it.each([['pt-BR'], ['en-US'], ['es-LA'], ['fr-FR']])(
-    'seeds %s wards with exactly the app default — the two can never drift apart',
+    'creates a %s ward without seeding any WhatsApp template',
     async (language) => {
       await call({ ...VALID, language });
-      const w = wardInsert() as Record<string, string>;
-
-      expect(w.whatsapp_template_speech_1).toBe(getDefaultSpeechTemplate(language, 1));
-      expect(w.whatsapp_template_speech_2).toBe(getDefaultSpeechTemplate(language, 2));
-      expect(w.whatsapp_template_speech_3).toBe(getDefaultSpeechTemplate(language, 3));
-      expect(w.whatsapp_template_opening_prayer).toBe(getDefaultPrayerTemplate(language, 'opening'));
-      expect(w.whatsapp_template_closing_prayer).toBe(getDefaultPrayerTemplate(language, 'closing'));
-    }
-  );
-
-  // Every language branch, plus the unknown-language fallback: each one is a separate block of
-  // hardcoded strings, so pinning only pt-BR lets the other two regress silently.
-  it.each([['pt-BR'], ['en-US'], ['es-LA'], ['fr-FR']])(
-    'seeds %s templates that greet by the informal name, with the placeholders the sender substitutes',
-    async (language) => {
-      // A template missing the name or {data} silently sends "Hi , ... on Sunday". The greeting
-      // must be {nome informal}, not {nome}: {nome} is the FULL name, so a seeded ward that never
-      // customized anything would greet "Hi Maria Silva" instead of "Hi Maria".
-      await call({ ...VALID, language });
-      const w = wardInsert() as Record<string, string>;
+      const w = wardInsert() as Record<string, unknown>;
 
       for (const key of [
         'whatsapp_template_speech_1',
         'whatsapp_template_speech_2',
         'whatsapp_template_speech_3',
+        'whatsapp_template_opening_prayer',
+        'whatsapp_template_closing_prayer',
       ]) {
-        expect(w[key]).toContain('{nome informal}');
-        expect(w[key]).not.toContain('{nome}');
-        expect(w[key]).toContain('{data}');
-        expect(w[key]).toContain('{titulo}');
-      }
-      for (const key of ['whatsapp_template_opening_prayer', 'whatsapp_template_closing_prayer']) {
-        expect(w[key]).toContain('{nome informal}');
-        expect(w[key]).not.toContain('{nome}');
-        expect(w[key]).toContain('{data}');
+        expect(w[key]).toBeUndefined();
       }
     }
   );
 
-  it('gives each speech position its own template', async () => {
-    await call(VALID);
-    const w = wardInsert() as Record<string, string>;
-    const templates = [
-      w.whatsapp_template_speech_1,
-      w.whatsapp_template_speech_2,
-      w.whatsapp_template_speech_3,
-    ];
-    expect(new Set(templates).size).toBe(3);
+  it('still records the ward identity it is responsible for', async () => {
+    await call({ ...VALID, language: 'es-LA', timezone: 'America/Lima' });
+    expect(wardInsert()).toEqual({
+      name: 'Ala Modelo',
+      stake_name: 'Estaca Central',
+      language: 'es-LA',
+      timezone: 'America/Lima',
+    });
   });
 
   it.each([

@@ -5,9 +5,10 @@
 
 // --- Default Speech Templates (3 positions x 3 languages) ---
 //
-// This is the SINGLE source of the default wording: the register-first-user edge function
-// imports these getters to seed a new ward, so the text a ward is born with and the text
-// "restore default" gives back can no longer drift apart.
+// This is the SINGLE source of the default wording. Nothing stores a copy: a new ward is created
+// with these columns NULL and the app falls back to the text below, so the wording a ward is born
+// with and the wording "restore default" gives back cannot drift apart — and no deployed copy of
+// this text exists anywhere to go stale.
 
 export const DEFAULT_TEMPLATE_SPEECH_1_PT_BR =
   'Olá {nome informal}, tudo bom? O bispado gostaria de te convidar para fazer o 1º discurso na Reunião Sacramental do domingo dia {data}! Você falará por 5 minutos sobre "{titulo}". {link}\n\nPodemos confirmar o seu discurso?';

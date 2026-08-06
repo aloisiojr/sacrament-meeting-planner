@@ -2,6 +2,11 @@
 
 ## Problem / intent
 
+> **REVERTIDO EM PARTE — ver `specs/whatsapp-stop-seeding-templates.md` (2026-08-06).**
+> A redação única definida aqui continua valendo. O MECANISMO não: a edge function deixou de
+> importar `whatsappUtils` e de semear as colunas. Elas nascem NULL e o app cai no default.
+> Motivo: o deploy empacotava uma cópia congelada do texto, que envelhecia em silêncio.
+
 Existem hoje DOIS conjuntos de "texto padrão" para as mesmas 5 mensagens de WhatsApp, com
 redações diferentes: o que a edge function `register-first-user` grava em cada ala nova, e o que
 `whatsappUtils.ts` devolve quando a coluna está NULL (ou seja, o que "restaurar padrão" entrega).

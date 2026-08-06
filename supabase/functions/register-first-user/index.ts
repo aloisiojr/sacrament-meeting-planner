@@ -3,13 +3,6 @@
 // Also creates the default "Temas da Ala" collection config.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-// The default WhatsApp templates live in the app's pure, dependency-free whatsappUtils so that
-// the wording a ward is BORN with and the wording "restore default" gives back are one text,
-// not two that drift. Deno needs the explicit .ts extension.
-import {
-  getDefaultSpeechTemplate,
-  getDefaultPrayerTemplate,
-} from '../../../src/lib/whatsappUtils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,11 +94,10 @@ Deno.serve(async (req) => {
         stake_name: input.stakeName,
         language: wardLanguage,
         timezone: input.timezone || 'America/Sao_Paulo',
-        whatsapp_template_speech_1: getDefaultSpeechTemplate(wardLanguage, 1),
-        whatsapp_template_speech_2: getDefaultSpeechTemplate(wardLanguage, 2),
-        whatsapp_template_speech_3: getDefaultSpeechTemplate(wardLanguage, 3),
-        whatsapp_template_opening_prayer: getDefaultPrayerTemplate(wardLanguage, 'opening'),
-        whatsapp_template_closing_prayer: getDefaultPrayerTemplate(wardLanguage, 'closing'),
+        // The whatsapp_template_* columns are deliberately left NULL. Seeding them would bake a
+        // copy of the wording into the deployed function, and that copy silently goes stale the
+        // first time the app's text changes without a redeploy. NULL means the app's own default
+        // is the single source; whatsapp_template_delegation_wrapper has worked this way all along.
       })
       .select()
       .single();

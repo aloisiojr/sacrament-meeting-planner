@@ -70,6 +70,15 @@
   (`members.tsx:238`, `useApplyMemberImport.ts:51`, `useMembers.ts:130`, `csvUtils.ts:207`). Depois
   deste passo existirá um helper canônico; adotá-lo nos quatro é uma limpeza separada, não esta.
 
+## Ajustes vindos da verificação (2026-08-11)
+
+- **AC9/AC10** acrescentados ao spec: a reconciliação também acontece ao salvar (o botão Salvar não
+  tira o foco do campo) e não renormaliza um informal que já diz a mesma coisa.
+- A regra saiu do componente para `reconcileInformalName()` em `nameUtils`, usada nos dois pontos
+  de commit — blur e save.
+- Regressão introduzida e corrigida no meio do caminho: mover a atualização da referência para
+  dentro da função fez ela rodar também com o nome em branco, apagando o "primeiro nome anterior".
+
 ## Rollback
 
 Dois commits independentes. `git revert` do passo 2 devolve o editor ao comportamento atual e

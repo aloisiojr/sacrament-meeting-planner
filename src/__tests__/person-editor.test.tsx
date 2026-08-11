@@ -239,6 +239,36 @@ describe('PersonEditor — the informal name follows the first name', () => {
     expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({ informal_name: 'joao' });
   });
 
+  it('clearing the name and retyping still follows the first name', async () => {
+    // Blanking the field must not advance the "previous first name" reference: the informal name
+    // still tracks the old one, so the next rename has to be recognised.
+    await render();
+    await typeNameAndBlur('Joao Silva');
+    await typeNameAndBlur('   ');
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Pedro');
+  });
+
+  it('a blank detour does not poison the save either', async () => {
+    await render({ member: { ...OTHER, full_name: 'Joao Alves', informal_name: 'Joao' } });
+    await typeNameAndBlur('   ');
+    await change(null, 'person-editor-full-name', 'Pedro Alves');
+    await press(null, 'person-editor-save');
+
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({ informal_name: 'Pedro' });
+  });
+
+  it('reconciles on save on the create path too (AC9)', async () => {
+    await render({ initialName: 'Maria Souza' });
+    await change(null, 'person-editor-full-name', 'Ana Souza');
+    await press(null, 'person-editor-save');
+
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
+      full_name: 'Ana Souza',
+      informal_name: 'Ana',
+    });
+  });
+
   it('keeps following across repeated corrections before saving', async () => {
     await render({ initialName: 'Maria Souza' });
     await typeNameAndBlur('Mariana Souza');

@@ -195,6 +195,10 @@ export function PersonEditor({
    * Returns the reconciled informal name so the save path does not have to wait for a re-render.
    */
   const reconcileInformal = useCallback((): string => {
+    // A blank name commits nothing — not even the reference. Advancing it here would erase the
+    // previous first name, and a later rename would no longer be recognised as still tracking it.
+    if (!getFirstName(fullName)) return informalName;
+
     const next = reconcileInformalName({
       fullName,
       informalName,

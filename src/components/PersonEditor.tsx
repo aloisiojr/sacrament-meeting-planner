@@ -194,7 +194,7 @@ export function PersonEditor({
    * otherwise keep the informal name of the OLD first name — the very thing this rule exists to fix.
    * Returns the reconciled informal name so the save path does not have to wait for a re-render.
    */
-  const reconcileInformal = (): string => {
+  const reconcileInformal = useCallback((): string => {
     const next = reconcileInformalName({
       fullName,
       informalName,
@@ -204,7 +204,7 @@ export function PersonEditor({
     if (next === null) return informalName;
     setInformalName(next);
     return next;
-  };
+  }, [fullName, informalName, lastFullName]);
 
   const responsibleMember = useMemo(
     () => (allMembers ?? []).find((m) => m.id === responsibleId) ?? null,
@@ -308,8 +308,8 @@ export function PersonEditor({
       createMember.mutate(fields, { onSuccess, onError });
     }
   }, [
+    reconcileInformal,
     fullName,
-    informalName,
     calling,
     countryCode,
     phone,

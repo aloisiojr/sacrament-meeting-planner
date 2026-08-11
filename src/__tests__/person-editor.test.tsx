@@ -132,6 +132,98 @@ beforeEach(() => {
   mockDeleteMock.mockClear();
 });
 
+/** Value currently shown in a text field. */
+function fieldValue(testID: string): string {
+  return screen.getByTestId(testID).props.value as string;
+}
+
+/** Type into the full-name field and leave it, which is what triggers the rule. */
+async function typeNameAndBlur(value: string) {
+  await fireEvent.changeText(screen.getByTestId('person-editor-full-name'), value);
+  await fireEvent(screen.getByTestId('person-editor-full-name'), 'blur');
+}
+
+describe('PersonEditor — the informal name follows the first name', () => {
+  it('prefills the informal name when the editor opens with a name (AC1)', async () => {
+    await render({ initialName: 'Maria Souza' });
+    expect(fieldValue('person-editor-informal-name')).toBe('Maria');
+  });
+
+  it('fills an empty informal name when the full name loses focus (AC2)', async () => {
+    await render();
+    expect(fieldValue('person-editor-informal-name')).toBe('');
+    await typeNameAndBlur('João Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('João');
+  });
+
+  it('follows the first name when it changes and the informal still matched it (AC3)', async () => {
+    await render();
+    await typeNameAndBlur('João Silva');
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Pedro');
+  });
+
+  it('follows the change while editing an existing member too (AC3)', async () => {
+    await render({ member: { ...OTHER, full_name: 'João Silva', informal_name: 'João' } });
+    expect(fieldValue('person-editor-informal-name')).toBe('João');
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Pedro');
+  });
+
+  it('recognises a match written without accents or in another case (AC5)', async () => {
+    await render({ member: { ...OTHER, full_name: 'João Silva', informal_name: 'joao' } });
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Pedro');
+  });
+
+  it('leaves a customized informal name alone (AC4)', async () => {
+    await render({ member: { ...OTHER, full_name: 'João Silva', informal_name: 'Joãozinho' } });
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Joãozinho');
+  });
+
+  it('leaves alone what the user typed in the informal field (AC8)', async () => {
+    await render();
+    await typeNameAndBlur('João Silva');
+    await change(null, 'person-editor-informal-name', 'Jota');
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Jota');
+  });
+
+  it('does not clear the informal name when the full name is emptied (AC6)', async () => {
+    await render();
+    await typeNameAndBlur('João Silva');
+    await typeNameAndBlur('   ');
+    expect(fieldValue('person-editor-informal-name')).toBe('João');
+  });
+
+  it('shows the stored informal name untouched when editing (AC7)', async () => {
+    await render({ member: { ...OTHER, full_name: 'João Silva', informal_name: 'Joãozinho' } });
+    expect(fieldValue('person-editor-informal-name')).toBe('Joãozinho');
+  });
+
+  it('carries the filled informal name into the save', async () => {
+    // useCreateMember has its own first-name fallback, so the payload could look right even if the
+    // field never filled. Blur first, then save: this proves the value the user SAW is the one sent.
+    await render();
+    await typeNameAndBlur('João Silva');
+    await press(null, 'person-editor-save');
+
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({
+      full_name: 'João Silva',
+      informal_name: 'João',
+    });
+  });
+
+  it('keeps following across repeated corrections before saving', async () => {
+    await render({ initialName: 'Maria Souza' });
+    await typeNameAndBlur('Mariana Souza');
+    expect(fieldValue('person-editor-informal-name')).toBe('Mariana');
+    await typeNameAndBlur('Ana Souza');
+    expect(fieldValue('person-editor-informal-name')).toBe('Ana');
+  });
+});
+
 describe('PersonEditor', () => {
   it('creates a person with identity + capability flags (AC7)', async () => {
     const { onSaved, onClose } = await render();

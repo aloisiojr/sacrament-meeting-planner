@@ -43,6 +43,7 @@ import {
   filterMembers,
 } from '../hooks/useMembers';
 import { COUNTRY_CODES, getFlagForCode } from '../lib/countryCodes';
+import { getFirstName, isSameName } from '../lib/nameUtils';
 import type { Member } from '../types/database';
 
 // --- Capability field mapping (shared shape with PeoplePicker) ---
@@ -121,6 +122,9 @@ export function PersonEditor({
 
   const [fullName, setFullName] = useState('');
   const [informalName, setInformalName] = useState('');
+  // Last full name the informal field was reconciled against — the rule compares the informal
+  // name to the PREVIOUS first name, which the current `fullName` no longer holds.
+  const [lastFullName, setLastFullName] = useState('');
   const [calling, setCalling] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const [phone, setPhone] = useState('');
@@ -150,6 +154,7 @@ export function PersonEditor({
       if (member) {
         setFullName(member.full_name);
         setInformalName(member.informal_name ?? '');
+        setLastFullName(member.full_name);
         setCalling(member.calling ?? '');
         setCountryCode(member.country_code ?? '');
         setPhone(member.phone ?? '');
@@ -164,7 +169,8 @@ export function PersonEditor({
           setResponsibleId(member.responsible_id);
       } else {
         setFullName(initialName ?? '');
-        setInformalName('');
+        setInformalName(getFirstName(initialName ?? ''));
+        setLastFullName(initialName ?? '');
         setCalling('');
         setCountryCode('');
         setPhone('');
@@ -179,6 +185,20 @@ export function PersonEditor({
       setCountrySearch('');
     }
   }
+
+  /**
+   * The informal name follows the first name until someone personalizes it: fill it when empty,
+   * and keep it in step while it still matches the first name the full name had before this edit.
+   * A blank full name changes nothing — clearing the name must not wipe the informal one.
+   */
+  const handleFullNameBlur = () => {
+    const first = getFirstName(fullName);
+    if (!first) return;
+    if (!informalName.trim() || isSameName(informalName, getFirstName(lastFullName))) {
+      setInformalName(first);
+    }
+    setLastFullName(fullName);
+  };
 
   const responsibleMember = useMemo(
     () => (allMembers ?? []).find((m) => m.id === responsibleId) ?? null,
@@ -332,6 +352,7 @@ export function PersonEditor({
             style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
             value={fullName}
             onChangeText={setFullName}
+            onBlur={handleFullNameBlur}
             placeholder={t('members.fullName')}
             placeholderTextColor={colors.placeholder}
             autoCapitalize="words"

@@ -55,6 +55,10 @@ alguém escrever algo diferente ali.
 - AC3: WHILE o nome informal for igual ao primeiro nome anterior, WHEN o campo do nome completo
   perde o foco com um primeiro nome diferente, the system SHALL atualizar o nome informal para o
   novo primeiro nome. Isso vale tanto criando quanto editando.
+- AC9: WHEN o formulário é salvo, the system SHALL aplicar a mesma reconciliação antes de montar o
+  payload, mesmo que o campo do nome completo nunca tenha perdido o foco.
+- AC10: IF o nome informal já diz a mesma coisa que o primeiro nome atual (ignorando caixa e
+  acentos), THEN the system SHALL deixá-lo exatamente como está, sem renormalizar a grafia.
 - AC4: IF o nome informal foi personalizado (não é igual ao primeiro nome anterior nem está vazio),
   THEN the system SHALL deixá-lo intocado quando o nome completo mudar.
 - AC5: WHEN comparar o nome informal com o primeiro nome anterior, the system SHALL ignorar
@@ -91,5 +95,21 @@ já usada em `members.tsx:238`.
 **Comparação com o primeiro nome ANTERIOR:** a regra depende do valor que o nome completo tinha
 antes desta edição, então o componente precisa lembrar o último nome completo aplicado — não basta
 olhar o estado atual.
+
+**AC9 e AC10 vieram da verificação adversarial (2026-08-11), não do pedido original.**
+
+- **AC9 — o pedido dizia "quando o foco sair do campo", e o código cumpria isso à risca. Só que o
+  botão Salvar fica no cabeçalho, FORA do `ScrollView`: tocar nele não tira o foco de um
+  `TextInput`.** Editar o nome e salvar direto — o fluxo mais provável — não disparava o `onBlur`.
+  Na criação o fallback de `useMembers.ts:130` disfarçava; na edição, que é a metade que esta
+  mudança existe para consertar, o informal continuava apontando para o nome antigo. Estendido para
+  o salvar; se o usuário preferir a semântica literal de só-no-blur, basta reverter esse commit.
+- **AC10** — sem essa guarda, apenas visitar o campo do nome reescrevia um informal "joao" como
+  "Joao". Era uma escrita que o usuário não pediu, e o espelho invertido da promessa do AC4.
+
+**Comportamento conhecido, deliberado:** se alguém apagar o nome informal de propósito e depois
+mexer no nome completo, o informal volta a ser preenchido (AC2). Não há como salvar uma pessoa com
+informal em branco se o campo do nome for revisitado. Aceitável porque `useCreateMember` já impunha
+o primeiro nome de qualquer forma.
 
 **Sem deploy, sem migração.** Mudança de cliente apenas.

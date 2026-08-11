@@ -43,7 +43,7 @@ import {
   filterMembers,
 } from '../hooks/useMembers';
 import { COUNTRY_CODES, getFlagForCode } from '../lib/countryCodes';
-import { getFirstName, isSameName } from '../lib/nameUtils';
+import { getFirstName, reconcileInformalName } from '../lib/nameUtils';
 import type { Member } from '../types/database';
 
 // --- Capability field mapping (shared shape with PeoplePicker) ---
@@ -187,17 +187,23 @@ export function PersonEditor({
   }
 
   /**
-   * The informal name follows the first name until someone personalizes it: fill it when empty,
-   * and keep it in step while it still matches the first name the full name had before this edit.
-   * A blank full name changes nothing — clearing the name must not wipe the informal one.
+   * Apply "the informal name follows the first name" and return the value to save with.
+   *
+   * Runs on blur AND on save: tapping Save does not blur a focused TextInput (the button lives in
+   * the header, outside the ScrollView), so a user who edits the name and saves straight away would
+   * otherwise keep the informal name of the OLD first name — the very thing this rule exists to fix.
+   * Returns the reconciled informal name so the save path does not have to wait for a re-render.
    */
-  const handleFullNameBlur = () => {
-    const first = getFirstName(fullName);
-    if (!first) return;
-    if (!informalName.trim() || isSameName(informalName, getFirstName(lastFullName))) {
-      setInformalName(first);
-    }
+  const reconcileInformal = (): string => {
+    const next = reconcileInformalName({
+      fullName,
+      informalName,
+      previousFullName: lastFullName,
+    });
     setLastFullName(fullName);
+    if (next === null) return informalName;
+    setInformalName(next);
+    return next;
   };
 
   const responsibleMember = useMemo(
@@ -264,9 +270,13 @@ export function PersonEditor({
       return;
     }
 
+    // Saving is also a commit point for the informal-name rule: the Save button does not blur the
+    // name field, so without this an edited name would be saved next to the old first name.
+    const reconciledInformal = reconcileInformal();
+
     const fields = {
       full_name: trimmedName,
-      informal_name: informalName.trim() || null,
+      informal_name: reconciledInformal.trim() || null,
       calling: calling.trim() || null,
       // Default to the app/DB default (+55) rather than persisting an empty country code.
       country_code: countryCode.trim() || '+55',
@@ -352,7 +362,7 @@ export function PersonEditor({
             style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
             value={fullName}
             onChangeText={setFullName}
-            onBlur={handleFullNameBlur}
+            onBlur={reconcileInformal}
             placeholder={t('members.fullName')}
             placeholderTextColor={colors.placeholder}
             autoCapitalize="words"

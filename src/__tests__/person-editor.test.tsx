@@ -215,6 +215,30 @@ describe('PersonEditor — the informal name follows the first name', () => {
     });
   });
 
+  it('reconciles on save even when the name field never lost focus', async () => {
+    // The Save button sits in the header, outside the ScrollView: tapping it does NOT blur a
+    // focused TextInput. Editing the name and saving straight away is the most likely flow, and it
+    // used to persist the OLD first name as the informal one.
+    await render({ member: { ...OTHER, full_name: 'Joao Alves', informal_name: 'Joao' } });
+    await change(null, 'person-editor-full-name', 'Pedro Alves');
+    await press(null, 'person-editor-save');
+
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({
+      full_name: 'Pedro Alves',
+      informal_name: 'Pedro',
+    });
+  });
+
+  it('saving does not renormalize an informal name that already says the same thing', async () => {
+    // Visiting the name field without changing anything must not rewrite "joao" as "Joao".
+    await render({ member: { ...OTHER, full_name: 'Joao Alves', informal_name: 'joao' } });
+    await fireEvent(screen.getByTestId('person-editor-full-name'), 'blur');
+    expect(fieldValue('person-editor-informal-name')).toBe('joao');
+    await press(null, 'person-editor-save');
+
+    expect(mockUpdateMock.mock.calls[0][0]).toMatchObject({ informal_name: 'joao' });
+  });
+
   it('keeps following across repeated corrections before saving', async () => {
     await render({ initialName: 'Maria Souza' });
     await typeNameAndBlur('Mariana Souza');

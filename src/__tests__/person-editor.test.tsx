@@ -269,6 +269,20 @@ describe('PersonEditor — the informal name follows the first name', () => {
     });
   });
 
+  it('a customized informal name still advances the reference, so an old first name cannot resurrect', async () => {
+    // Once the informal name is customized the rename is not followed — but the reference must
+    // still move to the new name. Otherwise, typing the ORIGINAL first name into the informal
+    // field later would look like "still tracking", and the next rename would overwrite it.
+    await render({ member: { ...OTHER, full_name: 'Joao Silva', informal_name: 'Joaozinho' } });
+    await typeNameAndBlur('Pedro Silva');
+    expect(fieldValue('person-editor-informal-name')).toBe('Joaozinho');
+
+    await change(null, 'person-editor-informal-name', 'Joao');
+    await typeNameAndBlur('Carlos Silva');
+
+    expect(fieldValue('person-editor-informal-name')).toBe('Joao');
+  });
+
   it('keeps following across repeated corrections before saving', async () => {
     await render({ initialName: 'Maria Souza' });
     await typeNameAndBlur('Mariana Souza');

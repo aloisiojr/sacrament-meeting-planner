@@ -42,6 +42,11 @@ let mockMEMBERS: Member[] = [];
 const mockUpdateMock = jest.fn((_vars: { id: string }, opts?: { onSuccess?: (m: Member) => void }) =>
   opts?.onSuccess?.({ ...MEMBER_B, can_preside: true })
 );
+/** Creating must return the stored row, or PersonEditor never calls onSaved. */
+const mockCreateMock = jest.fn(
+  (vars: { full_name: string }, opts?: { onSuccess?: (m: Member) => void }) =>
+    opts?.onSuccess?.({ ...MEMBER_A, id: 'new-person', full_name: vars.full_name })
+);
 const mockDeleteMock = jest.fn();
 
 jest.mock('../hooks/useMembers', () => {
@@ -49,7 +54,7 @@ jest.mock('../hooks/useMembers', () => {
   return {
     ...actual,
     useMembers: () => ({ data: mockMEMBERS }),
-    useCreateMember: () => ({ mutate: jest.fn() }),
+    useCreateMember: () => ({ mutate: mockCreateMock }),
     useUpdateMember: () => ({ mutate: mockUpdateMock }),
     useDeleteMember: () => ({ mutate: mockDeleteMock }),
   };
@@ -128,10 +133,17 @@ function ids(_renderer?: unknown): string[] {
 beforeEach(() => {
   mockMEMBERS = [MEMBER_A, MEMBER_B, MEMBER_C];
   mockUpdateMock.mockClear();
+  mockCreateMock.mockClear();
   mockDeleteMock.mockClear();
   mockHasPermissionMock.mockImplementation(() => true);
   jest.spyOn(Alert, 'alert').mockClear();
 });
+
+/** Switch state, platform-neutral (iOS exposes `value`, Android `on`). */
+function switchOn(testID: string): boolean {
+  const sw = screen.getByTestId(testID);
+  return (sw.props.value ?? (sw.props as { on?: boolean }).on) === true;
+}
 
 function alertButtons() {
   const calls = (Alert.alert as unknown as { mock: { calls: unknown[][] } }).mock.calls;
@@ -388,7 +400,44 @@ describe('PeoplePicker', () => {
     expect(ids()).not.toContain('b');
   });
 
-  describe('adding a person carries the picker context', () => {
+  describe('returning from adding a person', () => {
+  it('turns "Ver todos" back off (AC: the new person is in the filtered list now)', async () => {
+    await render({ context: 'play_piano' });
+    await toggle(null, 'people-picker-view-all', true);
+    expect(switchOn('people-picker-view-all')).toBe(true);
+
+    await press(null, 'people-picker-add');
+    await fireEvent.changeText(screen.getByTestId('person-editor-full-name'), 'Nova Pessoa');
+    await press(null, 'person-editor-save');
+
+    // The person was created WITH the capability, so the filtered list already shows them —
+    // leaving the unfiltered view on would hide that and keep every other member in the way.
+    expect(switchOn('people-picker-view-all')).toBe(false);
+  });
+
+  it('leaves it alone after EDITING someone — only adding resets the view', async () => {
+    // Needs a capability context: without one there is no filter and no "Ver todos" toggle.
+    await render({ context: 'play_piano' });
+    await toggle(null, 'people-picker-view-all', true);
+
+    await press(null, 'people-picker-edit-a');
+    await press(null, 'person-editor-save');
+
+    expect(switchOn('people-picker-view-all')).toBe(true);
+  });
+
+  it('leaves it alone when the editor is cancelled', async () => {
+    await render({ context: 'play_piano' });
+    await toggle(null, 'people-picker-view-all', true);
+
+    await press(null, 'people-picker-add');
+    await press(null, 'person-editor-cancel');
+
+    expect(switchOn('people-picker-view-all')).toBe(true);
+  });
+});
+
+describe('adding a person carries the picker context', () => {
   it('pre-selects the capability the picker is filtering by', async () => {
     await render({ context: 'play_piano' });
     await press(null, 'people-picker-add');

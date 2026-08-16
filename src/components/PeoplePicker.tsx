@@ -498,7 +498,12 @@ export function PeoplePicker({
           // Editing ignores this — PersonEditor keeps the stored flags; the rule lives there.
           initialCapability={effectiveCapability ?? null}
           onClose={() => setEditorVisible(false)}
-          onSaved={() => setEditorVisible(false)}
+          onSaved={() => {
+            setEditorVisible(false);
+            // A person created here gets the context capability, so the filtered list already
+            // shows them — keeping the unfiltered view on would bury them among everyone else.
+            if (!editingMember) setShowAll(false);
+          }}
         />
       ) : null}
     </Modal>

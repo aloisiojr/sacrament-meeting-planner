@@ -6,8 +6,8 @@
  * spied so we can exercise the "update calling?" branches.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { Alert, Keyboard, Platform, ScrollView } from 'react-native';
 import DesignationEditScreen from '../app/designations/[date]';
 import type { Member, Designation } from '../types/database';
 
@@ -117,17 +117,52 @@ beforeEach(() => {
 });
 
 describe('Designation edit screen (step 2)', () => {
-  it('keeps the form above the keyboard (AC1, AC4)', async () => {
+  it('scrolls the focused field clear of the keyboard (AC1)', async () => {
     /*
-     * Structural on purpose: jest has no virtual keyboard, so "the field ended up visible" is not
-     * observable here — this catches the container being removed, and the device checks in the spec
-     * cover the rest. The pattern mirrors the (auth) screens.
+     * Behavioural, not structural. KeyboardAvoidingView cannot help this screen — the form is short
+     * and top-aligned, so shrinking the viewport moves nothing and keyboardVerticalOffset cancels
+     * out of the on-screen gap. The field is raised by SCROLLING, so that is what is asserted:
+     * focusing subscribes to the keyboard, and when the keyboard is up the list scrolls to the end,
+     * which lands the content's last pixel (its paddingBottom) on the keyboard's top edge.
      */
+    const scrollToEnd = jest.spyOn(ScrollView.prototype, 'scrollToEnd').mockImplementation(() => {});
+    const listeners: (() => void)[] = [];
+    const addListener = jest
+      .spyOn(Keyboard, 'addListener')
+      .mockImplementation(((event: string, cb: () => void) => {
+        if (event === 'keyboardDidShow') listeners.push(cb);
+        return { remove: jest.fn() };
+      }) as unknown as typeof Keyboard.addListener);
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(false);
+
     await render();
-    const avoider = screen.getByTestId('designation-edit-keyboard-avoider');
-    // Nesting is the point: the container has to WRAP the scrollable form, not sit beside it.
-    const scroll = within(avoider).getByTestId('designation-edit-scroll');
-    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    await press(null, 'designation-type-sustain');
+    await act(async () => {
+      fireEvent(screen.getByTestId('designation-calling-input'), 'focus');
+    });
+
+    expect(addListener).toHaveBeenCalledWith('keyboardDidShow', expect.any(Function));
+    expect(scrollToEnd).not.toHaveBeenCalled(); // nothing to scroll to before the inset exists
+
+    await act(async () => {
+      listeners.forEach((cb) => cb());
+    });
+    expect(scrollToEnd).toHaveBeenCalled();
+
+    scrollToEnd.mockRestore();
+    addListener.mockRestore();
+  });
+
+  it('asks iOS for the keyboard inset that gives a short form its scroll range', async () => {
+    await render();
+    // iOS only: without this the scroll range stops at the content end and scrollToEnd is a no-op.
+    // On Android the window itself resizes (softwareKeyboardLayoutMode), so the range already exists.
+    expect(screen.getByTestId('designation-edit-scroll').props.automaticallyAdjustKeyboardInsets).toBe(
+      Platform.OS === 'ios'
+    );
+    expect(screen.getByTestId('designation-edit-scroll').props.keyboardShouldPersistTaps).toBe(
+      'handled'
+    );
   });
 
   it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', async () => {

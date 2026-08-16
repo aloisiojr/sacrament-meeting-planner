@@ -12,6 +12,13 @@ import { KeyboardAvoidingView, Platform, type ViewStyle } from 'react-native';
  *
  * The (auth) screens predate this and inline the same pattern; they work, so they were left alone.
  *
+ * USELESS on a SHORT, TOP-ALIGNED form. Shrinking the viewport cannot move content that is anchored
+ * to the top, and the on-screen gap works out to ,
+ * which does not contain the offset at all — so no value of it changes anything. Such a screen has
+ * to SCROLL the field instead; see the comment on handleFieldFocus in app/designations/[date].tsx.
+ * The (auth) screens escape this because their content is centred with flexGrow, so it tracks the
+ * viewport.
+ *
  * On iOS the padding KeyboardAvoidingView computes is already exactly the keyboard height — the
  * gap problem is elsewhere: RN scrolls the focused field FLUSH against the keyboard on purpose
  * ("pulling the content down so that the target component's bottom meets the keyboard's top",

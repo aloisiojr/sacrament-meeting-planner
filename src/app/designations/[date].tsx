@@ -12,8 +12,18 @@
  *   router.push({ pathname: '/designations/[date]', params: { date, index } })     // edit item
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Alert,
+  Keyboard,
+  Platform,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,7 +31,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { PeoplePicker } from '../../components/PeoplePicker';
-import { KeyboardAvoider } from '../../components/KeyboardAvoider';
 import { formatFullDate } from '../../lib/dateUtils';
 import { getCurrentLanguage } from '../../i18n';
 import { useAgenda, useUpdateAgendaByDate } from '../../hooks/useAgenda';
@@ -111,6 +120,35 @@ function DesignationEditContent() {
     date,
   ]);
 
+  const scrollRef = useRef<ScrollView>(null);
+
+  /**
+   * Raise the focused field above the keyboard.
+   *
+   * KeyboardAvoidingView does NOT work here and no offset can fix it: this form is short and
+   * top-aligned, so shrinking the viewport moves nothing. The gap is
+   * `H - keyboardHeight - fieldBottom + scrollOffset` — `keyboardVerticalOffset` only changes the
+   * viewport, which is absent from that expression, so it cancels out. (The (auth) screens differ:
+   * their content is centred with flexGrow, so it tracks the viewport.)
+   *
+   * The only term that can move the field is the scroll offset. `automaticallyAdjustKeyboardInsets`
+   * sets contentInset.bottom to the keyboard overlap, which is what gives a short form any scroll
+   * range at all; scrollToEnd then lands the content's last pixel on the keyboard's top edge, so
+   * the clearance ends up equal to scrollContent.paddingBottom.
+   */
+  const handleFieldFocus = useCallback(() => {
+    const toEnd = () => scrollRef.current?.scrollToEnd({ animated: true });
+    if (Keyboard.isVisible()) {
+      toEnd();
+      return;
+    }
+    // The inset only exists once the keyboard is up; scrolling before that is a no-op.
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      sub.remove();
+      toEnd();
+    });
+  }, []);
+
   const handleSave = useCallback(() => {
     if (!canSave || !type) return;
     // AC11/AC13: only offer the calling update for sustain/release linked to a member.
@@ -183,10 +221,12 @@ function DesignationEditContent() {
         </Pressable>
       </View>
 
-      <KeyboardAvoider testID="designation-edit-keyboard-avoider">
-        <ScrollView
+      <ScrollView
+          ref={scrollRef}
           testID="designation-edit-scroll"
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -252,6 +292,7 @@ function DesignationEditContent() {
             </Text>
             <TextInput
               testID="designation-calling-input"
+              onFocus={handleFieldFocus}
               style={[
                 styles.textInput,
                 { color: colors.text, borderColor: calling.trim() ? colors.primary : colors.border },
@@ -295,7 +336,6 @@ function DesignationEditContent() {
         )}
         {/* new_member (AC10): no extra field. */}
         </ScrollView>
-      </KeyboardAvoider>
 
       <PeoplePicker
         visible={pickerVisible}
@@ -351,6 +391,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 16,
     paddingVertical: 8,

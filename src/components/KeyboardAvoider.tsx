@@ -12,6 +12,13 @@ import { KeyboardAvoidingView, Platform, type ViewStyle } from 'react-native';
  *
  * The (auth) screens predate this and inline the same pattern; they work, so they were left alone.
  *
+ * USELESS on a SHORT, TOP-ALIGNED form — do not reach for it there. Shrinking the viewport cannot
+ * move content anchored to the top, and the on-screen gap works out to
+ * `height - keyboardHeight - fieldBottom + scrollOffset`, which does not contain the offset at all,
+ * so no value of it changes anything. Such a screen has to SCROLL the field instead; see
+ * handleFieldFocus in app/designations/[date].tsx. The (auth) screens escape this because their
+ * content is centred with flexGrow, so it tracks the viewport.
+ *
  * USELESS on a SHORT, TOP-ALIGNED form. Shrinking the viewport cannot move content that is anchored
  * to the top, and the on-screen gap works out to ,
  * which does not contain the offset at all — so no value of it changes anything. Such a screen has

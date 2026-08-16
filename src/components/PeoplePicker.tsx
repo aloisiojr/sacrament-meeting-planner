@@ -417,6 +417,8 @@ export function PeoplePicker({
             onChangeText={setSearch}
             placeholder={t('common.search')}
             autoCapitalize="words"
+            // Opens ready to type, matching TopicSelectorModal.
+            autoFocus
           />
           {canManage ? (
             <Pressable

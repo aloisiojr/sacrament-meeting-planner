@@ -388,7 +388,25 @@ describe('PeoplePicker', () => {
     expect(ids()).not.toContain('b');
   });
 
-  describe('multiSelect draft (recognition)', () => {
+  describe('the picker opens ready to type', () => {
+  /*
+   * Asserted on the rendered prop rather than on real focus: the test host has no focus manager, so
+   * there is nothing observable to check — RNTL ships no focus matcher. `autoFocus` IS the
+   * instruction the platform acts on, and removing it is exactly the regression worth catching.
+   * The topic selector already does this (TopicSelectorModal); the people picker did not.
+   */
+  it('focuses the search field so the keyboard comes up (AC1, AC2)', async () => {
+    await render();
+    expect(screen.getByTestId('people-picker-search').props.autoFocus).toBe(true);
+  });
+
+  it('still opens with an empty search and the full list (AC4)', async () => {
+    await render();
+    expect(screen.getByTestId('people-picker-search').props.value).toBe('');
+  });
+});
+
+describe('multiSelect draft (recognition)', () => {
     it('Save grants the capability to selected + confirms the set; Cancel discards', async () => {
       const onConfirmMulti = jest.fn();
       const { onClose } = await render({

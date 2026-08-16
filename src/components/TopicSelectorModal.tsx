@@ -126,6 +126,24 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
     resetEdit();
   }, [editTitle, editLink, editingId, allTopics, t, createTopic, updateTopic, deleteTopic, resetEdit]);
 
+  /*
+   * Start every opening clean. The exit paths (select, cancel) already clear the search, but the
+   * component stays mounted between openings — the parent only toggles `visible` — so any path that
+   * forgets to clear leaves the next opening pre-filtered. Creating a topic via "+ Adicionar" is one
+   * such path. Asserting the invariant on open covers all of them, present and future.
+   *
+   * Adjusted during render rather than in an effect (React's documented "changing state when a prop
+   * changes" pattern), so the first painted frame is already clean.
+   */
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setSearch('');
+      resetEdit();
+    }
+  }
+
   const handleSelect = useCallback(
     (topic: TopicWithCollection) => {
       onSelect(topic);

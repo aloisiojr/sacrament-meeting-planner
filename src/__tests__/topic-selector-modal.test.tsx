@@ -43,6 +43,21 @@ jest.mock('../hooks/useTopics', () => ({
 const WARD: TopicWithCollection = { id: 'w1', title: 'Fé', link: 'http://x', collection: 'topics.customTopics', type: 'ward' };
 const GEN: TopicWithCollection = { id: 'g1', title: 'Repentance', link: null, collection: 'General Conference April 2024', type: 'general' };
 
+it('a busca começa limpa a cada abertura (não vaza entre discursos)', async () => {
+  // O pai reaproveita o mesmo modal entre discursos, só alternando `visible` — sem isto, o texto
+  // digitado para um discurso volta a filtrar a lista do próximo.
+  const props = { onSelect: jest.fn(), onClose: jest.fn() };
+  const view = await rtlRender(React.createElement(TopicSelectorModal, { visible: true, ...props }));
+
+  await fireEvent.changeText(screen.getByTestId('topic-selector-search-input'), 'Fé');
+  expect(screen.getByTestId('topic-selector-search-input').props.value).toBe('Fé');
+
+  await view.rerender(React.createElement(TopicSelectorModal, { visible: false, ...props }));
+  await view.rerender(React.createElement(TopicSelectorModal, { visible: true, ...props }));
+
+  expect(screen.getByTestId('topic-selector-search-input').props.value).toBe('');
+});
+
 async function render() {
   const onSelect = jest.fn();
   await rtlRender(React.createElement(TopicSelectorModal, { visible: true, onSelect, onClose: jest.fn() }));

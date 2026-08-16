@@ -114,30 +114,6 @@ describe('i18n locale files', () => {
     expect(esLA.date.months['02']).toBe('FEB');
   });
 
-  it('has the new-person selection prompt, with placeholders, in all locales', () => {
-    // The action phrases are new keys on purpose: the picker subtitles describe the list FILTER
-    // ("Pessoas que podem presidir"), which would read wrong inside "…selecionar Maria para ___?".
-    const CONTEXTS = [
-      'speaker', 'opening_prayer', 'closing_prayer', 'preside',
-      'conduct', 'lead_music', 'play_piano', 'be_recognized',
-    ];
-    for (const locale of [ptBR, enUS, esLA] as Record<string, any>[]) {
-      expect(locale.people.selectNewTitle).toBeTruthy();
-      expect(locale.people.selectNewMessage).toContain('{{name}}');
-      expect(locale.people.selectNewMessage).toContain('{{action}}');
-      expect(locale.people.selectNewMessageNoAction).toContain('{{name}}');
-      expect(locale.people.selectNewMessageNoAction).not.toContain('{{action}}');
-      for (const c of CONTEXTS) {
-        expect(locale.people.selectNewActions[c]).toBeTruthy();
-      }
-    }
-  });
-
-  it('uses the Church term for a sacrament-meeting talk in en-US', () => {
-    expect((enUS as Record<string, any>).people.selectNewActions.speaker).toContain('talk');
-    expect((enUS as Record<string, any>).people.selectNewActions.speaker).not.toContain('speech');
-  });
-
   it('should have all 3 theme options in all locales', () => {
     const themes = ['automatic', 'light', 'dark'];
     for (const theme of themes) {

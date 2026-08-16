@@ -457,6 +457,21 @@ describe('adding a person carries the picker context', () => {
   });
 });
 
+describe('the first tap is not swallowed by the keyboard', () => {
+  /*
+   * The picker now opens WITH the keyboard up (autoFocus), which turned a latent defect into the
+   * normal case: React Native's default is to spend the first tap dismissing the keyboard and
+   * discard the target. "handled" lets the tap reach the row and still dismisses on background
+   * taps. The prop is the only observable part — there is no keyboard in the test host.
+   */
+  it('the list lets taps through while the keyboard is open', async () => {
+    await render();
+    expect(screen.getByTestId('people-picker-list').props.keyboardShouldPersistTaps).toBe(
+      'handled'
+    );
+  });
+});
+
 describe('the picker opens ready to type', () => {
   /*
    * Asserted on the rendered prop rather than on real focus: the test host has no focus manager, so

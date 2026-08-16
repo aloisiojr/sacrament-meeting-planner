@@ -138,7 +138,7 @@ function HomeTabContent() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <HomeMemberImportPrompt />
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">

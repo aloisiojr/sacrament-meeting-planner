@@ -120,6 +120,7 @@ export function AccordionCard({
                 contentContainerStyle={styles.cardContentInner}
                 showsVerticalScrollIndicator
                 nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
               >
                 {card.content}
               </ScrollView>

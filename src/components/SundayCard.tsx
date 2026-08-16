@@ -328,6 +328,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
                   </Text>
                 </Pressable>
               )}
+              keyboardShouldPersistTaps="handled"
             />
           </View>
         </Pressable>

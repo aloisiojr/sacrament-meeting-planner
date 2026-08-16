@@ -337,7 +337,7 @@ export default function UserManagementScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
             <KeyboardAvoider testID="users-keyboard-avoider">
-  <ScrollView>
+  <ScrollView keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
               <Text style={[styles.backButton, { color: colors.primary }]}>

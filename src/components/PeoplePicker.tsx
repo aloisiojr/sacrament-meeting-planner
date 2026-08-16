@@ -476,6 +476,7 @@ export function PeoplePicker({
         ) : null}
 
         <FlatList
+          testID="people-picker-list"
           data={rows}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

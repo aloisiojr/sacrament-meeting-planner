@@ -87,6 +87,7 @@ export function SacramentPrayerModal({ visible, onClose, fontSizes }: SacramentP
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={[styles.prayerLabel, { color: colors.textSecondary, fontSize: labelSize }]}>
               {t('presentation.sacramentPrayerBreadLabel')}

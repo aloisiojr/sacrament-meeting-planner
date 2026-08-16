@@ -114,6 +114,7 @@ export function StatusChangeModal({
               </Pressable>
             )}
             scrollEnabled={false}
+            keyboardShouldPersistTaps="handled"
           />
 
           <Pressable

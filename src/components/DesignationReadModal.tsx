@@ -92,6 +92,7 @@ export function DesignationReadModal({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
           >
             {orderDesignations(designations).map((item, idx) => {
               const override = templates?.[item.type];

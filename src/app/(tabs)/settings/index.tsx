@@ -178,7 +178,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: colors.text }]}>
           {t('settings.title')}
         </Text>

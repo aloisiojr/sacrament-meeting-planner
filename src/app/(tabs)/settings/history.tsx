@@ -158,6 +158,7 @@ export default function ActivityLogScreen() {
               />
             ) : null
           }
+          keyboardShouldPersistTaps="handled"
         />
       )}
     </SafeAreaView>

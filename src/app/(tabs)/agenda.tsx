@@ -350,6 +350,7 @@ function AgendaTabContent() {
           onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
           scrollEventThrottle={16}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
         />
         </KeyboardAvoider>
     </SafeAreaView>

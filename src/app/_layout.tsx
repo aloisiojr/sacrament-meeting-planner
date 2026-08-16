@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { QueryClient, QueryCache, MutationCache, onlineManager } from '@tanstack/react-query';
@@ -118,7 +118,7 @@ function VersionGate({ children }: { children: React.ReactNode }) {
  * Inner layout that uses theme context (must be inside ThemeProvider).
  */
 function InnerLayout() {
-  const { mode } = useTheme();
+  const { mode, colors } = useTheme();
 
   return (
     <AuthProvider>
@@ -126,7 +126,16 @@ function InnerLayout() {
         <VersionGate>
           <NavigationGuard>
             <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-            <Slot />
+            {/* A Stack, not a Slot: without a navigator there is no history at the root, so
+                leaving a route that lives outside (tabs) — designations, speeches, presentation —
+                unmounted the tab group and dropped the user on the first tab with its state gone.
+                Matches the (auth) and settings layouts. */}
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            />
           </NavigationGuard>
         </VersionGate>
       </SyncProvider>

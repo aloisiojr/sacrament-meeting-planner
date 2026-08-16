@@ -14,6 +14,8 @@
 /** Packages that ship untranspiled ESM/Flow and must be transformed. */
 const transformIgnorePatterns = [
   'node_modules/(?!((jest-)?react-native|@react-native(-community)?)' +
+    // expo-router 57 puxa standard-navigation, que é publicado como ESM.
+    '|standard-navigation' +
     '|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*' +
     '|react-navigation|@react-navigation/.*' +
     '|@testing-library/react-native' +

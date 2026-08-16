@@ -143,6 +143,36 @@ async function typeNameAndBlur(value: string) {
   await fireEvent(screen.getByTestId('person-editor-full-name'), 'blur');
 }
 
+describe('PersonEditor — the picker context pre-selects the capability', () => {
+  it('switches the capability on when creating from that context', async () => {
+    await render({ initialCapability: 'play_piano' });
+    expect(switchValue('person-editor-cap-switch-play_piano')).toBe(true);
+    // Only that one — creating a pianist does not make the person a presiding officer.
+    expect(switchValue('person-editor-cap-switch-preside')).toBe(false);
+  });
+
+  it('saves the pre-selected capability without the user touching it', async () => {
+    const { onSaved: _onSaved } = await render({ initialCapability: 'play_piano' });
+    await change(null, 'person-editor-full-name', 'Nova Pessoa');
+    await press(null, 'person-editor-save');
+
+    expect(mockCreateMock.mock.calls[0][0]).toMatchObject({ can_play_piano: true });
+  });
+
+  it('leaves everything off when there is no capability context', async () => {
+    await render();
+    expect(switchValue('person-editor-cap-switch-play_piano')).toBe(false);
+  });
+
+  it("ignores it when EDITING — the stored flags win", async () => {
+    await render({
+      member: { ...OTHER, can_play_piano: false },
+      initialCapability: 'play_piano',
+    });
+    expect(switchValue('person-editor-cap-switch-play_piano')).toBe(false);
+  });
+});
+
 describe('PersonEditor — the informal name follows the first name', () => {
   it('prefills the informal name when the editor opens with a name (AC1)', async () => {
     await render({ initialName: 'Maria Souza' });

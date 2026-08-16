@@ -28,8 +28,8 @@ import { KeyboardAvoidingView, Platform, type ViewStyle } from 'react-native';
  * measured before this padding applies, so the two double-count and leave a dead strip.
  */
 
-/** Breathing room between the focused field and the keyboard. */
-const IOS_KEYBOARD_GAP = 24;
+/** Breathing room between the focused field and the keyboard. Single knob — tune here. */
+const IOS_KEYBOARD_GAP = 40;
 export function KeyboardAvoider({
   children,
   testID,

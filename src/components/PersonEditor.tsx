@@ -89,6 +89,12 @@ export interface PersonEditorProps {
   member?: Member | null;
   /** Prefilled name when creating (e.g. the text typed in the picker search). */
   initialName?: string;
+  /**
+   * Capability to switch ON when creating. Someone adding a person from the "who can play the
+   * piano" picker means that person plays the piano — making them tick the box again is friction.
+   * Ignored when editing an existing member, whose stored flags win.
+   */
+  initialCapability?: PeopleCapability | null;
   onClose: () => void;
   /** Called after a successful create/update with the saved member. */
   onSaved?: (member: Member) => void;
@@ -114,6 +120,7 @@ export function PersonEditor({
   visible,
   member,
   initialName,
+  initialCapability,
   onClose,
   onSaved,
 }: PersonEditorProps) {
@@ -148,7 +155,9 @@ export function PersonEditor({
   // in an effect: React re-runs the component before committing, so the seeded values are in the
   // first painted frame instead of a second render pass.
   const [initKey, setInitKey] = useState<string | null>(null);
-  const currentKey = visible ? `${member?.id ?? 'new'}:${initialName ?? ''}` : null;
+  const currentKey = visible
+    ? `${member?.id ?? 'new'}:${initialName ?? ''}:${initialCapability ?? ''}`
+    : null;
   if (currentKey !== initKey) {
     setInitKey(currentKey);
     if (visible) {
@@ -175,7 +184,7 @@ export function PersonEditor({
         setCalling('');
         setCountryCode('');
         setPhone('');
-        setCaps(EMPTY_CAPS);
+        setCaps(initialCapability ? { ...EMPTY_CAPS, [initialCapability]: true } : EMPTY_CAPS);
         setContactViaResponsible(false);
         setResponsibleId(null);
       }

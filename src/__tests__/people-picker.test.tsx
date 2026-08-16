@@ -388,7 +388,27 @@ describe('PeoplePicker', () => {
     expect(ids()).not.toContain('b');
   });
 
-  describe('the picker opens ready to type', () => {
+  describe('adding a person carries the picker context', () => {
+  it('pre-selects the capability the picker is filtering by', async () => {
+    await render({ context: 'play_piano' });
+    await press(null, 'people-picker-add');
+
+    // The editor is the real component, so this asserts the whole chain: context -> capability
+    // -> the switch the user would otherwise have to flip.
+    const sw = screen.getByTestId('person-editor-cap-switch-play_piano');
+    expect((sw.props.value ?? sw.props.on) === true).toBe(true);
+  });
+
+  it('leaves capabilities alone when the picker has no capability context', async () => {
+    await render({ context: 'speaker' });
+    await press(null, 'people-picker-add');
+
+    const sw = screen.getByTestId('person-editor-cap-switch-play_piano');
+    expect((sw.props.value ?? sw.props.on) === true).toBe(false);
+  });
+});
+
+describe('the picker opens ready to type', () => {
   /*
    * Asserted on the rendered prop rather than on real focus: the test host has no focus manager, so
    * there is nothing observable to check — RNTL ships no focus matcher. `autoFocus` IS the

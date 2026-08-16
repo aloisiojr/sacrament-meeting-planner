@@ -495,6 +495,8 @@ export function PeoplePicker({
           visible={editorVisible}
           member={editingMember}
           initialName={editingMember ? undefined : search.trim() || undefined}
+          // Editing ignores this — PersonEditor keeps the stored flags; the rule lives there.
+          initialCapability={effectiveCapability ?? null}
           onClose={() => setEditorVisible(false)}
           onSaved={() => setEditorVisible(false)}
         />

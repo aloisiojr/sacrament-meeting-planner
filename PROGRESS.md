@@ -7,6 +7,22 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `fix/keyboard-safe-forms` — 16 commits, verificada, NÃO mergeada.**
+  Teclado + ajustes no seletor de pessoas/temas. Suíte 290 suites / 5342 tests, tsc 0, lint no
+  baseline (2 warnings pré-existentes em PdfTextExtractor).
+  - **EXIGE BUILD NATIVO** antes de testar no Android: `softwareKeyboardLayoutMode: 'resize'`.
+  - Tela de apoios usa mecanismo DIFERENTE das outras 7: `automaticallyAdjustKeyboardInsets` +
+    `scrollToEnd` no foco, porque `KeyboardAvoidingView` não move campo em formulário curto
+    alinhado ao topo (a folga não depende do offset). Os dois nunca podem coexistir.
+  - **CORREÇÃO DE REGISTRO — a mensagem do commit `6dde262` está errada.** Ela afirma que o
+    primeiro toque engolido no seletor de pessoas foi causado pelo autofocus e corrigido ali.
+    Falso: `keyboardShouldPersistTaps="handled"` já existia no `main` no PeoplePicker,
+    TopicSelectorModal e HymnSelector. Minha varredura deu falso positivo porque parava no
+    primeiro `>`, que aparece dentro de `renderItem={({ item }) =>`. O commit ADICIONOU a prop em
+    10 outras listas (correto e útil), mas **se o toque engolido foi visto no seletor de pessoas,
+    não está corrigido e a causa é desconhecida.**
+  - Lacuna conhecida: a aba de agenda é a única das 8 telas sem teste que afirme o wrapper —
+    nenhum teste a renderiza.
 - **IN FLIGHT — `specs/whatsapp-informal-name-placeholder.md`: placeholder "Nome Informal".**
   Branch `feat/whatsapp-informal-name` (a partir de `main`, após o merge de `export-pdf`).
   Stage: **build COMPLETE, aguardando verify-change**. Plan: `.plan.md` (4 passos, todos ✅).

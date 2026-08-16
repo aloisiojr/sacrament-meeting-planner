@@ -166,3 +166,12 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     }
   });
 });
+
+describe('Android keyboard behaviour', () => {
+  // Without this the Expo default is 'pan', which slides the whole window up instead of resizing
+  // it — the form keeps its height and fields end up behind the keyboard with nowhere to scroll.
+  it.each([undefined, 'development'])('resizes the window for variant %s', (variant) => {
+    const resolved = resolveConfig(variant);
+    expect(resolved.android.softwareKeyboardLayoutMode).toBe('resize');
+  });
+});

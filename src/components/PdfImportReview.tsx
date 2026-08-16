@@ -18,6 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { PencilIcon } from './icons';
 import type { MergePlan } from '../lib/memberMergePlan';
 import type { MemberImportApply, MemberImportPhoneUpdate } from '../hooks/useApplyMemberImport';
+import { KeyboardAvoider } from './KeyboardAvoider';
 
 /** A member with a blank/unparsed phone (step 1). memberId is set when it already exists in the DB. */
 export interface BlankPhoneEntry {
@@ -206,65 +207,67 @@ export function PdfImportReview({
       )}
 
       {/* Scrollable name list (only this scrolls). */}
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        {!current && (
-          <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.nothingToReview')}</Text>
-        )}
+            <KeyboardAvoider testID="pdf-import-review-keyboard-avoider">
+  <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          {!current && (
+            <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.nothingToReview')}</Text>
+          )}
 
-        {current === 'blanks' &&
-          blanks.map((b, i) => (
-            <View key={`b-${i}`} style={[styles.row, { borderBottomColor: colors.divider }]}>
-              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{b.name}</Text>
-              {manualFull(b.name) && (
-                <Text style={[styles.savedPhone, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {manualEntry[b.name].phone}
-                </Text>
-              )}
-              <Pressable
-                onPress={() => openEditor(b.name)}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('common.edit')} ${b.name}`}
-                testID={`pdf-blank-edit-${i}`}
-              >
-                <PencilIcon size={18} color={colors.primary} />
-              </Pressable>
-            </View>
-          ))}
-
-        {current === 'conflicts' &&
-          plan.phoneConflicts.map((c) => (
-            <View key={c.member.id} style={styles.conflict}>
-              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{c.member.full_name}</Text>
-              <View style={styles.conflictRow}>
-                <Text style={[styles.phoneText, { color: colors.textSecondary }]} numberOfLines={1}>{c.pdfPhone}</Text>
-                <AppSwitch
-                  testID={`pdf-conflict-toggle-${c.member.id}`}
-                  accessibilityLabel={c.member.full_name}
-                  value={useApp[c.member.id] !== false}
-                  onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
-                  trackColor={{ false: colors.primary, true: colors.primary }}
-                  ios_backgroundColor={colors.primary}
-                />
-                <Text style={[styles.phoneText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1}>+{c.appPhone}</Text>
+          {current === 'blanks' &&
+            blanks.map((b, i) => (
+              <View key={`b-${i}`} style={[styles.row, { borderBottomColor: colors.divider }]}>
+                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{b.name}</Text>
+                {manualFull(b.name) && (
+                  <Text style={[styles.savedPhone, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {manualEntry[b.name].phone}
+                  </Text>
+                )}
+                <Pressable
+                  onPress={() => openEditor(b.name)}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('common.edit')} ${b.name}`}
+                  testID={`pdf-blank-edit-${i}`}
+                >
+                  <PencilIcon size={18} color={colors.primary} />
+                </Pressable>
               </View>
-            </View>
-          ))}
+            ))}
 
-        {current === 'removals' &&
-          plan.absentInDb.map((m) => (
-            <View key={m.id} style={[styles.row, { borderBottomColor: colors.divider }]}>
-              <Text style={[styles.name, { color: colors.text, flex: 1 }]} numberOfLines={1}>{m.full_name}</Text>
-              <AppSwitch
-                testID={`pdf-remove-${m.id}`}
-                accessibilityLabel={m.full_name}
-                value={!!toRemove[m.id]}
-                onValueChange={(v) => setToRemove((s) => ({ ...s, [m.id]: v }))}
-                trackColor={{ true: colors.error }}
-              />
-            </View>
-          ))}
-      </ScrollView>
+          {current === 'conflicts' &&
+            plan.phoneConflicts.map((c) => (
+              <View key={c.member.id} style={styles.conflict}>
+                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{c.member.full_name}</Text>
+                <View style={styles.conflictRow}>
+                  <Text style={[styles.phoneText, { color: colors.textSecondary }]} numberOfLines={1}>{c.pdfPhone}</Text>
+                  <AppSwitch
+                    testID={`pdf-conflict-toggle-${c.member.id}`}
+                    accessibilityLabel={c.member.full_name}
+                    value={useApp[c.member.id] !== false}
+                    onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
+                    trackColor={{ false: colors.primary, true: colors.primary }}
+                    ios_backgroundColor={colors.primary}
+                  />
+                  <Text style={[styles.phoneText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1}>+{c.appPhone}</Text>
+                </View>
+              </View>
+            ))}
+
+          {current === 'removals' &&
+            plan.absentInDb.map((m) => (
+              <View key={m.id} style={[styles.row, { borderBottomColor: colors.divider }]}>
+                <Text style={[styles.name, { color: colors.text, flex: 1 }]} numberOfLines={1}>{m.full_name}</Text>
+                <AppSwitch
+                  testID={`pdf-remove-${m.id}`}
+                  accessibilityLabel={m.full_name}
+                  value={!!toRemove[m.id]}
+                  onValueChange={(v) => setToRemove((s) => ({ ...s, [m.id]: v }))}
+                  trackColor={{ true: colors.error }}
+                />
+              </View>
+            ))}
+        </ScrollView>
+      </KeyboardAvoider>
 
       {/* Bottom bar: Voltar (left, disabled on the first step) + Próximo/Concluir (right). */}
       <View style={[styles.footer, { borderTopColor: colors.divider }]}>

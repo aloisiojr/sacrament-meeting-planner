@@ -35,6 +35,7 @@ import { AttendanceBlock } from '../../components/AttendanceBlock';
 import { buildUnifiedCardData, isNoSacramentReason } from '../../lib/unifiedCard';
 import { PlayIcon, ChevronUpIcon } from '../../components/icons';
 import type { SundayException, SundayExceptionReason, Speech, SundayAgenda } from '../../types/database';
+import { KeyboardAvoider } from '../../components/KeyboardAvoider';
 
 // --- Types ---
 
@@ -325,30 +326,32 @@ function AgendaTabContent() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        ref={flatListRef}
-        data={listItems}
-        keyExtractor={getItemKey}
-        renderItem={renderItem}
-        onEndReached={hasMoreFuture ? loadMoreFuture : undefined}
-        onEndReachedThreshold={0.5}
-        ListHeaderComponent={
-          hasMorePast ? (
-            <Pressable
-              style={[styles.loadMore, { borderColor: colors.border }]}
-              onPress={loadMorePast}
-            >
-              <Text style={{ color: colors.primary }}>
-                {t('common.loading')}
-              </Text>
-            </Pressable>
-          ) : null
-        }
-        onScrollToIndexFailed={onScrollToIndexFailed}
-        onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.listContent}
-      />
+        <KeyboardAvoider testID="agenda-keyboard-avoider">
+        <FlatList
+          ref={flatListRef}
+          data={listItems}
+          keyExtractor={getItemKey}
+          renderItem={renderItem}
+          onEndReached={hasMoreFuture ? loadMoreFuture : undefined}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={
+            hasMorePast ? (
+              <Pressable
+                style={[styles.loadMore, { borderColor: colors.border }]}
+                onPress={loadMorePast}
+              >
+                <Text style={{ color: colors.primary }}>
+                  {t('common.loading')}
+                </Text>
+              </Pressable>
+            ) : null
+          }
+          onScrollToIndexFailed={onScrollToIndexFailed}
+          onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.listContent}
+        />
+        </KeyboardAvoider>
     </SafeAreaView>
   );
 }

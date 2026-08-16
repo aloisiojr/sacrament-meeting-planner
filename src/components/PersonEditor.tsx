@@ -45,6 +45,7 @@ import {
 import { COUNTRY_CODES, getFlagForCode } from '../lib/countryCodes';
 import { getFirstName, reconcileInformalName } from '../lib/nameUtils';
 import type { Member } from '../types/database';
+import { KeyboardAvoider } from './KeyboardAvoider';
 
 // --- Capability field mapping (shared shape with PeoplePicker) ---
 
@@ -348,180 +349,182 @@ export function PersonEditor({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {error ? (
-            <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
-              <Text style={[styles.errorText, { color: colors.error }]} testID="person-editor-error">
-                {error}
-              </Text>
-            </View>
-          ) : null}
+                  <KeyboardAvoider testID="person-editor-keyboard-avoider">
+  <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {error ? (
+              <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
+                <Text style={[styles.errorText, { color: colors.error }]} testID="person-editor-error">
+                  {error}
+                </Text>
+              </View>
+            ) : null}
 
-          {/* Identity */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('members.fullName')}
-          </Text>
-          <TextInput
-            testID="person-editor-full-name"
-            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-            value={fullName}
-            onChangeText={setFullName}
-            onBlur={reconcileInformal}
-            placeholder={t('members.fullName')}
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="words"
-          />
+            {/* Identity */}
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('members.fullName')}
+            </Text>
+            <TextInput
+              testID="person-editor-full-name"
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              value={fullName}
+              onChangeText={setFullName}
+              onBlur={reconcileInformal}
+              placeholder={t('members.fullName')}
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+            />
 
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('personEditor.informalNameLabel')}
-          </Text>
-          <TextInput
-            testID="person-editor-informal-name"
-            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-            value={informalName}
-            onChangeText={setInformalName}
-            placeholder={t('members.informalNamePlaceholder')}
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="words"
-          />
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('personEditor.informalNameLabel')}
+            </Text>
+            <TextInput
+              testID="person-editor-informal-name"
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              value={informalName}
+              onChangeText={setInformalName}
+              placeholder={t('members.informalNamePlaceholder')}
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+            />
 
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {t('personEditor.callingLabel')}
-          </Text>
-          <TextInput
-            testID="person-editor-calling"
-            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-            value={calling}
-            onChangeText={setCalling}
-            placeholder={t('personEditor.callingPlaceholder')}
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="words"
-          />
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t('personEditor.callingLabel')}
+            </Text>
+            <TextInput
+              testID="person-editor-calling"
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              value={calling}
+              onChangeText={setCalling}
+              placeholder={t('personEditor.callingPlaceholder')}
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+            />
 
-          <View style={styles.phoneRow}>
-            <View style={styles.countryCodeCol}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('members.countryCode')}
-              </Text>
-              <Pressable
-                testID="person-editor-country-code"
-                style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                onPress={() => setCountryPickerVisible(true)}
-              >
-                <Text
-                  style={[styles.selectorText, { color: countryCode ? colors.text : colors.placeholder }]}
-                  numberOfLines={1}
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCodeCol}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {t('members.countryCode')}
+                </Text>
+                <Pressable
+                  testID="person-editor-country-code"
+                  style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                  onPress={() => setCountryPickerVisible(true)}
                 >
-                  {countryCode ? `${getFlagForCode(countryCode)} ${countryCode}` : '+55'}
+                  <Text
+                    style={[styles.selectorText, { color: countryCode ? colors.text : colors.placeholder }]}
+                    numberOfLines={1}
+                  >
+                    {countryCode ? `${getFlagForCode(countryCode)} ${countryCode}` : '+55'}
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.phoneCol}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {t('members.phone')}
                 </Text>
-              </Pressable>
-            </View>
-            <View style={styles.phoneCol}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('members.phone')}
-              </Text>
-              <TextInput
-                testID="person-editor-phone"
-                style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder={t('members.phone')}
-                placeholderTextColor={colors.placeholder}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-
-          {/* Permissions (functions) */}
-          <Text style={[styles.sectionHeader, { color: colors.text }]}>
-            {t('personEditor.permissions')}
-          </Text>
-          {CAPABILITY_ORDER.map((cap) => {
-            const CapIcon = CAPABILITY_ICON[cap];
-            return (
-              <View key={cap} testID={`person-editor-cap-${cap}`} style={styles.capRow}>
-                <CapIcon size={22} color={colors.textSecondary} />
-                <Text style={[styles.capLabel, { color: colors.text }]}>
-                  {t(`capabilities.${cap}`)}
-                </Text>
-                <AppSwitch
-                  testID={`person-editor-cap-switch-${cap}`}
-                  value={caps[cap]}
-                  onValueChange={() => toggleCap(cap)}
+                <TextInput
+                  testID="person-editor-phone"
+                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder={t('members.phone')}
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="phone-pad"
                 />
               </View>
-            );
-          })}
-
-          {/* Delegation */}
-          <Text style={[styles.sectionHeader, { color: colors.text }]}>
-            {t('personEditor.delegation')}
-          </Text>
-          <Pressable
-            testID="person-editor-contact-via-responsible"
-            style={styles.toggleRow}
-            onPress={() => setContactViaResponsible((v) => !v)}
-          >
-            {contactViaResponsible ? (
-              <CheckSquareIcon size={22} color={colors.primary} />
-            ) : (
-              <SquareIcon size={22} color={colors.textSecondary} />
-            )}
-            <Text style={[styles.toggleLabel, { color: colors.text }]}>
-              {t('personEditor.contactViaResponsible')}
-            </Text>
-          </Pressable>
-
-          {contactViaResponsible ? (
-            <>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>
-                {t('personEditor.responsible')}
-              </Text>
-              <Pressable
-                testID="person-editor-responsible-select"
-                style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-                onPress={() => setResponsiblePickerVisible(true)}
-              >
-                <Text
-                  style={[styles.selectorText, { color: responsibleMember ? colors.text : colors.placeholder }]}
-                  numberOfLines={1}
-                >
-                  {responsibleMember?.full_name ?? t('personEditor.selectResponsible')}
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
-
-          {/* Responsible-for list (read-only, editing an existing member with dependents) */}
-          {responsibleForNames.length > 0 ? (
-            <View testID="person-editor-responsible-for">
-              <Text style={[styles.sectionHeader, { color: colors.text }]}>
-                {t('personEditor.responsibleForList')}
-              </Text>
-              {responsibleForNames.map((name) => (
-                <Text
-                  key={name}
-                  style={[styles.responsibleForItem, { color: colors.textSecondary }]}
-                >
-                  {name}
-                </Text>
-              ))}
             </View>
-          ) : null}
 
-          {/* Destructive delete (editing an existing member with member:write) */}
-          {canDelete ? (
+            {/* Permissions (functions) */}
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>
+              {t('personEditor.permissions')}
+            </Text>
+            {CAPABILITY_ORDER.map((cap) => {
+              const CapIcon = CAPABILITY_ICON[cap];
+              return (
+                <View key={cap} testID={`person-editor-cap-${cap}`} style={styles.capRow}>
+                  <CapIcon size={22} color={colors.textSecondary} />
+                  <Text style={[styles.capLabel, { color: colors.text }]}>
+                    {t(`capabilities.${cap}`)}
+                  </Text>
+                  <AppSwitch
+                    testID={`person-editor-cap-switch-${cap}`}
+                    value={caps[cap]}
+                    onValueChange={() => toggleCap(cap)}
+                  />
+                </View>
+              );
+            })}
+
+            {/* Delegation */}
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>
+              {t('personEditor.delegation')}
+            </Text>
             <Pressable
-              testID="person-editor-delete"
-              style={[styles.deleteBtn, { borderColor: colors.error }]}
-              onPress={handleDelete}
+              testID="person-editor-contact-via-responsible"
+              style={styles.toggleRow}
+              onPress={() => setContactViaResponsible((v) => !v)}
             >
-              <Text style={[styles.deleteBtnText, { color: colors.error }]}>
-                {t('personEditor.deletePerson')}
+              {contactViaResponsible ? (
+                <CheckSquareIcon size={22} color={colors.primary} />
+              ) : (
+                <SquareIcon size={22} color={colors.textSecondary} />
+              )}
+              <Text style={[styles.toggleLabel, { color: colors.text }]}>
+                {t('personEditor.contactViaResponsible')}
               </Text>
             </Pressable>
-          ) : null}
-        </ScrollView>
+
+            {contactViaResponsible ? (
+              <>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {t('personEditor.responsible')}
+                </Text>
+                <Pressable
+                  testID="person-editor-responsible-select"
+                  style={[styles.selector, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                  onPress={() => setResponsiblePickerVisible(true)}
+                >
+                  <Text
+                    style={[styles.selectorText, { color: responsibleMember ? colors.text : colors.placeholder }]}
+                    numberOfLines={1}
+                  >
+                    {responsibleMember?.full_name ?? t('personEditor.selectResponsible')}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+
+            {/* Responsible-for list (read-only, editing an existing member with dependents) */}
+            {responsibleForNames.length > 0 ? (
+              <View testID="person-editor-responsible-for">
+                <Text style={[styles.sectionHeader, { color: colors.text }]}>
+                  {t('personEditor.responsibleForList')}
+                </Text>
+                {responsibleForNames.map((name) => (
+                  <Text
+                    key={name}
+                    style={[styles.responsibleForItem, { color: colors.textSecondary }]}
+                  >
+                    {name}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Destructive delete (editing an existing member with member:write) */}
+            {canDelete ? (
+              <Pressable
+                testID="person-editor-delete"
+                style={[styles.deleteBtn, { borderColor: colors.error }]}
+                onPress={handleDelete}
+              >
+                <Text style={[styles.deleteBtnText, { color: colors.error }]}>
+                  {t('personEditor.deletePerson')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+          </KeyboardAvoider>
       </View>
 
       {/* Responsible picker (excludes self) */}

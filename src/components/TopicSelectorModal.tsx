@@ -29,6 +29,7 @@ import {
   useDeleteWardTopic,
 } from '../hooks/useTopics';
 import type { TopicWithCollection } from '../types/database';
+import { KeyboardAvoider } from './KeyboardAvoider';
 
 export interface TopicSelectorModalProps {
   visible: boolean;
@@ -214,42 +215,44 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
           )}
         </View>
 
-        <FlatList
-          data={filteredTopics}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={editingId === NEW_ID ? renderEditor() : null}
-          renderItem={({ item }) => {
-            if (editingId === item.id) return renderEditor();
-            const isWard = item.type === 'ward';
-            return (
-              <View style={[styles.topicItem, { borderBottomColor: colors.divider }]}>
-                <Pressable
-                  style={styles.topicPressable}
-                  onPress={() => handleSelect(item)}
-                  testID={`topic-row-${item.id}`}
-                >
-                  <Text style={[styles.topicCollection, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {item.collection}
-                  </Text>
-                  <Text style={[styles.topicTitle, { color: colors.text }]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                </Pressable>
-                {isWard && canManage && (
-                  <Pressable hitSlop={8} onPress={() => startEdit(item)} testID={`topic-edit-${item.id}`}>
-                    <PencilIcon size={18} color={colors.textSecondary} />
+        <KeyboardAvoider testID="topic-selector-keyboard-avoider">
+          <FlatList
+            data={filteredTopics}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={editingId === NEW_ID ? renderEditor() : null}
+            renderItem={({ item }) => {
+              if (editingId === item.id) return renderEditor();
+              const isWard = item.type === 'ward';
+              return (
+                <View style={[styles.topicItem, { borderBottomColor: colors.divider }]}>
+                  <Pressable
+                    style={styles.topicPressable}
+                    onPress={() => handleSelect(item)}
+                    testID={`topic-row-${item.id}`}
+                  >
+                    <Text style={[styles.topicCollection, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {item.collection}
+                    </Text>
+                    <Text style={[styles.topicTitle, { color: colors.text }]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
                   </Pressable>
-                )}
+                  {isWard && canManage && (
+                    <Pressable hitSlop={8} onPress={() => startEdit(item)} testID={`topic-edit-${item.id}`}>
+                      <PencilIcon size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  )}
+                </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('common.noResults')}</Text>
               </View>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('common.noResults')}</Text>
-            </View>
-          }
-          keyboardShouldPersistTaps="handled"
-        />
+            }
+            keyboardShouldPersistTaps="handled"
+          />
+        </KeyboardAvoider>
       </View>
     </Modal>
   );

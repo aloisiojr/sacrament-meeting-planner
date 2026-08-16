@@ -13,17 +13,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  TextInput,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,6 +21,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { PeoplePicker } from '../../components/PeoplePicker';
+import { KeyboardAvoider } from '../../components/KeyboardAvoider';
 import { formatFullDate } from '../../lib/dateUtils';
 import { getCurrentLanguage } from '../../i18n';
 import { useAgenda, useUpdateAgendaByDate } from '../../hooks/useAgenda';
@@ -192,12 +183,7 @@ function DesignationEditContent() {
         </Pressable>
       </View>
 
-      {/* Keeps the fields above the virtual keyboard; same pattern as the (auth) screens. */}
-      <KeyboardAvoidingView
-        testID="designation-edit-keyboard-avoider"
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoider testID="designation-edit-keyboard-avoider">
         <ScrollView
           testID="designation-edit-scroll"
           contentContainerStyle={styles.scrollContent}
@@ -309,7 +295,7 @@ function DesignationEditContent() {
         )}
         {/* new_member (AC10): no extra field. */}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
 
       <PeoplePicker
         visible={pickerVisible}
@@ -330,7 +316,6 @@ export default function DesignationEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   container: {
     flex: 1,
   },

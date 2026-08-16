@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { useWardInfo, useUpdateWardInfo } from '../../../hooks/useWard';
+import { KeyboardAvoider } from '../../../components/KeyboardAvoider';
 
 /**
  * Edit the ward name and stake name (post-registration). Writes are RLS-gated to non-observers of
@@ -80,35 +81,37 @@ export default function WardInfoScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {!isOnline && (
-            <View style={[styles.offlineBox, { backgroundColor: colors.errorContainer }]}>
-              <Text style={[styles.offlineText, { color: colors.error }]}>{t('wardInfo.offline')}</Text>
-            </View>
-          )}
+              <KeyboardAvoider testID="ward-keyboard-avoider">
+  <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {!isOnline && (
+              <View style={[styles.offlineBox, { backgroundColor: colors.errorContainer }]}>
+                <Text style={[styles.offlineText, { color: colors.error }]}>{t('wardInfo.offline')}</Text>
+              </View>
+            )}
 
-          <Text style={[styles.label, { color: colors.textSecondary }]}>{t('wardInfo.wardName')}</Text>
-          <TextInput
-            testID="ward-info-name"
-            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-            value={name}
-            onChangeText={setName}
-            placeholder={t('wardInfo.wardName')}
-            placeholderTextColor={colors.placeholder}
-            editable={isOnline}
-          />
+            <Text style={[styles.label, { color: colors.textSecondary }]}>{t('wardInfo.wardName')}</Text>
+            <TextInput
+              testID="ward-info-name"
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('wardInfo.wardName')}
+              placeholderTextColor={colors.placeholder}
+              editable={isOnline}
+            />
 
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 20 }]}>{t('wardInfo.stakeName')}</Text>
-          <TextInput
-            testID="ward-info-stake"
-            style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-            value={stakeName}
-            onChangeText={setStakeName}
-            placeholder={t('wardInfo.stakeName')}
-            placeholderTextColor={colors.placeholder}
-            editable={isOnline}
-          />
-        </ScrollView>
+            <Text style={[styles.label, { color: colors.textSecondary, marginTop: 20 }]}>{t('wardInfo.stakeName')}</Text>
+            <TextInput
+              testID="ward-info-stake"
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+              value={stakeName}
+              onChangeText={setStakeName}
+              placeholder={t('wardInfo.stakeName')}
+              placeholderTextColor={colors.placeholder}
+              editable={isOnline}
+            />
+          </ScrollView>
+      </KeyboardAvoider>
       )}
     </SafeAreaView>
   );

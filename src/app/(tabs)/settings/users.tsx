@@ -25,6 +25,7 @@ import { throwIfOffline, isRequiresConnectionError } from '../../../lib/offlineG
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons';
 import type { Role } from '../../../types/database';
+import { KeyboardAvoider } from '../../../components/KeyboardAvoider';
 
 const ROLES: Role[] = ['bishopric', 'secretary', 'observer'];
 
@@ -335,248 +336,250 @@ export default function UserManagementScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
-            <Text style={[styles.backButton, { color: colors.primary }]}>
-              {t('common.back')}
-            </Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {t('users.title')}
-          </Text>
-          {canManageUsers && (
-            <Pressable
-              style={[styles.inviteButton, { backgroundColor: colors.primary }]}
-              onPress={openInviteModal}
-              accessibilityRole="button"
-              accessibilityLabel={t('users.inviteUser')}
-              testID="users-invite-button"
-            >
-              <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
+            <KeyboardAvoider testID="users-keyboard-avoider">
+  <ScrollView>
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12}>
+              <Text style={[styles.backButton, { color: colors.primary }]}>
+                {t('common.back')}
+              </Text>
             </Pressable>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {t('users.title')}
+            </Text>
+            {canManageUsers && (
+              <Pressable
+                style={[styles.inviteButton, { backgroundColor: colors.primary }]}
+                onPress={openInviteModal}
+                accessibilityRole="button"
+                accessibilityLabel={t('users.inviteUser')}
+                testID="users-invite-button"
+              >
+                <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {isLoading && (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
           )}
-        </View>
 
-        {isLoading && (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        )}
+          {usersError && canManageUsers && (
+            <View style={styles.centered}>
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {t('users.loadError')}
+              </Text>
+              <Pressable
+                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                onPress={() => refetch()}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+              >
+                <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+              </Pressable>
+            </View>
+          )}
 
-        {usersError && canManageUsers && (
-          <View style={styles.centered}>
-            <Text style={[styles.errorText, { color: colors.error }]}>
-              {t('users.loadError')}
-            </Text>
-            <Pressable
-              style={[styles.retryButton, { backgroundColor: colors.primary }]}
-              onPress={() => refetch()}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.retry')}
-            >
-              <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
-            </Pressable>
-          </View>
-        )}
+          {!isLoading && !usersError && users.length === 0 && (
+            <View style={styles.centered}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {t('users.noUsers')}
+              </Text>
+            </View>
+          )}
 
-        {!isLoading && !usersError && users.length === 0 && (
-          <View style={styles.centered}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('users.noUsers')}
-            </Text>
-          </View>
-        )}
+          {displayedUsers.map((u) => {
+            const isExpanded = expandedUserId === u.id;
+            const isSelf = u.id === currentUserId;
 
-        {displayedUsers.map((u) => {
-          const isExpanded = expandedUserId === u.id;
-          const isSelf = u.id === currentUserId;
-
-          return (
-            <Pressable
-              key={u.id}
-              style={[styles.userCard, { backgroundColor: colors.card }]}
-              onPress={() => {
-                if (isExpanded) {
-                  setExpandedUserId(null);
-                } else {
-                  setExpandedUserId(u.id);
-                  if (isSelf) {
-                    setEditingName(u.full_name || '');
+            return (
+              <Pressable
+                key={u.id}
+                style={[styles.userCard, { backgroundColor: colors.card }]}
+                onPress={() => {
+                  if (isExpanded) {
+                    setExpandedUserId(null);
+                  } else {
+                    setExpandedUserId(u.id);
+                    if (isSelf) {
+                      setEditingName(u.full_name || '');
+                    }
                   }
-                }
-              }}
-              accessibilityRole="button"
-            >
-              <View style={styles.userHeader}>
-                <View style={styles.userInfo}>
-                  <Text
-                    style={[styles.userDisplayName, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {u.full_name || u.email}
-                  </Text>
-                  <Text style={[styles.userRole, { color: colors.textSecondary }]}>
-                    {t(`roles.${u.role}`)}
-                    {isSelf ? ` (${t('common.you') || 'you'})` : ''}
-                  </Text>
-                </View>
-                <View style={styles.expandIcon}>
-                  {isExpanded
-                    ? <ChevronUpIcon size={12} color={colors.textSecondary} />
-                    : <ChevronDownIcon size={12} color={colors.textSecondary} />
-                  }
-                </View>
-              </View>
-
-              {isExpanded && (
-                <View style={[styles.expandedSection, { borderTopColor: colors.divider }]}>
-                  {/* Name: editable for self, read-only for others */}
-                  {isSelf ? (
-                    <View style={styles.fieldRow}>
-                      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                        {t('users.name')}
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.nameInput,
-                          {
-                            color: colors.text,
-                            borderColor: colors.divider,
-                            backgroundColor: colors.surfaceVariant,
-                          },
-                        ]}
-                        value={editingName}
-                        onChangeText={setEditingName}
-                        autoCapitalize="words"
-                        placeholder={t('auth.fullNamePlaceholder')}
-                        placeholderTextColor={colors.textSecondary}
-                      />
-                      <Pressable
-                        style={[
-                          styles.saveButton,
-                          { backgroundColor: colors.primary },
-                          (!editingName.trim() ||
-                            editingName.trim() === (u.full_name || '') ||
-                            updateNameMutation.isPending) && {
-                            opacity: 0.5,
-                          },
-                        ]}
-                        onPress={() => handleSaveName(u.full_name || '')}
-                        disabled={
-                          !editingName.trim() ||
-                          editingName.trim() === (u.full_name || '') ||
-                          updateNameMutation.isPending
-                        }
-                        accessibilityRole="button"
-                      >
-                        {updateNameMutation.isPending ? (
-                          <ActivityIndicator color="#FFFFFF" size="small" />
-                        ) : (
-                          <Text style={styles.saveButtonText}>
-                            {t('common.save')}
-                          </Text>
-                        )}
-                      </Pressable>
-                    </View>
-                  ) : u.full_name ? (
-                    <View style={styles.fieldRow}>
-                      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                        {t('users.name')}
-                      </Text>
-                      <Text style={[styles.fieldValue, { color: colors.text }]}>
-                        {u.full_name}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {/* Email (read-only) */}
-                  <View style={styles.fieldRow}>
-                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                      {t('users.email')}
+                }}
+                accessibilityRole="button"
+              >
+                <View style={styles.userHeader}>
+                  <View style={styles.userInfo}>
+                    <Text
+                      style={[styles.userDisplayName, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {u.full_name || u.email}
                     </Text>
-                    <Text style={[styles.fieldValue, { color: colors.text }]}>
-                      {u.email}
+                    <Text style={[styles.userRole, { color: colors.textSecondary }]}>
+                      {t(`roles.${u.role}`)}
+                      {isSelf ? ` (${t('common.you') || 'you'})` : ''}
                     </Text>
                   </View>
+                  <View style={styles.expandIcon}>
+                    {isExpanded
+                      ? <ChevronUpIcon size={12} color={colors.textSecondary} />
+                      : <ChevronDownIcon size={12} color={colors.textSecondary} />
+                    }
+                  </View>
+                </View>
 
-                  {/* Role selector (only for other users' cards) */}
-                  {!isSelf && (
+                {isExpanded && (
+                  <View style={[styles.expandedSection, { borderTopColor: colors.divider }]}>
+                    {/* Name: editable for self, read-only for others */}
+                    {isSelf ? (
+                      <View style={styles.fieldRow}>
+                        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                          {t('users.name')}
+                        </Text>
+                        <TextInput
+                          style={[
+                            styles.nameInput,
+                            {
+                              color: colors.text,
+                              borderColor: colors.divider,
+                              backgroundColor: colors.surfaceVariant,
+                            },
+                          ]}
+                          value={editingName}
+                          onChangeText={setEditingName}
+                          autoCapitalize="words"
+                          placeholder={t('auth.fullNamePlaceholder')}
+                          placeholderTextColor={colors.textSecondary}
+                        />
+                        <Pressable
+                          style={[
+                            styles.saveButton,
+                            { backgroundColor: colors.primary },
+                            (!editingName.trim() ||
+                              editingName.trim() === (u.full_name || '') ||
+                              updateNameMutation.isPending) && {
+                              opacity: 0.5,
+                            },
+                          ]}
+                          onPress={() => handleSaveName(u.full_name || '')}
+                          disabled={
+                            !editingName.trim() ||
+                            editingName.trim() === (u.full_name || '') ||
+                            updateNameMutation.isPending
+                          }
+                          accessibilityRole="button"
+                        >
+                          {updateNameMutation.isPending ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                          ) : (
+                            <Text style={styles.saveButtonText}>
+                              {t('common.save')}
+                            </Text>
+                          )}
+                        </Pressable>
+                      </View>
+                    ) : u.full_name ? (
+                      <View style={styles.fieldRow}>
+                        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                          {t('users.name')}
+                        </Text>
+                        <Text style={[styles.fieldValue, { color: colors.text }]}>
+                          {u.full_name}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {/* Email (read-only) */}
                     <View style={styles.fieldRow}>
                       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
-                        {t('users.role')}
+                        {t('users.email')}
                       </Text>
-                      <View style={styles.roleSelector}>
-                        {ROLES.map((role) => (
-                          <Pressable
-                            key={role}
-                            style={[
-                              styles.roleOption,
-                              {
-                                backgroundColor:
-                                  u.role === role ? colors.primary : colors.surfaceVariant,
-                              },
-                            ]}
-                            onPress={() => {
-                              if (role !== u.role) {
-                                handleRoleChange(u, role);
-                              }
-                            }}
-                            disabled={changeRoleMutation.isPending}
-                            accessibilityRole="radio"
-                            accessibilityState={{
-                              selected: u.role === role,
-                            }}
-                          >
-                            <Text
+                      <Text style={[styles.fieldValue, { color: colors.text }]}>
+                        {u.email}
+                      </Text>
+                    </View>
+
+                    {/* Role selector (only for other users' cards) */}
+                    {!isSelf && (
+                      <View style={styles.fieldRow}>
+                        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                          {t('users.role')}
+                        </Text>
+                        <View style={styles.roleSelector}>
+                          {ROLES.map((role) => (
+                            <Pressable
+                              key={role}
                               style={[
-                                styles.roleOptionText,
+                                styles.roleOption,
                                 {
-                                  color:
-                                    u.role === role ? '#FFFFFF' : colors.text,
+                                  backgroundColor:
+                                    u.role === role ? colors.primary : colors.surfaceVariant,
                                 },
                               ]}
+                              onPress={() => {
+                                if (role !== u.role) {
+                                  handleRoleChange(u, role);
+                                }
+                              }}
+                              disabled={changeRoleMutation.isPending}
+                              accessibilityRole="radio"
+                              accessibilityState={{
+                                selected: u.role === role,
+                              }}
                             >
-                              {t(`roles.${role}`)}
-                            </Text>
-                          </Pressable>
-                        ))}
+                              <Text
+                                style={[
+                                  styles.roleOptionText,
+                                  {
+                                    color:
+                                      u.role === role ? '#FFFFFF' : colors.text,
+                                  },
+                                ]}
+                              >
+                                {t(`roles.${role}`)}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
                       </View>
-                    </View>
-                  )}
+                    )}
 
-                  {/* Delete button */}
-                  {isSelf ? (
-                    <Pressable
-                      style={[styles.deleteButton, { backgroundColor: colors.error }]}
-                      onPress={() => handleDelete(u)}
-                      disabled={deleteUserMutation.isPending}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('users.deleteMyAccount')}
-                    >
-                      <Text style={styles.deleteButtonText}>
-                        {t('users.deleteMyAccount')}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      style={[styles.deleteButton, { backgroundColor: colors.error }]}
-                      onPress={() => handleDelete(u)}
-                      disabled={deleteUserMutation.isPending}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('users.deleteUser')}
-                    >
-                      <Text style={styles.deleteButtonText}>
-                        {t('users.deleteUser')}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                    {/* Delete button */}
+                    {isSelf ? (
+                      <Pressable
+                        style={[styles.deleteButton, { backgroundColor: colors.error }]}
+                        onPress={() => handleDelete(u)}
+                        disabled={deleteUserMutation.isPending}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('users.deleteMyAccount')}
+                      >
+                        <Text style={styles.deleteButtonText}>
+                          {t('users.deleteMyAccount')}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[styles.deleteButton, { backgroundColor: colors.error }]}
+                        onPress={() => handleDelete(u)}
+                        disabled={deleteUserMutation.isPending}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('users.deleteUser')}
+                      >
+                        <Text style={styles.deleteButtonText}>
+                          {t('users.deleteUser')}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </KeyboardAvoider>
 
       {/* Invite Modal */}
       <Modal

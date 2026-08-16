@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { KeyboardAvoider } from './KeyboardAvoider';
 
 export interface TemplatePlaceholder {
   token: string; // e.g. "{nome}"
@@ -169,96 +170,98 @@ export function TemplateEditorScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="template-editor-back">
-            <Text style={[styles.backButton, { color: colors.primary }]}>{t('common.back')}</Text>
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {title}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {tabs.length > 1 && (
-          <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceVariant }]}>
-            {tabs.map((tab) => {
-              const isActive = tab.key === activeKey;
-              return (
-                <Pressable
-                  key={tab.key}
-                  testID={`template-tab-${tab.key}`}
-                  style={[styles.segmentedTab, isActive && { backgroundColor: colors.card }]}
-                  onPress={() => switchTab(tab.key)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                >
-                  <Text
-                    style={[
-                      styles.segmentedTabText,
-                      { color: isActive ? colors.primary : colors.textSecondary },
-                      isActive && { fontWeight: '600' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            <KeyboardAvoider testID="template-editor-keyboard-avoider">
+  <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="template-editor-back">
+              <Text style={[styles.backButton, { color: colors.primary }]}>{t('common.back')}</Text>
+            </Pressable>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {title}
+            </Text>
+            <View style={styles.headerSpacer} />
           </View>
-        )}
 
-        {activeTab && activeTab.placeholders.length > 0 && (
-          <>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-              {t('settings.templateEditor.placeholders')}
-            </Text>
-            <View style={styles.placeholderList}>
-              {activeTab.placeholders.map((p) => (
-                <Pressable
-                  key={p.token}
-                  testID={`template-chip-${p.token}`}
-                  style={[styles.placeholderChip, { backgroundColor: colors.surfaceVariant }]}
-                  onPress={() => handleInsert(p.token)}
-                >
-                  <Text style={[styles.placeholderText, { color: colors.text }]}>{p.label}</Text>
-                </Pressable>
-              ))}
+          {tabs.length > 1 && (
+            <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceVariant }]}>
+              {tabs.map((tab) => {
+                const isActive = tab.key === activeKey;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    testID={`template-tab-${tab.key}`}
+                    style={[styles.segmentedTab, isActive && { backgroundColor: colors.card }]}
+                    onPress={() => switchTab(tab.key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentedTabText,
+                        { color: isActive ? colors.primary : colors.textSecondary },
+                        isActive && { fontWeight: '600' },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          </>
-        )}
+          )}
 
-        <View style={styles.templateHeader}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            {t('settings.templateEditor.template')}
-          </Text>
-          <Pressable onPress={handleRestore} hitSlop={8} testID="template-restore">
-            <Text style={[styles.restore, { color: colors.primary }]}>
-              {t('settings.templateEditor.restoreDefault')}
+          {activeTab && activeTab.placeholders.length > 0 && (
+            <>
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+                {t('settings.templateEditor.placeholders')}
+              </Text>
+              <View style={styles.placeholderList}>
+                {activeTab.placeholders.map((p) => (
+                  <Pressable
+                    key={p.token}
+                    testID={`template-chip-${p.token}`}
+                    style={[styles.placeholderChip, { backgroundColor: colors.surfaceVariant }]}
+                    onPress={() => handleInsert(p.token)}
+                  >
+                    <Text style={[styles.placeholderText, { color: colors.text }]}>{p.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          <View style={styles.templateHeader}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+              {t('settings.templateEditor.template')}
             </Text>
-          </Pressable>
-        </View>
-        <TextInput
-          testID="template-editor"
-          style={[styles.editor, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.surfaceVariant }]}
-          value={currentText}
-          onChangeText={handleChange}
-          onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
-          onBlur={() => flush(activeKey)}
-          multiline
-          textAlignVertical="top"
-          autoCapitalize={autoCapitalize}
-          autoCorrect={false}
-        />
+            <Pressable onPress={handleRestore} hitSlop={8} testID="template-restore">
+              <Text style={[styles.restore, { color: colors.primary }]}>
+                {t('settings.templateEditor.restoreDefault')}
+              </Text>
+            </Pressable>
+          </View>
+          <TextInput
+            testID="template-editor"
+            style={[styles.editor, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.surfaceVariant }]}
+            value={currentText}
+            onChangeText={handleChange}
+            onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
+            onBlur={() => flush(activeKey)}
+            multiline
+            textAlignVertical="top"
+            autoCapitalize={autoCapitalize}
+            autoCorrect={false}
+          />
 
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-          {t('settings.templateEditor.preview')}
-        </Text>
-        <View style={[styles.previewCard, { backgroundColor: colors.card }]} testID="template-preview">
-          <Text style={[styles.previewText, { color: colors.text }]}>{preview}</Text>
-        </View>
-      </ScrollView>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            {t('settings.templateEditor.preview')}
+          </Text>
+          <View style={[styles.previewCard, { backgroundColor: colors.card }]} testID="template-preview">
+            <Text style={[styles.previewText, { color: colors.text }]}>{preview}</Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

@@ -6,7 +6,7 @@
  * spied so we can exercise the "update calling?" branches.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import DesignationEditScreen from '../app/designations/[date]';
 import type { Member, Designation } from '../types/database';
@@ -117,6 +117,19 @@ beforeEach(() => {
 });
 
 describe('Designation edit screen (step 2)', () => {
+  it('keeps the form above the keyboard (AC1, AC4)', async () => {
+    /*
+     * Structural on purpose: jest has no virtual keyboard, so "the field ended up visible" is not
+     * observable here — this catches the container being removed, and the device checks in the spec
+     * cover the rest. The pattern mirrors the (auth) screens.
+     */
+    await render();
+    const avoider = screen.getByTestId('designation-edit-keyboard-avoider');
+    // Nesting is the point: the container has to WRAP the scrollable form, not sit beside it.
+    const scroll = within(avoider).getByTestId('designation-edit-scroll');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
   it('sustain: prefills calling from member, saves snapshot, and updates member calling on confirm', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const r = await render();

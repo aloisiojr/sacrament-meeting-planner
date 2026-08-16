@@ -42,6 +42,11 @@ let mockMEMBERS: Member[] = [];
 const mockUpdateMock = jest.fn((_vars: { id: string }, opts?: { onSuccess?: (m: Member) => void }) =>
   opts?.onSuccess?.({ ...MEMBER_B, can_preside: true })
 );
+/** Creating returns the stored row, which is what makes PersonEditor call onSaved. */
+const mockCreateMock = jest.fn(
+  (vars: { full_name: string }, opts?: { onSuccess?: (m: Member) => void }) =>
+    opts?.onSuccess?.({ ...MEMBER_A, id: 'new-person', full_name: vars.full_name, can_lead_music: false })
+);
 const mockDeleteMock = jest.fn();
 
 jest.mock('../hooks/useMembers', () => {
@@ -49,7 +54,7 @@ jest.mock('../hooks/useMembers', () => {
   return {
     ...actual,
     useMembers: () => ({ data: mockMEMBERS }),
-    useCreateMember: () => ({ mutate: jest.fn() }),
+    useCreateMember: () => ({ mutate: mockCreateMock }),
     useUpdateMember: () => ({ mutate: mockUpdateMock }),
     useDeleteMember: () => ({ mutate: mockDeleteMock }),
   };
@@ -128,6 +133,7 @@ function ids(_renderer?: unknown): string[] {
 beforeEach(() => {
   mockMEMBERS = [MEMBER_A, MEMBER_B, MEMBER_C];
   mockUpdateMock.mockClear();
+  mockCreateMock.mockClear();
   mockDeleteMock.mockClear();
   mockHasPermissionMock.mockImplementation(() => true);
   jest.spyOn(Alert, 'alert').mockClear();
@@ -403,6 +409,72 @@ describe('PeoplePicker', () => {
   it('still opens with an empty search and the full list (AC4)', async () => {
     await render();
     expect(screen.getByTestId('people-picker-search').props.value).toBe('');
+  });
+});
+
+describe('creating a person from inside the picker offers to select it', () => {
+  /** Add a person through the real PersonEditor and return the alert's buttons. */
+  async function addPerson(name: string) {
+    await press(null, 'people-picker-add');
+    await fireEvent.changeText(screen.getByTestId('person-editor-full-name'), name);
+    await press(null, 'person-editor-save');
+    return alertButtons();
+  }
+
+  it('asks whether to select the new person, naming the action (AC1)', async () => {
+    await render({ context: 'lead_music' });
+    await addPerson('Nova Pessoa');
+
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    const [title, message] = (Alert.alert as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    expect(title).toBe('people.selectNewTitle');
+    expect(message).toBe('people.selectNewMessage');
+  });
+
+  it('yes selects the person and grants the capability with no second dialog (AC2, AC3)', async () => {
+    const { onSelect } = await render({ context: 'lead_music' });
+    const buttons = await addPerson('Nova Pessoa');
+
+    await act(async () => {
+      buttons.find((b) => b.text === 'common.yes')?.onPress?.();
+    });
+
+    expect(mockUpdateMock).toHaveBeenCalledWith(
+      { id: 'new-person', can_lead_music: true },
+      expect.anything()
+    );
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    // The grant dialog that a normal tap would raise must NOT appear.
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('no keeps the person and stays in the list (AC4)', async () => {
+    const { onSelect, onClose } = await render({ context: 'lead_music' });
+    const buttons = await addPerson('Nova Pessoa');
+
+    await act(async () => {
+      buttons.find((b) => b.text === 'common.no')?.onPress?.();
+    });
+
+    expect(mockCreateMock).toHaveBeenCalledTimes(1); // already saved
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('editing an existing person asks nothing (AC6)', async () => {
+    await render();
+    await press(null, 'people-picker-edit-a');
+    await press(null, 'person-editor-save');
+
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+
+  it('without a context, asks without naming an action (AC7)', async () => {
+    await render();
+    await addPerson('Nova Pessoa');
+
+    const [, message] = (Alert.alert as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    expect(message).toBe('people.selectNewMessageNoAction');
   });
 });
 

@@ -271,6 +271,58 @@ export function PeoplePicker({
     [canSelect, isDraft, capabilityField, effectiveCapability, t, updateMember, commitSelect]
   );
 
+  /**
+   * A person created from inside the picker was almost certainly created to be used right now, so
+   * offer to select it instead of dropping the user back in the list to hunt for the name.
+   *
+   * Saying yes grants the context capability WITHOUT the confirmation a normal tap would raise —
+   * answering the question already is the consent. In draft multi-select the person is added to the
+   * draft and the list stays open, because there the user is assembling a set.
+   */
+  const selectNewPerson = useCallback(
+    (member: Member) => {
+      const finish = (m: Member) => {
+        if (isDraft) {
+          setDraftIds((prev) => new Set(prev).add(m.id));
+          return;
+        }
+        commitSelect(m);
+      };
+      if (capabilityField && member[capabilityField] !== true) {
+        updateMember.mutate(
+          { id: member.id, [capabilityField]: true },
+          // Offline the write is queued and resolves null; carry on with the flag applied locally,
+          // mirroring the grant-on-select path.
+          { onSuccess: (saved) => finish(saved ?? { ...member, [capabilityField]: true }) }
+        );
+        return;
+      }
+      finish(member);
+    },
+    [isDraft, commitSelect, capabilityField, updateMember]
+  );
+
+  const handlePersonSaved = useCallback(
+    (saved: Member) => {
+      // Only for people just created here; editing an existing one just closes.
+      if (editingMember) return;
+      Alert.alert(
+        t('people.selectNewTitle'),
+        context
+          ? t('people.selectNewMessage', {
+              name: saved.full_name,
+              action: t(`people.selectNewActions.${context}`),
+            })
+          : t('people.selectNewMessageNoAction', { name: saved.full_name }),
+        [
+          { text: t('common.no'), style: 'cancel' },
+          { text: t('common.yes'), onPress: () => selectNewPerson(saved) },
+        ]
+      );
+    },
+    [editingMember, t, context, selectNewPerson]
+  );
+
   const openEditor = useCallback((member: Member | null) => {
     setEditingMember(member);
     setEditorVisible(true);
@@ -496,7 +548,7 @@ export function PeoplePicker({
           member={editingMember}
           initialName={editingMember ? undefined : search.trim() || undefined}
           onClose={() => setEditorVisible(false)}
-          onSaved={() => setEditorVisible(false)}
+          onSaved={handlePersonSaved}
         />
       ) : null}
     </Modal>

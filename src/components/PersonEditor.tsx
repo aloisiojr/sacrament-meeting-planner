@@ -358,8 +358,8 @@ export function PersonEditor({
           </Pressable>
         </View>
 
-                  <KeyboardAvoider testID="person-editor-keyboard-avoider">
-  <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoider testID="person-editor-keyboard-avoider">
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
             {error ? (
               <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
                 <Text style={[styles.errorText, { color: colors.error }]} testID="person-editor-error">
@@ -533,7 +533,7 @@ export function PersonEditor({
               </Pressable>
             ) : null}
           </ScrollView>
-          </KeyboardAvoider>
+        </KeyboardAvoider>
       </View>
 
       {/* Responsible picker (excludes self) */}

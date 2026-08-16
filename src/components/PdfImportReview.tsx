@@ -207,8 +207,8 @@ export function PdfImportReview({
       )}
 
       {/* Scrollable name list (only this scrolls). */}
-            <KeyboardAvoider testID="pdf-import-review-keyboard-avoider">
-  <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoider testID="pdf-import-review-keyboard-avoider">
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {!current && (
             <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.nothingToReview')}</Text>
           )}

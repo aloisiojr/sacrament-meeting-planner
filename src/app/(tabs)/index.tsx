@@ -32,6 +32,7 @@ import { useSundayExceptions } from '../../hooks/useSundayTypes';
 import { getNextSundays, toISODateString } from '../../lib/dateUtils';
 import { PlayIcon } from '../../components/icons';
 import type { SundayAgenda, Speech, SundayException } from '../../types/database';
+import { KeyboardAvoider } from '../../components/KeyboardAvoider';
 
 const NEXT_SUNDAYS_COUNT = 3;
 
@@ -138,48 +139,50 @@ function HomeTabContent() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <HomeMemberImportPrompt />
-        <View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">
-            {wardName
-              ? `${t('home.meetingAgendaTitle')} - ${wardName}`
-              : t('home.meetingAgendaTitle')}
-          </Text>
-          <Pressable
-            testID="home-start-meeting-button"
-            style={[styles.meetingButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push({ pathname: '/presentation', params: { date: heroDate } })}
-            accessibilityRole="button"
-          >
-            <View style={styles.meetingButtonContent}>
-              <View style={styles.playIconWrapper}>
-                <PlayIcon size={20} color={colors.onPrimary} />
-              </View>
-              <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
-                {t('home.startMeeting')}
-              </Text>
-            </View>
-          </Pressable>
-
-          {/* Hero: the next Sunday, highlighted. */}
-          {heroCard && renderCard(heroCard, { highlighted: true, testID: `home-hero-card-${heroCard.date}` })}
-        </View>
-
-        {upcomingCards.length > 0 && (
+      <KeyboardAvoider testID="home-keyboard-avoider">
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <HomeMemberImportPrompt />
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {t('home.upcomingSundays')}
+            <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">
+              {wardName
+                ? `${t('home.meetingAgendaTitle')} - ${wardName}`
+                : t('home.meetingAgendaTitle')}
             </Text>
-            {upcomingCards.map((entry) =>
-              renderCard(entry, { hideStatusBlock: true, testID: `home-upcoming-card-${entry.date}` })
-            )}
-          </View>
-        )}
+            <Pressable
+              testID="home-start-meeting-button"
+              style={[styles.meetingButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push({ pathname: '/presentation', params: { date: heroDate } })}
+              accessibilityRole="button"
+            >
+              <View style={styles.meetingButtonContent}>
+                <View style={styles.playIconWrapper}>
+                  <PlayIcon size={20} color={colors.onPrimary} />
+                </View>
+                <Text style={[styles.meetingButtonText, { color: colors.onPrimary }]}>
+                  {t('home.startMeeting')}
+                </Text>
+              </View>
+            </Pressable>
 
-        {isOnline && <NextAssignmentsSection />}
-        {isOnline && <InviteManagementSection />}
-      </ScrollView>
+            {/* Hero: the next Sunday, highlighted. */}
+            {heroCard && renderCard(heroCard, { highlighted: true, testID: `home-hero-card-${heroCard.date}` })}
+          </View>
+
+          {upcomingCards.length > 0 && (
+            <View>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('home.upcomingSundays')}
+              </Text>
+              {upcomingCards.map((entry) =>
+                renderCard(entry, { hideStatusBlock: true, testID: `home-upcoming-card-${entry.date}` })
+              )}
+            </View>
+          )}
+
+          {isOnline && <NextAssignmentsSection />}
+          {isOnline && <InviteManagementSection />}
+        </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

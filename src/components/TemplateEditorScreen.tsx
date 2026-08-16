@@ -170,8 +170,8 @@ export function TemplateEditorScreen({
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-            <KeyboardAvoider testID="template-editor-keyboard-avoider">
-  <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoider testID="template-editor-keyboard-avoider">
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="template-editor-back">
               <Text style={[styles.backButton, { color: colors.primary }]}>{t('common.back')}</Text>

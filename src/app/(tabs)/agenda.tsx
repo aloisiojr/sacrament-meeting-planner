@@ -326,7 +326,7 @@ function AgendaTabContent() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-        <KeyboardAvoider testID="agenda-keyboard-avoider">
+      <KeyboardAvoider testID="agenda-keyboard-avoider">
         <FlatList
           ref={flatListRef}
           data={listItems}
@@ -352,7 +352,7 @@ function AgendaTabContent() {
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
         />
-        </KeyboardAvoider>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

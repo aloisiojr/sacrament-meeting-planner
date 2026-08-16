@@ -81,8 +81,8 @@ export default function WardInfoScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-              <KeyboardAvoider testID="ward-keyboard-avoider">
-  <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoider testID="ward-keyboard-avoider">
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
             {!isOnline && (
               <View style={[styles.offlineBox, { backgroundColor: colors.errorContainer }]}>
                 <Text style={[styles.offlineText, { color: colors.error }]}>{t('wardInfo.offline')}</Text>
@@ -111,7 +111,7 @@ export default function WardInfoScreen() {
               editable={isOnline}
             />
           </ScrollView>
-      </KeyboardAvoider>
+        </KeyboardAvoider>
       )}
     </SafeAreaView>
   );

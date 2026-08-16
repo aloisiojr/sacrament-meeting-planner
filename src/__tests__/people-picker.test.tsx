@@ -42,10 +42,13 @@ let mockMEMBERS: Member[] = [];
 const mockUpdateMock = jest.fn((_vars: { id: string }, opts?: { onSuccess?: (m: Member) => void }) =>
   opts?.onSuccess?.({ ...MEMBER_B, can_preside: true })
 );
-/** Creating must return the stored row, or PersonEditor never calls onSaved. */
+/**
+ * Creating must return the stored row, or PersonEditor never calls onSaved. It echoes the fields it
+ * was given — the capability flags in particular, since callers branch on what was actually saved.
+ */
 const mockCreateMock = jest.fn(
-  (vars: { full_name: string }, opts?: { onSuccess?: (m: Member) => void }) =>
-    opts?.onSuccess?.({ ...MEMBER_A, id: 'new-person', full_name: vars.full_name })
+  (vars: Partial<Member> & { full_name: string }, opts?: { onSuccess?: (m: Member) => void }) =>
+    opts?.onSuccess?.({ ...MEMBER_A, id: 'new-person', ...vars })
 );
 const mockDeleteMock = jest.fn();
 
@@ -426,6 +429,24 @@ describe('PeoplePicker', () => {
     expect(switchOn('people-picker-view-all')).toBe(true);
   });
 
+  it('keeps "Ver todos" ON when the saved person does NOT have the capability', async () => {
+    // The reset assumes the new person shows up in the filtered list. If the user unticked the
+    // capability before saving, closing the unfiltered view would bury the person they just created.
+    mockCreateMock.mockImplementationOnce(
+      (vars: { full_name: string }, opts?: { onSuccess?: (m: Member) => void }) =>
+        opts?.onSuccess?.({ ...MEMBER_A, id: 'new-person', full_name: vars.full_name, can_play_piano: false })
+    );
+    await render({ context: 'play_piano' });
+    await toggle(null, 'people-picker-view-all', true);
+
+    await press(null, 'people-picker-add');
+    await fireEvent.changeText(screen.getByTestId('person-editor-full-name'), 'Sem Capacidade');
+    await toggle(null, 'person-editor-cap-switch-play_piano', false);
+    await press(null, 'person-editor-save');
+
+    expect(switchOn('people-picker-view-all')).toBe(true);
+  });
+
   it('leaves it alone when the editor is cancelled', async () => {
     await render({ context: 'play_piano' });
     await toggle(null, 'people-picker-view-all', true);
@@ -469,6 +490,22 @@ describe('the first tap is not swallowed by the keyboard', () => {
     expect(screen.getByTestId('people-picker-list').props.keyboardShouldPersistTaps).toBe(
       'handled'
     );
+  });
+});
+
+describe('the picker opens clean', () => {
+  it('a search typed in a previous opening does not leak into the next (AC4)', async () => {
+    const props = { onSelect: jest.fn(), onClose: jest.fn(), context: 'play_piano' as const };
+    const view = await rtlRender(React.createElement(PeoplePicker, { visible: true, ...props }));
+
+    await fireEvent.changeText(screen.getByTestId('people-picker-search'), 'Alice');
+    await toggle(null, 'people-picker-view-all', true);
+
+    await view.rerender(React.createElement(PeoplePicker, { visible: false, ...props }));
+    await view.rerender(React.createElement(PeoplePicker, { visible: true, ...props }));
+
+    expect(screen.getByTestId('people-picker-search').props.value).toBe('');
+    expect(switchOn('people-picker-view-all')).toBe(false);
   });
 });
 

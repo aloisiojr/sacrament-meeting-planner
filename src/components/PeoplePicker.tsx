@@ -122,7 +122,14 @@ export function PeoplePicker({
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
-    if (visible) setDraftIds(new Set(selectedIds ?? []));
+    if (visible) {
+      setDraftIds(new Set(selectedIds ?? []));
+      // Same invariant as TopicSelectorModal: assert a clean search on OPEN rather than trusting
+      // every exit path to clear it. The component stays mounted between openings, and autoFocus
+      // means a leaked filter would be the first thing the user types into.
+      setSearch('');
+      setShowAll(false);
+    }
   }
 
   const { data: allMembers } = useMembers();
@@ -499,11 +506,14 @@ export function PeoplePicker({
           // Editing ignores this — PersonEditor keeps the stored flags; the rule lives there.
           initialCapability={effectiveCapability ?? null}
           onClose={() => setEditorVisible(false)}
-          onSaved={() => {
+          onSaved={(saved) => {
             setEditorVisible(false);
-            // A person created here gets the context capability, so the filtered list already
-            // shows them — keeping the unfiltered view on would bury them among everyone else.
-            if (!editingMember) setShowAll(false);
+            // A person created here normally gets the context capability, so the filtered list
+            // already shows them and the unfiltered view has done its job. But the user may have
+            // unticked it before saving — then the person is NOT in the filtered list, and closing
+            // the unfiltered view would bury the very person they just created.
+            const inFilteredList = !capabilityField || saved[capabilityField] === true;
+            if (!editingMember && inFilteredList) setShowAll(false);
           }}
         />
       ) : null}

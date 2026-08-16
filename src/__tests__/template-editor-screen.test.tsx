@@ -124,3 +124,15 @@ describe('TemplateEditorScreen', () => {
     expect(screen.getByTestId('template-preview')).toHaveTextContent('DEFAULT B Maria');
   });
 });
+
+describe('keyboard reachability', () => {
+  /*
+   * Removing the KeyboardAvoider from every screen used to leave the whole suite green — the
+   * wrapper was the branch's main deliverable and nothing pinned it. This asserts presence only:
+   * whether a field ends up visible needs a device, but silent removal is now caught.
+   */
+  it('keeps the form inside a KeyboardAvoider', async () => {
+    await render();
+    expect(screen.getByTestId('template-editor-keyboard-avoider')).toBeTruthy();
+  });
+});

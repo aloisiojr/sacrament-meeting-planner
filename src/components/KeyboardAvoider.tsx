@@ -2,48 +2,42 @@ import React from 'react';
 import { KeyboardAvoidingView, Platform, type ViewStyle } from 'react-native';
 
 /**
- * Wraps a scrollable form so the virtual keyboard cannot cover its fields
+ * Wraps a scrollable form so the keyboard cannot leave its fields unreachable
  * (specs/keyboard-safe-form-fields.md).
  *
- * One component instead of the same Platform check copied into every screen: the Android side of
- * this is the fragile half — `behavior="height"` can fight the native `adjustResize` that
- * `app.json`'s `softwareKeyboardLayoutMode: 'resize'` turns on, producing a double jump. If that
- * shows up on a device, this is the single place to change it.
+ * WHAT THIS DOES, PRECISELY: it shrinks the scrollable area by the keyboard's height, so every
+ * field stays REACHABLE BY SCROLLING. It does NOT move a focused field on its own. React Native has
+ * no automatic scroll-to-focused-input unless `automaticallyAdjustKeyboardInsets` is set on the
+ * ScrollView (the flush-scroll code in ScrollView.js is an imperative API nothing calls), and that
+ * prop must not be combined with this wrapper: the native inset is measured before this padding
+ * commits, so the two double-count and leave a dead strip.
  *
- * The (auth) screens predate this and inline the same pattern; they work, so they were left alone.
+ * Consequences, by screen shape:
+ *   - Long / overflowing form → this is enough; the user scrolls.
+ *   - Short, TOP-ALIGNED form → this does NOTHING. Shrinking the viewport cannot move content
+ *     anchored to the top, and the on-screen gap works out to
+ *     `height - keyboardHeight - fieldBottom + scrollOffset`, which holds no term this component
+ *     controls. Such a screen must scroll the field itself — see `handleFieldFocus` in
+ *     `app/designations/[date].tsx`, which uses `automaticallyAdjustKeyboardInsets` + `scrollToEnd`
+ *     INSTEAD of this wrapper.
+ *   - Centred form → works, because `flexGrow: 1` + `justifyContent: 'center'` makes the content
+ *     track the viewport. That is why the `(auth)` screens are fine; they inline their own
+ *     KeyboardAvoidingView and were left alone.
  *
- * USELESS on a SHORT, TOP-ALIGNED form — do not reach for it there. Shrinking the viewport cannot
- * move content anchored to the top, and the on-screen gap works out to
- * `height - keyboardHeight - fieldBottom + scrollOffset`, which does not contain the offset at all,
- * so no value of it changes anything. Such a screen has to SCROLL the field instead; see
- * handleFieldFocus in app/designations/[date].tsx. The (auth) screens escape this because their
- * content is centred with flexGrow, so it tracks the viewport.
+ * `keyboardVerticalOffset` is additive in `_relativeKeyboardHeight` (padding = keyboardHeight +
+ * offset), so it enlarges the shrink. That buys visible clearance only where the content actually
+ * moves — on a top-aligned form it changes nothing, which is why raising it from 24 to 40 had no
+ * effect on the designations screen. Android stays at 0: the window already resizes
+ * (`softwareKeyboardLayoutMode: 'resize'`), and an offset there would compound a double jump with
+ * `behavior="height"`.
  *
- * USELESS on a SHORT, TOP-ALIGNED form. Shrinking the viewport cannot move content that is anchored
- * to the top, and the on-screen gap works out to ,
- * which does not contain the offset at all — so no value of it changes anything. Such a screen has
- * to SCROLL the field instead; see the comment on handleFieldFocus in app/designations/[date].tsx.
- * The (auth) screens escape this because their content is centred with flexGrow, so it tracks the
- * viewport.
- *
- * On iOS the padding KeyboardAvoidingView computes is already exactly the keyboard height — the
- * gap problem is elsewhere: RN scrolls the focused field FLUSH against the keyboard on purpose
- * ("pulling the content down so that the target component's bottom meets the keyboard's top",
- * ScrollView.js), so a 1pt border ends up sitting on the boundary. `keyboardVerticalOffset` is
- * purely additive in `_relativeKeyboardHeight` (padding = keyboardHeight + offset), so it buys
- * exactly this many points of breathing room. The RN docs describe the prop as a screen-geometry
- * correction; using it as a gap knob is justified by the source arithmetic, not by that wording —
- * hence this note.
- *
- * Android is deliberately left at 0: the window already resizes (softwareKeyboardLayoutMode), and
- * an offset there would compound the double-jump warned about above.
- *
- * Do NOT also set `automaticallyAdjustKeyboardInsets` on the ScrollView: the native inset is
- * measured before this padding applies, so the two double-count and leave a dead strip.
+ * One component rather than the same Platform check in every screen, so the Android half — the
+ * fragile one — has a single place to change.
  */
 
-/** Breathing room between the focused field and the keyboard. Single knob — tune here. */
+/** Extra clearance on iOS, for screens whose content actually moves. Single knob — tune here. */
 const IOS_KEYBOARD_GAP = 40;
+
 export function KeyboardAvoider({
   children,
   testID,

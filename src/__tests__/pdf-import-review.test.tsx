@@ -138,3 +138,17 @@ describe('PdfImportReview wizard', () => {
     expect(onApply.mock.calls[0][0].removeIds).toEqual(['m-ab']);
   });
 });
+
+describe('keyboard reachability', () => {
+  /*
+   * Removing the KeyboardAvoider from every screen used to leave the whole suite green — the
+   * wrapper was the branch's main deliverable and nothing pinned it. This asserts presence only:
+   * whether a field ends up visible needs a device, but silent removal is now caught.
+   */
+  it('keeps the form inside a KeyboardAvoider', async () => {
+    const r = render(jest.fn());
+    expect(
+      r.root.findAll((n) => n.props?.testID === 'pdf-import-review-keyboard-avoider').length
+    ).toBeGreaterThan(0);
+  });
+});

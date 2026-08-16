@@ -1,7 +1,8 @@
 # Ao criar uma pessoa dentro do seletor, oferecer selecioná-la na hora
 
 > **REVERTIDO em 2026-08-15, a pedido do usuário.** Foi construído (commit `9e71735`) e desfeito
-> (`db45509`) no mesmo dia; o motivo não foi registrado. O comportamento descrito abaixo **não
+> (`db45509`) no mesmo dia. Motivo: o usuário desistiu da ideia — decisão de produto, não defeito.
+> Nada foi encontrado de errado no comportamento implementado. O comportamento descrito abaixo **não
 > existe** no app: criar uma pessoa pelo seletor volta a apenas fechar o editor e devolver a lista.
 > O spec fica como registro da decisão e do desenho, e o commit original é o ponto de partida se um
 > dia se quiser retomá-lo.

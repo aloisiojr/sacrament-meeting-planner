@@ -12,6 +12,8 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 
+import { ROW_GAP_THRESHOLD_JS } from '../lib/lcrPdfLayout';
+
 export interface PdfTextExtractorProps {
   /** Base64 of the picked PDF. */
   base64: string;
@@ -20,7 +22,12 @@ export interface PdfTextExtractorProps {
 }
 
 // In-WebView bootstrap: rebuild pdf.js from embedded base64, extract text grouped into lines.
-const BOOTSTRAP = `
+/** Exported so a test can evaluate the injected script and prove the threshold works in there. */
+export const BOOTSTRAP = `
+  // Literal source from src/lib/lcrPdfLayout.ts. NOT the function itself: minification makes it
+  // anonymous (a SyntaxError once injected) and Hermes drops function source entirely — both
+  // invisible in the dev client, which serves unminified JS. See the note in that module.
+  ${ROW_GAP_THRESHOLD_JS}
   const b64ToText = (b64) => decodeURIComponent(escape(atob(b64)));
   const runReady = () => window.ReactNativeWebView.postMessage(JSON.stringify({ ready: true }));
   window.__runPdf = async (pdfB64) => {
@@ -77,9 +84,9 @@ const BOOTSTRAP = `
           if (g > 0) freq.set(g, (freq.get(g) || 0) + 1);
         }
       }
-      const common = Array.from(freq.entries()).sort((a, b) => b[1] - a[1]).map((e) => e[0]);
-      let thr = Infinity;
-      if (common.length >= 2) thr = (Math.min(common[0], common[1]) + Math.max(common[0], common[1])) / 2;
+      // See src/lib/lcrPdfLayout.ts — the threshold has to SEPARATE the record gap from the
+      // inside-record ones, not average the two most frequent (which split three-line names).
+      const thr = rowGapThreshold(freq);
       // Join items into text: group by line (Y, top→bottom), order each line left→right by X and
       // insert a space only for a real gap (word/column boundary, NOT between accent glyphs), then
       // join lines with a space. So "Gon" "ç" "alves" → "Gonçalves", "Jos" "é" → "José".

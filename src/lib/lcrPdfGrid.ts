@@ -159,40 +159,14 @@ export function bandsOf(page: LcrRawPage, boundaries: readonly number[]): LcrBan
     const items = page.items.filter((o) => inRange(o, ys[i], ys[i + 1]));
     bands.push({ top: ys[i], bottom: ys[i + 1], items, text: joinTextRun(items) });
   }
-  const first = ys.length ? ys[0] : Infinity;
+  // Sem fronteira nenhuma TUDO fica fora da grade, em vez de desaparecer: uma página que não
+  // produz banda alguma precisa aparecer na contagem de âncoras, senão a grade a descarta inteira
+  // e ainda se declara bem-sucedida.
+  const first = ys.length ? ys[0] : -Infinity;
   const last = ys.length ? ys[ys.length - 1] : -Infinity;
   bands.above = joinTextRun(page.items.filter((o) => o.y >= first - 0.5));
   bands.below = joinTextRun(page.items.filter((o) => o.y <= last - 0.5));
   return bands;
-}
-
-/** Quão bem um particionamento explica o dado. */
-export interface LcrPartitionScore {
-  exactlyOne: number;
-  twoOrMore: number;
-  empty: number;
-  /** Nenhuma banda com dois registros. É condição de uso, não preferência. */
-  valid: boolean;
-}
-
-/**
- * Julga um particionamento contando registros por banda (AC5, AC6).
- *
- * Banda vazia não é erro — o cabeçalho de coluna ocupa uma. Banda com dois registros é veto, mesmo
- * que todo o resto esteja certo: fundir dois membros faz um deles sumir sem aviso, e é o único erro
- * que a tela de revisão não consegue mostrar, porque o registro simplesmente não chega lá.
- */
-export function scorePartition(bands: readonly LcrBand[]): LcrPartitionScore {
-  let exactlyOne = 0;
-  let twoOrMore = 0;
-  let empty = 0;
-  for (const b of bands) {
-    const n = countAnchors(b.text);
-    if (n === 1) exactlyOne += 1;
-    else if (n === 0) empty += 1;
-    else twoOrMore += 1;
-  }
-  return { exactlyOne, twoOrMore, empty, valid: twoOrMore === 0 && exactlyOne > 0 };
 }
 
 /** De onde vieram as fronteiras escolhidas. `gap` é o algoritmo anterior à grade. */
@@ -200,61 +174,10 @@ export type LcrBoundarySource = 'rules' | 'fills' | 'gap';
 
 export interface LcrChoice {
   source: LcrBoundarySource;
-  /** Fronteiras por página, na ordem das páginas. Vazio quando a fonte é `gap`. */
+  /** Fronteiras por página, na ordem das páginas. */
   perPage: number[][];
-}
-
-/** Fronteiras derivadas do limiar de gap — a mesma regra de sempre, expressa como fronteira. */
-function gapBoundaries(pages: readonly LcrRawPage[]): number[][] {
-  const freq = new Map<number, number>();
-  const perPageYs = pages.map((p) => {
-    const ys = Array.from(new Set(p.items.map((o) => Math.round(o.y)))).sort((a, b) => b - a);
-    for (let k = 1; k < ys.length; k++) {
-      const gap = Math.round(Math.abs(ys[k - 1] - ys[k]));
-      if (gap > 0) freq.set(gap, (freq.get(gap) || 0) + 1);
-    }
-    return ys;
-  });
-  const threshold = rowGapThreshold(freq);
-  return perPageYs.map((ys) => {
-    const cuts: number[] = ys.length ? [ys[0] + 1] : [];
-    for (let k = 1; k < ys.length; k++) {
-      if (Math.abs(ys[k - 1] - ys[k]) >= threshold) cuts.push((ys[k - 1] + ys[k]) / 2);
-    }
-    if (ys.length) cuts.push(ys[ys.length - 1] - 1);
-    return cuts;
-  });
-}
-
-/**
- * Escolhe, PARA O DOCUMENTO INTEIRO, de onde vêm as fronteiras (AC7, AC8).
- *
- * Por documento e não por página porque uma página atípica é comum e inofensiva — a última costuma
- * ter uma linha só, a primeira carrega título — enquanto alternar de critério no meio do arquivo
- * tornaria o resultado difícil de explicar quando desse errado.
- *
- * `gap` fecha a lista: se nenhum desenho serve, a tabela ou não tem separador — e então cada linha
- * cabe numa linha de texto, que é justamente o caso que o limiar resolve — ou tem um que não
- * reconhecemos, e aí o comportamento de hoje é o melhor conhecido.
- */
-export function chooseBoundaries(pages: readonly LcrRawPage[]): LcrChoice {
-  const candidates: { source: LcrBoundarySource; perPage: number[][] }[] = [
-    { source: 'rules', perPage: pages.map(ruleBoundaries) },
-    { source: 'fills', perPage: pages.map(fillBoundaries) },
-  ];
-  let best: { choice: LcrChoice; exactlyOne: number } | null = null;
-  for (const c of candidates) {
-    let exactlyOne = 0;
-    let valid = true;
-    for (let i = 0; i < pages.length; i++) {
-      const score = scorePartition(bandsOf(pages[i], c.perPage[i]));
-      if (score.twoOrMore > 0) valid = false;
-      exactlyOne += score.exactlyOne;
-    }
-    if (!valid || !exactlyOne) continue;
-    if (!best || exactlyOne > best.exactlyOne) best = { choice: c, exactlyOne };
-  }
-  return best ? best.choice : { source: 'gap', perPage: gapBoundaries(pages) };
+  /** Quantos registros esta fonte consegue explicar — o que a torna comparável às outras. */
+  explained: number;
 }
 
 /** Rodapé, título, cabeçalho de coluna e linha de contagem — tudo que não é registro. */
@@ -310,18 +233,97 @@ function pageBreakOrphans(pages: readonly LcrPageBands[]): Map<number, string> {
   return out;
 }
 
-/** Junta as bandas de todas as páginas numa lista de registros, fundindo os partidos na virada. */
-export function mergePageBreaks(pages: readonly LcrPageBands[]): string[] {
-  const orphans = pageBreakOrphans(pages);
-  const out: string[] = [];
-  pages.forEach((page, i) => {
-    page.bands.forEach((text, k) => {
-      if (!text.trim()) return;
-      const orphan = k === 0 ? orphans.get(i) : undefined;
-      out.push(orphan ? `${text} ${orphan}`.replace(/\s+/g, ' ').trim() : text);
-    });
+/** Fronteiras derivadas do limiar de gap — a mesma regra de sempre, expressa como fronteira. */
+function gapBoundaries(pages: readonly LcrRawPage[]): number[][] {
+  const freq = new Map<number, number>();
+  const perPageYs = pages.map((p) => {
+    const ys = Array.from(new Set(p.items.map((o) => Math.round(o.y)))).sort((a, b) => b - a);
+    for (let k = 1; k < ys.length; k++) {
+      const gap = Math.round(Math.abs(ys[k - 1] - ys[k]));
+      if (gap > 0) freq.set(gap, (freq.get(gap) || 0) + 1);
+    }
+    return ys;
   });
-  return out;
+  const threshold = rowGapThreshold(freq);
+  return perPageYs.map((ys) => {
+    const cuts: number[] = ys.length ? [ys[0] + 1] : [];
+    for (let k = 1; k < ys.length; k++) {
+      if (Math.abs(ys[k - 1] - ys[k]) >= threshold) cuts.push((ys[k - 1] + ys[k]) / 2);
+    }
+    if (ys.length) cuts.push(ys[ys.length - 1] - 1);
+    return cuts;
+  });
+}
+
+/** As páginas particionadas por um conjunto de fronteiras, na forma que a auditoria consome. */
+function bandTexts(pages: readonly LcrRawPage[], perPage: readonly number[][]): LcrPageBands[] {
+  return pages.map((page, i) => {
+    const bands = bandsOf(page, perPage[i]);
+    return { bands: bands.map((b) => b.text), above: bands.above, below: bands.below };
+  });
+}
+
+/**
+ * Quantos registros um conjunto de fronteiras explica, e se ele pode ser usado.
+ *
+ * A conferência é de CONSERVAÇÃO: toda âncora que existe no documento — dentro de banda, acima da
+ * grade ou abaixo dela — tem de virar exatamente um registro. Contar só as bandas boas não bastava,
+ * e escondia três maneiras diferentes de perder gente em silêncio: uma página sem fronteira alguma
+ * era descartada inteira, um órfão que não casa com a página seguinte evaporava, e uma coluna a
+ * mais zerava a leitura. Nenhuma delas dava erro; todas davam um membro a menos.
+ */
+function auditBoundaries(
+  pages: readonly LcrRawPage[],
+  perPage: readonly number[][]
+): { valid: boolean; explained: number } {
+  const texts = bandTexts(pages, perPage);
+  const orphans = pageBreakOrphans(texts);
+  let exactlyOne = 0;
+  let total = 0;
+  for (const page of texts) {
+    for (const text of page.bands) {
+      const n = countAnchors(text);
+      if (n === 1) exactlyOne += 1;
+      total += n;
+    }
+    total += countAnchors(page.above) + countAnchors(page.below);
+  }
+  // AC11: sobra abaixo da grade que não vira fusão invalida a fonte. Cobre as duas metades da
+  // regra — o órfão ancorado que não acha par (que a conservação de âncoras já pegaria) e o pedaço
+  // sem âncora, que não custa um registro mas custaria um nome truncado sem ninguém perceber.
+  // Medido nos 8 PDFs de referência: nenhuma página deixa sobra sem âncora, então isto não recusa
+  // nada que hoje funciona.
+  const leftoverUnpaired = texts.some((page, i) => stripChrome(page.below) && !orphans.has(i + 1));
+
+  const explained = exactlyOne + orphans.size;
+  return { valid: !leftoverUnpaired && explained > 0 && explained === total, explained };
+}
+
+/**
+ * Escolhe, PARA O DOCUMENTO INTEIRO, de onde vêm as fronteiras (AC7, AC8).
+ *
+ * As três fontes concorrem e ganha a que explica mais registros. No empate vence o desenho, nesta
+ * ordem: traços, faixas, limiar. O desempate não é gosto — as duas primeiras LEEM o que o gerador
+ * marcou e se conferem; a terceira infere de uma distribuição e não tem como saber se acertou.
+ *
+ * Por documento e não por página porque uma página atípica é comum e inofensiva — a última costuma
+ * ter uma linha só, a primeira carrega título — enquanto alternar de critério no meio do arquivo
+ * tornaria o resultado difícil de explicar quando desse errado.
+ */
+export function chooseBoundaries(pages: readonly LcrRawPage[]): LcrChoice {
+  const gap = gapBoundaries(pages);
+  const candidates: { source: LcrBoundarySource; perPage: number[][] }[] = [
+    { source: 'rules', perPage: pages.map(ruleBoundaries) },
+    { source: 'fills', perPage: pages.map(fillBoundaries) },
+    { source: 'gap', perPage: gap },
+  ];
+  let best: LcrChoice | null = null;
+  for (const c of candidates) {
+    const { valid, explained } = auditBoundaries(pages, c.perPage);
+    if (!valid) continue;
+    if (!best || explained > best.explained) best = { ...c, explained };
+  }
+  return best ?? { source: 'gap', perPage: gap, explained: 0 };
 }
 
 /** Ordem das colunas da tabela do LCR. Só nome, idade e telefone chegam ao app. */
@@ -434,5 +436,9 @@ export function readGrid(pages: readonly LcrRawPage[]): LcrRecord[] | null {
     });
   });
 
-  return records;
+  // Última conferência, contra a mesma conta que aprovou as fronteiras: a leitura por célula pode
+  // falhar por um motivo que a partição não enxerga — colunas mal detectadas, por exemplo, devolvem
+  // null em toda banda e produziriam um import vazio que se declara bem-sucedido. Se o número de
+  // registros lidos não bate com o de âncoras do documento, a grade não se aplica.
+  return records.length === choice.explained ? records : null;
 }

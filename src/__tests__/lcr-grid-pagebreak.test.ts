@@ -7,83 +7,140 @@
  * sem gênero ↔ banda sem gênero" não acha o par.
  *
  * Nos 39 pontos de quebra dos 8 PDFs a forma é uma só, sem exceção: dados órfãos embaixo, nome sem
- * gênero na primeira banda da página seguinte.
+ * gênero abrindo a página seguinte.
+ *
+ * Os testes atacam `readGrid`/`readLcrPages`, que é o que a produção executa. Uma versão anterior
+ * exercitava uma função de fusão que o caminho real não chamava — parecia cobertura de AC9 e não era.
  */
-import { mergePageBreaks } from '../lib/lcrPdfGrid';
+import { readGrid } from '../lib/lcrPdfGrid';
+import { readLcrPages } from '../lib/lcrPdfPage';
+import type { LcrRawPage, LcrTextItem } from '../lib/lcrPdfPage';
 
-const RODAPE = '15 Aug 2026 For Church Use Only © 2026 by Intellectual Reserve, Inc. All rights reserved. 2';
+const CTM = [1, 0, 0, 1, 0, 0];
+const frag = (x: number, y: number, s: string): LcrTextItem => ({ x, y, w: s.length * 4, size: 8, s });
 
-describe('mergePageBreaks — junta o registro partido na virada de página (AC9, AC10)', () => {
-  it('funde os dados órfãos com o nome da página seguinte', () => {
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978 (11) 90000-0001'], above: '', below: 'M 34 14 mai 1992 (11) 90000-0002' },
-      { bands: ['Exemplo, Beltrano de Souza', 'Exemplo, Ciclana F 65 25 jan 1961'], above: '', below: '' },
-    ];
+/** Traços nas 6 colunas: só juntos atravessam a tabela, como no LCR. */
+const cellRules = (y: number) =>
+  [[42, 100], [150, 62], [220, 42], [268, 62], [337, 74], [419, 100]].map(([x, w]) => ({
+    x1: x, y1: y, x2: x + w, y2: y, m: CTM,
+  }));
 
-    expect(mergePageBreaks(paginas)).toEqual([
-      'Exemplo, Fulana F 47 10 out 1978 (11) 90000-0001',
-      'Exemplo, Beltrano de Souza M 34 14 mai 1992 (11) 90000-0002',
-      'Exemplo, Ciclana F 65 25 jan 1961',
+/** Uma linha da tabela: nome sempre; dados só quando `idade` é dada (senão é fragmento de nome). */
+type Linha = { nome: string; idade?: number; tel?: string };
+
+/**
+ * Monta uma página com as fronteiras desenhadas nos lugares certos e, opcionalmente, um trecho
+ * solto ABAIXO da grade — que é onde o LCR deixa a metade de um registro partido.
+ */
+function pagina(linhas: Linha[], abaixo: LcrTextItem[] = []): LcrRawPage {
+  const items: LcrTextItem[] = [];
+  linhas.forEach((l, k) => {
+    const y = 700 - k * 19;
+    items.push(frag(42, y, l.nome));
+    if (l.idade !== undefined) {
+      items.push(
+        frag(150, y - 6, 'F'), frag(220, y - 6, String(l.idade)),
+        frag(268, y - 6, '10 out 1978'), frag(337, y - 6, l.tel ?? '(11) 90000-0001')
+      );
+    }
+  });
+  const ys = [704, ...linhas.map((_, k) => 700 - k * 19 - 10)];
+  return { width: 595, height: 842, items: [...items, ...abaixo], segments: ys.flatMap(cellRules), rects: [] };
+}
+
+/** Dados órfãos abaixo da grade, na posição em que o LCR os deixa. */
+const orfao = (y: number, extra: LcrTextItem[] = []) => [
+  frag(150, y, 'M'), frag(220, y, '34'), frag(268, y, '14 mai 1992'), frag(337, y, '(11) 90000-0099'),
+  ...extra,
+];
+
+describe('registro partido entre páginas (AC9, AC10)', () => {
+  it('funde os dados órfãos com o nome que abre a página seguinte', () => {
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
+    const records = readGrid([p1, p2]);
+
+    expect(records?.map((r) => r.name)).toEqual([
+      'Exemplo, Fulana',
+      'Exemplo, Beltrano',
+      'Exemplo, Ciclana',
     ]);
   });
 
-  it('descarta rodapé, título, cabeçalho e contagem antes de parear (AC10)', () => {
-    // No PDF real o órfão vem grudado no rodapé, e a página seguinte abre com o cabeçalho de coluna.
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978'], above: '', below: `M 34 14 mai 1992 (11) 90000-0002 ${RODAPE}` },
-      { bands: ['Exemplo, Beltrano'], above: 'Name Gender Age Birth Date Phone Number Email', below: 'Count: 2' },
-    ];
+  it('o registro fundido fica com os dados do órfão', () => {
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(mergePageBreaks(paginas)[1]).toBe('Exemplo, Beltrano M 34 14 mai 1992 (11) 90000-0002');
+    expect(readGrid([p1, p2])?.[1]).toMatchObject({ age: 34, rawPhone: '(11) 90000-0099' });
   });
 
-  it('não perde o telefone do registro fundido', () => {
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978'], below: 'M 16 8 set 2009 (11) 98634-0000', above: '' },
-      { bands: ['Exemplo, Beltrano'], above: '', below: '' },
-    ];
+  it('descarta o rodapé antes de parear (AC10)', () => {
+    // No PDF real o órfão vem grudado no rodapé; sem limpar, o par nunca casa.
+    const rodape = [frag(42, 620, '15 Aug 2026 For Church Use Only © 2026 by Intellectual Reserve, Inc. 2')];
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650, rodape));
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(mergePageBreaks(paginas)[1]).toContain('(11) 98634-0000');
+    expect(readGrid([p1, p2])?.map((r) => r.name)).toEqual([
+      'Exemplo, Fulana',
+      'Exemplo, Beltrano',
+      'Exemplo, Ciclana',
+    ]);
+  });
+
+  it('o nome do registro fundido vem da COLUNA, não do texto remontado', () => {
+    // A cauda "m" do e-mail de outra pessoa está na coluna de e-mail desta faixa. Remontar os dois
+    // pedaços como texto e mandar ao parser antigo devolveria a contaminação que a grade elimina.
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
+    p2.items.push(frag(419, 706, 'vizinho@gmail.co'), frag(419, 694, 'm'));
+
+    expect(readGrid([p1, p2])?.[1].name).toBe('Exemplo, Beltrano');
   });
 });
 
-describe('mergePageBreaks — recusa fundir quando as formas não casam (AC11)', () => {
-  it('não funde se o órfão não tem âncora', () => {
-    // Só sobra de nome embaixo: fundir inventaria um registro.
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978'], above: '', below: 'de Souza' },
-      { bands: ['Exemplo, Beltrano M 30 1 jan 1996'], above: '', below: '' },
-    ];
+describe('formas que não casam: não funde E cai no fallback (AC11)', () => {
+  it('órfão ancorado sem par — o documento inteiro usa o caminho antigo', () => {
+    // A página seguinte abre com um registro completo, então não há nome órfão para casar. Antes
+    // desta correção a grade seguia em frente e o registro do órfão simplesmente sumia.
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(mergePageBreaks(paginas)).toEqual([
-      'Exemplo, Fulana F 47 10 out 1978',
-      'Exemplo, Beltrano M 30 1 jan 1996',
-    ]);
+    expect(readGrid([p1, p2])).toBeNull();
   });
 
-  it('não funde se a primeira banda da página seguinte já tem âncora', () => {
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978'], above: '', below: 'M 34 14 mai 1992' },
-      { bands: ['Exemplo, Beltrano M 30 1 jan 1996'], above: '', below: '' },
-    ];
-    const out = mergePageBreaks(paginas);
+  it('e nesse caso nenhum registro é perdido', () => {
+    // Páginas grandes de propósito: o caminho antigo INFERE o limiar da distribuição de gaps e, com
+    // amostra pequena, devolve Infinity e não agrupa nada. Comportamento correto e já documentado,
+    // mas que tornaria esta contagem sem sentido.
+    const muitos = (n: number, desde: number): Linha[] =>
+      Array.from({ length: n }, (_, k) => ({ nome: `Exemplo, Nome${desde + k}`, idade: 30 + k }));
+    const p1 = pagina(muitos(6, 0), orfao(580));
+    const p2 = pagina(muitos(4, 6));
+    const r = readLcrPages([p1, p2]);
 
-    expect(out).toContain('Exemplo, Beltrano M 30 1 jan 1996');
-    expect(out.some((l) => l.includes('Beltrano') && l.includes('14 mai 1992'))).toBe(false);
+    expect(r.usedGrid).toBe(false);
+    // 6 + 4 registros nas bandas, mais o órfão que a grade recusou a fundir.
+    expect(r.records).toHaveLength(11);
   });
 
-  it('não funde na última página, que não tem seguinte', () => {
-    const paginas = [{ bands: ['Exemplo, Fulana F 47 10 out 1978'], above: '', below: 'M 34 14 mai 1992' }];
+  it('sobra sem âncora abaixo da grade também recusa a grade', () => {
+    // Não custaria um registro, mas custaria um nome truncado sem ninguém perceber.
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], [frag(42, 650, 'de Souza')]);
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }]);
 
-    expect(mergePageBreaks(paginas)).toHaveLength(1);
+    expect(readGrid([p1, p2])).toBeNull();
   });
 
-  it('ignora páginas sem nada fora da grade', () => {
-    const paginas = [
-      { bands: ['Exemplo, Fulana F 47 10 out 1978'], above: '', below: RODAPE },
-      { bands: ['Exemplo, Beltrano M 30 1 jan 1996'], above: '', below: '' },
-    ];
+  it('a última página não tenta fundir, porque não há seguinte', () => {
+    const so = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
 
-    expect(mergePageBreaks(paginas)).toHaveLength(2);
+    expect(readGrid([so])).toBeNull();
+  });
+
+  it('página sem nada fora da grade é lida normalmente', () => {
+    const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }]);
+    const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }]);
+
+    expect(readGrid([p1, p2])?.map((r) => r.name)).toEqual(['Exemplo, Fulana', 'Exemplo, Beltrano']);
   });
 });

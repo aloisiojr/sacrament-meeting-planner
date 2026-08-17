@@ -113,6 +113,21 @@ function findAnchor(toks: string[]): number {
   return -1;
 }
 
+/**
+ * How many records a stretch of text holds, counted by anchors.
+ *
+ * The grid uses this as its JUDGE: a candidate set of boundaries is only trusted when each band it
+ * produces holds exactly one. The anchor stops being the mechanism that parses a record and becomes
+ * the mechanism that checks a partition — which is why it stays here, next to the rules it encodes,
+ * instead of being duplicated in the grid.
+ */
+export function countAnchors(text: string): number {
+  const toks = text.split(/\s+/).filter(Boolean);
+  let n = 0;
+  for (let i = 0; i < toks.length; i++) if (isAnchorAt(toks, i)) n += 1;
+  return n;
+}
+
 /** A pure line that is leftover contact data (a split email tail or bare phone), not a name. */
 function isContactFragment(toks: string[], line: string): boolean {
   return toks.some((t) => t.includes('@')) || toks.every(isPhoneToken) || line.startsWith('.');

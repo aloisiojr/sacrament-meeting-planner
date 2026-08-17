@@ -12,7 +12,9 @@
  * CONJUNTO de traços naquela altura atravessa a tabela — que é como as bordas de célula do LCR
  * funcionam: seis pedaços de 48 a 148pt que só juntos cobrem a largura toda.
  */
-import { applyMatrix, type LcrRawPage, type LcrSegment } from './lcrPdfPage';
+import { applyMatrix, joinTextRun, type LcrRawPage, type LcrSegment, type LcrTextItem } from './lcrPdfPage';
+import { countAnchors } from './lcrPdfParser';
+import { rowGapThreshold } from './lcrPdfLayout';
 
 /** Duas alturas a menos disto são a mesma fronteira (ruído de arredondamento). */
 const Y_TOLERANCE = 1;
@@ -126,4 +128,131 @@ export function fillBoundaries(page: LcrRawPage): number[] {
     entries.push({ y: y1, span }, { y: y2, span });
   }
   return mergeYs(entries, width);
+}
+
+/** Uma faixa entre duas fronteiras, com o texto que caiu dentro dela. */
+export interface LcrBand {
+  top: number;
+  bottom: number;
+  items: LcrTextItem[];
+  text: string;
+}
+
+/** As faixas de uma página mais o texto que ficou fora da grade, em cima e embaixo. */
+export interface LcrBands extends Array<LcrBand> {
+  above: string;
+  below: string;
+}
+
+/**
+ * Parte as linhas de texto da página nas fronteiras dadas (topo → base).
+ *
+ * O que sobra fora da grade vem separado, e não descartado: é ali que mora metade de um registro
+ * partido entre páginas, e jogar fora custaria os 39 que o algoritmo antigo acerta.
+ */
+export function bandsOf(page: LcrRawPage, boundaries: readonly number[]): LcrBands {
+  const ys = boundaries.slice().sort((a, b) => b - a);
+  const bands = [] as unknown as LcrBands;
+  const inRange = (o: LcrTextItem, top: number, bottom: number) => o.y < top - 0.5 && o.y > bottom - 0.5;
+
+  for (let i = 0; i < ys.length - 1; i++) {
+    const items = page.items.filter((o) => inRange(o, ys[i], ys[i + 1]));
+    bands.push({ top: ys[i], bottom: ys[i + 1], items, text: joinTextRun(items) });
+  }
+  const first = ys.length ? ys[0] : Infinity;
+  const last = ys.length ? ys[ys.length - 1] : -Infinity;
+  bands.above = joinTextRun(page.items.filter((o) => o.y >= first - 0.5));
+  bands.below = joinTextRun(page.items.filter((o) => o.y <= last - 0.5));
+  return bands;
+}
+
+/** Quão bem um particionamento explica o dado. */
+export interface LcrPartitionScore {
+  exactlyOne: number;
+  twoOrMore: number;
+  empty: number;
+  /** Nenhuma banda com dois registros. É condição de uso, não preferência. */
+  valid: boolean;
+}
+
+/**
+ * Julga um particionamento contando registros por banda (AC5, AC6).
+ *
+ * Banda vazia não é erro — o cabeçalho de coluna ocupa uma. Banda com dois registros é veto, mesmo
+ * que todo o resto esteja certo: fundir dois membros faz um deles sumir sem aviso, e é o único erro
+ * que a tela de revisão não consegue mostrar, porque o registro simplesmente não chega lá.
+ */
+export function scorePartition(bands: readonly LcrBand[]): LcrPartitionScore {
+  let exactlyOne = 0;
+  let twoOrMore = 0;
+  let empty = 0;
+  for (const b of bands) {
+    const n = countAnchors(b.text);
+    if (n === 1) exactlyOne += 1;
+    else if (n === 0) empty += 1;
+    else twoOrMore += 1;
+  }
+  return { exactlyOne, twoOrMore, empty, valid: twoOrMore === 0 && exactlyOne > 0 };
+}
+
+/** De onde vieram as fronteiras escolhidas. `gap` é o algoritmo anterior à grade. */
+export type LcrBoundarySource = 'rules' | 'fills' | 'gap';
+
+export interface LcrChoice {
+  source: LcrBoundarySource;
+  /** Fronteiras por página, na ordem das páginas. Vazio quando a fonte é `gap`. */
+  perPage: number[][];
+}
+
+/** Fronteiras derivadas do limiar de gap — a mesma regra de sempre, expressa como fronteira. */
+function gapBoundaries(pages: readonly LcrRawPage[]): number[][] {
+  const freq = new Map<number, number>();
+  const perPageYs = pages.map((p) => {
+    const ys = Array.from(new Set(p.items.map((o) => Math.round(o.y)))).sort((a, b) => b - a);
+    for (let k = 1; k < ys.length; k++) {
+      const gap = Math.round(Math.abs(ys[k - 1] - ys[k]));
+      if (gap > 0) freq.set(gap, (freq.get(gap) || 0) + 1);
+    }
+    return ys;
+  });
+  const threshold = rowGapThreshold(freq);
+  return perPageYs.map((ys) => {
+    const cuts: number[] = ys.length ? [ys[0] + 1] : [];
+    for (let k = 1; k < ys.length; k++) {
+      if (Math.abs(ys[k - 1] - ys[k]) >= threshold) cuts.push((ys[k - 1] + ys[k]) / 2);
+    }
+    if (ys.length) cuts.push(ys[ys.length - 1] - 1);
+    return cuts;
+  });
+}
+
+/**
+ * Escolhe, PARA O DOCUMENTO INTEIRO, de onde vêm as fronteiras (AC7, AC8).
+ *
+ * Por documento e não por página porque uma página atípica é comum e inofensiva — a última costuma
+ * ter uma linha só, a primeira carrega título — enquanto alternar de critério no meio do arquivo
+ * tornaria o resultado difícil de explicar quando desse errado.
+ *
+ * `gap` fecha a lista: se nenhum desenho serve, a tabela ou não tem separador — e então cada linha
+ * cabe numa linha de texto, que é justamente o caso que o limiar resolve — ou tem um que não
+ * reconhecemos, e aí o comportamento de hoje é o melhor conhecido.
+ */
+export function chooseBoundaries(pages: readonly LcrRawPage[]): LcrChoice {
+  const candidates: { source: LcrBoundarySource; perPage: number[][] }[] = [
+    { source: 'rules', perPage: pages.map(ruleBoundaries) },
+    { source: 'fills', perPage: pages.map(fillBoundaries) },
+  ];
+  let best: { choice: LcrChoice; exactlyOne: number } | null = null;
+  for (const c of candidates) {
+    let exactlyOne = 0;
+    let valid = true;
+    for (let i = 0; i < pages.length; i++) {
+      const score = scorePartition(bandsOf(pages[i], c.perPage[i]));
+      if (score.twoOrMore > 0) valid = false;
+      exactlyOne += score.exactlyOne;
+    }
+    if (!valid || !exactlyOne) continue;
+    if (!best || exactlyOne > best.exactlyOne) best = { choice: c, exactlyOne };
+  }
+  return best ? best.choice : { source: 'gap', perPage: gapBoundaries(pages) };
 }

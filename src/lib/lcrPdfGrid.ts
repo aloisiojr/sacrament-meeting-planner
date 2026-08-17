@@ -13,7 +13,7 @@
  * funcionam: seis pedaços de 48 a 148pt que só juntos cobrem a largura toda.
  */
 import { applyMatrix, joinTextRun, type LcrRawPage, type LcrSegment, type LcrTextItem } from './lcrPdfPage';
-import { countAnchors } from './lcrPdfParser';
+import { countAnchors, type LcrRecord } from './lcrPdfParser';
 import { rowGapThreshold } from './lcrPdfLayout';
 
 /** Duas alturas a menos disto são a mesma fronteira (ruído de arredondamento). */
@@ -324,4 +324,70 @@ export function mergePageBreaks(pages: readonly LcrPageBands[]): string[] {
     }
   });
   return out;
+}
+
+/** Ordem das colunas da tabela do LCR. Só nome, idade e telefone chegam ao app. */
+const COL_NAME = 0;
+const COL_GENDER = 1;
+const COL_AGE = 2;
+const COL_BIRTH = 3;
+const COL_PHONE = 4;
+
+/**
+ * Lê um registro dos itens de uma faixa, cada campo da sua própria coluna (AC12, AC13).
+ *
+ * Aqui mora o ganho da grade. Com as colunas conhecidas, o nome é o conteúdo da coluna de nome e
+ * ponto final — a cauda de um e-mail que quebrou de linha está na coluna de e-mail e não tem por
+ * onde chegar ao nome. As duas contaminações que chegaram à tela de revisão (`l.com` grudado num
+ * sobrenome, e o `m` de um `@gmail.co` do vizinho) deixam de ser possíveis, em vez de precisarem de
+ * heurística que as reconheça pela forma — o que nunca ia funcionar, porque nem a cauda nem a
+ * cabeça têm forma distinguível.
+ *
+ * A atribuição é pelo X de INÍCIO do item: um nome comprido continua sendo nome mesmo chegando
+ * perto da coluna seguinte. Nos PDFs de referência nenhum nome alcança a coluna de gênero — sobram
+ * 6pt — porque o gerador quebra o nome na largura da célula.
+ *
+ * Devolve null quando a faixa não descreve um registro (cabeçalho, faixa vazia).
+ */
+export function readCells(items: readonly LcrTextItem[], columns: readonly number[]): LcrRecord | null {
+  if (!columns.length) return null;
+  const cells: LcrTextItem[][] = columns.map(() => []);
+  for (const o of items) {
+    let col = -1;
+    for (let i = 0; i < columns.length; i++) if (o.x >= columns[i] - X_TOLERANCE) col = i;
+    if (col >= 0) cells[col].push(o);
+  }
+  const text = cells.map(joinTextRun);
+
+  const anchor = `${text[COL_GENDER]} ${text[COL_AGE]} ${text[COL_BIRTH]}`.trim();
+  if (countAnchors(anchor) !== 1) return null;
+
+  const phone = text[COL_PHONE]?.trim();
+  return {
+    name: text[COL_NAME].trim(),
+    rawPhone: phone || null,
+    age: Number(text[COL_AGE]),
+  };
+}
+
+/**
+ * Colunas da tabela, deduzidas do X onde os traços começam (AC4).
+ *
+ * As bordas de célula começam exatamente na borda esquerda de cada coluna, então os X de início
+ * agrupados SÃO as colunas. O agrupamento com tolerância é necessário e não decorativo: na primeira
+ * página dos PDFs reais a mesma coluna aparece como 34,3 e 35,1, e tratá-las como duas quebraria a
+ * atribuição de todo o cabeçalho.
+ *
+ * Considera todas as páginas juntas — a última costuma ter uma linha só, e uma página não é amostra.
+ */
+export function detectColumns(pages: readonly LcrRawPage[]): number[] {
+  const xs: number[] = [];
+  for (const page of pages) {
+    for (const s of page.segments) {
+      const t = inTextSpace(s);
+      if (Math.abs(t.y1 - t.y2) > FLATNESS) continue;
+      xs.push(Math.min(t.x1, t.x2));
+    }
+  }
+  return columnStarts(xs);
 }

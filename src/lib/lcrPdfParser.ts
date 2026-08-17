@@ -119,6 +119,31 @@ function isContactFragment(toks: string[], line: string): boolean {
 }
 
 /**
+ * True when the leftover after a record's contact data is the wrapped REMAINDER of `head`.
+ *
+ * An address printed across two visual lines is joined by Y, so its head can land before the gender
+ * token and its tail after the phone — the same position a name that overflowed occupies. Read as a
+ * surname, the tail reached the review screen glued to the name ("Fulana Exemplo l.com", "Fulana
+ * Maria da m Exemplo").
+ *
+ * The tail's SHAPE settles nothing: "m", "om", "com", "COM", "br", "l.com" are all plausible-looking
+ * fragments, and the head is not reliably recognizable as truncated either — "…@gmail.co" ends in a
+ * real TLD. What does settle it is that head + tail spells one valid address, since a name never
+ * completes an e-mail. Guarded by two conditions that keep a real surname:
+ *   - exactly ONE token left (an address wraps in one piece; overflow like "José de" is several);
+ *   - the token is not Capitalized-word shaped, which "Sobrenome" is and no TLD fragment is.
+ *
+ * Measured over the 8 reference PDFs (~2900 records): every one of the 59 leftovers was an e-mail
+ * tail and none was a name — expected, since name overflow sits in the NAME column, which the
+ * extractor joins BEFORE the data column.
+ */
+function isEmailTail(head: string | undefined, rest: string[]): boolean {
+  if (!head || rest.length !== 1) return false;
+  if (/^[A-ZÀ-Þ][a-zà-þ]/.test(rest[0])) return false;
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(head + rest[0]);
+}
+
+/**
  * Backup contact-residue strip (the extractor already keeps email/phone in the data column). Drops
  * any email token wherever it lands, plus stray phone / ".com" fragments — never truncates, so a
  * name is never blanked. Keeps accented/particled names intact.
@@ -217,8 +242,11 @@ export function parseLcrText(text: string): LcrParseResult {
     records.push({ name, rawPhone: phoneTokens.length ? joinPhone(phoneTokens) : null, age });
     lastIdx = records.length - 1;
 
-    // Any name tokens still trailing on THIS line (overflow that didn't wrap) belong to this record.
-    appendName(lastIdx, toks.slice(j).filter((t) => !t.includes('@') && !isPhoneToken(t)));
+    // Any name tokens still trailing on THIS line (overflow that didn't wrap) belong to this
+    // record — unless what trails is the wrapped remainder of an address printed above the anchor.
+    const overflow = toks.slice(j).filter((t) => !t.includes('@') && !isPhoneToken(t));
+    const emailHead = toks.filter((t) => t.includes('@')).pop();
+    appendName(lastIdx, isEmailTail(emailHead, overflow) ? [] : overflow);
   }
 
   // A wrapped tail on the very last record has no following anchor line to resolve it.

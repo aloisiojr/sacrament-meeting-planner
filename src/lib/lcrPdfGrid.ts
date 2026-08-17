@@ -256,3 +256,72 @@ export function chooseBoundaries(pages: readonly LcrRawPage[]): LcrChoice {
   }
   return best ? best.choice : { source: 'gap', perPage: gapBoundaries(pages) };
 }
+
+/** Rodapé, título, cabeçalho de coluna e linha de contagem — tudo que não é registro. */
+const CHROME =
+  /intellectual reserve|church use|uso da igreja|uso exclusivo|^\s*(count|contagem|recuento|conteo)\s*:/i;
+
+/**
+ * Remove o cromo da página de um trecho solto, preservando o resto.
+ *
+ * O órfão de uma quebra de página vem grudado no rodapé, então limpar antes de parear não é
+ * higiene: sem isso o par nunca casa.
+ */
+function stripChrome(text: string): string {
+  if (!text) return '';
+  const semRodape = text.replace(/\d{1,2}\s+\S+\s+\d{4}\s+(For Church Use|Somente para Uso|Para uso)[^]*$/i, '');
+  return semRodape
+    .split(/\s{2,}|\n/)
+    .filter((part) => part.trim() && !CHROME.test(part))
+    .join(' ')
+    .replace(/©[^]*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Uma página já particionada: o texto de cada banda e o que sobrou fora da grade. */
+export interface LcrPageBands {
+  bands: string[];
+  above: string;
+  below: string;
+}
+
+/**
+ * Junta as bandas de todas as páginas numa lista de registros, fundindo os partidos na virada.
+ *
+ * A forma da quebra, medida em 39 ocorrências nos 8 PDFs sem uma exceção: os DADOS ficam órfãos
+ * abaixo da última fronteira da página N e o NOME abre a primeira banda da página N+1. Os dois
+ * pedaços são complementares, e a fusão é a concatenação deles.
+ *
+ * O pareamento é por FORMA, não por posição: exige âncora no órfão e ausência de âncora na banda
+ * seguinte. Se um PDF novo quebrar de outro jeito as formas não casam, nada funde, e o documento
+ * segue para o fallback — que é bem melhor do que fundir errado em silêncio.
+ */
+export function mergePageBreaks(pages: readonly LcrPageBands[]): string[] {
+  const out: string[] = [];
+  const consumed = new Set<number>();
+
+  pages.forEach((page, i) => {
+    const orphan = stripChrome(page.below);
+    const next = pages[i + 1];
+    const canMerge =
+      !!orphan &&
+      countAnchors(orphan) === 1 &&
+      !!next &&
+      next.bands.length > 0 &&
+      countAnchors(next.bands[0]) === 0 &&
+      next.bands[0].trim().length > 0;
+
+    page.bands.forEach((text, k) => {
+      const skip = i > 0 && k === 0 && consumed.has(i);
+      if (skip || !text.trim()) return;
+      out.push(text);
+    });
+
+    if (canMerge) {
+      consumed.add(i + 1);
+      out.push(`${next.bands[0]} ${orphan}`.replace(/\s+/g, ' ').trim());
+    }
+  });
+  return out;
+}

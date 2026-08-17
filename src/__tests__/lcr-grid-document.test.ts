@@ -11,7 +11,6 @@ import type { LcrRawPage, LcrTextItem } from '../lib/lcrPdfPage';
 
 const CTM = [1, 0, 0, 1, 0, 0];
 const frag = (x: number, y: number, s: string): LcrTextItem => ({ x, y, w: s.length * 4, size: 8, s });
-const rule = (y: number) => ({ x1: 0, y1: y, x2: 600, y2: y, m: CTM });
 /** Traços nas 6 colunas, como o LCR desenha — só juntos atravessam a tabela. */
 const cellRules = (y: number) =>
   [[0, 108], [108, 70], [178, 48], [226, 70], [296, 82], [378, 222]].map(([x, w]) => ({
@@ -82,7 +81,7 @@ describe('readLcrPages — fallback (AC8)', () => {
 });
 
 describe('readLcrPages — contagem declarada (AC18)', () => {
-  const comContagem = (segments: ReturnType<typeof rule>[]) =>
+  const comContagem = (segments: ReturnType<typeof cellRules>) =>
     page({ items: [...ITEMS, frag(0, 560, 'Contagem: 4')], segments });
 
   it('expõe a contagem do PDF pela grade', () => {

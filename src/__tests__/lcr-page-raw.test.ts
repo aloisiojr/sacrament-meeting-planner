@@ -24,7 +24,6 @@ const page = (items: LcrTextItem[]): LcrRawPage => ({
   items,
   segments: [],
   rects: [],
-  transform: [1, 0, 0, 1, 0, 0],
 });
 
 describe('buildLcrText — reconstrói o texto que o extrator montava dentro da WebView', () => {

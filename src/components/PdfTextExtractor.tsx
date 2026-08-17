@@ -61,19 +61,35 @@ export const BOOTSTRAP = `
           });
         }
         // Drawn geometry. The generator draws the table's row and column rules, which say where a
-        // record ends far more reliably than any spacing we could infer. Colour and line width are
-        // forwarded as-is and never interpreted here — deciding is not this file's job.
+        // record ends far more reliably than any spacing we could infer. Colour is forwarded as-is
+        // and never interpreted here — deciding is not this file's job.
+        //
+        // Path coordinates live in whatever coordinate system the content stream installed with a
+        // cm operator, NOT in the text's space, so the current CTM travels with each shape and the
+        // conversion happens in TS where it can be tested. Tracking save/restore/transform is
+        // bookkeeping, not a decision.
         const segments = [];
         const rects = [];
         const ol = await page.getOperatorList();
         let fill = null;
+        let ctm = [1, 0, 0, 1, 0, 0];
+        const stack = [];
+        const mul = (m, n) => [
+          m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
+          m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3],
+          m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5],
+        ];
         for (let i = 0; i < ol.fnArray.length; i++) {
           const fn = ol.fnArray[i];
+          if (fn === OPS.save) { stack.push(ctm.slice()); continue; }
+          if (fn === OPS.restore) { ctm = stack.pop() || ctm; continue; }
+          if (fn === OPS.transform) { ctm = mul(ctm, ol.argsArray[i]); continue; }
           if (fn === OPS.setFillRGBColor) {
             fill = ol.argsArray[i].join(',');
             continue;
           }
           if (fn !== OPS.constructPath) continue;
+          const m = ctm.map(round);
           const pathOps = ol.argsArray[i][0];
           const args = ol.argsArray[i][1];
           let k = 0;
@@ -82,14 +98,17 @@ export const BOOTSTRAP = `
             if (op === OPS.rectangle) {
               rects.push({
                 x: round(args[k]), y: round(args[k + 1]),
-                w: round(args[k + 2]), h: round(args[k + 3]), color: fill,
+                w: round(args[k + 2]), h: round(args[k + 3]), color: fill, m: m,
               });
               k += 4;
               prev = null;
             } else if (op === OPS.moveTo || op === OPS.lineTo) {
               const pt = [args[k], args[k + 1]];
               if (prev && op === OPS.lineTo) {
-                segments.push({ x1: round(prev[0]), y1: round(prev[1]), x2: round(pt[0]), y2: round(pt[1]) });
+                segments.push({
+                  x1: round(prev[0]), y1: round(prev[1]),
+                  x2: round(pt[0]), y2: round(pt[1]), m: m,
+                });
               }
               prev = pt;
               k += 2;
@@ -100,10 +119,7 @@ export const BOOTSTRAP = `
           }
         }
         const view = page.getViewport({ scale: 1 });
-        pages.push({
-          width: view.width, height: view.height,
-          items, segments, rects, transform: view.transform,
-        });
+        pages.push({ width: view.width, height: view.height, items, segments, rects });
       }
       window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, pages: pages }));
     } catch (e) {

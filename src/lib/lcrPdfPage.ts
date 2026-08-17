@@ -25,15 +25,26 @@ export interface LcrTextItem {
   s: string;
 }
 
-/** Um traço do desenho da página, no espaço de coordenadas gráficas. */
+/**
+ * Uma matriz afim `[a, b, c, d, e, f]` — o CTM que estava em vigor quando o desenho foi emitido.
+ *
+ * As coordenadas de um path NÃO vêm no mesmo espaço do texto: elas estão no sistema que o próprio
+ * content stream instalou com um operador `cm`. Nos PDFs do LCR esse CTM é `[0.75, 0, 0, -0.75, 0,
+ * altura]` — um documento desenhado a 96dpi. Nada disso é constante do formato, então a matriz vem
+ * anexada e a conversão acontece aqui, em TS testável, e não dentro da WebView.
+ */
+export type LcrMatrix = readonly number[];
+
+/** Um traço do desenho da página, nas coordenadas do seu próprio CTM. */
 export interface LcrSegment {
   x1: number;
   y1: number;
   x2: number;
   y2: number;
+  m: LcrMatrix;
 }
 
-/** Um retângulo preenchido (faixa de fundo), no espaço de coordenadas gráficas. */
+/** Um retângulo preenchido (faixa de fundo), nas coordenadas do seu próprio CTM. */
 export interface LcrRect {
   x: number;
   y: number;
@@ -41,6 +52,7 @@ export interface LcrRect {
   h: number;
   /** Cor de preenchimento como veio, sem interpretação — a grade não pode depender de um valor. */
   color: string;
+  m: LcrMatrix;
 }
 
 export interface LcrRawPage {
@@ -49,8 +61,11 @@ export interface LcrRawPage {
   items: LcrTextItem[];
   segments: LcrSegment[];
   rects: LcrRect[];
-  /** Transformação do viewport, para levar coordenadas gráficas ao espaço do texto. */
-  transform: number[];
+}
+
+/** Leva um ponto do espaço de `m` para o espaço do texto. */
+export function applyMatrix(m: LcrMatrix, x: number, y: number): [number, number] {
+  return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 }
 
 /**

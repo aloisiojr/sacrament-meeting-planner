@@ -1,33 +1,35 @@
 /**
- * S6 — on-device PDF text extractor (WebView + pdf.js). Renders a hidden WebView that loads pdf.js
- * from the app's BUNDLED assets (assets/pdfjs/*.txt — offline, no CDN, LGPD-safe), decodes the given
- * PDF base64 IN MEMORY, extracts each page's text grouped into visual lines (by Y then X), and
- * returns the joined text. The raw PDF is never persisted or uploaded (AC1, AC15).
+ * S6 — on-device PDF reader (WebView + pdf.js). Renders a hidden WebView that loads pdf.js from the
+ * app's BUNDLED assets (assets/pdfjs/*.txt — offline, no CDN, LGPD-safe), decodes the given PDF
+ * base64 IN MEMORY and returns each page's RAW contents: text fragments with their coordinates, the
+ * page's drawn segments and filled rectangles, and its viewport transform. The raw PDF is never
+ * persisted or uploaded (AC1, AC15).
  *
- * ⚠️ The WebView/pdf.js path cannot run under vitest — validate on-device. The heavy, correctness-
- * critical logic (parse/repair/merge) is in the unit-tested pure modules; this bridge is thin.
+ * ⚠️ Nothing in this file can run under jest — it only executes inside a WebView, on a device. That
+ * is exactly why it holds no logic: it reads and forwards. Everything that decides anything lives in
+ * `src/lib/lcrPdfPage.ts` and its neighbours, as plain TS with tests.
+ *
+ * It used to build the record text in here, which cost a copy of `rowGapThreshold` as a literal
+ * string — `${fn}` cannot be injected, because minification makes the function anonymous and Hermes
+ * drops function source. Moving the logic out removed that duplication instead of guarding it.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 
-import { ROW_GAP_THRESHOLD_JS } from '../lib/lcrPdfLayout';
+import type { LcrRawPage } from '../lib/lcrPdfPage';
 
 export interface PdfTextExtractorProps {
   /** Base64 of the picked PDF. */
   base64: string;
-  onResult: (text: string) => void;
+  onResult: (pages: LcrRawPage[]) => void;
   onError: (message: string) => void;
 }
 
-// In-WebView bootstrap: rebuild pdf.js from embedded base64, extract text grouped into lines.
-/** Exported so a test can evaluate the injected script and prove the threshold works in there. */
+// In-WebView bootstrap: rebuild pdf.js from embedded base64 and forward each page's raw contents.
+/** Exported so a test can at least prove the script parses and defines its entry point. */
 export const BOOTSTRAP = `
-  // Literal source from src/lib/lcrPdfLayout.ts. NOT the function itself: minification makes it
-  // anonymous (a SyntaxError once injected) and Hermes drops function source entirely — both
-  // invisible in the dev client, which serves unminified JS. See the note in that module.
-  ${ROW_GAP_THRESHOLD_JS}
   const b64ToText = (b64) => decodeURIComponent(escape(atob(b64)));
   const runReady = () => window.ReactNativeWebView.postMessage(JSON.stringify({ ready: true }));
   window.__runPdf = async (pdfB64) => {
@@ -40,96 +42,70 @@ export const BOOTSTRAP = `
       const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-      // Pass 1: per page, collect text items grouped into visual lines (by Y). Keep raw items
-      // (x, advance width, glyph size) so we can split the name column from the data columns and
-      // glue accented glyphs (pdf.js emits accents like ç/ã/é as separate adjacent items).
+      const OPS = pdfjsLib.OPS;
+      const round = (n) => Math.round(n * 100) / 100;
       const pages = [];
-      const genderXs = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
-        const tc = await page.getTextContent();
-        const lines = new Map();
-        for (const it of tc.items) {
+        // Text fragments. Keep the advance width and glyph size: pdf.js emits accents (ç/ã/é) as
+        // separate adjacent items, and telling "same word" from "next column" needs both.
+        const items = [];
+        for (const it of (await page.getTextContent()).items) {
           if (typeof it.str !== 'string' || !it.str.trim()) continue;
-          const y = Math.round(it.transform[5]);
-          const o = {
-            x: it.transform[4],
-            w: it.width || 0,
-            size: Math.hypot(it.transform[2], it.transform[3]) || it.height || 8,
+          items.push({
+            x: round(it.transform[4]),
+            y: round(it.transform[5]),
+            w: round(it.width || 0),
+            size: round(Math.hypot(it.transform[2], it.transform[3]) || it.height || 8),
             s: it.str,
-          };
-          if (!lines.has(y)) lines.set(y, []);
-          lines.get(y).push(o);
-          if (/^[VMF]$/.test(o.s.trim())) genderXs.push(o.x); // Gender (Sexo) column marker
+          });
         }
-        const ys = Array.from(lines.keys()).sort((a, b) => b - a); // top → bottom
-        pages.push({ ys, lines });
-      }
-      // Name/data boundary = just left of the Gender column (the first data column after the name).
-      // Names always sit left of it; gender/age/date/phone/email sit at or after it. Splitting by
-      // this X keeps an email that wrapped ABOVE the name from being mis-read as the name, and keeps
-      // phone/email out of the name entirely.
-      let boundary = Infinity;
-      if (genderXs.length) {
-        genderXs.sort((a, b) => a - b);
-        boundary = genderXs[Math.floor(genderXs.length / 2)] - 4;
-      }
-      // A member's name can wrap across visual lines within one table ROW. Rows are separated by a
-      // larger vertical gap than lines within a row. Threshold = midpoint of the two MOST FREQUENT
-      // line-gaps (within-row spacing vs between-row spacing).
-      const freq = new Map();
-      for (const pg of pages) {
-        for (let k = 1; k < pg.ys.length; k++) {
-          const g = Math.round(Math.abs(pg.ys[k - 1] - pg.ys[k]));
-          if (g > 0) freq.set(g, (freq.get(g) || 0) + 1);
-        }
-      }
-      // See src/lib/lcrPdfLayout.ts — the threshold has to SEPARATE the record gap from the
-      // inside-record ones, not average the two most frequent (which split three-line names).
-      const thr = rowGapThreshold(freq);
-      // Join items into text: group by line (Y, top→bottom), order each line left→right by X and
-      // insert a space only for a real gap (word/column boundary, NOT between accent glyphs), then
-      // join lines with a space. So "Gon" "ç" "alves" → "Gonçalves", "Jos" "é" → "José".
-      const joinCol = (items) => {
-        const byY = new Map();
-        for (const o of items) { if (!byY.has(o.y)) byY.set(o.y, []); byY.get(o.y).push(o); }
-        const yy = Array.from(byY.keys()).sort((a, b) => b - a);
-        const parts = [];
-        for (const y of yy) {
-          const arr = byY.get(y).map((o, i) => ({ ...o, i }));
-          arr.sort((a, b) => (a.x - b.x) || (a.i - b.i));
-          let text = '';
-          let prevEnd = null;
-          for (const o of arr) {
-            if (prevEnd !== null && o.x - prevEnd > o.size * 0.2 && !text.endsWith(' ') && !o.s.startsWith(' ')) text += ' ';
-            text += o.s;
-            prevEnd = o.x + o.w;
+        // Drawn geometry. The generator draws the table's row and column rules, which say where a
+        // record ends far more reliably than any spacing we could infer. Colour and line width are
+        // forwarded as-is and never interpreted here — deciding is not this file's job.
+        const segments = [];
+        const rects = [];
+        const ol = await page.getOperatorList();
+        let fill = null;
+        for (let i = 0; i < ol.fnArray.length; i++) {
+          const fn = ol.fnArray[i];
+          if (fn === OPS.setFillRGBColor) {
+            fill = ol.argsArray[i].join(',');
+            continue;
           }
-          parts.push(text.trim());
+          if (fn !== OPS.constructPath) continue;
+          const pathOps = ol.argsArray[i][0];
+          const args = ol.argsArray[i][1];
+          let k = 0;
+          let prev = null;
+          for (const op of pathOps) {
+            if (op === OPS.rectangle) {
+              rects.push({
+                x: round(args[k]), y: round(args[k + 1]),
+                w: round(args[k + 2]), h: round(args[k + 3]), color: fill,
+              });
+              k += 4;
+              prev = null;
+            } else if (op === OPS.moveTo || op === OPS.lineTo) {
+              const pt = [args[k], args[k + 1]];
+              if (prev && op === OPS.lineTo) {
+                segments.push({ x1: round(prev[0]), y1: round(prev[1]), x2: round(pt[0]), y2: round(pt[1]) });
+              }
+              prev = pt;
+              k += 2;
+            } else if (op === OPS.curveTo) {
+              k += 6;
+              prev = null;
+            }
+          }
         }
-        return parts.join(' ').replace(/\\s+/g, ' ').trim();
-      };
-      // Emit one line per table row: "<name column> <data columns>".
-      const out = [];
-      for (const pg of pages) {
-        let cur = [];
-        const flush = () => {
-          if (!cur.length) return;
-          const items = [];
-          for (const y of cur) for (const o of pg.lines.get(y)) items.push({ ...o, y });
-          const line = (joinCol(items.filter((o) => o.x < boundary)) + ' ' + joinCol(items.filter((o) => o.x >= boundary)))
-            .replace(/\\s+/g, ' ')
-            .trim();
-          if (line) out.push(line);
-          cur = [];
-        };
-        for (let k = 0; k < pg.ys.length; k++) {
-          if (k > 0 && Math.abs(pg.ys[k - 1] - pg.ys[k]) >= thr) flush();
-          cur.push(pg.ys[k]);
-        }
-        flush();
+        const view = page.getViewport({ scale: 1 });
+        pages.push({
+          width: view.width, height: view.height,
+          items, segments, rects, transform: view.transform,
+        });
       }
-      window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, text: out.join('\\n') }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, pages: pages }));
     } catch (e) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ ok: false, error: String((e && e.message) || e) }));
     }
@@ -174,7 +150,7 @@ export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractor
   }, [assets]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
-    let msg: { ready?: boolean; ok?: boolean; text?: string; error?: string };
+    let msg: { ready?: boolean; ok?: boolean; pages?: LcrRawPage[]; error?: string };
     try {
       msg = JSON.parse(event.nativeEvent.data);
     } catch {
@@ -184,7 +160,7 @@ export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractor
       // Inject the (in-memory) PDF and run extraction. JSON.stringify escapes the base64 safely.
       ref.current?.injectJavaScript(`window.__runPdf(${JSON.stringify(base64)}); true;`);
     } else if (msg.ok) {
-      onResult(msg.text ?? '');
+      onResult(msg.pages ?? []);
     } else if (msg.ok === false) {
       onError(msg.error ?? 'PDF extraction failed');
     }

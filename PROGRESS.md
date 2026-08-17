@@ -218,3 +218,21 @@ Built in 6 atomic commits (`27c01e3`..`aa68757`), fresh subagent per step, kept 
 - `f021-topic-library-overhaul.test.ts` asserts source text (`function normalizeForSearch`) via
   fs/string-matching — against the "behavioral tests only" rule; keeps dead code alive in
   `useTopics.ts`. Worth revisiting (test + dead code) as a future cleanup.
+
+## Grade da tabela no import de PDF (`specs/pdf-import-table-grid.md`)
+
+Spec e plano aprovados 2026-08-17. 7 passos; **passo 1 concluído**.
+
+- **Passo 1 — a WebView devolve dados brutos.** `PdfTextExtractor` deixou de montar texto e passou a
+  postar, por página, itens de texto com coordenadas, segmentos, retângulos preenchidos e a
+  transformação do viewport. A montagem virou `src/lib/lcrPdfPage.ts` (`buildLcrText`/`joinTextRun`),
+  em TS puro e testado. `PdfImportModal` chama `buildLcrText` antes do `parseLcrText`.
+  **Neutro por construção e verificado:** a saída é idêntica byte a byte à anterior nos 8 PDFs.
+  Removidos `ROW_GAP_THRESHOLD_JS` e o teste de concordância que o guardava — a duplicação existia
+  só porque a lógica morava dentro da WebView, e o objeto que o teste vigiava deixou de existir.
+- **Falta:** passos 2 a 7 (candidatos de fronteira, validação/escolha, quebra de página, leitura por
+  célula, ligação com fallback, arnês dos 8 PDFs).
+- ⚠️ **Só o aparelho prova a bridge.** Nada em `PdfTextExtractor.tsx` roda no jest. O passo 1 mudou o
+  contrato inteiro da WebView e ainda **não foi testado em device** — é o risco aberto nº 1.
+- Nota para o passo 7: `scripts/check-lcr-pdfs.mjs` compila com `tsc` e `lcrPdfPage` importa
+  `lcrPdfLayout`; o output precisa de `.js` nos imports para rodar como ESM no Node.

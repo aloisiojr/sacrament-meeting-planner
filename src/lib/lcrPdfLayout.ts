@@ -5,24 +5,13 @@
  * on any of them — in the reference PDFs a three-line name puts the data on the MIDDLE line. Rows
  * are told apart from wrapped lines by the vertical gap between baselines.
  *
- * Extracted from PdfTextExtractor so it can be tested: the fixtures are gap distributions measured
- * from the real ward PDFs, which stay out of the repository because they carry members' names,
- * phones and e-mails.
+ * The fixtures are gap distributions measured from the real ward PDFs, which stay out of the
+ * repository because they carry members' names, phones and e-mails.
  *
- * ── Why the injected copy below is a STRING and not `${rowGapThreshold}` ─────────────────────────
- * PdfTextExtractor runs pdf.js inside a WebView and hands it a script built by template literal.
- * Interpolating the function itself works in development and is BROKEN in every shipped build, for
- * two independent reasons:
- *   1. Metro wraps each module and terser mangles the name away, so `String(fn)` yields
- *      `function(t){…}` — anonymous. Injected as a statement that is a SyntaxError, so the whole
- *      script fails to parse, `window.__runPdf` is never defined, and the import hangs with no
- *      timeout.
- *   2. The app runs on Hermes, which does not retain function source at all; `toString()` gives a
- *      `[bytecode]` placeholder.
- * Neither shows up in the dev client, which serves unminified JS — a device test there would pass
- * and prove nothing. So the WebView gets literal source, and `rowGapThreshold` below is its twin
- * for app code and tests. `lcr-row-threshold.test.ts` evaluates the string and asserts the two
- * agree on every reference PDF; that agreement is what keeps the duplication honest.
+ * This module used to be mirrored as a literal JS string, because the WebView built the record text
+ * itself and `${fn}` cannot be injected (minification makes the function anonymous; Hermes drops
+ * function source). The WebView now forwards raw page data and decides nothing, so the copy is gone
+ * and this is ordinary TypeScript again.
  */
 
 /**
@@ -62,25 +51,6 @@ export function rowGapThreshold(freq: ReadonlyMap<number, number>): number {
   return (Math.max.apply(null, inside) + separator) / 2;
 }
 
-/**
- * The same function as literal source, for injection into the WebView (see the note at the top).
- * Kept in step with the twin above by the agreement test — change one, change the other.
- */
-export const ROW_GAP_THRESHOLD_JS = `
-function rowGapThreshold(freq) {
-  var recurring = Array.from(freq.keys()).filter(function (gap) { return (freq.get(gap) || 0) >= 2; });
-  if (recurring.length < 2) return Infinity;
-
-  var byFrequency = recurring.slice().sort(function (a, b) {
-    return (freq.get(b) || 0) - (freq.get(a) || 0);
-  });
-  var separator = Math.max(byFrequency[0], byFrequency[1]);
-
-  var inside = Array.from(freq.keys()).filter(function (gap) { return gap < separator; });
-  if (!inside.length) return Infinity;
-
-  return (Math.max.apply(null, inside) + separator) / 2;
-}`;
 
 /**
  * Split baseline positions (top → bottom) into rows, breaking where the gap REACHES `threshold`.

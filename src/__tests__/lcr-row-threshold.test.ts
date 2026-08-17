@@ -8,7 +8,7 @@
  * Completeness matters here. An earlier version of this fix passed its tests and still merged
  * records on the real files, because the fixture was a hand-picked subset of the histogram.
  */
-import { rowGapThreshold, groupIntoRows, ROW_GAP_THRESHOLD_JS } from '../lib/lcrPdfLayout';
+import { rowGapThreshold, groupIntoRows } from '../lib/lcrPdfLayout';
 
 type Pdf = { file: string; separator: number; largestInside: number; gaps: [number, number][] };
 
@@ -45,13 +45,6 @@ describe('every LCR PDF shared so far', () => {
     expect(thr).toBeLessThan(pdf.separator);
   });
 
-  it.each(ALL_PDFS)('$file: the copy injected into the WebView agrees', (pdf) => {
-    const injected = new Function(
-      `${ROW_GAP_THRESHOLD_JS}; return rowGapThreshold;`
-    )() as typeof rowGapThreshold;
-
-    expect(injected(histogram(pdf))).toBe(rowGapThreshold(histogram(pdf)));
-  });
 });
 
 describe('rowGapThreshold', () => {

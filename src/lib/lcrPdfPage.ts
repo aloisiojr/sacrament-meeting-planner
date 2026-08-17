@@ -13,6 +13,8 @@
  * contrato da WebView duas vezes custaria dois testes de aparelho em vez de um.
  */
 import { rowGapThreshold } from './lcrPdfLayout';
+import { parseLcrText, type LcrParseResult } from './lcrPdfParser';
+import { readGrid } from './lcrPdfGrid';
 
 /** Um fragmento de texto com sua posição. O pdf.js quebra por troca de fonte, então acentos vêm à parte. */
 export interface LcrTextItem {
@@ -172,4 +174,27 @@ export function buildLcrText(pages: readonly LcrRawPage[]): string {
     flush();
   }
   return out.join('\n');
+}
+
+export interface LcrPagesResult extends LcrParseResult {
+  /** Se a grade desenhada foi usada. Sem isto, um fallback silencioso é indistinguível de sucesso. */
+  usedGrid: boolean;
+}
+
+/**
+ * Porta única do import: lê os registros de um PDF já extraído, pela grade ou pelo caminho antigo.
+ *
+ * A ordem não é preferência estética. A grade lê o que o gerador desenhou e se auto-confere; o
+ * limiar de gap infere e não tem como saber se acertou. Quando a grade não valida, o caminho antigo
+ * é o melhor comportamento conhecido — e é o certo, não só o tolerável, para uma tabela sem
+ * separador, onde cada registro cabe numa linha de texto.
+ */
+export function readLcrPages(pages: readonly LcrRawPage[]): LcrPagesResult {
+  // A contagem declarada sai do texto montado nos dois caminhos: ela é uma linha solta fora da
+  // tabela, então a grade não a enxerga e não deveria enxergar.
+  const flat = parseLcrText(buildLcrText(pages));
+  const grid = readGrid(pages);
+  return grid
+    ? { records: grid, expectedCount: flat.expectedCount, usedGrid: true }
+    : { ...flat, usedGrid: false };
 }

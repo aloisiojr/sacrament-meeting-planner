@@ -13,7 +13,7 @@
  * funcionam: seis pedaços de 48 a 148pt que só juntos cobrem a largura toda.
  */
 import { applyMatrix, joinTextRun, type LcrRawPage, type LcrSegment, type LcrTextItem } from './lcrPdfPage';
-import { countAnchors, type LcrRecord } from './lcrPdfParser';
+import { countAnchors, parseLcrText, type LcrRecord } from './lcrPdfParser';
 import { rowGapThreshold } from './lcrPdfLayout';
 
 /** Duas alturas a menos disto são a mesma fronteira (ruído de arredondamento). */
@@ -287,41 +287,39 @@ export interface LcrPageBands {
 }
 
 /**
- * Junta as bandas de todas as páginas numa lista de registros, fundindo os partidos na virada.
+ * Quais viradas de página escondem um registro partido: índice da página SEGUINTE → texto do órfão.
  *
  * A forma da quebra, medida em 39 ocorrências nos 8 PDFs sem uma exceção: os DADOS ficam órfãos
  * abaixo da última fronteira da página N e o NOME abre a primeira banda da página N+1. Os dois
- * pedaços são complementares, e a fusão é a concatenação deles.
+ * pedaços são complementares.
  *
  * O pareamento é por FORMA, não por posição: exige âncora no órfão e ausência de âncora na banda
  * seguinte. Se um PDF novo quebrar de outro jeito as formas não casam, nada funde, e o documento
- * segue para o fallback — que é bem melhor do que fundir errado em silêncio.
+ * segue para o fallback — bem melhor do que fundir errado em silêncio.
  */
-export function mergePageBreaks(pages: readonly LcrPageBands[]): string[] {
-  const out: string[] = [];
-  const consumed = new Set<number>();
-
+function pageBreakOrphans(pages: readonly LcrPageBands[]): Map<number, string> {
+  const out = new Map<number, string>();
   pages.forEach((page, i) => {
     const orphan = stripChrome(page.below);
     const next = pages[i + 1];
-    const canMerge =
-      !!orphan &&
-      countAnchors(orphan) === 1 &&
-      !!next &&
-      next.bands.length > 0 &&
-      countAnchors(next.bands[0]) === 0 &&
-      next.bands[0].trim().length > 0;
+    if (!orphan || countAnchors(orphan) !== 1) return;
+    if (!next || !next.bands.length || !next.bands[0].trim()) return;
+    if (countAnchors(next.bands[0]) !== 0) return;
+    out.set(i + 1, orphan);
+  });
+  return out;
+}
 
+/** Junta as bandas de todas as páginas numa lista de registros, fundindo os partidos na virada. */
+export function mergePageBreaks(pages: readonly LcrPageBands[]): string[] {
+  const orphans = pageBreakOrphans(pages);
+  const out: string[] = [];
+  pages.forEach((page, i) => {
     page.bands.forEach((text, k) => {
-      const skip = i > 0 && k === 0 && consumed.has(i);
-      if (skip || !text.trim()) return;
-      out.push(text);
+      if (!text.trim()) return;
+      const orphan = k === 0 ? orphans.get(i) : undefined;
+      out.push(orphan ? `${text} ${orphan}`.replace(/\s+/g, ' ').trim() : text);
     });
-
-    if (canMerge) {
-      consumed.add(i + 1);
-      out.push(`${next.bands[0]} ${orphan}`.replace(/\s+/g, ' ').trim());
-    }
   });
   return out;
 }
@@ -390,4 +388,51 @@ export function detectColumns(pages: readonly LcrRawPage[]): number[] {
     }
   }
   return columnStarts(xs);
+}
+
+/**
+ * Lê um documento inteiro pela grade, ou devolve null quando ela não se aplica (AC7, AC8).
+ *
+ * Null é resposta legítima, não erro: quem chama cai no `parseLcrText` sobre o texto reconstruído,
+ * que é o comportamento de hoje. Vale para tabela sem separador desenhado — em que cada linha cabe
+ * numa linha de texto e o limiar de gap acerta por construção — e para qualquer PDF cujo desenho
+ * não reconheçamos.
+ *
+ * O registro partido entre páginas é meio-termo, por necessidade: os dados órfãos estão fora da
+ * grade e só o `parseLcrText` sabe lê-los, mas o NOME continua vindo da coluna de nome. Remontar os
+ * dois pedaços como texto e mandar tudo ao parser antigo devolveria a contaminação que a grade
+ * existe para eliminar — foi o que aconteceu, e um `m` de e-mail do vizinho virou sobrenome.
+ *
+ * Devolve só os registros: a contagem declarada vem da linha "Count/Contagem/Recuento", que é
+ * texto solto fora da tabela e portanto não é assunto da grade.
+ */
+export function readGrid(pages: readonly LcrRawPage[]): LcrRecord[] | null {
+  const choice = chooseBoundaries(pages);
+  if (choice.source === 'gap') return null;
+
+  const columns = detectColumns(pages);
+  if (columns.length < 2) return null;
+
+  const banded = pages.map((page, i) => bandsOf(page, choice.perPage[i]));
+  const orphans = pageBreakOrphans(
+    banded.map((b) => ({ bands: b.map((x) => x.text), above: b.above, below: b.below }))
+  );
+
+  const records: LcrRecord[] = [];
+  banded.forEach((bands, i) => {
+    bands.forEach((band, k) => {
+      const orphan = k === 0 ? orphans.get(i) : undefined;
+      if (orphan) {
+        const [data] = parseLcrText(orphan).records;
+        if (!data) return;
+        const name = joinTextRun(band.items.filter((o) => o.x < columns[1] - X_TOLERANCE)).trim();
+        records.push({ ...data, name: name || data.name });
+        return;
+      }
+      const record = readCells(band.items, columns);
+      if (record) records.push(record);
+    });
+  });
+
+  return records;
 }

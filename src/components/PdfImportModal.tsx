@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMembers } from '../hooks/useMembers';
 import { useApplyMemberImport } from '../hooks/useApplyMemberImport';
-import { parseLcrText, lcrNameToFirstLast } from '../lib/lcrPdfParser';
-import { buildLcrText, type LcrRawPage } from '../lib/lcrPdfPage';
+import { lcrNameToFirstLast } from '../lib/lcrPdfParser';
+import { readLcrPages, type LcrRawPage } from '../lib/lcrPdfPage';
 import { repairPhones } from '../lib/lcrPhoneRepair';
 import { buildMergePlan, type MergePlan, type ParsedMember } from '../lib/memberMergePlan';
 import { normalizeName } from '../lib/csvUtils';
@@ -57,7 +57,7 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
 
   const onExtracted = (pages: LcrRawPage[]) => {
     try {
-      const { records, expectedCount } = parseLcrText(buildLcrText(pages));
+      const { records, expectedCount } = readLcrPages(pages);
       const named = records.map((r) => ({ ...r, name: lcrNameToFirstLast(r.name) }));
       const { resolved, unrepaired: unrep } = repairPhones(named, { countryCode, areaCode });
       const parsed: ParsedMember[] = resolved.map((r) => ({ name: r.name, phone: r.phone, age: r.age }));

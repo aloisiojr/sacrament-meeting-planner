@@ -7,7 +7,7 @@
  * tela de revisão — a cauda `l.com` e o `m` solto de um `@gmail.co` do vizinho — estão reproduzidos
  * aqui pela geometria, não pelo texto.
  */
-import { readCells } from '../lib/lcrPdfGrid';
+import { readCells, readGrid } from '../lib/lcrPdfGrid';
 import type { LcrTextItem } from '../lib/lcrPdfPage';
 
 /** Colunas dos PDFs reais, em espaço de texto. */
@@ -100,5 +100,39 @@ describe('readCells — a coluna impede a contaminação que existia (AC13)', ()
     ];
 
     expect(readCells(items, COLS)?.name).toBe('Exemplo dos Santos Pereira, Beltrano');
+  });
+});
+
+describe('readGrid — o registro partido também tira o nome da coluna', () => {
+  it('não deixa a cauda de e-mail do vizinho virar sobrenome no registro fundido', () => {
+    const CTM = [1, 0, 0, 1, 0, 0];
+    const cellRules = (y: number) =>
+      [[42, 100], [150, 62], [220, 42], [268, 62], [337, 74], [419, 100]].map(([x, w]) => ({
+        x1: x, y1: y, x2: x + w, y2: y, m: CTM,
+      }));
+    // Página 1 termina com dados órfãos abaixo da grade; página 2 abre com o nome — e com a cauda
+    // "m" do e-mail de OUTRA pessoa na coluna de e-mail, que foi o que contaminou o PDF real.
+    const p1 = {
+      width: 595, height: 842,
+      items: [
+        frag(42, 700, 'Exemplo, Fulana'), frag(150, 694, 'F'), frag(220, 694, '68'),
+        frag(268, 694, '17 out 1957'), frag(337, 694, '(11) 90000-0001'),
+        frag(150, 620, 'M'), frag(220, 620, '34'), frag(268, 620, '14 mai 1992'), frag(337, 620, '(11) 90000-0002'),
+      ],
+      segments: [710, 685].flatMap(cellRules), rects: [],
+    };
+    const p2 = {
+      width: 595, height: 842,
+      items: [
+        frag(419, 706, 'vizinho@gmail.co'),
+        frag(42, 700, 'Exemplo, Beltrano'), frag(419, 694, 'm'),
+        frag(42, 675, 'Exemplo, Ciclana'), frag(150, 669, 'F'), frag(220, 669, '30'), frag(268, 669, '1 jan 1996'),
+      ],
+      segments: [710, 685, 660].flatMap(cellRules), rects: [],
+    };
+    const records = readGrid([p1, p2]);
+
+    expect(records?.map((r) => r.name)).toEqual(['Exemplo, Fulana', 'Exemplo, Beltrano', 'Exemplo, Ciclana']);
+    expect(records?.[1]).toMatchObject({ age: 34, rawPhone: '(11) 90000-0002' });
   });
 });

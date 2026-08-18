@@ -23,8 +23,8 @@ describe('normalizeLcrPhone (Rule 3)', () => {
     expect(normalizeLcrPhone('(801) 859-5405', '1', '801')).toBe('+18018595405');
   });
   it('treats an 11-digit national mobile whose DDD equals the country code as national (BR +55, DDD 55)', () => {
-    // "(55) 98765-4321" → "55987654321"; must NOT be read as already-international (would drop the DDD).
-    expect(normalizeLcrPhone('(55) 98765-4321', '55', '55')).toBe('+5555987654321');
+    // "(55) 90000-0022" → "55987654321"; must NOT be read as already-international (would drop the DDD).
+    expect(normalizeLcrPhone('(55) 90000-0022', '55', '55')).toBe('+5555900000022');
   });
   it('accepts already-international numbers for 8–9-digit-national countries (no country-code doubling)', () => {
     expect(normalizeLcrPhone('34612345678', '34', '')).toBe('+34612345678'); // Spain (9-digit national)

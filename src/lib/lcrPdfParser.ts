@@ -113,9 +113,49 @@ function findAnchor(toks: string[]): number {
   return -1;
 }
 
+/**
+ * How many records a stretch of text holds, counted by anchors.
+ *
+ * The grid uses this as its JUDGE: a candidate set of boundaries is only trusted when each band it
+ * produces holds exactly one. The anchor stops being the mechanism that parses a record and becomes
+ * the mechanism that checks a partition — which is why it stays here, next to the rules it encodes,
+ * instead of being duplicated in the grid.
+ */
+export function countAnchors(text: string): number {
+  const toks = text.split(/\s+/).filter(Boolean);
+  let n = 0;
+  for (let i = 0; i < toks.length; i++) if (isAnchorAt(toks, i)) n += 1;
+  return n;
+}
+
 /** A pure line that is leftover contact data (a split email tail or bare phone), not a name. */
 function isContactFragment(toks: string[], line: string): boolean {
   return toks.some((t) => t.includes('@')) || toks.every(isPhoneToken) || line.startsWith('.');
+}
+
+/**
+ * True when the leftover after a record's contact data is the wrapped REMAINDER of `head`.
+ *
+ * An address printed across two visual lines is joined by Y, so its head can land before the gender
+ * token and its tail after the phone — the same position a name that overflowed occupies. Read as a
+ * surname, the tail reached the review screen glued to the name ("Fulana Exemplo l.com", "Fulana
+ * Maria da m Exemplo").
+ *
+ * The tail's SHAPE settles nothing: "m", "om", "com", "COM", "br", "l.com" are all plausible-looking
+ * fragments, and the head is not reliably recognizable as truncated either — "…@gmail.co" ends in a
+ * real TLD. What does settle it is that head + tail spells one valid address, since a name never
+ * completes an e-mail. Guarded by two conditions that keep a real surname:
+ *   - exactly ONE token left (an address wraps in one piece; overflow like "José de" is several);
+ *   - the token is not Capitalized-word shaped, which "Sobrenome" is and no TLD fragment is.
+ *
+ * Measured over the 8 reference PDFs (~2900 records): every one of the 59 leftovers was an e-mail
+ * tail and none was a name — expected, since name overflow sits in the NAME column, which the
+ * extractor joins BEFORE the data column.
+ */
+function isEmailTail(head: string | undefined, rest: string[]): boolean {
+  if (!head || rest.length !== 1) return false;
+  if (/^[A-ZÀ-Þ][a-zà-þ]/.test(rest[0])) return false;
+  return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(head + rest[0]);
 }
 
 /**
@@ -217,8 +257,11 @@ export function parseLcrText(text: string): LcrParseResult {
     records.push({ name, rawPhone: phoneTokens.length ? joinPhone(phoneTokens) : null, age });
     lastIdx = records.length - 1;
 
-    // Any name tokens still trailing on THIS line (overflow that didn't wrap) belong to this record.
-    appendName(lastIdx, toks.slice(j).filter((t) => !t.includes('@') && !isPhoneToken(t)));
+    // Any name tokens still trailing on THIS line (overflow that didn't wrap) belong to this
+    // record — unless what trails is the wrapped remainder of an address printed above the anchor.
+    const overflow = toks.slice(j).filter((t) => !t.includes('@') && !isPhoneToken(t));
+    const emailHead = toks.filter((t) => t.includes('@')).pop();
+    appendName(lastIdx, isEmailTail(emailHead, overflow) ? [] : overflow);
   }
 
   // A wrapped tail on the very last record has no following anchor line to resolve it.

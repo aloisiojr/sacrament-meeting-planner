@@ -11,9 +11,12 @@ import React, { useState } from 'react';
 import { Modal, View, Text, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useMembers } from '../hooks/useMembers';
 import { useApplyMemberImport } from '../hooks/useApplyMemberImport';
-import { parseLcrText, lcrNameToFirstLast } from '../lib/lcrPdfParser';
+import { lcrNameToFirstLast } from '../lib/lcrPdfParser';
+import { readLcrPages, type LcrRawPage } from '../lib/lcrPdfPage';
+import { reportPdfImportHealth } from '../lib/appHealth';
 import { repairPhones } from '../lib/lcrPhoneRepair';
 import { buildMergePlan, type MergePlan, type ParsedMember } from '../lib/memberMergePlan';
 import { normalizeName } from '../lib/csvUtils';
@@ -31,6 +34,7 @@ export interface PdfImportModalProps {
 export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose }: PdfImportModalProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { wardId } = useAuth();
   const { data: members = [] } = useMembers();
   const apply = useApplyMemberImport();
 
@@ -54,9 +58,18 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
     }
   }
 
-  const onExtracted = (text: string) => {
+  const onExtracted = (pages: LcrRawPage[]) => {
     try {
-      const { records, expectedCount } = parseLcrText(text);
+      const { records, expectedCount, usedGrid, fallbackReason } = readLcrPages(pages);
+      // Diagnóstico, não fluxo: reportPdfImportHealth nunca lança nem bloqueia. Sem await, para o
+      // usuário não esperar por uma escrita que não é dele. Ver src/lib/appHealth.ts.
+      void reportPdfImportHealth(wardId, {
+        usedGrid,
+        fallbackReason,
+        records: records.length,
+        expectedCount,
+        pages: pages.length,
+      });
       const named = records.map((r) => ({ ...r, name: lcrNameToFirstLast(r.name) }));
       const { resolved, unrepaired: unrep } = repairPhones(named, { countryCode, areaCode });
       const parsed: ParsedMember[] = resolved.map((r) => ({ name: r.name, phone: r.phone, age: r.age }));

@@ -1,0 +1,471 @@
+/**
+ * Fronteiras de registro e de coluna lidas do DESENHO da página (`specs/pdf-import-table-grid.md`).
+ *
+ * A ideia que organiza este módulo é do usuário e vale escrever por extenso: uma tabela em que cada
+ * célula pode ocupar mais de uma linha **precisa** de algum separador visual, senão fica ilegível
+ * para uma pessoa. Então em vez de inferir estatisticamente onde um registro termina — que foi o
+ * que errou três vezes — procura-se a evidência que o gerador desenhou. E o corolário é igualmente
+ * útil: se não houver separador nenhum, cada linha da tabela cabe numa linha de texto, e aí o
+ * limiar de gap está certo por construção. "Não achei" não é falha, é um caso com resposta conhecida.
+ *
+ * Nada aqui reconhece cor, espessura ou comprimento absoluto. Um traço vira fronteira quando o
+ * CONJUNTO de traços naquela altura atravessa a tabela — que é como as bordas de célula do LCR
+ * funcionam: seis pedaços de 48 a 148pt que só juntos cobrem a largura toda.
+ */
+import { applyMatrix, joinTextRun, type LcrRawPage, type LcrSegment, type LcrTextItem } from './lcrPdfPage';
+import { countAnchors, parseLcrText, type LcrRecord } from './lcrPdfParser';
+import { rowGapThreshold } from './lcrPdfLayout';
+
+/** Duas alturas a menos disto são a mesma fronteira (ruído de arredondamento). */
+const Y_TOLERANCE = 1;
+/** Dois X a menos disto são a mesma coluna — a página 1 dos PDFs reais tem 34,3 e 35,1. */
+const X_TOLERANCE = 2;
+/** Fração da largura ocupada por texto que uma fronteira precisa cobrir. */
+const MIN_COVERAGE = 0.7;
+/** Acima disto um segmento é vertical e não delimita linha. */
+const FLATNESS = 0.6;
+
+/** Faixa horizontal ocupada por texto na página; a base do critério relativo de cobertura. */
+export function textExtent(page: LcrRawPage): { min: number; max: number } | null {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const o of page.items) {
+    if (!o.s.trim()) continue;
+    min = Math.min(min, o.x);
+    max = Math.max(max, o.x + o.w);
+  }
+  return min <= max ? { min, max } : null;
+}
+
+/** Comprimento coberto por um conjunto de intervalos, contando sobreposição uma vez só. */
+function coveredLength(intervals: [number, number][]): number {
+  if (!intervals.length) return 0;
+  const sorted = intervals.slice().sort((a, b) => a[0] - b[0]);
+  let total = 0;
+  let [start, end] = sorted[0];
+  for (const [a, b] of sorted.slice(1)) {
+    if (a > end) {
+      total += end - start;
+      [start, end] = [a, b];
+    } else if (b > end) {
+      end = b;
+    }
+  }
+  return total + (end - start);
+}
+
+/** Agrupa valores próximos e devolve o primeiro de cada grupo, em ordem crescente. */
+export function columnStarts(values: readonly number[], tolerance = X_TOLERANCE): number[] {
+  const sorted = values.slice().sort((a, b) => a - b);
+  const out: number[] = [];
+  for (const v of sorted) {
+    if (!out.length || v - out[out.length - 1] > tolerance) out.push(v);
+  }
+  return out;
+}
+
+/** Um segmento levado ao espaço do texto pelo CTM que veio com ele. */
+function inTextSpace(s: LcrSegment): { x1: number; y1: number; x2: number; y2: number } {
+  const [x1, y1] = applyMatrix(s.m, s.x1, s.y1);
+  const [x2, y2] = applyMatrix(s.m, s.x2, s.y2);
+  return { x1, y1, x2, y2 };
+}
+
+/** Agrupa alturas próximas e devolve uma fronteira por grupo, do topo para baixo. */
+function mergeYs(entries: { y: number; span: [number, number] }[], width: number): number[] {
+  const sorted = entries.slice().sort((a, b) => b.y - a.y);
+  const out: number[] = [];
+  let group: typeof sorted = [];
+  const flush = () => {
+    if (!group.length) return;
+    if (coveredLength(group.map((g) => g.span)) >= width * MIN_COVERAGE) out.push(group[0].y);
+    group = [];
+  };
+  for (const e of sorted) {
+    if (group.length && Math.abs(group[group.length - 1].y - e.y) > Y_TOLERANCE) flush();
+    group.push(e);
+  }
+  flush();
+  return out;
+}
+
+/**
+ * Fronteiras vindas de traços desenhados, do topo para baixo.
+ *
+ * Traços quase horizontais são agrupados por altura; o grupo vira fronteira quando a união dos seus
+ * intervalos cobre a maior parte do texto da página. É a união que importa: uma borda de célula
+ * sozinha cobre um quinto da tabela e seria descartada por qualquer critério individual.
+ */
+export function ruleBoundaries(page: LcrRawPage): number[] {
+  const extent = textExtent(page);
+  if (!extent) return [];
+  const entries: { y: number; span: [number, number] }[] = [];
+  for (const s of page.segments) {
+    const t = inTextSpace(s);
+    if (Math.abs(t.y1 - t.y2) > FLATNESS) continue;
+    entries.push({ y: t.y1, span: [Math.min(t.x1, t.x2), Math.max(t.x1, t.x2)] });
+  }
+  return mergeYs(entries, extent.max - extent.min);
+}
+
+/**
+ * Fronteiras vindas de faixas de fundo: as duas arestas de cada retângulo largo o bastante.
+ *
+ * As duas arestas, e não só uma, porque o LCR pinta linhas ALTERNADAS — a aresta de baixo de uma
+ * faixa cinza e a de cima da seguinte delimitam a linha branca entre elas. Sem isso, metade dos
+ * registros ficaria sem fronteira. A cor não é lida: nada garante o mesmo cinza noutro PDF.
+ */
+export function fillBoundaries(page: LcrRawPage): number[] {
+  const extent = textExtent(page);
+  if (!extent) return [];
+  const width = extent.max - extent.min;
+  const entries: { y: number; span: [number, number] }[] = [];
+  for (const r of page.rects) {
+    const [x1, y1] = applyMatrix(r.m, r.x, r.y);
+    const [x2, y2] = applyMatrix(r.m, r.x + r.w, r.y + r.h);
+    const span: [number, number] = [Math.min(x1, x2), Math.max(x1, x2)];
+    if (span[1] - span[0] < width * MIN_COVERAGE) continue;
+    entries.push({ y: y1, span }, { y: y2, span });
+  }
+  return mergeYs(entries, width);
+}
+
+/** Uma faixa entre duas fronteiras, com o texto que caiu dentro dela. */
+export interface LcrBand {
+  top: number;
+  bottom: number;
+  items: LcrTextItem[];
+  text: string;
+}
+
+/** As faixas de uma página mais o texto que ficou fora da grade, em cima e embaixo. */
+export interface LcrBands extends Array<LcrBand> {
+  above: string;
+  below: string;
+}
+
+/**
+ * Parte as linhas de texto da página nas fronteiras dadas (topo → base).
+ *
+ * O que sobra fora da grade vem separado, e não descartado: é ali que mora metade de um registro
+ * partido entre páginas, e jogar fora custaria os 39 que o algoritmo antigo acerta.
+ */
+export function bandsOf(page: LcrRawPage, boundaries: readonly number[]): LcrBands {
+  const ys = boundaries.slice().sort((a, b) => b - a);
+  const bands = [] as unknown as LcrBands;
+  const inRange = (o: LcrTextItem, top: number, bottom: number) => o.y < top - 0.5 && o.y > bottom - 0.5;
+
+  for (let i = 0; i < ys.length - 1; i++) {
+    const items = page.items.filter((o) => inRange(o, ys[i], ys[i + 1]));
+    bands.push({ top: ys[i], bottom: ys[i + 1], items, text: joinTextRun(items) });
+  }
+  // Sem fronteira nenhuma TUDO fica fora da grade, em vez de desaparecer: uma página que não
+  // produz banda alguma precisa aparecer na contagem de âncoras, senão a grade a descarta inteira
+  // e ainda se declara bem-sucedida.
+  const first = ys.length ? ys[0] : -Infinity;
+  const last = ys.length ? ys[ys.length - 1] : -Infinity;
+  bands.above = joinTextRun(page.items.filter((o) => o.y >= first - 0.5));
+  bands.below = joinTextRun(page.items.filter((o) => o.y <= last - 0.5));
+  return bands;
+}
+
+/** De onde vieram as fronteiras escolhidas. `gap` é o algoritmo anterior à grade. */
+export type LcrBoundarySource = 'rules' | 'fills' | 'gap';
+
+export interface LcrChoice {
+  source: LcrBoundarySource;
+  /** Fronteiras por página, na ordem das páginas. */
+  perPage: number[][];
+  /** Quantos registros esta fonte consegue explicar — o que a torna comparável às outras. */
+  explained: number;
+}
+
+/** Rodapé, título, cabeçalho de coluna e linha de contagem — tudo que não é registro. */
+const CHROME =
+  /intellectual reserve|church use|uso da igreja|uso exclusivo|^\s*(count|contagem|recuento|conteo)\s*:/i;
+
+/**
+ * Remove o cromo da página de um trecho solto, preservando o resto.
+ *
+ * O órfão de uma quebra de página vem grudado no rodapé, então limpar antes de parear não é
+ * higiene: sem isso o par nunca casa.
+ */
+function stripChrome(text: string): string {
+  if (!text) return '';
+  const semRodape = text.replace(/\d{1,2}\s+\S+\s+\d{4}\s+(For Church Use|Somente para Uso|Para uso)[^]*$/i, '');
+  return semRodape
+    .split(/\s{2,}|\n/)
+    .filter((part) => part.trim() && !CHROME.test(part))
+    .join(' ')
+    .replace(/©[^]*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Uma página já particionada: o texto de cada banda e o que sobrou fora da grade. */
+export interface LcrPageBands {
+  bands: string[];
+  above: string;
+  below: string;
+}
+
+/**
+ * Quais viradas de página escondem um registro partido: índice da página SEGUINTE → texto do órfão.
+ *
+ * A forma da quebra, medida em 39 ocorrências nos 8 PDFs sem uma exceção: os DADOS ficam órfãos
+ * abaixo da última fronteira da página N e o NOME abre a primeira banda da página N+1. Os dois
+ * pedaços são complementares.
+ *
+ * O pareamento é por FORMA, não por posição: exige âncora no órfão e ausência de âncora na banda
+ * seguinte. Se um PDF novo quebrar de outro jeito as formas não casam, nada funde, e o documento
+ * segue para o fallback — bem melhor do que fundir errado em silêncio.
+ */
+function pageBreakOrphans(pages: readonly LcrPageBands[]): Map<number, string> {
+  const out = new Map<number, string>();
+  pages.forEach((page, i) => {
+    const orphan = stripChrome(page.below);
+    const next = pages[i + 1];
+    if (!orphan || countAnchors(orphan) !== 1) return;
+    if (!next || !next.bands.length || !next.bands[0].trim()) return;
+    if (countAnchors(next.bands[0]) !== 0) return;
+    out.set(i + 1, orphan);
+  });
+  return out;
+}
+
+/** Fronteiras derivadas do limiar de gap — a mesma regra de sempre, expressa como fronteira. */
+function gapBoundaries(pages: readonly LcrRawPage[]): number[][] {
+  const freq = new Map<number, number>();
+  const perPageYs = pages.map((p) => {
+    const ys = Array.from(new Set(p.items.map((o) => Math.round(o.y)))).sort((a, b) => b - a);
+    for (let k = 1; k < ys.length; k++) {
+      const gap = Math.round(Math.abs(ys[k - 1] - ys[k]));
+      if (gap > 0) freq.set(gap, (freq.get(gap) || 0) + 1);
+    }
+    return ys;
+  });
+  const threshold = rowGapThreshold(freq);
+  return perPageYs.map((ys) => {
+    const cuts: number[] = ys.length ? [ys[0] + 1] : [];
+    for (let k = 1; k < ys.length; k++) {
+      if (Math.abs(ys[k - 1] - ys[k]) >= threshold) cuts.push((ys[k - 1] + ys[k]) / 2);
+    }
+    if (ys.length) cuts.push(ys[ys.length - 1] - 1);
+    return cuts;
+  });
+}
+
+/** As páginas particionadas por um conjunto de fronteiras, na forma que a auditoria consome. */
+function bandTexts(pages: readonly LcrRawPage[], perPage: readonly number[][]): LcrPageBands[] {
+  return pages.map((page, i) => {
+    const bands = bandsOf(page, perPage[i]);
+    return { bands: bands.map((b) => b.text), above: bands.above, below: bands.below };
+  });
+}
+
+/**
+ * Quantos registros um conjunto de fronteiras explica, e se ele pode ser usado.
+ *
+ * A conferência é de CONSERVAÇÃO: toda âncora que existe no documento — dentro de banda, acima da
+ * grade ou abaixo dela — tem de virar exatamente um registro. Contar só as bandas boas não bastava,
+ * e escondia três maneiras diferentes de perder gente em silêncio: uma página sem fronteira alguma
+ * era descartada inteira, um órfão que não casa com a página seguinte evaporava, e uma coluna a
+ * mais zerava a leitura. Nenhuma delas dava erro; todas davam um membro a menos.
+ */
+function auditBoundaries(
+  pages: readonly LcrRawPage[],
+  perPage: readonly number[][]
+): { valid: boolean; explained: number } {
+  const texts = bandTexts(pages, perPage);
+  const orphans = pageBreakOrphans(texts);
+  let exactlyOne = 0;
+  let total = 0;
+  for (const page of texts) {
+    for (const text of page.bands) {
+      const n = countAnchors(text);
+      if (n === 1) exactlyOne += 1;
+      total += n;
+    }
+    total += countAnchors(page.above) + countAnchors(page.below);
+  }
+  // AC11: sobra abaixo da grade que não vira fusão invalida a fonte. Cobre as duas metades da
+  // regra — o órfão ancorado que não acha par (que a conservação de âncoras já pegaria) e o pedaço
+  // sem âncora, que não custa um registro mas custaria um nome truncado sem ninguém perceber.
+  // Medido nos 8 PDFs de referência: nenhuma página deixa sobra sem âncora, então isto não recusa
+  // nada que hoje funciona.
+  const leftoverUnpaired = texts.some((page, i) => stripChrome(page.below) && !orphans.has(i + 1));
+
+  const explained = exactlyOne + orphans.size;
+  return { valid: !leftoverUnpaired && explained > 0 && explained === total, explained };
+}
+
+/**
+ * Escolhe, PARA O DOCUMENTO INTEIRO, de onde vêm as fronteiras (AC7, AC8).
+ *
+ * As três fontes concorrem e ganha a que explica mais registros. No empate vence o desenho, nesta
+ * ordem: traços, faixas, limiar. O desempate não é gosto — as duas primeiras LEEM o que o gerador
+ * marcou e se conferem; a terceira infere de uma distribuição e não tem como saber se acertou.
+ *
+ * Por documento e não por página porque uma página atípica é comum e inofensiva — a última costuma
+ * ter uma linha só, a primeira carrega título — enquanto alternar de critério no meio do arquivo
+ * tornaria o resultado difícil de explicar quando desse errado.
+ */
+export function chooseBoundaries(pages: readonly LcrRawPage[]): LcrChoice {
+  const gap = gapBoundaries(pages);
+  const candidates: { source: LcrBoundarySource; perPage: number[][] }[] = [
+    { source: 'rules', perPage: pages.map(ruleBoundaries) },
+    { source: 'fills', perPage: pages.map(fillBoundaries) },
+    { source: 'gap', perPage: gap },
+  ];
+  let best: LcrChoice | null = null;
+  for (const c of candidates) {
+    const { valid, explained } = auditBoundaries(pages, c.perPage);
+    if (!valid) continue;
+    if (!best || explained > best.explained) best = { ...c, explained };
+  }
+  return best ?? { source: 'gap', perPage: gap, explained: 0 };
+}
+
+/** Ordem das colunas da tabela do LCR. Só nome, idade e telefone chegam ao app. */
+const COL_NAME = 0;
+const COL_GENDER = 1;
+const COL_AGE = 2;
+const COL_BIRTH = 3;
+const COL_PHONE = 4;
+
+/**
+ * Lê um registro dos itens de uma faixa, cada campo da sua própria coluna (AC12, AC13).
+ *
+ * Aqui mora o ganho da grade. Com as colunas conhecidas, o nome é o conteúdo da coluna de nome e
+ * ponto final — a cauda de um e-mail que quebrou de linha está na coluna de e-mail e não tem por
+ * onde chegar ao nome. As duas contaminações que chegaram à tela de revisão (`l.com` grudado num
+ * sobrenome, e o `m` de um `@gmail.co` do vizinho) deixam de ser possíveis, em vez de precisarem de
+ * heurística que as reconheça pela forma — o que nunca ia funcionar, porque nem a cauda nem a
+ * cabeça têm forma distinguível.
+ *
+ * A atribuição é pelo X de INÍCIO do item: um nome comprido continua sendo nome mesmo chegando
+ * perto da coluna seguinte. Nos PDFs de referência nenhum nome alcança a coluna de gênero — sobram
+ * 6pt — porque o gerador quebra o nome na largura da célula.
+ *
+ * Devolve null quando a faixa não descreve um registro (cabeçalho, faixa vazia).
+ */
+export function readCells(items: readonly LcrTextItem[], columns: readonly number[]): LcrRecord | null {
+  if (!columns.length) return null;
+  const cells: LcrTextItem[][] = columns.map(() => []);
+  for (const o of items) {
+    let col = -1;
+    for (let i = 0; i < columns.length; i++) if (o.x >= columns[i] - X_TOLERANCE) col = i;
+    if (col >= 0) cells[col].push(o);
+  }
+  const text = cells.map(joinTextRun);
+
+  const anchor = `${text[COL_GENDER]} ${text[COL_AGE]} ${text[COL_BIRTH]}`.trim();
+  if (countAnchors(anchor) !== 1) return null;
+
+  const phone = text[COL_PHONE]?.trim();
+  return {
+    name: text[COL_NAME].trim(),
+    rawPhone: phone || null,
+    age: Number(text[COL_AGE]),
+  };
+}
+
+/**
+ * Colunas da tabela, deduzidas do X onde os traços começam (AC4).
+ *
+ * As bordas de célula começam exatamente na borda esquerda de cada coluna, então os X de início
+ * agrupados SÃO as colunas. O agrupamento com tolerância é necessário e não decorativo: na primeira
+ * página dos PDFs reais a mesma coluna aparece como 34,3 e 35,1, e tratá-las como duas quebraria a
+ * atribuição de todo o cabeçalho.
+ *
+ * Considera todas as páginas juntas — a última costuma ter uma linha só, e uma página não é amostra.
+ */
+export function detectColumns(pages: readonly LcrRawPage[]): number[] {
+  const xs: number[] = [];
+  for (const page of pages) {
+    for (const s of page.segments) {
+      const t = inTextSpace(s);
+      if (Math.abs(t.y1 - t.y2) > FLATNESS) continue;
+      xs.push(Math.min(t.x1, t.x2));
+    }
+  }
+  return columnStarts(xs);
+}
+
+/** Por que a grade foi recusada. Distinguir os três importa para o diagnóstico, não para o app. */
+export type LcrFallbackReason =
+  /**
+   * Nenhuma fonte DESENHADA explicou o documento — nem traços, nem faixas.
+   *
+   * O rótulo é exato, e não "o limiar ganhou por pontos", por causa de uma invariante: as bandas
+   * mais o que sobra acima e abaixo particionam TODOS os itens, e uma âncora vive inteira numa
+   * linha, então nenhuma fronteira horizontal a destrói. Logo `total` é o número de âncoras do
+   * documento, igual para qualquer fonte — medido nos PDFs reais: 510 tanto por traços quanto por
+   * faixas. Como validade exige `explained === total`, toda fonte válida empata, o desempate por
+   * ordem entrega ao desenho, e `gap` só vence quando nenhum desenho é válido.
+   *
+   * Se um dia `total` passar a depender das fronteiras, esta conclusão cai junto e o rótulo vira
+   * mentira.
+   */
+  | 'no-valid-source'
+  /** As fronteiras servem, mas não há traços de onde deduzir as colunas. */
+  | 'columns'
+  /** Fronteiras e colunas servem, mas a leitura por célula produziu menos registros do que existem. */
+  | 'unexplained';
+
+export type LcrGridResult =
+  | { ok: true; records: LcrRecord[] }
+  | { ok: false; reason: LcrFallbackReason };
+
+/**
+ * Lê um documento inteiro pela grade, ou diz por que ela não se aplica (AC7, AC8).
+ *
+ * Null é resposta legítima, não erro: quem chama cai no `parseLcrText` sobre o texto reconstruído,
+ * que é o comportamento de hoje. Vale para tabela sem separador desenhado — em que cada linha cabe
+ * numa linha de texto e o limiar de gap acerta por construção — e para qualquer PDF cujo desenho
+ * não reconheçamos.
+ *
+ * O registro partido entre páginas é meio-termo, por necessidade: os dados órfãos estão fora da
+ * grade e só o `parseLcrText` sabe lê-los, mas o NOME continua vindo da coluna de nome. Remontar os
+ * dois pedaços como texto e mandar tudo ao parser antigo devolveria a contaminação que a grade
+ * existe para eliminar — foi o que aconteceu, e um `m` de e-mail do vizinho virou sobrenome.
+ *
+ * Devolve só os registros: a contagem declarada vem da linha "Count/Contagem/Recuento", que é
+ * texto solto fora da tabela e portanto não é assunto da grade.
+ */
+export function readGrid(pages: readonly LcrRawPage[]): LcrGridResult {
+  const choice = chooseBoundaries(pages);
+  if (choice.source === 'gap') return { ok: false, reason: 'no-valid-source' };
+
+  const columns = detectColumns(pages);
+  if (columns.length < 2) return { ok: false, reason: 'columns' };
+
+  const banded = pages.map((page, i) => bandsOf(page, choice.perPage[i]));
+  const orphans = pageBreakOrphans(
+    banded.map((b) => ({ bands: b.map((x) => x.text), above: b.above, below: b.below }))
+  );
+
+  const records: LcrRecord[] = [];
+  banded.forEach((bands, i) => {
+    bands.forEach((band, k) => {
+      const orphan = k === 0 ? orphans.get(i) : undefined;
+      if (orphan) {
+        const [data] = parseLcrText(orphan).records;
+        if (!data) return;
+        const name = joinTextRun(band.items.filter((o) => o.x < columns[1] - X_TOLERANCE)).trim();
+        records.push({ ...data, name: name || data.name });
+        return;
+      }
+      const record = readCells(band.items, columns);
+      if (record) records.push(record);
+    });
+  });
+
+  // Última conferência, contra a mesma conta que aprovou as fronteiras: a leitura por célula pode
+  // falhar por um motivo que a partição não enxerga — colunas mal detectadas, por exemplo, devolvem
+  // null em toda banda e produziriam um import vazio que se declara bem-sucedido. Se o número de
+  // registros lidos não bate com o de âncoras do documento, a grade não se aplica.
+  return records.length === choice.explained
+    ? { ok: true, records }
+    : { ok: false, reason: 'unexplained' };
+}

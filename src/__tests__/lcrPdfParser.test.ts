@@ -158,7 +158,7 @@ describe('parseLcrText — edge cases', () => {
     const txt = [
       'Nome Sexo Idade',
       'Ciclana Beltrana M 57 17 jun 1969 (11) 90000-0019 c@example.com',
-      'Soares', // wrapped tail, no comma anywhere
+      'Delta', // wrapped tail, no comma anywhere
       'Outro, Joao M 40 2 fev 1984',
     ].join('\n');
     const r = parseLcrText(txt);
@@ -179,6 +179,49 @@ describe('parseLcrText — edge cases', () => {
     // No comma anywhere — the tail still joins.
     expect(r.records[1].name).toBe('Ciclana Beltrana Delta de Almeida');
     expect(lcrNameToFirstLast(r.records[1].name)).toBe('Ciclana Beltrana Delta de Almeida');
+  });
+
+  // Row-grouping joins a record's lines by Y, so an address printed on a line ABOVE the anchor puts
+  // its head before the gender token and its wrapped tail after the phone — where name overflow
+  // lives. Read as a surname, the tail reached the review screen glued to the name. Every wrap
+  // point seen in the reference PDFs is covered; the data below is invented, the SHAPES are real.
+  describe.each([
+    ['before the dot', 'a.pessoa@gmai', 'l.com'],
+    ['after the dot', 'a.pessoa@gmail.', 'com'],
+    ['after the dot, uppercase', 'a.pessoa@HOTMAIL.', 'COM'],
+    // The nastiest: the head ends in ".co", a real TLD, so it does not look truncated at all.
+    ['inside a TLD that is itself valid', 'a.pessoa@gmail.co', 'm'],
+    ['mid-TLD', 'a.pessoa@gmail.c', 'om'],
+    ['before a country suffix', 'a.pessoa@empresa.com.', 'br'],
+  ])('a wrapped email tail (%s)', (_desc, head, tail) => {
+    const txt = [
+      'Nome Sexo Idade',
+      `Exemplo, Fulana ${head} F 26 3 mar 2000 (11) 90000-0001 ${tail}`,
+    ].join('\n');
+
+    it('does not become part of the name', () => {
+      expect(parseLcrText(txt).records[0].name).toBe('Exemplo, Fulana');
+    });
+
+    it('does not cost the record its phone', () => {
+      expect(parseLcrText(txt).records[0].rawPhone).toBe('(11) 90000-0001');
+    });
+  });
+
+  it('keeps name overflow that only LOOKS like an email tail', () => {
+    // Two tokens cannot be one wrapped address, and a Capitalized word is not a TLD fragment —
+    // both must survive, or the fix would silently truncate long names.
+    const txt = [
+      'Nome Sexo Idade',
+      'Exemplo, Fulana f@exemplo.com F 43 13 abr 1983 (11) 90000-0002 Sobrenome de',
+      'Outro, Beltrano b@exemplo.com M 35 10 set 1990 (11) 90000-0003 Sobrenome',
+    ].join('\n');
+    const r = parseLcrText(txt);
+
+    expect(r.records.map((x) => x.name)).toEqual([
+      'Exemplo, Fulana Sobrenome de',
+      'Outro, Beltrano Sobrenome',
+    ]);
   });
 
   it('strips email/phone residue that interleaves into a name', () => {

@@ -218,3 +218,65 @@ Built in 6 atomic commits (`27c01e3`..`aa68757`), fresh subagent per step, kept 
 - `f021-topic-library-overhaul.test.ts` asserts source text (`function normalizeForSearch`) via
   fs/string-matching — against the "behavioral tests only" rule; keeps dead code alive in
   `useTopics.ts`. Worth revisiting (test + dead code) as a future cleanup.
+
+## Grade da tabela no import de PDF (`specs/pdf-import-table-grid.md`)
+
+Spec e plano aprovados 2026-08-17. **Os 7 passos estão concluídos e commitados.**
+
+O import deixou de inferir estatisticamente onde um registro termina e passou a ler as fronteiras
+que o gerador do PDF desenha; com as colunas conhecidas, cada campo vem da sua célula.
+
+1. A WebView devolve dados brutos (itens de texto, segmentos, retângulos, CTM). Neutro e verificado
+   byte a byte. Removeu a duplicação literal do `ROW_GAP_THRESHOLD_JS`.
+2. Fronteiras candidatas de traços e faixas, sem cor/espessura/comprimento fixos: a cobertura é da
+   UNIÃO dos traços de uma altura, relativa à largura de texto daquela página.
+3. Validação pelo próprio dado (banda com 2+ registros é veto) e escolha da fonte por documento.
+4. Fusão dos registros partidos entre páginas (órfão abaixo da grade + primeira banda da seguinte).
+5. Leitura por célula — a contaminação de coluna deixa de ser possível, em vez de ser tratada.
+6. `readLcrPages` como porta única, com fallback e `usedGrid`.
+7. `scripts/check-lcr-pdfs.mjs` roda os dois caminhos sobre os PDFs locais.
+
+**Medido nos 8 PDFs:** grade usada em todos, 8/8 batem a contagem declarada, zero nomes com resíduo
+de outra coluna, 39 registros partidos recuperados. As 12 diferenças em relação ao caminho antigo
+são todas melhorias (6 ganharam telefone, 2 nomes ficaram completos, 2 perderam resíduo do vizinho).
+
+### O que ainda NÃO foi provado
+- ⚠️ **Nada disso foi testado em aparelho.** `PdfTextExtractor.tsx` não roda no jest, e o contrato
+  da WebView mudou por completo. A validação nos 8 PDFs usa `scripts/lcr-raw.mjs`, que **replica**
+  o bootstrap em Node — se os dois divergirem, a verificação mente. Risco aberto nº 1.
+- O payload do `postMessage` cresceu de ~50KB de texto para ~2500–3500 itens mais a geometria.
+  Sem AC de desempenho (decisão do usuário), mas se a WebView engasgar é aqui.
+- `verify-change` (estágio 4) ainda não rodou.
+- Dois caminhos vivos: o fallback mantém `parseLcrText`, `rowGapThreshold`, `isEmailTail` e
+  `cleanName` em uso. Correção de domínio pode precisar ser feita duas vezes.
+
+## Canal de diagnóstico (`specs/app-health-events.md`)
+
+Spec, ADR-007 e plano aprovados 2026-08-17. **Os 4 passos estão concluídos e commitados.**
+
+O fallback do import de PDF era silencioso; agora ele deixa rastro numa tabela que só o
+desenvolvedor lê.
+
+1. Migration `048_app_health_events.sql` — tabela aditiva, INSERT sem `can_write()` (deliberado, ver
+   ADR-007), sem policy de SELECT/UPDATE/DELETE, poda de 180 dias no padrão do 045.
+2. `readGrid` passa a dizer POR QUE recusou: `no-valid-source`, `columns` ou `unexplained`.
+3. `src/lib/appHealth.ts` — `reportHealthEvent`, fire-and-forget, fora da fila offline, com filtro
+   de privacidade que só deixa passar número finito e booleano.
+4. `reportPdfImportHealth` decide o que emitir; `PdfImportModal` só chama.
+
+**Verificado contra o banco de STAGING** (não em CI — não existe harness de RLS no projeto):
+observer insere na própria ala; insert para outra ala é recusado; como `authenticated` a tabela
+mostra 0 linhas e apaga 0; função de poda existe e é `SECURITY DEFINER`.
+
+**Nos 8 PDFs de referência o canal fica calado** — grade usada em todos, contagens batendo.
+
+### Pendências e armadilhas
+- ⚠️ **`pg_cron` não está instalado no staging**: a poda existe mas NÃO está agendada. Agendar pelo
+  dashboard, como já acontece com `process-notifications` e o job do 045.
+- ⚠️ **Aplicar a `048` em produção é item do cutover v2.** Até lá o canal fica INERTE, porque em
+  staging não se importa PDF real. Se isso escapar da lista do passo 4, o canal nunca liga.
+- ⚠️ **Nunca usar `.select()` na escrita.** Sem policy de SELECT, o Postgres recusa o RETURNING e
+  toda escrita falha — em silêncio, porque o erro é engolido por desenho. Há teste prendendo isso.
+- Não registramos imports bem-sucedidos (decisão do usuário): sem denominador, distinguir "um PDF
+  esquisito" de "o layout mudou" depende de contar `ward_id` distintos.
+- `verify-change` desta mudança ainda não rodou.

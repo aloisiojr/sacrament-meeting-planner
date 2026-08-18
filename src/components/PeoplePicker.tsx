@@ -494,9 +494,8 @@ export function PeoplePicker({
             data={rows}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            // Arrastar devolve a tela inteira sem precisar tocar em nada; `handled` garante que um
-            // toque numa pessoa ainda seleciona, em vez de ser gasto fechando o teclado.
-            keyboardDismissMode="on-drag"
+            // `handled` garante que um toque numa pessoa selecione, em vez de ser gasto fechando
+            // o teclado — sem isso o usuário tocaria duas vezes em tudo.
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.empty}>

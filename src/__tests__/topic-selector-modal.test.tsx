@@ -170,12 +170,10 @@ describe('keyboard reachability', () => {
   });
 });
 
-describe('teclado: arrastar a lista fecha o teclado (AC2, AC3)', () => {
-  it('a lista fecha o teclado quando é arrastada, igual ao seletor de pessoas', async () => {
+describe('teclado: o toque numa linha não é gasto fechando o teclado (AC2, AC3)', () => {
+  it('o toque continua chegando à linha com o teclado aberto', async () => {
     await render();
 
-    expect(screen.getByTestId('topic-selector-list').props.keyboardDismissMode).toBe('on-drag');
-    // O que já funcionava não pode regredir: o toque continua chegando à linha.
     expect(screen.getByTestId('topic-selector-list').props.keyboardShouldPersistTaps).toBe('handled');
   });
 });

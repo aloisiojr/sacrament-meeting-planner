@@ -16,15 +16,14 @@
 
 1. **`fix(people-picker): a lista encolhe quando o teclado abre`**
    Envolver o `FlatList` de `PeoplePicker` num `KeyboardAvoider`, como o seletor de temas faz.
-   — covers: AC1, AC5
+   — covers: AC1, AC4
    — tests: em `people-picker.test.tsx`, a lista está dentro do avoider (aninhamento por testID);
    a suíte existente do componente continua verde, provando que envolver não quebrou nada.
 
-2. **`feat(pickers): arrastar a lista fecha o teclado`**
-   `keyboardDismissMode="on-drag"` nos dois `FlatList`.
-   — covers: AC2, AC3, AC4
-   — tests: os dois seletores expõem o modo de fechar ao arrastar; e — o que é comportamento de
-   verdade — tocar numa linha com `keyboardShouldPersistTaps="handled"` seleciona o item, nos dois.
+2. **`feat(pickers): arrastar a lista fecha o teclado`** — ⚠️ **REVERTIDO** (usuário testou a ideia
+   e não gostou, 2026-08-18). O `keyboardDismissMode` saiu dos dois componentes. Ficou o teste de
+   que um toque numa linha seleciona com o teclado aberto, que não existia antes.
+   — covers: AC2, AC3
 
 ## AC → coverage matrix
 
@@ -32,18 +31,14 @@
 |----|------|------|
 | AC1 | 1 | aninhamento no `people-picker.test.tsx` + **conferência no aparelho** (ver Riscos) |
 | AC2 | 2 | suíte do `topic-selector-modal` verde + o toque continua selecionando |
-| AC3 | 2 | os dois seletores expõem `on-drag` |
-| AC4 | 2 | tocar numa linha seleciona, nos dois seletores |
-| AC5 | 1, 2 | as duas telas passam a usar o mesmo mecanismo, afirmado nos dois arquivos |
+| AC3 | 2 | tocar numa linha seleciona, nos dois seletores |
+| AC4 | 1 | as duas telas passam a usar o mesmo mecanismo |
 
 ## Risks / deploys
 
 - **O AC1 não é observável em CI.** Não há teclado virtual no jest; o teste prende a presença e o
   encaixe do container, o que pega remoção acidental mas não prova que o último item ficou visível.
   Conferir no aparelho, em iOS **e** Android — os mecanismos são distintos.
-- **`on-drag` no Android** é suportado pelo `FlatList`, mas o comportamento não é idêntico ao do
-  iOS (lá não há o modo interativo). Se incomodar no aparelho, a correção é restringir por
-  plataforma — decidir com o aparelho na mão.
 - **Envolver o `FlatList` mexe no layout.** O `KeyboardAvoider` usa `flex: 1`; se algum ancestral do
   `PeoplePicker` não propagar altura, a lista pode colapsar. É o risco real deste passo, e aparece
   imediatamente na tela — não em silêncio.

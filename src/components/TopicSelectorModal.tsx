@@ -269,9 +269,6 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('common.noResults')}</Text>
               </View>
             }
-            // Mesmo comportamento do seletor de pessoas: a queixa original era as duas telas
-            // divergirem, então mudar só uma delas trocaria a divergência de lado.
-            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           />
         </KeyboardAvoider>

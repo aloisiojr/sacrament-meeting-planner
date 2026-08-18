@@ -6,14 +6,12 @@ No seletor de pessoas, com o teclado aberto, rolar a lista até o fim não mostr
 lista corre por trás do teclado. No seletor de temas, a mesma ação funciona. São dois modais com a
 mesma forma — busca no topo, lista embaixo — e o usuário percebeu a diferença entre eles.
 
-Além de igualar as duas telas, arrastar a lista passa a fechar o teclado, devolvendo a tela inteira
-sem precisar tocar em nada.
+A correção é igualar as duas telas: a lista encolhe quando o teclado abre, e todo item continua
+alcançável rolando.
 
 ## In scope / Out of scope
 
 - **In:** `src/components/PeoplePicker.tsx` — a lista passa a encolher quando o teclado abre.
-- **In:** fechar o teclado ao arrastar a lista, **nos dois** seletores, para não trocar uma
-  divergência por outra.
 - **Out:** `HymnSelector`. Ele não tem campo de busca — o teclado nunca aparece ali, então o defeito
   não existe. Verificado, não suposto.
 - **Out:** qualquer mudança de layout, ordenação ou conteúdo das listas.
@@ -39,11 +37,9 @@ sem precisar tocar em nada.
   the system SHALL manter o último item alcançável.
 - AC2: WHILE o teclado está aberto no seletor de temas, the system SHALL continuar se comportando
   como hoje — este é o caso que já funciona e não pode regredir.
-- AC3: WHEN o usuário arrasta a lista de qualquer um dos dois seletores, the system SHALL fechar o
-  teclado.
-- AC4: WHILE o teclado está aberto, WHEN o usuário toca num item da lista, the system SHALL
+- AC3: WHILE o teclado está aberto, WHEN o usuário toca num item da lista, the system SHALL
   selecionar esse item, e SHALL NOT gastar o toque apenas fechando o teclado.
-- AC5: The system SHALL usar o mesmo mecanismo nos dois seletores, de modo que a diferença relatada
+- AC4: The system SHALL usar o mesmo mecanismo nos dois seletores, de modo que a diferença relatada
   deixe de existir em vez de trocar de lado.
 
 ## Open questions
@@ -52,10 +48,18 @@ Nenhuma.
 
 ## Notes
 
+**Reversão (2026-08-18): o teclado NÃO fecha ao arrastar.** A primeira versão deste spec, aprovada
+com essa opção, incluía um AC para fechar o teclado ao rolar a lista, nos dois seletores. O usuário
+testou a ideia e não gostou; o AC foi removido e o `keyboardDismissMode` saiu dos dois componentes.
+O que ficou é apenas o que resolve a queixa original: a lista encolhe.
+
+Ficou de pé o que aquele passo trouxe de útil por tabela — o teste de que um toque numa linha
+seleciona com o teclado aberto (AC3), que antes não existia em nenhum dos dois seletores.
+
 **O que os testes conseguem provar aqui, e o que não conseguem.** O jest não tem teclado virtual,
 então "o último item ficou visível" (AC1) não é observável em CI — é conferência no aparelho, como
 já registrado em `specs/keyboard-safe-form-fields.md`. O que dá para prender é a presença e o
-encaixe do container, e o AC4, que é comportamento de verdade: tocar numa linha seleciona a pessoa.
+encaixe do container, e o AC3, que é comportamento de verdade: tocar numa linha seleciona a pessoa.
 `src/__tests__/keyboard-safe-forms.test.tsx` já estabelece esse padrão e o justifica.
 
 **Sem i18n, sem permissão, sem migração, sem deploy.** Cliente apenas, dois arquivos.

@@ -14,7 +14,7 @@
  */
 import { rowGapThreshold } from './lcrPdfLayout';
 import { parseLcrText, type LcrParseResult } from './lcrPdfParser';
-import { readGrid } from './lcrPdfGrid';
+import { readGrid, type LcrFallbackReason } from './lcrPdfGrid';
 
 /** Um fragmento de texto com sua posição. O pdf.js quebra por troca de fonte, então acentos vêm à parte. */
 export interface LcrTextItem {
@@ -179,6 +179,8 @@ export function buildLcrText(pages: readonly LcrRawPage[]): string {
 export interface LcrPagesResult extends LcrParseResult {
   /** Se a grade desenhada foi usada. Sem isto, um fallback silencioso é indistinguível de sucesso. */
   usedGrid: boolean;
+  /** Por que a grade foi recusada; null quando ela foi usada. Alimenta o canal de diagnóstico. */
+  fallbackReason: LcrFallbackReason | null;
 }
 
 /**
@@ -194,7 +196,7 @@ export function readLcrPages(pages: readonly LcrRawPage[]): LcrPagesResult {
   // tabela, então a grade não a enxerga e não deveria enxergar.
   const flat = parseLcrText(buildLcrText(pages));
   const grid = readGrid(pages);
-  return grid
-    ? { records: grid, expectedCount: flat.expectedCount, usedGrid: true }
-    : { ...flat, usedGrid: false };
+  return grid.ok
+    ? { records: grid.records, expectedCount: flat.expectedCount, usedGrid: true, fallbackReason: null }
+    : { ...flat, usedGrid: false, fallbackReason: grid.reason };
 }

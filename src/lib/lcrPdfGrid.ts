@@ -392,8 +392,21 @@ export function detectColumns(pages: readonly LcrRawPage[]): number[] {
   return columnStarts(xs);
 }
 
+/** Por que a grade foi recusada. Distinguir os três importa para o diagnóstico, não para o app. */
+export type LcrFallbackReason =
+  /** Nenhuma fonte de fronteiras explicou o documento — nem traços, nem faixas. */
+  | 'no-valid-source'
+  /** As fronteiras servem, mas não há traços de onde deduzir as colunas. */
+  | 'columns'
+  /** Fronteiras e colunas servem, mas a leitura por célula produziu menos registros do que existem. */
+  | 'unexplained';
+
+export type LcrGridResult =
+  | { ok: true; records: LcrRecord[] }
+  | { ok: false; reason: LcrFallbackReason };
+
 /**
- * Lê um documento inteiro pela grade, ou devolve null quando ela não se aplica (AC7, AC8).
+ * Lê um documento inteiro pela grade, ou diz por que ela não se aplica (AC7, AC8).
  *
  * Null é resposta legítima, não erro: quem chama cai no `parseLcrText` sobre o texto reconstruído,
  * que é o comportamento de hoje. Vale para tabela sem separador desenhado — em que cada linha cabe
@@ -408,12 +421,12 @@ export function detectColumns(pages: readonly LcrRawPage[]): number[] {
  * Devolve só os registros: a contagem declarada vem da linha "Count/Contagem/Recuento", que é
  * texto solto fora da tabela e portanto não é assunto da grade.
  */
-export function readGrid(pages: readonly LcrRawPage[]): LcrRecord[] | null {
+export function readGrid(pages: readonly LcrRawPage[]): LcrGridResult {
   const choice = chooseBoundaries(pages);
-  if (choice.source === 'gap') return null;
+  if (choice.source === 'gap') return { ok: false, reason: 'no-valid-source' };
 
   const columns = detectColumns(pages);
-  if (columns.length < 2) return null;
+  if (columns.length < 2) return { ok: false, reason: 'columns' };
 
   const banded = pages.map((page, i) => bandsOf(page, choice.perPage[i]));
   const orphans = pageBreakOrphans(
@@ -440,5 +453,7 @@ export function readGrid(pages: readonly LcrRawPage[]): LcrRecord[] | null {
   // falhar por um motivo que a partição não enxerga — colunas mal detectadas, por exemplo, devolvem
   // null em toda banda e produziriam um import vazio que se declara bem-sucedido. Se o número de
   // registros lidos não bate com o de âncoras do documento, a grade não se aplica.
-  return records.length === choice.explained ? records : null;
+  return records.length === choice.explained
+    ? { ok: true, records }
+    : { ok: false, reason: 'unexplained' };
 }

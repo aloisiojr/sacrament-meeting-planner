@@ -16,6 +16,9 @@ import { readGrid } from '../lib/lcrPdfGrid';
 import { readLcrPages } from '../lib/lcrPdfPage';
 import type { LcrRawPage, LcrTextItem } from '../lib/lcrPdfPage';
 
+/** Os registros quando a grade se aplica, ou null quando ela foi recusada. */
+const recs = (r: ReturnType<typeof readGrid>) => (r.ok ? r.records : null);
+
 const CTM = [1, 0, 0, 1, 0, 0];
 const frag = (x: number, y: number, s: string): LcrTextItem => ({ x, y, w: s.length * 4, size: 8, s });
 
@@ -58,7 +61,7 @@ describe('registro partido entre páginas (AC9, AC10)', () => {
   it('funde os dados órfãos com o nome que abre a página seguinte', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
     const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
-    const records = readGrid([p1, p2]);
+    const records = recs(readGrid([p1, p2]));
 
     expect(records?.map((r) => r.name)).toEqual([
       'Exemplo, Fulana',
@@ -71,7 +74,7 @@ describe('registro partido entre páginas (AC9, AC10)', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
     const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(readGrid([p1, p2])?.[1]).toMatchObject({ age: 34, rawPhone: '(11) 90000-0099' });
+    expect(recs(readGrid([p1, p2]))?.[1]).toMatchObject({ age: 34, rawPhone: '(11) 90000-0099' });
   });
 
   it('descarta o rodapé antes de parear (AC10)', () => {
@@ -80,7 +83,7 @@ describe('registro partido entre páginas (AC9, AC10)', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650, rodape));
     const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(readGrid([p1, p2])?.map((r) => r.name)).toEqual([
+    expect(recs(readGrid([p1, p2]))?.map((r) => r.name)).toEqual([
       'Exemplo, Fulana',
       'Exemplo, Beltrano',
       'Exemplo, Ciclana',
@@ -94,7 +97,7 @@ describe('registro partido entre páginas (AC9, AC10)', () => {
     const p2 = pagina([{ nome: 'Exemplo, Beltrano' }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
     p2.items.push(frag(419, 706, 'vizinho@gmail.co'), frag(419, 694, 'm'));
 
-    expect(readGrid([p1, p2])?.[1].name).toBe('Exemplo, Beltrano');
+    expect(recs(readGrid([p1, p2]))?.[1].name).toBe('Exemplo, Beltrano');
   });
 });
 
@@ -105,7 +108,7 @@ describe('formas que não casam: não funde E cai no fallback (AC11)', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
     const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }, { nome: 'Exemplo, Ciclana', idade: 65 }]);
 
-    expect(readGrid([p1, p2])).toBeNull();
+    expect(readGrid([p1, p2]).ok).toBe(false);
   });
 
   it('e nesse caso nenhum registro é perdido', () => {
@@ -128,19 +131,19 @@ describe('formas que não casam: não funde E cai no fallback (AC11)', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], [frag(42, 650, 'de Souza')]);
     const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }]);
 
-    expect(readGrid([p1, p2])).toBeNull();
+    expect(readGrid([p1, p2]).ok).toBe(false);
   });
 
   it('a última página não tenta fundir, porque não há seguinte', () => {
     const so = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }], orfao(650));
 
-    expect(readGrid([so])).toBeNull();
+    expect(readGrid([so]).ok).toBe(false);
   });
 
   it('página sem nada fora da grade é lida normalmente', () => {
     const p1 = pagina([{ nome: 'Exemplo, Fulana', idade: 47 }]);
     const p2 = pagina([{ nome: 'Exemplo, Beltrano', idade: 30 }]);
 
-    expect(readGrid([p1, p2])?.map((r) => r.name)).toEqual(['Exemplo, Fulana', 'Exemplo, Beltrano']);
+    expect(recs(readGrid([p1, p2]))?.map((r) => r.name)).toEqual(['Exemplo, Fulana', 'Exemplo, Beltrano']);
   });
 });

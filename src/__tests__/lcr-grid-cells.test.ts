@@ -10,6 +10,9 @@
 import { readCells, readGrid } from '../lib/lcrPdfGrid';
 import type { LcrTextItem } from '../lib/lcrPdfPage';
 
+/** Os registros quando a grade se aplica, ou null quando ela foi recusada. */
+const recs = (r: ReturnType<typeof readGrid>) => (r.ok ? r.records : null);
+
 /** Colunas dos PDFs reais, em espaço de texto. */
 const COLS = [42, 150, 220, 268, 337, 419];
 
@@ -130,7 +133,7 @@ describe('readGrid — o registro partido também tira o nome da coluna', () => 
       ],
       segments: [710, 685, 660].flatMap(cellRules), rects: [],
     };
-    const records = readGrid([p1, p2]);
+    const records = recs(readGrid([p1, p2]));
 
     expect(records?.map((r) => r.name)).toEqual(['Exemplo, Fulana', 'Exemplo, Beltrano', 'Exemplo, Ciclana']);
     expect(records?.[1]).toMatchObject({ age: 34, rawPhone: '(11) 90000-0002' });

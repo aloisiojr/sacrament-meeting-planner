@@ -422,11 +422,18 @@ export function InviteManagementSection() {
             </Text>
             <View style={styles.details}>
               <View style={styles.speakerNameRow}>
-                <Text style={[styles.speakerName, { color: colors.text }]} numberOfLines={1}>
+                <Text
+                  testID="invite-speaker-name"
+                  style={[styles.speakerName, { color: colors.text }]}
+                  numberOfLines={1}
+                >
                   {speech.speaker_name}
                 </Text>
                 {topicMissing && (
-                  <Text style={[styles.topicMissing, { color: colors.error }]}>
+                  <Text
+                    testID="invite-topic-missing"
+                    style={[styles.topicMissing, { color: colors.error }]}
+                  >
                     {t('invite.topicMissing')}
                   </Text>
                 )}
@@ -531,6 +538,9 @@ const styles = StyleSheet.create({
   speakerName: {
     fontSize: 15,
     fontWeight: '500',
+    // No RN o flexShrink é 0 por padrão, ao contrário da web: sem isto o nome mantém a largura
+    // intrínseca, a row transborda e o aviso ao lado sai por baixo do botão de ação.
+    flexShrink: 1,
   },
   speakerNameRow: {
     flexDirection: 'row',
@@ -540,6 +550,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginLeft: 6,
+    // Explícito embora seja o padrão: é o aviso que diz por que o convite não pode ser enviado, e
+    // quem cede espaço tem de ser o nome. Deixar implícito convidaria a "arrumar" isto junto.
+    flexShrink: 0,
   },
   speechNum: {
     fontSize: 12,

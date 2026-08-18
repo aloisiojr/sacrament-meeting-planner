@@ -24,15 +24,28 @@ jest.mock('expo-constants', () => ({
 
 const mockInsert = jest.fn();
 const mockSelect = jest.fn();
-const mockEnqueue = jest.fn();
-jest.mock('../lib/offlineQueue', () => ({ enqueue: (...a: unknown[]) => mockEnqueue(...a) }));
 jest.mock('../lib/supabase', () => ({
   supabase: { from: jest.fn(() => ({ insert: (...a: unknown[]) => mockInsert(...a) })) },
 }));
 
+/**
+ * O `insert` devolve sempre um thenable que TAMBÉM oferece `.select()`.
+ *
+ * Não é capricho: com um `mockRejectedValue` simples, acrescentar `.select()` ao código deixaria uma
+ * promise rejeitada órfã e o Node derrubaria o worker do jest — o mutante seria "detectado" por um
+ * crash, e o próximo mantenedor receberia um diagnóstico errado sobre o que quebrou. Assim a
+ * asserção falha, legivelmente.
+ */
+const respondeCom = (valor: unknown, rejeita = false) => ({
+  select: mockSelect,
+  then: (ok: (v: unknown) => void, falha: (e: unknown) => void) =>
+    (rejeita ? falha(valor) : ok(valor)),
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
-  mockInsert.mockResolvedValue({ error: null });
+  mockSelect.mockResolvedValue({ error: null });
+  mockInsert.mockReturnValue(respondeCom({ error: null }));
 });
 
 describe('sanitizeHealthDetails — só número e conjunto fechado (AC10)', () => {
@@ -80,7 +93,9 @@ describe('reportHealthEvent — a escrita', () => {
   });
 
   it('NÃO pede a linha de volta — a tabela não tem policy de SELECT', async () => {
-    mockInsert.mockReturnValue({ select: mockSelect, then: (r: (v: unknown) => void) => r({ error: null }) });
+    // O retorno é um thenable que TAMBÉM oferece .select(), resolvendo normalmente: se alguém
+    // acrescentar .select() no código, esta asserção falha de forma legível. Um mock que quebrasse
+    // nesse caso derrubaria o worker do jest e daria ao próximo mantenedor um diagnóstico errado.
     await reportHealthEvent('ward-1', 'pdf_import_fallback', { pages: 14 });
 
     expect(mockSelect).not.toHaveBeenCalled();
@@ -89,13 +104,13 @@ describe('reportHealthEvent — a escrita', () => {
 
 describe('reportHealthEvent — nunca atrapalha quem o chama (AC11, AC12)', () => {
   it('não rejeita quando o Supabase devolve erro', async () => {
-    mockInsert.mockResolvedValue({ error: { message: 'row-level security' } });
+    mockInsert.mockReturnValue(respondeCom({ error: { message: 'row-level security' } }));
 
     await expect(reportHealthEvent('ward-1', 'pdf_import_fallback', { pages: 1 })).resolves.toBeUndefined();
   });
 
   it('não rejeita quando a chamada explode', async () => {
-    mockInsert.mockRejectedValue(new Error('network down'));
+    mockInsert.mockReturnValue(respondeCom(new Error('network down'), true));
 
     await expect(reportHealthEvent('ward-1', 'pdf_import_fallback', { pages: 1 })).resolves.toBeUndefined();
   });
@@ -105,18 +120,22 @@ describe('reportHealthEvent — nunca atrapalha quem o chama (AC11, AC12)', () =
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('não entra na fila offline (AC12)', async () => {
-    // Um diagnóstico reenviado três dias depois, fora de contexto, é ruído. O import já é
-    // online-only, então perder o evento quando não há rede é o comportamento certo.
+  it('escreve direto no Supabase, sem intermediário que pudesse enfileirar (AC12)', async () => {
+    // A versão anterior deste teste mockava offlineQueue e afirmava que `enqueue` não foi chamado —
+    // vacuamente verdadeiro, porque appHealth nem importa esse módulo. Passaria contra qualquer
+    // implementação que enfileirasse por outro caminho. O que dá para afirmar de verdade é que a
+    // escrita vai direto à tabela na mesma chamada, e é isso que garante que nada é reenviado
+    // depois: um diagnóstico fora de contexto três dias atrasado é ruído.
     await reportHealthEvent('ward-1', 'pdf_import_fallback', { pages: 1 });
 
-    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
-  it('também não enfileira quando a escrita falha', async () => {
-    mockInsert.mockRejectedValue(new Error('network down'));
+  it('quando a escrita falha, o evento é PERDIDO e não guardado para depois', async () => {
+    mockInsert.mockReturnValue(respondeCom(new Error('network down'), true));
     await reportHealthEvent('ward-1', 'pdf_import_fallback', { pages: 1 });
 
-    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(mockInsert).toHaveBeenCalledTimes(1); // uma tentativa, sem retry nem fila
   });
 });

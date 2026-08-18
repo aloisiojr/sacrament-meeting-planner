@@ -24,7 +24,10 @@
    — covers: AC1, AC2, AC3, AC4, AC5
    — verificação: **contra o banco de staging**, não em CI (ver Riscos). Aplicar via Management API
    e conferir: a tabela existe; um insert com `ward_id` de outra ala é recusado; um SELECT como
-   `authenticated` devolve zero linhas; a função de poda existe e está agendada.
+   `authenticated` devolve zero linhas; a função de poda existe e funciona.
+   ⚠️ Corrigido após a verificação: `pg_cron` NÃO está instalado no staging, então a poda **não
+   fica agendada** pela migration — a função existe e precisa ser agendada pelo dashboard, como já
+   acontece com o job do 045. Até lá, AC5 não está em vigor.
 
 2. **`feat(pdf): readGrid informa por que recusou a grade`**
    `readGrid` deixa de devolver `null` cru e passa a devolver o motivo — sem fonte válida, colunas

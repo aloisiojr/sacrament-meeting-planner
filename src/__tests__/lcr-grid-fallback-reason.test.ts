@@ -8,7 +8,8 @@
  *
  * Nenhum comportamento muda aqui: só passa a viajar uma informação que era descartada.
  */
-import { readGrid } from '../lib/lcrPdfGrid';
+import { bandsOf, readGrid } from '../lib/lcrPdfGrid';
+import { countAnchors } from '../lib/lcrPdfParser';
 import { readLcrPages } from '../lib/lcrPdfPage';
 import type { LcrRawPage, LcrTextItem } from '../lib/lcrPdfPage';
 
@@ -84,5 +85,21 @@ describe('readLcrPages — repassa o motivo para quem registra', () => {
 
     expect(r.usedGrid).toBe(false);
     expect(r.fallbackReason).toBe('no-valid-source');
+  });
+});
+
+describe('o rótulo no-valid-source é exato, não aproximado', () => {
+  it('a contagem de âncoras do documento não depende de onde caem as fronteiras', () => {
+    // É esta invariante que sustenta o rótulo: se toda fonte válida explica o mesmo total, elas
+    // empatam, o desempate entrega ao desenho, e o limiar só vence quando nenhum desenho serve.
+    const p = page({ items: registros(6), segments: fronteiras(6).flatMap(cellRules) });
+    const total = (fronteirasUsadas: number[]) => {
+      const b = bandsOf(p, fronteirasUsadas);
+      return b.reduce((n, x) => n + countAnchors(x.text), 0) + countAnchors(b.above) + countAnchors(b.below);
+    };
+
+    expect(total(fronteiras(6))).toBe(6);
+    expect(total(fronteiras(6).slice(0, -2))).toBe(6); // fronteiras a menos
+    expect(total([])).toBe(6); // nenhuma fronteira
   });
 });

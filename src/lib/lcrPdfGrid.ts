@@ -394,7 +394,19 @@ export function detectColumns(pages: readonly LcrRawPage[]): number[] {
 
 /** Por que a grade foi recusada. Distinguir os três importa para o diagnóstico, não para o app. */
 export type LcrFallbackReason =
-  /** Nenhuma fonte de fronteiras explicou o documento — nem traços, nem faixas. */
+  /**
+   * Nenhuma fonte DESENHADA explicou o documento — nem traços, nem faixas.
+   *
+   * O rótulo é exato, e não "o limiar ganhou por pontos", por causa de uma invariante: as bandas
+   * mais o que sobra acima e abaixo particionam TODOS os itens, e uma âncora vive inteira numa
+   * linha, então nenhuma fronteira horizontal a destrói. Logo `total` é o número de âncoras do
+   * documento, igual para qualquer fonte — medido nos PDFs reais: 510 tanto por traços quanto por
+   * faixas. Como validade exige `explained === total`, toda fonte válida empata, o desempate por
+   * ordem entrega ao desenho, e `gap` só vence quando nenhum desenho é válido.
+   *
+   * Se um dia `total` passar a depender das fronteiras, esta conclusão cai junto e o rótulo vira
+   * mentira.
+   */
   | 'no-valid-source'
   /** As fronteiras servem, mas não há traços de onde deduzir as colunas. */
   | 'columns'

@@ -31,6 +31,7 @@ import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { KeyboardAvoider } from './KeyboardAvoider';
 import { SearchInput } from './SearchInput';
 import { CheckSquareIcon, SquareIcon, PencilIcon, PlusIcon } from './icons';
 import {
@@ -482,20 +483,27 @@ export function PeoplePicker({
           </View>
         ) : null}
 
-        <FlatList
-          testID="people-picker-list"
-          data={rows}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {t('common.noResults')}
-              </Text>
-            </View>
-          }
-        />
+        {/*
+          A busca recebe foco ao abrir, então o teclado sobe junto com o modal e não sai mais. Sem
+          encolher a área rolável, o fim da lista fica atrás dele para sempre. O seletor de temas já
+          fazia isto; a diferença entre as duas telas era só a ausência deste wrapper aqui.
+        */}
+        <KeyboardAvoider testID="people-picker-keyboard-avoider">
+          <FlatList
+            testID="people-picker-list"
+            data={rows}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('common.noResults')}
+                </Text>
+              </View>
+            }
+          />
+        </KeyboardAvoider>
       </View>
 
       {canManage ? (

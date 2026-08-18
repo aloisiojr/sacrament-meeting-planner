@@ -5,7 +5,7 @@
  * mocked per-file; pure utils (getResponsibleForMap/filterMembers) stay real via importOriginal.
  */
 import React from 'react';
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
+import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { Member } from '../types/database';
 // jest.mock calls below are hoisted above this import, so the mocks still apply.
@@ -565,5 +565,26 @@ describe('multiSelect draft (recognition)', () => {
       expect(onConfirmMulti).not.toHaveBeenCalled();
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+/**
+ * Alcançar o fim da lista com o teclado aberto (`specs/picker-keyboard-reachability.md`).
+ *
+ * Estrutural de propósito: o jest não tem teclado virtual, então "o último item ficou visível"
+ * (AC1) não é observável aqui — isso é conferência no aparelho, registrada no spec.
+ *
+ * O alcance exato deste teste, medido por mutação: ele PEGA a remoção do wrapper (a regressão
+ * realista, num refactor futuro) e é CEGO à substituição por um `View` com o mesmo testID — um
+ * `KeyboardAvoidingView` renderiza o mesmo host que um `View`, então nenhum teste de árvore
+ * distingue os dois. Quem garante que o container funciona são os testes do próprio
+ * `KeyboardAvoider` em `keyboard-safe-forms.test.tsx`; este aqui garante que ele está no caminho.
+ */
+describe('teclado: a lista tem de continuar alcançável (AC1, AC5)', () => {
+  it('a lista fica dentro do KeyboardAvoider, como no seletor de temas', async () => {
+    await render();
+
+    const avoider = screen.getByTestId('people-picker-keyboard-avoider');
+    expect(within(avoider).getByTestId('people-picker-list')).toBeTruthy();
   });
 });

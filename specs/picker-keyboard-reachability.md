@@ -41,6 +41,8 @@ alcançável rolando.
   selecionar esse item, e SHALL NOT gastar o toque apenas fechando o teclado.
 - AC4: The system SHALL usar o mesmo mecanismo nos dois seletores, de modo que a diferença relatada
   deixe de existir em vez de trocar de lado.
+- AC5: WHILE o teclado está aberto em qualquer um dos dois seletores, the system SHALL encostar o
+  fim da lista no teclado, sem faixa vazia entre os dois.
 
 ## Open questions
 
@@ -55,6 +57,17 @@ O que ficou é apenas o que resolve a queixa original: a lista encolhe.
 
 Ficou de pé o que aquele passo trouxe de útil por tabela — o teste de que um toque numa linha
 seleciona com o teclado aberto (AC3), que antes não existia em nenhum dos dois seletores.
+
+**A folga de 40pt (AC5) era deliberada — para formulário.** O `KeyboardAvoider` aplica um
+`keyboardVerticalOffset` de 40pt no iOS para que o campo em foco não fique colado no teclado. Numa
+lista não há campo em foco a desencostar, então os mesmos 40pt viram uma faixa morta entre o último
+item e o teclado. Os dois seletores passam `keyboardGap={0}`; os formulários seguem com o padrão.
+
+**AC5 também não é observável em CI, e por um motivo diferente do AC1.** Medido: o host renderizado
+pelo `KeyboardAvoidingView` expõe apenas `style`, `onLayout`, `testID` e `children` — o
+`keyboardVerticalOffset` é consumido internamente e não chega à árvore. Não há teste possível, nem
+com mock; é conferência no aparelho. O mesmo já valia para `behavior`, como o docblock do componente
+registra.
 
 **O que os testes conseguem provar aqui, e o que não conseguem.** O jest não tem teclado virtual,
 então "o último item ficou visível" (AC1) não é observável em CI — é conferência no aparelho, como

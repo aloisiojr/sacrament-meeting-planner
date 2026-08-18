@@ -488,7 +488,7 @@ export function PeoplePicker({
           encolher a área rolável, o fim da lista fica atrás dele para sempre. O seletor de temas já
           fazia isto; a diferença entre as duas telas era só a ausência deste wrapper aqui.
         */}
-        <KeyboardAvoider testID="people-picker-keyboard-avoider">
+        <KeyboardAvoider testID="people-picker-keyboard-avoider" keyboardGap={0}>
           <FlatList
             testID="people-picker-list"
             data={rows}

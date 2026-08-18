@@ -233,7 +233,7 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
           )}
         </View>
 
-        <KeyboardAvoider testID="topic-selector-keyboard-avoider">
+        <KeyboardAvoider testID="topic-selector-keyboard-avoider" keyboardGap={0}>
           <FlatList
             testID="topic-selector-list"
             data={filteredTopics}

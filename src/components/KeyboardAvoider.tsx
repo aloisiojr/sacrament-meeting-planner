@@ -35,7 +35,13 @@ import { KeyboardAvoidingView, Platform, type ViewStyle } from 'react-native';
  * fragile one — has a single place to change.
  */
 
-/** Extra clearance on iOS, for screens whose content actually moves. Single knob — tune here. */
+/**
+ * Extra clearance on iOS, for screens whose content actually moves. Single knob — tune here.
+ *
+ * The default suits a FORM: it keeps the focused field from sitting flush against the keyboard.
+ * A LIST wants `keyboardGap={0}` instead — there is no focused row to clear, so the same 40pt is
+ * just a dead strip between the last item and the keyboard. Both selectors pass 0.
+ */
 const IOS_KEYBOARD_GAP = 40;
 
 export function KeyboardAvoider({

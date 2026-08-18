@@ -249,3 +249,34 @@ são todas melhorias (6 ganharam telefone, 2 nomes ficaram completos, 2 perderam
 - `verify-change` (estágio 4) ainda não rodou.
 - Dois caminhos vivos: o fallback mantém `parseLcrText`, `rowGapThreshold`, `isEmailTail` e
   `cleanName` em uso. Correção de domínio pode precisar ser feita duas vezes.
+
+## Canal de diagnóstico (`specs/app-health-events.md`)
+
+Spec, ADR-007 e plano aprovados 2026-08-17. **Os 4 passos estão concluídos e commitados.**
+
+O fallback do import de PDF era silencioso; agora ele deixa rastro numa tabela que só o
+desenvolvedor lê.
+
+1. Migration `048_app_health_events.sql` — tabela aditiva, INSERT sem `can_write()` (deliberado, ver
+   ADR-007), sem policy de SELECT/UPDATE/DELETE, poda de 180 dias no padrão do 045.
+2. `readGrid` passa a dizer POR QUE recusou: `no-valid-source`, `columns` ou `unexplained`.
+3. `src/lib/appHealth.ts` — `reportHealthEvent`, fire-and-forget, fora da fila offline, com filtro
+   de privacidade que só deixa passar número finito e booleano.
+4. `reportPdfImportHealth` decide o que emitir; `PdfImportModal` só chama.
+
+**Verificado contra o banco de STAGING** (não em CI — não existe harness de RLS no projeto):
+observer insere na própria ala; insert para outra ala é recusado; como `authenticated` a tabela
+mostra 0 linhas e apaga 0; função de poda existe e é `SECURITY DEFINER`.
+
+**Nos 8 PDFs de referência o canal fica calado** — grade usada em todos, contagens batendo.
+
+### Pendências e armadilhas
+- ⚠️ **`pg_cron` não está instalado no staging**: a poda existe mas NÃO está agendada. Agendar pelo
+  dashboard, como já acontece com `process-notifications` e o job do 045.
+- ⚠️ **Aplicar a `048` em produção é item do cutover v2.** Até lá o canal fica INERTE, porque em
+  staging não se importa PDF real. Se isso escapar da lista do passo 4, o canal nunca liga.
+- ⚠️ **Nunca usar `.select()` na escrita.** Sem policy de SELECT, o Postgres recusa o RETURNING e
+  toda escrita falha — em silêncio, porque o erro é engolido por desenho. Há teste prendendo isso.
+- Não registramos imports bem-sucedidos (decisão do usuário): sem denominador, distinguir "um PDF
+  esquisito" de "o layout mudou" depende de contar `ward_id` distintos.
+- `verify-change` desta mudança ainda não rodou.

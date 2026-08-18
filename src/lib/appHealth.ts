@@ -15,6 +15,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
+import type { LcrFallbackReason } from './lcrPdfGrid';
 
 /** O que pode ir num `details`. Nada além disto sai do aparelho. */
 export type HealthDetailValue = number | boolean;
@@ -71,5 +72,57 @@ export async function reportHealthEvent(
     if (error) console.warn('Health event not recorded:', error.message);
   } catch (err) {
     console.warn('Health event not recorded:', err);
+  }
+}
+
+/** O que o import de PDF terminou entregando, na forma que o diagnóstico entende. */
+export interface PdfImportOutcome {
+  usedGrid: boolean;
+  fallbackReason: LcrFallbackReason | null;
+  records: number;
+  expectedCount: number | null;
+  pages: number;
+}
+
+/**
+ * Registra o que o import de PDF teve de digno de atenção — nada, se correu bem (AC6, AC8, AC9).
+ *
+ * Dois eventos possíveis, e eles são independentes: a grade pode ter sido recusada, a contagem pode
+ * não bater, e os dois podem acontecer no mesmo import. Separá-los importa porque significam coisas
+ * diferentes — "não entendi o desenho deste PDF" não é o mesmo problema que "li menos gente do que
+ * o próprio arquivo diz que tem".
+ *
+ * O motivo do fallback vira três booleanos em vez de uma string. Parece contorcido, e é deliberado:
+ * o filtro de privacidade recusa texto de qualquer tamanho, sem exceção nem lista de permitidos. Uma
+ * exceção para "strings que eu sei que são seguras" seria a porta pela qual um emissor futuro passa
+ * um sobrenome.
+ *
+ * Sucesso não é registrado (decisão do usuário, 2026-08-17). A consequência: distinguir "um PDF
+ * esquisito de uma ala" de "o layout do LCR mudou" depende de contar `ward_id` distintos entre os
+ * eventos.
+ */
+export async function reportPdfImportHealth(
+  wardId: string | null | undefined,
+  outcome: PdfImportOutcome
+): Promise<void> {
+  const { usedGrid, fallbackReason, records, expectedCount, pages } = outcome;
+
+  if (!usedGrid) {
+    await reportHealthEvent(wardId, 'pdf_import_fallback', {
+      pages,
+      records,
+      reasonNoValidSource: fallbackReason === 'no-valid-source',
+      reasonColumns: fallbackReason === 'columns',
+      reasonUnexplained: fallbackReason === 'unexplained',
+    });
+  }
+
+  if (expectedCount != null && expectedCount !== records) {
+    await reportHealthEvent(wardId, 'pdf_import_count_mismatch', {
+      pages,
+      records,
+      expected: expectedCount,
+      usedGrid,
+    });
   }
 }

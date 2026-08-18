@@ -588,3 +588,22 @@ describe('teclado: a lista tem de continuar alcançável (AC1, AC5)', () => {
     expect(within(avoider).getByTestId('people-picker-list')).toBeTruthy();
   });
 });
+
+describe('teclado: arrastar a lista fecha o teclado (AC3, AC4)', () => {
+  it('a lista fecha o teclado quando é arrastada', async () => {
+    await render();
+
+    expect(screen.getByTestId('people-picker-list').props.keyboardDismissMode).toBe('on-drag');
+  });
+
+  it('e o toque numa pessoa ainda seleciona, em vez de ser gasto fechando o teclado', async () => {
+    // Comportamento de verdade, e o que protege o AC4: com o teclado aberto, `handled` faz o toque
+    // chegar à linha. Sem isso, o primeiro toque só fecharia o teclado e o usuário tocaria duas
+    // vezes em tudo.
+    const { onSelect } = await render();
+    await press(null, 'people-picker-item-a');
+
+    expect(onSelect).toHaveBeenCalledWith(MEMBER_A);
+    expect(screen.getByTestId('people-picker-list').props.keyboardShouldPersistTaps).toBe('handled');
+  });
+});

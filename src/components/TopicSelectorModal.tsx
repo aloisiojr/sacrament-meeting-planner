@@ -235,6 +235,7 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
 
         <KeyboardAvoider testID="topic-selector-keyboard-avoider">
           <FlatList
+            testID="topic-selector-list"
             data={filteredTopics}
             keyExtractor={(item) => item.id}
             ListHeaderComponent={editingId === NEW_ID ? renderEditor() : null}
@@ -268,6 +269,9 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('common.noResults')}</Text>
               </View>
             }
+            // Mesmo comportamento do seletor de pessoas: a queixa original era as duas telas
+            // divergirem, então mudar só uma delas trocaria a divergência de lado.
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           />
         </KeyboardAvoider>

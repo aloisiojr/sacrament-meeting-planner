@@ -3,6 +3,11 @@
  * Processes pending notification_queue entries where send_after <= now().
  * Groups designation entries by (ward_id, sunday_date).
  * Sends via Expo Push API. Handles invalid tokens.
+ *
+ * Cron authentication (CONF-03): the scheduler MUST send header
+ * `x-cron-secret: <CRON_SECRET>` (function secret, see supabase/functions/README.md).
+ * Anything else gets 401 before the database is touched — this function runs with the
+ * service_role key and its URL + anon key are public.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -258,9 +263,36 @@ function buildSecretaryReviewText(
   return texts[language] ?? texts['en-US'];
 }
 
+// --- Cron authentication (CONF-03) ---
+
+// Duplicated in push-update-nudge (Deno functions cannot share a local import here).
+// Constant-time: both sides are hashed to fixed-length SHA-256 digests, then XOR-compared
+// over every byte. Fail-closed: no CRON_SECRET configured, or no header, means no run.
+async function cronSecretOk(req: Request): Promise<boolean> {
+  const expected = Deno.env.get('CRON_SECRET');
+  const provided = req.headers.get('x-cron-secret');
+  if (!expected || !provided) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(expected)),
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+  ]);
+  const av = new Uint8Array(a);
+  const bv = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < av.length; i++) diff |= av[i] ^ bv[i];
+  return diff === 0;
+}
+
 // --- Main Handler ---
 
 Deno.serve(async (req: Request) => {
+  if (!(await cronSecretOk(req))) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

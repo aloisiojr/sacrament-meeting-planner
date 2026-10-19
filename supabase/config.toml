@@ -33,6 +33,11 @@ enable_confirmations = false
 # - Authenticated endpoints (create-invitation, delete-user, list-users, update-user-name, update-user-role)
 #   verify JWT internally in code, so gateway-level verification is not needed.
 # This prevents the "Verify JWT with legacy secret" toggle from being enabled on deploy.
+#
+# Cron functions (process-notifications, push-update-nudge) have no user JWT by design; they
+# instead require the dedicated function secret CRON_SECRET sent as header `x-cron-secret`
+# (CONF-03). Set it per environment with `supabase secrets set CRON_SECRET=<value>` and make
+# the scheduler send the header. The VALUE is never committed — see functions/README.md.
 
 [functions.create-invitation]
 verify_jwt = false

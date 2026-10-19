@@ -42,7 +42,24 @@ export function isNetworkError(err: unknown): boolean {
 }
 
 /** What the queue needs to replay a write later. */
-export type OfflineMutationEntry = Pick<QueuedMutation, 'table' | 'operation' | 'data'>;
+export type OfflineMutationEntry = Pick<QueuedMutation, 'table' | 'operation' | 'data' | 'onConflict'>;
+
+/**
+ * A client-generated UUID for a queue entry (and, for INSERTs, the row itself). Giving the row its
+ * id on the client is what makes replay idempotent: the processor upserts on that id, so a write
+ * that actually landed before the connection dropped is neither duplicated nor a UNIQUE violation
+ * when it is replayed.
+ */
+export function createClientId(): string {
+  const cryptoObj = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+  // RFC 4122 v4 fallback for runtimes without crypto.randomUUID.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 /**
  * Run a write; if it fails because the device is offline, persist it for replay on reconnect.
@@ -64,11 +81,19 @@ export async function withOfflineQueue<T>(
     if (!isNetworkError(err)) throw err;
 
     const timestamp = Date.now();
+    const id = createClientId();
     const queued = await enqueue({
-      id: `${entry.table}:${entry.operation}:${timestamp}:${Math.random().toString(36).slice(2, 8)}`,
+      id,
       table: entry.table,
       operation: entry.operation,
-      data: entry.data,
+      // An INSERT replayed without the row's id would create a second row (or explode on a UNIQUE
+      // constraint) when the first attempt had in fact landed. Stamp the client id onto the row
+      // unless the caller already assigned one; replay upserts on it.
+      data:
+        entry.operation === 'INSERT' && entry.data.id == null
+          ? { ...entry.data, id }
+          : entry.data,
+      onConflict: entry.onConflict,
       timestamp,
     });
 

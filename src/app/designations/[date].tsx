@@ -12,7 +12,7 @@
  *   router.push({ pathname: '/designations/[date]', params: { date, index } })     // edit item
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
   Keyboard,
   Platform,
 } from 'react-native';
@@ -70,6 +71,25 @@ function DesignationEditContent() {
   const [calling, setCalling] = useState(existing?.calling ?? '');
   const [office, setOffice] = useState<PriesthoodOffice | null>(existing?.office ?? null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // EST-11: the useState seeds above only see `existing` on the first render. With a cold cache
+  // the agenda query has not resolved yet, so an EDIT would open blank and saving would overwrite
+  // fields the user never saw. Until the agenda exists (`undefined` = still loading; `null` =
+  // loaded, none yet) the screen shows a spinner and cannot save; when the edited item first
+  // arrives, hydrate the fields from it exactly once.
+  const isAgendaLoading = agenda === undefined;
+  const hydratedRef = useRef(existing != null);
+  useEffect(() => {
+    if (hydratedRef.current || !existing) return;
+    hydratedRef.current = true;
+    setType(existing.type);
+    setPersonName(existing.person_name);
+    setMemberId(existing.member_id);
+    setCalling(existing.calling ?? '');
+    setOffice(existing.office);
+  }, [existing]);
 
   const dateLabel = useMemo(
     () => (date ? formatFullDate(date, getCurrentLanguage()) : ''),
@@ -79,7 +99,12 @@ function DesignationEditContent() {
   const isCallingType = type === 'sustain' || type === 'release';
   // Gate saving by permission (defense-in-depth): an observer deep-linking here must not be
   // able to write the agenda. RLS is the real enforcement (P0-1); this hides the affordance.
-  const canSave = hasPermission('agenda:write') && !!type && personName.trim().length > 0;
+  const canSave =
+    hasPermission('agenda:write') &&
+    !!type &&
+    personName.trim().length > 0 &&
+    !isAgendaLoading &&
+    !isSaving;
 
   const handleSelectType = useCallback((next: DesignationType) => {
     setType(next);
@@ -94,7 +119,11 @@ function DesignationEditContent() {
     setPickerVisible(false);
   }, []);
 
-  const persist = useCallback(() => {
+  // EST-01: saving AWAITS the write (mutateAsync). The agenda mutation is queued offline
+  // (DEC-01: designations are a meeting flow), so a resolved promise means "saved or safely
+  // queued"; only a real rejection reaches the catch, where the user stays on this screen with
+  // their edits intact and an inline error. Never navigate away from an unconfirmed write.
+  const persist = useCallback(async () => {
     if (!type) return;
     const item: Designation = {
       type,
@@ -106,7 +135,7 @@ function DesignationEditContent() {
     const next = [...designations];
     if (editIndex != null && editIndex >= 0 && editIndex < next.length) next[editIndex] = item;
     else next.push(item);
-    updateAgenda.mutate({ sundayDate: date, updates: { designations: next } });
+    await updateAgenda.mutateAsync({ sundayDate: date, updates: { designations: next } });
   }, [
     type,
     personName,
@@ -151,6 +180,28 @@ function DesignationEditContent() {
 
   const handleSave = useCallback(() => {
     if (!canSave || !type) return;
+    setSaveError(null);
+
+    // Await every write; navigate back ONLY once they all resolve. On failure the user stays
+    // here, with the form exactly as they left it and an inline error to act on.
+    const saveAll = async (updateCalling: boolean) => {
+      setIsSaving(true);
+      try {
+        await persist();
+        if (updateCalling && memberId) {
+          await updateMember.mutateAsync({
+            id: memberId,
+            calling: type === 'sustain' && calling.trim() ? calling.trim() : null,
+          });
+        }
+        router.back();
+      } catch {
+        setSaveError(t('agenda.designations.saveFailed'));
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
     // AC11/AC13: only offer the calling update for sustain/release linked to a member.
     if (isCallingType && memberId) {
       Alert.alert(
@@ -160,28 +211,35 @@ function DesignationEditContent() {
           {
             text: t('agenda.designations.updateCallingSkip'),
             onPress: () => {
-              persist();
-              router.back();
+              void saveAll(false);
             },
           },
           {
             text: t('agenda.designations.updateCallingConfirm'),
             onPress: () => {
-              persist();
-              updateMember.mutate({
-                id: memberId,
-                calling: type === 'sustain' && calling.trim() ? calling.trim() : null,
-              });
-              router.back();
+              void saveAll(true);
             },
           },
         ]
       );
       return;
     }
-    persist();
-    router.back();
+    void saveAll(false);
   }, [canSave, type, isCallingType, memberId, t, personName, persist, router, updateMember, calling]);
+
+  // EST-11: with a cold cache there is nothing safe to edit yet — the fields would be seeded from
+  // an item that has not arrived. Show loading (all hooks above have run) until the agenda query
+  // resolves, one way or the other.
+  if (isAgendaLoading) {
+    return (
+      <SafeAreaView
+        edges={['top', 'left', 'right']}
+        style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}
+      >
+        <ActivityIndicator testID="designation-edit-loading" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -230,6 +288,12 @@ function DesignationEditContent() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+        {saveError && (
+          <Text testID="designation-edit-error" style={[styles.saveError, { color: colors.error }]}>
+            {saveError}
+          </Text>
+        )}
+
         {/* 1. Type — AC6 */}
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
           {t('agenda.designations.typeLabel')}
@@ -358,6 +422,14 @@ export default function DesignationEditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveError: {
+    fontSize: 14,
+    marginTop: 12,
   },
   header: {
     flexDirection: 'row',

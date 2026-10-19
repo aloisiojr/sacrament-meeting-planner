@@ -66,3 +66,33 @@ export function throwIfOffline(operation: string, isOnline: boolean): void {
     throw err;
   }
 }
+
+// --- Blocked-offline mutations (DEC-01: non-meeting flows) ---
+
+/**
+ * Stable identifier for a mutation blocked because the device is offline (lib/mutationClassification,
+ * class `blocked-offline`). Branch on the code, never the message: the message is translated.
+ */
+export const OFFLINE_BLOCKED = 'offline_blocked';
+
+/** An Error carrying the offline-blocked code. */
+export interface OfflineBlockedError extends Error {
+  code: typeof OFFLINE_BLOCKED;
+}
+
+/** True when `err` was raised because a blocked-offline mutation ran without a connection. */
+export function isOfflineBlockedError(err: unknown): err is OfflineBlockedError {
+  return (err as { code?: unknown } | null)?.code === OFFLINE_BLOCKED;
+}
+
+/**
+ * Throw the blocked-offline error when offline. This is the ONE reusable blocking mechanism for
+ * every non-meeting-flow mutation (via useClassifiedMutation): the user gets a clear "connect to
+ * save" message instead of an edit that pretends to succeed and then vanishes.
+ */
+export function throwIfOfflineBlocked(isOnline: boolean): void {
+  if (isOnline) return;
+  const err = new Error(i18n.t('offline.blockedEdit')) as OfflineBlockedError;
+  err.code = OFFLINE_BLOCKED;
+  throw err;
+}

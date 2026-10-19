@@ -10,6 +10,10 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
+// Writer roles allowed to self-register. Deno cannot import src/lib/permissions.ts
+// (WRITER_ROLES), so this literal is pinned by security-perms-concordance.test.ts.
+const ALLOWED_ROLES = ['bishopric', 'secretary'];
+
 interface RegisterInput {
   email: string;
   password: string;
@@ -47,7 +51,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate role (only Bishopric and Secretary allowed for self-registration)
-    if (input.role !== 'bishopric' && input.role !== 'secretary') {
+    if (!ALLOWED_ROLES.includes(input.role)) {
       return new Response(
         JSON.stringify({ error: 'Invalid role. Only bishopric and secretary allowed.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

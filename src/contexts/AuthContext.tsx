@@ -7,7 +7,10 @@ import React, {
   useMemo,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { clearQueue } from '../lib/offlineQueue';
+import { CACHE_STORAGE_KEY } from '../lib/queryConfig';
 import { hasPermission as checkPermission } from '../lib/permissions';
 import { changeLanguage, getCurrentLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
 import type { Session, User } from '@supabase/supabase-js';
@@ -96,8 +99,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
       // On sign-out (explicit, self-delete, or server-revoked session) drop the query cache so
       // the next user on this device — even in the same ward — can't see the prior user's data.
+      // The offline queue and the persisted cache get the same treatment (EST-05): pending writes
+      // belong to the user who left, and replaying them under the next session would write one
+      // user's edits with another's credentials.
       if (_event === 'SIGNED_OUT') {
         queryClient.clear();
+        void clearQueue().catch(() => {
+          // Storage failure must not break sign-out; the session is already gone.
+        });
+        void AsyncStorage.removeItem(CACHE_STORAGE_KEY).catch(() => {});
       }
       setSession(newSession);
       setLoading(false);

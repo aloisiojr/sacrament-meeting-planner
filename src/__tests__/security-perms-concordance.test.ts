@@ -81,7 +81,7 @@ describe('client: one canonical writer set (DEC-04)', () => {
     expect(isWriterRole('bishopric')).toBe(true);
     expect(isWriterRole('secretary')).toBe(true);
     expect(isWriterRole('observer')).toBe(false);
-    for (const garbage of ['', 'admin', 'BISHOPRIC', 'bishopric ', 'root'] as Role[]) {
+    for (const garbage of ['', 'admin', 'BISHOPRIC', 'bishopric ', 'root'] as unknown as Role[]) {
       expect(isWriterRole(garbage)).toBe(false);
       expect(getPermissions(garbage)).toEqual([]);
       for (const perm of ALL_PERMISSIONS) {

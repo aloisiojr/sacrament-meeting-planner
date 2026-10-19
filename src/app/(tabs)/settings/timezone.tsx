@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -41,7 +42,7 @@ export default function TimezoneScreen() {
     },
   });
 
-  const saveTimezoneMutation = useMutation({
+  const saveTimezoneMutation = useClassifiedMutation('settings.saveTimezone', {
     mutationFn: async (timezone: string) => {
       const { error } = await supabase
         .from('wards')

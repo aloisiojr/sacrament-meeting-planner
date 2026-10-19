@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
@@ -117,7 +118,7 @@ export function useAutoAssignSundayTypes() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useAutoAssignSundayTypes', {
     mutationFn: async (sundayDates: string[]): Promise<number> => {
       if (sundayDates.length === 0) return 0;
 
@@ -204,7 +205,7 @@ export function useSetSundayType() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useSetSundayType', {
     mutationFn: async ({
       date,
       reason,
@@ -288,7 +289,7 @@ export function useRemoveSundayException() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useRemoveSundayException', {
     mutationFn: async (date: string): Promise<void> => {
       const { error } = await supabase
         .from('sunday_exceptions')

@@ -7,6 +7,8 @@
  * stayed green. Pure config belongs in lib/ per CLAUDE.md; _layout.tsx now imports it.
  */
 
+import { isOfflineBlockedError } from './offlineGuard';
+
 /** How long a persisted cache entry stays usable offline. */
 export const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 
@@ -61,13 +63,19 @@ export function shouldRetryQuery(
  * A mutation that failed because the device is offline is not an error the user needs to see —
  * it is the expected path, and the offline queue will replay it. Mutations that opt out via
  * `meta.suppressGlobalError` handle their own reporting.
+ *
+ * The one explicit exception is a mutation BLOCKED because it is offline (DEC-01,
+ * `offline_blocked`): that rejection exists precisely to tell the user "connect to save this
+ * change", so it alerts even while offline. Swallowing it would recreate the silent-failure
+ * mode this classification exists to remove.
  */
 export function shouldAlertMutationError(
-  error: { message?: string } | null | undefined,
+  error: { message?: string; code?: string } | null | undefined,
   isOnline: boolean,
   meta?: { suppressGlobalError?: boolean }
 ): boolean {
   if (meta?.suppressGlobalError) return false;
+  if (isOfflineBlockedError(error)) return true;
   if (!isOnline) return false;
   const message = error?.message ?? '';
   const isNetworkError =

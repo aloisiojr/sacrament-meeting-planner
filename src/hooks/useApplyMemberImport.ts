@@ -5,7 +5,8 @@
  *  - removeIds: ONLY the members the user explicitly marked in the removal review.
  * Online-only (RLS-gated write path, migration 044). No local queue.
  */
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { splitPhoneNumber } from '../lib/countryCodes';
@@ -39,7 +40,7 @@ export function useApplyMemberImport() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useApplyMemberImport', {
     mutationFn: async (apply: MemberImportApply): Promise<MemberImportResult> => {
       // Inserts (batched). Derive informal_name = first word (matches useCreateMember default).
       if (apply.inserts.length > 0) {

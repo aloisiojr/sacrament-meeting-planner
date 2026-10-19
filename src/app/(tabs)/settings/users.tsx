@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -120,7 +121,7 @@ export default function UserManagementScreen() {
   });
 
   // Invite user mutation
-  const inviteMutation = useMutation({
+  const inviteMutation = useClassifiedMutation('settings.inviteUser', {
     mutationFn: async ({ email, role }: { email: string; role: Role }) => {
       return callEdgeFunction('create-invitation', { email, role }, isOnline);
     },
@@ -138,7 +139,7 @@ export default function UserManagementScreen() {
   });
 
   // Change role mutation
-  const changeRoleMutation = useMutation({
+  const changeRoleMutation = useClassifiedMutation('settings.changeUserRole', {
     mutationFn: async ({
       targetUserId,
       newRole,
@@ -167,7 +168,7 @@ export default function UserManagementScreen() {
   });
 
   // Delete user mutation
-  const deleteUserMutation = useMutation({
+  const deleteUserMutation = useClassifiedMutation('settings.deleteUser', {
     mutationFn: async ({ targetUserId, targetName, targetEmail }: { targetUserId: string; targetName: string; targetEmail: string }) => {
       return callEdgeFunction('delete-user', { targetUserId }, isOnline);
     },
@@ -196,7 +197,7 @@ export default function UserManagementScreen() {
   });
 
   // Update own name mutation
-  const updateNameMutation = useMutation({
+  const updateNameMutation = useClassifiedMutation('settings.updateUserName', {
     mutationFn: async (newName: string) => {
       return callEdgeFunction('update-user-name', {
         fullName: newName.trim(),

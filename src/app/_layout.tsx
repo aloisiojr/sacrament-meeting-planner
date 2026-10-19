@@ -26,6 +26,7 @@ import {
   shouldAlertMutationError,
   shouldRetryQuery,
 } from '../lib/queryConfig';
+import { isOfflineBlockedError } from '../lib/offlineGuard';
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
@@ -49,7 +50,9 @@ const queryClient = new QueryClient({
       }
       Alert.alert(
         i18n.t('common.error'),
-        i18n.t('errors.mutationFailed')
+        // A blocked-offline edit (DEC-01) already carries its translated "connect to save"
+        // message; the generic failure text would hide the one actionable fact.
+        isOfflineBlockedError(error) ? error.message : i18n.t('errors.mutationFailed')
       );
     },
   }),

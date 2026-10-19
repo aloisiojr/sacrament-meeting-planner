@@ -4,7 +4,8 @@
  * and auto-save on every field change.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { withOfflineQueue } from '../lib/offlineMutation';
@@ -86,7 +87,7 @@ export function useLazyCreateAgenda() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useLazyCreateAgenda', {
     mutationFn: async (sundayDate: string): Promise<SundayAgenda> => {
       // Check if agenda already exists
       const { data: existing } = await supabase
@@ -144,7 +145,7 @@ export function useUpdateAgenda() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateAgenda', {
     mutationFn: async ({
       agendaId,
       fields,
@@ -192,53 +193,69 @@ export function useUpdateAgendaByDate() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateAgendaByDate', {
     mutationFn: async ({
       sundayDate,
       updates,
     }: {
       sundayDate: string;
       updates: AgendaUpdateInput;
-    }): Promise<SundayAgenda> => {
-      // Check if agenda exists
-      const { data: existing } = await supabase
-        .from('sunday_agendas')
-        .select('*')
-        .eq('ward_id', wardId)
-        .eq('sunday_date', sundayDate)
-        .maybeSingle();
+    }): Promise<SundayAgenda | null> =>
+      // Offline (EST-01/EST-03, DEC-01: designations/speeches are meeting flows): the row id is
+      // unknown without a round-trip, so the queued entry replays as an upsert on the natural
+      // key (ward_id, sunday_date) — the same UNIQUE the lazy-create relies on. The payload
+      // carries ONLY the requested updates plus the key: the has_* flags default to false in
+      // the schema for a fresh row, and sending them would clobber an existing row's values.
+      withOfflineQueue(
+        {
+          table: 'sunday_agendas',
+          operation: 'UPSERT',
+          onConflict: 'ward_id,sunday_date',
+          data: { ward_id: wardId, sunday_date: sundayDate, ...updates },
+        },
+        async () => {
+          // Check if agenda exists
+          const { data: existing } = await supabase
+            .from('sunday_agendas')
+            .select('*')
+            .eq('ward_id', wardId)
+            .eq('sunday_date', sundayDate)
+            .maybeSingle();
 
-      if (existing) {
-        // Update existing
-        const { data, error } = await supabase
-          .from('sunday_agendas')
-          .update(updates)
-          .eq('id', existing.id)
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      }
+          if (existing) {
+            // Update existing
+            const { data, error } = await supabase
+              .from('sunday_agendas')
+              .update(updates)
+              .eq('id', existing.id)
+              .select()
+              .single();
+            if (error) throw error;
+            return data;
+          }
 
-      // Create new with updates
-      const { data, error } = await supabase
-        .from('sunday_agendas')
-        .insert({
-          ward_id: wardId,
-          sunday_date: sundayDate,
-          has_baby_blessing: false,
-          has_baptism_confirmation: false,
-          has_stake_announcements: false,
-          has_special_presentation: false,
-          ...updates,
-        })
-        .select()
-        .single();
+          // Create new with updates
+          const { data, error } = await supabase
+            .from('sunday_agendas')
+            .insert({
+              ward_id: wardId,
+              sunday_date: sundayDate,
+              has_baby_blessing: false,
+              has_baptism_confirmation: false,
+              has_stake_announcements: false,
+              has_special_presentation: false,
+              ...updates,
+            })
+            .select()
+            .single();
 
-      if (error) throw error;
-      return data;
-    },
+          if (error) throw error;
+          return data;
+        }
+      ),
     onSuccess: (data) => {
+      // null means the write was queued offline — no server row to key an invalidation on yet.
+      if (!data) return;
       queryClient.invalidateQueries({
         queryKey: agendaKeys.bySunday(wardId, data.sunday_date),
       });

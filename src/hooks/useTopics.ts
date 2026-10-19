@@ -3,7 +3,8 @@
  * Ward topics CRUD + general collection toggle + active topics aggregation.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -75,7 +76,7 @@ export function useCreateWardTopic() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useCreateWardTopic', {
     mutationFn: async (input: CreateTopicInput): Promise<WardTopic> => {
       const { data, error } = await supabase
         .from('ward_topics')
@@ -107,7 +108,7 @@ export function useUpdateWardTopic() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateWardTopic', {
     mutationFn: async (input: { id: string; title?: string; link?: string | null }): Promise<WardTopic> => {
       const { id, ...fields } = input;
       const { data, error } = await supabase
@@ -154,7 +155,7 @@ export function useDeleteWardTopic() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useDeleteWardTopic', {
     mutationFn: async ({ topicId, topicTitle }: { topicId: string; topicTitle: string }): Promise<string> => {
       const { error } = await supabase.from('ward_topics').delete().eq('id', topicId);
       if (error) throw error;

@@ -4,7 +4,8 @@
  * Status lifecycle: not_assigned -> assigned_not_invited -> assigned_invited -> assigned_confirmed | gave_up
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
@@ -178,7 +179,7 @@ export function useLazyCreateSpeeches() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useLazyCreateSpeeches', {
     mutationFn: async (input: { sundayDate: string; sundayType?: SundayExceptionReason }): Promise<Speech[]> => {
       const { sundayDate, sundayType } = input;
 
@@ -252,7 +253,7 @@ export function useAssignSpeaker() {
   const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useAssignSpeaker', {
     mutationFn: async (input: AssignSpeakerInput): Promise<Speech | null> => {
       const fields = {
         member_id: input.memberId,
@@ -301,7 +302,7 @@ export function useAssignTopic() {
   const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useAssignTopic', {
     mutationFn: async (input: AssignTopicInput): Promise<Speech | null> => {
       const fields = {
         topic_title: input.topicTitle,
@@ -344,49 +345,63 @@ export function useChangeStatus() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (input: ChangeStatusInput): Promise<Speech | null> => {
-      // Fetch current speech to validate transition
-      const { data: current, error: fetchErr } = await supabase
-        .from('speeches')
-        .select('status')
-        .eq('id', input.speechId)
-        .single();
+  return useClassifiedMutation('useChangeStatus', {
+    mutationFn: async (input: ChangeStatusInput): Promise<Speech | null> =>
+      // Offline (EST-03, DEC-01: speeches are a meeting flow): the transition guard below needs
+      // a read, so on a transport failure the requested status itself is queued as a plain
+      // UPDATE and applied on reconnect. The optimistic-concurrency guard cannot run without
+      // the read — the recorded tradeoff of queuing this write. The speeches UI already
+      // disables these actions while offline, so the realistic path is a connection flap
+      // mid-gesture.
+      withOfflineQueue(
+        {
+          table: 'speeches',
+          operation: 'UPDATE',
+          data: { id: input.speechId, status: input.status },
+        },
+        async () => {
+          // Fetch current speech to validate transition
+          const { data: current, error: fetchErr } = await supabase
+            .from('speeches')
+            .select('status')
+            .eq('id', input.speechId)
+            .single();
 
-      if (fetchErr) throw fetchErr;
+          if (fetchErr) throw fetchErr;
 
-      // Already there: nothing to do. Re-sending an invite to someone already marked invited is a
-      // real, supported action ("Re-enviar convite"), and it asked for the status it already had —
-      // which the transition table rejects, surfacing "Invalid status transition:
-      // assigned_invited -> assigned_invited" as an error alert. A no-op is not an invalid
-      // transition; returning null skips the write AND the activity-log entry, so the history does
-      // not fill with status changes that never happened.
-      if (current.status === input.status) return null;
+          // Already there: nothing to do. Re-sending an invite to someone already marked invited is a
+          // real, supported action ("Re-enviar convite"), and it asked for the status it already had —
+          // which the transition table rejects, surfacing "Invalid status transition:
+          // assigned_invited -> assigned_invited" as an error alert. A no-op is not an invalid
+          // transition; returning null skips the write AND the activity-log entry, so the history does
+          // not fill with status changes that never happened.
+          if (current.status === input.status) return null;
 
-      if (!isValidTransition(current.status as SpeechStatus, input.status)) {
-        throw new Error(`Invalid status transition: ${current.status} -> ${input.status}`);
-      }
+          if (!isValidTransition(current.status as SpeechStatus, input.status)) {
+            throw new Error(`Invalid status transition: ${current.status} -> ${input.status}`);
+          }
 
-      // Guard the write on the status we validated (.eq('status', current.status)): if another
-      // device changed it between our read and write, 0 rows update and we surface a retry instead
-      // of silently applying a transition we never validated.
-      const { data, error } = await supabase
-        .from('speeches')
-        .update({ status: input.status })
-        .eq('id', input.speechId)
-        .eq('status', current.status)
-        .select()
-        .maybeSingle();
+          // Guard the write on the status we validated (.eq('status', current.status)): if another
+          // device changed it between our read and write, 0 rows update and we surface a retry instead
+          // of silently applying a transition we never validated.
+          const { data, error } = await supabase
+            .from('speeches')
+            .update({ status: input.status })
+            .eq('id', input.speechId)
+            .eq('status', current.status)
+            .select()
+            .maybeSingle();
 
-      if (error) throw error;
-      if (!data) {
-        throw new Error('Speech status changed concurrently; please retry.');
-      }
-      return data;
-    },
+          if (error) throw error;
+          if (!data) {
+            throw new Error('Speech status changed concurrently; please retry.');
+          }
+          return data;
+        }
+      ),
     onSuccess: (data) => {
-      if (!data) return; // no-op: the status was already the requested one
       queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      if (!data) return; // no-op (already the requested status) or queued offline — logged when it lands
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'speech:status_change', buildLogDescription('speech:status_change', { nome: data.speaker_name ?? 'N/A', status: data.status, data: formatDateHumanReadable(data.sunday_date, getCurrentLanguage()), N: data.position }), userName);
       }
@@ -403,7 +418,7 @@ export function useChangeStatus() {
 export function useUpdateSpeechContact() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateSpeechContact', {
     mutationFn: async (input: {
       speechId: string;
       speakerPhone?: string | null;
@@ -448,7 +463,7 @@ export function useRemoveAssignment() {
   const { wardId, user, userName, role } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useRemoveAssignment', {
     mutationFn: async ({ speechId, speakerName }: { speechId: string; speakerName?: string }): Promise<{ speech: Speech | null; previousSpeaker: string }> => {
       const fields = {
         member_id: null,
@@ -498,7 +513,7 @@ export function useDeleteSpeechesByDate() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useDeleteSpeechesByDate', {
     mutationFn: async (input: { sundayDate: string; positions?: number[] }) => {
       const { sundayDate, positions } = input;
       let query = supabase

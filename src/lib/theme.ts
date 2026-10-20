@@ -26,6 +26,7 @@ export interface ThemeColors {
 
   // Status
   error: string;
+  onError: string;
   errorContainer: string;
   success: string;
   warning: string;
@@ -49,6 +50,10 @@ export interface ThemeColors {
   placeholder: string;
   /** Off-state track for toggles (Switch). Visible against light/dark backgrounds. */
   switchTrackOff: string;
+  /** Modal/dropdown overlay scrim (BEL-13). */
+  scrim: string;
+  /** WhatsApp brand green tuned per theme (BEL-14); never the sole signal at small sizes. */
+  whatsapp: string;
 }
 
 export interface ThemeContextValue {
@@ -81,6 +86,7 @@ export const lightColors: ThemeColors = {
   onPrimary: '#FFFFFF',
 
   error: '#DC2626',
+  onError: '#FFFFFF',           // 4.83:1 on error (BEL-01)
   errorContainer: '#FEE2E2',
   success: '#16A34A',
   warning: '#D97706',
@@ -98,12 +104,14 @@ export const lightColors: ThemeColors = {
   divider: '#CBD5E1',           // Slate-300 (bluish divider)
 
   tabBar: '#F1F5F9',            // matches background
-  tabBarInactive: '#64748B',    // Slate-500
+  tabBarInactive: '#475569',    // Slate-600, 6.92:1 on tabBar (BEL-08; was #64748B at 4.34:1)
 
   inputBackground: '#F8FAFC',   // Slate-50
-  inputBorder: '#94A3B8',       // Slate-400 (matches border)
+  inputBorder: '#64748B',       // Slate-500, 4.55:1 on inputBackground (BEL-09 ≥3:1; diverges from decorative border)
   placeholder: '#64748B',       // Slate-500 (~4.6:1 on inputBackground; was #94A3B8 at 2.45:1)
   switchTrackOff: '#94A3B8',    // Slate-400 — visible off-track (default iOS gray was ~invisible)
+  scrim: 'rgba(0,0,0,0.5)',
+  whatsapp: '#0F7A3E',          // 5.42:1 on white (BEL-14; brand #25D366 is 1.98:1)
 };
 
 export const darkColors: ThemeColors = {
@@ -123,6 +131,7 @@ export const darkColors: ThemeColors = {
   onPrimary: '#0F172A',
 
   error: '#F87171',
+  onError: '#0F172A',           // 6.45:1 on error (BEL-01; white was 2.77:1)
   errorContainer: '#451A1A',
   success: '#4ADE80',
   warning: '#FBBF24',
@@ -140,12 +149,14 @@ export const darkColors: ThemeColors = {
   divider: '#334155',
 
   tabBar: '#1E293B',
-  tabBarInactive: '#64748B',
+  tabBarInactive: '#94A3B8',    // Slate-400, 5.71:1 on tabBar (BEL-08; was #64748B at 3.07:1)
 
   inputBackground: '#1E293B',
-  inputBorder: '#475569',
-  placeholder: '#64748B',
+  inputBorder: '#94A3B8',       // Slate-400, 5.71:1 on inputBackground (BEL-09 ≥3:1; was #475569 at 1.93:1)
+  placeholder: '#94A3B8',       // Slate-400, 5.71:1 on inputBackground (BEL-03; was #64748B at 3.07:1)
   switchTrackOff: '#64748B',    // Slate-500 — visible off-track on dark surfaces
+  scrim: 'rgba(0,0,0,0.5)',
+  whatsapp: '#25D366',          // brand green, high contrast on dark surfaces (BEL-14)
 };
 
 // --- Storage ---

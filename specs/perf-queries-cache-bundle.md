@@ -127,7 +127,13 @@ No fechamento: `npx expo export --platform ios` e registrar aqui o `.hbc`
 (tamanho + módulos) contra a baseline 5.460.946 B / 2.046 módulos. Nenhuma
 troca de config (`inlineRequires` etc.) neste pacote.
 
-_Resultado (preenchido no fechamento): —_
+_Resultado (fechamento, medido nesta branch): `npx expo export --platform ios`
+→ `.hbc` **5.514.070 B** (baseline 5.460.946 B: **+53.124 B / +0,97%**) e
+**2.037 sources** no sourcemap (baseline 2.046 módulos: −9). O delta de bytes é
+o código novo do pacote (hook de janelas, allowlist/poda, helper de data) —
+nenhuma config de bundle foi tocada, como manda o item. Ícones recomprimidos
+não entram no `.hbc` (geração EAS/prebuild), então o RAP-05 não move este
+número; o ganho dele é checkout/favicon web, registrado no item próprio._
 
 ## RAP-15 — registro: `useActiveTopics` como está
 

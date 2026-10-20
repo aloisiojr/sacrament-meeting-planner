@@ -666,8 +666,8 @@ describe('F064-S5: useActiveTopics Promise.all parallelization', () => {
 // =============================================================================
 
 describe('F064-S6: POLLING_INTERVAL_MS', () => {
-  it('AC-064-14: POLLING_INTERVAL_MS equals 10000 (10 seconds)', () => {
-    expect(POLLING_INTERVAL_MS).toBe(10000);
+  it('AC-064-14: POLLING_INTERVAL_MS equals 45000 (RAP-11)', () => {
+    expect(POLLING_INTERVAL_MS).toBe(45000); // RAP-11 supersedes the 10s value
   });
 
   it('AC-064-14: POLLING_INTERVAL_MS is not 2500 (old value)', () => {

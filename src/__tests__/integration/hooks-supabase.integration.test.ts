@@ -399,7 +399,7 @@ describe('useSundayList integration', () => {
     const wrapper = createWrapper(undefined, queryClient);
     const { result } = renderHook(() => useSundayList(), { wrapper });
 
-    expect(result.current.sundays.length).toBeGreaterThan(50);
+    expect(result.current.sundays.length).toBeGreaterThan(30); // RAP-03: 3+6 month opening window
     result.current.sundays.forEach((dateStr) => {
       const d = new Date(dateStr + 'T12:00:00Z');
       expect(d.getUTCDay()).toBe(0);

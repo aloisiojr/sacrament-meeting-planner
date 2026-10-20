@@ -21,6 +21,12 @@ const mockFailTables = new Set<string>();
 const mockErrorTables = new Set<string>();
 /** Tables whose writes resolve with a 401 auth error (expired session, EST-17). */
 const mockAuthTables = new Set<string>();
+/** Rows a guarded UPDATE replay returns; [] simulates a lost optimistic-concurrency race. */
+let mockGuardRows: unknown[] = [{ id: 'row1' }];
+const mockGuardSelect = () =>
+  mockErrorTables.size > 0
+    ? Promise.resolve({ data: null, error: { message: 'rejected' } })
+    : Promise.resolve({ data: mockGuardRows, error: null });
 
 /** Records what the processor asks Supabase to do, so replay can be asserted precisely. */
 function mockMakeChain(table: string) {
@@ -50,12 +56,20 @@ function mockMakeChain(table: string) {
       if (mockFailTables.has(table)) throw new Error('update failed');
       const rec = { op: 'update', table, payload, eqArgs: [] as unknown[] };
       calls.push(rec);
-      return {
+      const chain: Record<string, unknown> = {
         eq: (...args: unknown[]) => {
-          rec.eqArgs = args;
-          return result();
+          if (rec.eqArgs.length === 0) rec.eqArgs = args;
+          (rec as { eqCalls?: unknown[][] }).eqCalls = [
+            ...((rec as { eqCalls?: unknown[][] }).eqCalls ?? []),
+            args,
+          ];
+          return chain;
         },
+        select: () => mockGuardSelect(),
+        then: (ok: (v: unknown) => unknown, err?: (e: unknown) => unknown) =>
+          result().then(ok, err),
       };
+      return chain;
     },
     delete: () => {
       if (mockFailTables.has(table)) throw new Error('delete failed');
@@ -74,6 +88,11 @@ function mockMakeChain(table: string) {
 
 jest.mock('../lib/supabase', () => ({
   supabase: { from: (table: string) => mockMakeChain(table) },
+}));
+
+const mockLogAction = jest.fn(() => Promise.resolve());
+jest.mock('../lib/activityLog', () => ({
+  logAction: (...args: unknown[]) => mockLogAction(...(args as [])),
 }));
 
 jest.mock('../lib/appHealth', () => ({
@@ -130,6 +149,8 @@ beforeEach(async () => {
   mockFailTables.clear();
   mockErrorTables.clear();
   mockAuthTables.clear();
+  mockLogAction.mockClear();
+  mockGuardRows = [{ id: 'row1' }];
 });
 
 describe('useOfflineQueueProcessor — when it runs', () => {
@@ -235,6 +256,89 @@ describe('useOfflineQueueProcessor — replay fidelity', () => {
 
     expect(calls.map((c) => c.table)).toEqual(['a', 'b', 'c']);
     expect(await getQueueSize()).toBe(0);
+  });
+
+  it('emits the queued log intent exactly once when the replay lands (CONF-11)', async () => {
+    await enqueue(
+      makeMutation({
+        operation: 'DELETE',
+        table: 'members',
+        data: { id: 'm7' },
+        logIntent: {
+          wardId: 'w1',
+          userId: 'u1',
+          userEmail: 'a@b.c',
+          userName: 'Me',
+          actionType: 'member:delete',
+          description: 'member:delete|nome=Ana',
+        },
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(mockLogAction).toHaveBeenCalledTimes(1);
+    expect(mockLogAction).toHaveBeenCalledWith(
+      'w1', 'u1', 'a@b.c', 'member:delete', 'member:delete|nome=Ana', 'Me'
+    );
+  });
+
+  it('guarded replay with 0 rows is a visible conflict: dead-letter + health event, no retry (CONF-09)', async () => {
+    mockGuardRows = [];
+    await enqueue(
+      makeMutation({
+        operation: 'UPDATE',
+        table: 'sunday_agendas',
+        data: { id: 'ag1', presiding_name: 'X' },
+        expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(await getQueueSize()).toBe(0);
+    const dead = await readDeadLetter();
+    expect(dead).toHaveLength(1);
+    expect(dead[0]).toMatchObject({ id: 'q1', table: 'sunday_agendas' });
+    expect(mockHealthEvents).toContainEqual([null, 'offline_queue_conflict', {}]);
+    expect(mockLogAction).not.toHaveBeenCalled();
+  });
+
+  it('guarded replay that lands accepts and dequeues (CONF-09)', async () => {
+    await enqueue(
+      makeMutation({
+        operation: 'UPDATE',
+        table: 'sunday_agendas',
+        data: { id: 'ag1', presiding_name: 'X' },
+        expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(await getQueueSize()).toBe(0);
+    expect(await readDeadLetter()).toHaveLength(0);
+    expect(calls[0].eqArgs).toEqual(['id', 'ag1']);
+    expect((calls[0] as { eqCalls?: unknown[][] }).eqCalls).toContainEqual([
+      'updated_at',
+      '2026-08-01T00:00:00.000Z',
+    ]);
+  });
+
+  it('does not emit the log intent when the replay is rejected (CONF-11)', async () => {
+    mockErrorTables.add('members');
+    await enqueue(
+      makeMutation({
+        operation: 'DELETE',
+        table: 'members',
+        data: { id: 'm7' },
+        logIntent: {
+          wardId: 'w1', userId: 'u1', userEmail: 'a@b.c', actionType: 'member:delete',
+          description: 'member:delete|nome=Ana',
+        },
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(mockLogAction).not.toHaveBeenCalled();
+    expect(await getQueueSize()).toBe(1);
   });
 
   it('refreshes the cache once after draining, not per mutation', async () => {

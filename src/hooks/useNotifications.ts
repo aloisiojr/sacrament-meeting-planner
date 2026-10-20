@@ -102,7 +102,9 @@ export function useRegisterPushToken(isOnline: boolean): void {
               platform: Platform.OS,
             },
             {
-              onConflict: 'user_id,expo_push_token',
+              // CONF-13 (migration 055): the token itself is unique — a device that
+              // changed user transfers the single row to the current owner.
+              onConflict: 'expo_push_token',
             }
           );
 

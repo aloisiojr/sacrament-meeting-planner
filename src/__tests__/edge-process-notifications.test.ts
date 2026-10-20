@@ -65,6 +65,8 @@ beforeEach(() => {
     const messages = JSON.parse(init.body);
     pushed.push(messages);
     return {
+      ok: true,
+      status: 200,
       json: async () => ({
         data: pushTickets ?? messages.map(() => ({ status: 'ok' })),
       }),
@@ -127,19 +129,20 @@ describe('process-notifications — the queue read', () => {
   it('does nothing at all when the queue is empty', async () => {
     const res = await run();
 
-    expect(res.body).toEqual({ processed: 0 });
+    expect(res.body).toEqual({ processed: 0, failed: 0 });
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(rec.updates).toEqual([]);
+    // Only the claim attempt ran; nothing was retired as sent/failed.
+    expect(rec.updates.filter((u) => (u.payload as { status?: string }).status !== 'processing')).toEqual([]);
   });
 
-  it('asks only for pending entries that are due', async () => {
-    // Without both filters the cron would fire scheduled reminders early, or re-send sent ones.
+  it('claims only pending entries that are due, atomically as processing (CONF-04)', async () => {
     pendingQueue = [entry()];
     await run();
 
-    const read = rec.selects.find((s) => s.table === 'notification_queue')!;
-    expect(read.filters).toContainEqual(['status', 'pending']);
-    expect(read.filters.some(([c]) => c === 'send_after')).toBe(true);
+    const claim = rec.updates.find((u) => u.table === 'notification_queue')!;
+    expect(claim.payload).toEqual({ status: 'processing' });
+    expect(claim.filters).toContainEqual(['status', 'pending']);
+    expect(claim.filters.some(([c]) => c === 'send_after')).toBe(true);
   });
 
   it('reports the error rather than silently sending nothing', async () => {
@@ -394,9 +397,40 @@ describe('process-notifications — retiring and cleanup', () => {
     pendingQueue = [entry({ id: 'q1' }), entry({ id: 'q2', sunday_date: '2026-08-16' })];
     await run();
 
-    const update = rec.updates.find((u) => u.table === 'notification_queue')!;
+    const update = rec.updates.find(
+      (u) => u.table === 'notification_queue' && (u.payload as { status?: string }).status === 'sent'
+    )!;
     expect(update.payload).toEqual({ status: 'sent' });
     expect(update.filters).toContainEqual(['id', ['q1', 'q2']]);
+  });
+
+  it('marks failed (attempts+1, reason) when Expo answers a ticket error, never sent (CONF-04)', async () => {
+    pushTickets = [{ status: 'error', details: { error: 'MessageRateExceeded' } }];
+    pendingQueue = [entry({ attempts: 2 })];
+    const res = await run();
+
+    expect(res.body.processed).toBe(0);
+    expect(res.body.failed).toBe(1);
+    const failed = rec.updates.find(
+      (u) => (u.payload as { status?: string }).status === 'failed'
+    )!;
+    expect(failed.payload).toEqual({ status: 'failed', attempts: 3, last_error: 'MessageRateExceeded' });
+    expect(rec.updates.some((u) => (u.payload as { status?: string }).status === 'sent')).toBe(false);
+  });
+
+  it('marks failed when Expo HTTP is not ok, even if the body looks fine (CONF-04)', async () => {
+    fetchSpy.mockImplementation(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({ data: [{ status: 'ok' }] }),
+    }));
+    pendingQueue = [entry()];
+    const res = await run();
+
+    expect(res.body.failed).toBe(1);
+    expect(
+      rec.updates.find((u) => (u.payload as { status?: string }).status === 'failed')!.payload
+    ).toMatchObject({ status: 'failed', attempts: 1, last_error: 'expo_http_503' });
   });
 
   it('drops tokens the push service rejected as unregistered', async () => {
@@ -428,16 +462,21 @@ describe('process-notifications — retiring and cleanup', () => {
     );
   });
 
-  it('still retires the entries when the push API is unreachable', async () => {
-    // Otherwise an outage leaves a growing backlog that all fires at once on recovery.
+  it('marks failed, not sent, when the push API is unreachable (CONF-04)', async () => {
+    // CONF-04 supersedes the old "still retires as sent" expectation: an outage must not
+    // turn an undelivered withdrawal notice into a silent 'sent'.
     fetchSpy.mockRejectedValue(new Error('network'));
     pendingQueue = [entry()];
     const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const res = await run();
     spy.mockRestore();
 
-    expect(res.body.processed).toBe(1);
-    expect(rec.updates.find((u) => u.table === 'notification_queue')).toBeDefined();
+    expect(res.body.processed).toBe(0);
+    expect(res.body.failed).toBe(1);
+    expect(
+      rec.updates.find((u) => (u.payload as { status?: string }).status === 'failed')!.payload
+    ).toMatchObject({ status: 'failed', attempts: 1 });
+    expect(rec.updates.some((u) => (u.payload as { status?: string }).status === 'sent')).toBe(false);
   });
 
   it('sweeps only old, already-finished entries', async () => {
@@ -445,7 +484,7 @@ describe('process-notifications — retiring and cleanup', () => {
     await run();
 
     const sweep = rec.tableDeletes.filter((d) => d.startsWith('notification_queue:'));
-    expect(sweep).toContain('notification_queue:status=sent,cancelled');
+    expect(sweep).toContain('notification_queue:status=sent,cancelled,failed');
     expect(sweep.some((d) => d.startsWith('notification_queue:created_at='))).toBe(true);
   });
 });

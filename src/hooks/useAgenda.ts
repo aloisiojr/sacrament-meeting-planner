@@ -9,7 +9,20 @@ import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { withOfflineQueue } from '../lib/offlineMutation';
+import { reportHealthEvent } from '../lib/appHealth';
 import type { SundayAgenda } from '../types/database';
+
+/** CONF-09: the agenda row changed on another device since it was read (0 guarded rows). */
+export class AgendaConflictError extends Error {
+  constructor() {
+    super('agenda_conflict');
+    this.name = 'AgendaConflictError';
+  }
+}
+
+export function isAgendaConflict(err: unknown): boolean {
+  return err instanceof AgendaConflictError;
+}
 
 // --- Query Keys ---
 
@@ -149,9 +162,12 @@ export function useUpdateAgenda() {
     mutationFn: async ({
       agendaId,
       fields,
+      expectedUpdatedAt,
     }: {
       agendaId: string;
       fields: AgendaUpdateInput;
+      /** CONF-09: updated_at the caller read; a mismatch is a visible conflict, not LWW. */
+      expectedUpdatedAt?: string;
     }): Promise<SundayAgenda | null> =>
       // Offline: persisted for replay on reconnect instead of being lost. Resolves null, which the
       // auto-save UI treats as "saved locally".
@@ -160,16 +176,25 @@ export function useUpdateAgenda() {
           table: 'sunday_agendas',
           operation: 'UPDATE',
           data: { id: agendaId, ...fields },
+          expectedUpdatedAt,
         },
         async () => {
-          const { data, error } = await supabase
+          let query = supabase
             .from('sunday_agendas')
             .update(fields)
-            .eq('id', agendaId)
-            .select()
-            .single();
+            .eq('id', agendaId);
+          if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+          const { data, error } = await query.select().maybeSingle();
 
           if (error) throw error;
+          if (!data) {
+            // 0 rows with a guard = another device won; without a guard = row gone.
+            if (expectedUpdatedAt) {
+              void reportHealthEvent(wardId, 'agenda_update_conflict', {});
+              throw new AgendaConflictError();
+            }
+            throw new Error('Agenda not found');
+          }
           return data;
         }
       ),
@@ -197,9 +222,11 @@ export function useUpdateAgendaByDate() {
     mutationFn: async ({
       sundayDate,
       updates,
+      expectedUpdatedAt,
     }: {
       sundayDate: string;
       updates: AgendaUpdateInput;
+      expectedUpdatedAt?: string;
     }): Promise<SundayAgenda | null> =>
       // Offline (EST-01/EST-03, DEC-01: designations/speeches are meeting flows): the row id is
       // unknown without a round-trip, so the queued entry replays as an upsert on the natural
@@ -222,15 +249,26 @@ export function useUpdateAgendaByDate() {
             .eq('sunday_date', sundayDate)
             .maybeSingle();
 
+          if (existing && expectedUpdatedAt && existing.updated_at !== expectedUpdatedAt) {
+            void reportHealthEvent(wardId, 'agenda_update_conflict', {});
+            throw new AgendaConflictError();
+          }
+
           if (existing) {
-            // Update existing
+            // CONF-09: guard on the updated_at just read — if another device wrote
+            // between the read and this update, 0 rows land and it is a conflict.
             const { data, error } = await supabase
               .from('sunday_agendas')
               .update(updates)
               .eq('id', existing.id)
+              .eq('updated_at', existing.updated_at)
               .select()
-              .single();
+              .maybeSingle();
             if (error) throw error;
+            if (!data) {
+              void reportHealthEvent(wardId, 'agenda_update_conflict', {});
+              throw new AgendaConflictError();
+            }
             return data;
           }
 

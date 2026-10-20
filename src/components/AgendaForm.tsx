@@ -135,6 +135,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       if (!agenda || isObserver) return;
       updateAgenda.mutate({
         agendaId: agenda.id,
+        expectedUpdatedAt: agenda.updated_at,
         fields: { [field]: value } as Record<string, unknown>,
       });
     },
@@ -148,6 +149,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       if (!agenda || isObserver) return;
       updateAgenda.mutate({
         agendaId: agenda.id,
+        expectedUpdatedAt: agenda.updated_at,
         fields: { [nameField]: member.full_name } as Record<string, unknown>,
       });
     },
@@ -205,6 +207,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
       if (!agenda || isObserver) return;
       updateAgenda.mutate({
         agendaId: agenda.id,
+        expectedUpdatedAt: agenda.updated_at,
         fields: { [field]: hymn.id } as Record<string, unknown>,
       });
     },

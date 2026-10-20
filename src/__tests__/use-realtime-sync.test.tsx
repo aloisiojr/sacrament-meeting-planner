@@ -144,7 +144,8 @@ describe('useRealtimeSync — subscription', () => {
 
     expect(mockChannelState.configs).toHaveLength(SYNCED_TABLES.length);
     for (const cfg of mockChannelState.configs) {
-      expect(cfg.filter).toBe('ward_id=eq.ward-abc');
+      // CONF-09/15: wards has no ward_id column — it is scoped by its own id instead.
+      expect(cfg.filter).toBe(cfg.table === 'wards' ? 'id=eq.ward-abc' : 'ward_id=eq.ward-abc');
       expect(cfg.type).toBe('postgres_changes');
       expect(cfg.event).toBe('*'); // INSERT, UPDATE and DELETE all invalidate
       expect(cfg.schema).toBe('public');

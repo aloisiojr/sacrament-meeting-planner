@@ -82,6 +82,16 @@ describe('useRegisterPushToken (EST-23)', () => {
     expect(mockReportHealthEvent).toHaveBeenCalledTimes(2);
   });
 
+  it('upsert conflita só no token, transferindo a linha ao dono atual (CONF-13)', async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+    await render(<Probe online />);
+    await flush();
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'u1', ward_id: 'w1', expo_push_token: 'ExpoTok[A]' }),
+      { onConflict: 'expo_push_token' }
+    );
+  });
+
   it('upsert com sucesso não registra evento de falha', async () => {
     mockUpsert.mockResolvedValue({ error: null });
     await render(<Probe online />);

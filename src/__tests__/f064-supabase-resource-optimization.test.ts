@@ -709,8 +709,8 @@ describe('F064-S2: Migration 029 device_push_tokens role column', () => {
 // =============================================================================
 
 describe('F064 cross-feature: all optimizations backward-compatible', () => {
-  it('SYNCED_TABLES has 5 tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(5);
+  it('SYNCED_TABLES has 7 tables (CONF-09/15 added wards + activity_log)', () => {
+    expect(SYNCED_TABLES).toHaveLength(7);
   });
 
   it('TABLE_TO_QUERY_KEYS.speeches includes speechCountKeys', () => {

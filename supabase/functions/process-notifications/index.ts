@@ -25,6 +25,53 @@ interface NotificationQueueEntry {
   target_role: string;
   status: string;
   send_after: string;
+  attempts?: number | null;
+}
+
+interface ExpoTicket {
+  status?: string;
+  message?: string;
+  details?: { error?: string };
+}
+
+type PushOutcome =
+  | { kind: 'sent'; invalidTokens: string[] }
+  | { kind: 'failed'; error: string; invalidTokens: string[] };
+
+const INVALID_TOKEN_ERRORS = new Set(['DeviceNotRegistered', 'InvalidCredentials']);
+
+/**
+ * Pure ticket→outcome decision (CONF-04): an entry is 'sent' only when every ticket that
+ * is not an invalid-token rejection is 'ok'. Any transport/HTTP failure, malformed ticket
+ * list, or non-invalid ticket error is 'failed' with a reason — never a silent 'sent'.
+ * Tested by driving this handler in jest (edge-process-notifications.test.ts).
+ */
+function classifyPushOutcome(input: {
+  httpOk: boolean;
+  httpStatus: number;
+  tickets: ExpoTicket[] | null;
+  tokenCount: number;
+}): PushOutcome {
+  const { httpOk, httpStatus, tickets, tokenCount } = input;
+  if (tokenCount === 0) return { kind: 'sent', invalidTokens: [] };
+  if (!httpOk) return { kind: 'failed', error: `expo_http_${httpStatus}`, invalidTokens: [] };
+  if (!tickets || tickets.length !== tokenCount) {
+    return { kind: 'failed', error: 'expo_malformed_response', invalidTokens: [] };
+  }
+  const invalidTokens: string[] = [];
+  let firstFailure: string | null = null;
+  tickets.forEach((ticket, i) => {
+    if (ticket.status === 'ok') return;
+    const code = ticket.details?.error;
+    if (code && INVALID_TOKEN_ERRORS.has(code)) {
+      // Token index aligns with message order; caller maps back to the token string.
+      invalidTokens.push(String(i));
+      return;
+    }
+    firstFailure ??= code ?? ticket.message ?? 'expo_ticket_error';
+  });
+  if (firstFailure) return { kind: 'failed', error: firstFailure, invalidTokens };
+  return { kind: 'sent', invalidTokens };
 }
 
 interface WardInfo {
@@ -298,17 +345,20 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Fetch pending notifications where send_after <= now
+    // 1. Claim a bounded batch atomically (CONF-04): pending -> processing in one UPDATE
+    // so concurrent cron runs claim disjoint batches and never send the same entry twice.
     const { data: pending, error: fetchError } = await supabase
       .from('notification_queue')
-      .select('*')
+      .update({ status: 'processing' })
       .eq('status', 'pending')
       .lte('send_after', new Date().toISOString())
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(200)
+      .select();
 
     if (fetchError) throw fetchError;
     if (!pending || pending.length === 0) {
-      return new Response(JSON.stringify({ processed: 0 }), {
+      return new Response(JSON.stringify({ processed: 0, failed: 0 }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -350,7 +400,16 @@ Deno.serve(async (req: Request) => {
 
     // 3. Process each group/entry
     const processedIds: string[] = [];
+    const failedEntries: { id: string; attempts: number; error: string }[] = [];
     const invalidTokens: string[] = [];
+    const applyOutcome = (ids: string[], outcome: PushOutcome, attemptsOf: (id: string) => number) => {
+      invalidTokens.push(...outcome.invalidTokens);
+      if (outcome.kind === 'sent') {
+        processedIds.push(...ids);
+      } else {
+        for (const id of ids) failedEntries.push({ id, attempts: attemptsOf(id), error: outcome.error });
+      }
+    };
 
     // Process grouped designations
     for (const [, group] of designationGroups) {
@@ -372,10 +431,9 @@ Deno.serve(async (req: Request) => {
       const tokens = await getTargetTokens(supabase, wardId, targetRole);
 
       // Send push
-      const failed = await sendPush(tokens, title, body);
-      invalidTokens.push(...failed);
-
-      processedIds.push(...group.map((e) => e.id));
+      const outcome = await sendPush(tokens, title, body);
+      const byId = new Map(group.map((e) => [e.id, e.attempts ?? 0]));
+      applyOutcome(group.map((e) => e.id), outcome, (id) => byId.get(id) ?? 0);
     }
 
     // Process immediate entries
@@ -442,18 +500,22 @@ Deno.serve(async (req: Request) => {
       }
 
       const tokens = await getTargetTokens(supabase, entry.ward_id, entry.target_role);
-      const failed = await sendPush(tokens, title, body);
-      invalidTokens.push(...failed);
-
-      processedIds.push(entry.id);
+      const outcome = await sendPush(tokens, title, body);
+      applyOutcome([entry.id], outcome, () => entry.attempts ?? 0);
     }
 
-    // 4. Mark processed entries as sent
+    // 4. Retire entries honestly: 'sent' only on a confirmed outcome, else 'failed'.
     if (processedIds.length > 0) {
       await supabase
         .from('notification_queue')
         .update({ status: 'sent' })
         .in('id', processedIds);
+    }
+    for (const failed of failedEntries) {
+      await supabase
+        .from('notification_queue')
+        .update({ status: 'failed', attempts: failed.attempts + 1, last_error: failed.error })
+        .eq('id', failed.id);
     }
 
     // 5. Remove invalid tokens
@@ -470,7 +532,7 @@ Deno.serve(async (req: Request) => {
       await supabase
         .from('notification_queue')
         .delete()
-        .in('status', ['sent', 'cancelled'])
+        .in('status', ['sent', 'cancelled', 'failed'])
         .lt('created_at', sevenDaysAgo);
     } catch (cleanupErr) {
       console.error('Notification queue cleanup error:', cleanupErr);
@@ -479,6 +541,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         processed: processedIds.length,
+        failed: failedEntries.length,
         invalidTokensRemoved: invalidTokens.length,
       }),
       { headers: { 'Content-Type': 'application/json' } }
@@ -524,10 +587,10 @@ async function sendPush(
   tokens: PushToken[],
   title: string,
   body: string
-): Promise<string[]> {
-  if (tokens.length === 0 || !title || !body) return [];
-
-  const invalidTokens: string[] = [];
+): Promise<PushOutcome> {
+  // Nobody to notify (or nothing to say): retiring as 'sent' is honest — retrying cannot
+  // change an empty recipient list.
+  if (tokens.length === 0 || !title || !body) return { kind: 'sent', invalidTokens: [] };
 
   const messages = tokens.map((t) => ({
     to: t.expo_push_token,
@@ -547,25 +610,29 @@ async function sendPush(
       body: JSON.stringify(messages),
     });
 
-    const result = await response.json();
-
-    // Check for invalid tokens in the response
-    if (result.data && Array.isArray(result.data)) {
-      for (let i = 0; i < result.data.length; i++) {
-        const ticket = result.data[i];
-        if (ticket.status === 'error') {
-          if (
-            ticket.details?.error === 'DeviceNotRegistered' ||
-            ticket.details?.error === 'InvalidCredentials'
-          ) {
-            invalidTokens.push(tokens[i].expo_push_token);
-          }
-        }
-      }
+    let tickets: ExpoTicket[] | null = null;
+    try {
+      const result = await response.json();
+      tickets = Array.isArray(result?.data) ? (result.data as ExpoTicket[]) : null;
+    } catch {
+      tickets = null;
     }
+
+    const outcome = classifyPushOutcome({
+      httpOk: response.ok === true,
+      httpStatus: typeof response.status === 'number' ? response.status : 0,
+      tickets,
+      tokenCount: tokens.length,
+    });
+    // classifyPushOutcome reports invalid tokens by index; map back to token strings.
+    return {
+      ...outcome,
+      invalidTokens: outcome.invalidTokens
+        .map((idx) => tokens[Number(idx)]?.expo_push_token)
+        .filter((t): t is string => !!t),
+    };
   } catch (err) {
     console.error('Failed to send push notifications:', err);
+    return { kind: 'failed', error: (err as Error).message || 'expo_fetch_failed', invalidTokens: [] };
   }
-
-  return invalidTokens;
 }

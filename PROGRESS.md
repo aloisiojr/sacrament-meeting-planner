@@ -7,6 +7,23 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-cutover-gate` (wave 4B) — COMPLETA, verificada, NÃO mergeada (sem push).**
+  `specs/cutover-gate.md` sobre `main` @c576bf4, 5 commits por achado: CONF-08 (gate honesto:
+  primeira resolução vence por checagem, rechecagem em `AppState 'active'`, versão ausente =
+  fail-open explícito e logado — sem `0.0.0` espúria), DEC-08 (migration **057**: `app_config`
+  ganha `writes_blocked_below` NULL, `app_write_allowed()` lê `x-app-version` de
+  `request.headers`, policies RESTRICTIVE de escrita em 11 tabelas — **desligada por
+  default, comportamento idêntico até o dono ligar na janela**; cliente envia o header
+  global em `lib/supabase`; `app-config` já lia `app_config` desde a 036, sem mudança),
+  CONF-12 (migration **058** `public_rate_limits` fechada + `check_rate_limit`; lookup do
+  `send-reset-email` por e-mail via Admin API sem scan `listUsers`; env nomeado na subida e
+  429 acima de 20/h por função+IP+e-mail nas 3 públicas, fail-open logado; CORS `*` mantido
+  e documentado na spec) e CONF-06 (`docs/CUTOVER_RUNBOOK.md` na ordem do CLAUDE.md com
+  restore ensaiado como passo explícito, `scripts/cutover/preflight-name-collisions.sql`
+  READ-ONLY, migration **059** de crons guardados — sem `pg_cron`, NOTICE nomeado, nunca
+  silêncio). Migrations 057–059 criadas, **NÃO aplicadas** em nenhum banco. Pendências
+  estacionadas por credencial/dispositivo: aplicar migrations, prova SQL com JWT, ensaio
+  de restore em staging, `CRON_SECRET`/jobs de dashboard, builds EAS.
 - **BRANCH `muse/smp-reliability-rest` (wave 4A) — COMPLETA, verificada, NÃO mergeada (sem push).**
   `specs/reliability-rest.md` sobre `main` @b7f049a, 7 commits por achado: CONF-04 (migration
   **053** + claim atômico `processing`/limit 200 no `process-notifications`; `sent` só com

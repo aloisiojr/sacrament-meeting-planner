@@ -3,9 +3,9 @@
  * request so the server-side cutover barrier can read it from `request.headers` — and must
  * send nothing (never a spurious version) when the build has no version.
  */
-const mockCreateClient = jest.fn(() => ({}));
+const mockCreateClient = jest.fn((..._args: unknown[]) => ({}));
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: (...args: unknown[]) => mockCreateClient(...(args as [])),
+  createClient: (...args: unknown[]) => mockCreateClient(...args),
 }));
 
 let mockExpoConfig: { version?: string } | null = { version: '2.0.0' };
@@ -22,9 +22,10 @@ function loadClientOptions(): { global?: { headers?: Record<string, string> } } 
   jest.resetModules();
   mockCreateClient.mockClear();
   mockCreateClient.mockImplementation(() => ({}));
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('../lib/supabase');
-  return mockCreateClient.mock.calls[0][2] as { global?: { headers?: Record<string, string> } };
+  return mockCreateClient.mock.calls[0][2] as unknown as {
+    global?: { headers?: Record<string, string> };
+  };
 }
 
 describe('supabase client x-app-version header (DEC-08)', () => {

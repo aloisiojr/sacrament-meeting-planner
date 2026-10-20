@@ -323,7 +323,7 @@ describe('create-invitation — the response', () => {
   });
 
   it('names the missing env var instead of an opaque 500 (CONF-12)', async () => {
-    const deno = (globalThis as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
+    const deno = (globalThis as unknown as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
     const originalGet = deno.env.get;
     deno.env.get = (k: string) => (k === 'SUPABASE_URL' ? undefined : `test-${k}`);
     const q = quiet();

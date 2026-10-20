@@ -351,7 +351,7 @@ describe('send-reset-email — public-endpoint brake (CONF-12)', () => {
   });
 
   it('names the missing env var instead of an opaque 500', async () => {
-    const deno = (globalThis as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
+    const deno = (globalThis as unknown as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
     const originalGet = deno.env.get;
     deno.env.get = (k: string) => (k === 'GMAIL_USER' ? undefined : `test-${k}`);
     const spy = quiet();

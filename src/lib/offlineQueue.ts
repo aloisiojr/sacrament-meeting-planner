@@ -14,11 +14,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // --- Types ---
 
+/** Activity-log entry to emit exactly once when a queued write is accepted on replay (CONF-11). */
+export interface QueuedLogIntent {
+  wardId: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  actionType: string;
+  description: string;
+}
+
 export interface QueuedMutation {
   id: string;
   table: string;
   operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'UPSERT';
   data: Record<string, unknown>;
+  /** CONF-11: log to write when (and only when) this entry's replay is accepted. */
+  logIntent?: QueuedLogIntent;
+  /** CONF-09: optimistic-concurrency guard for UPDATE replay (expected updated_at). */
+  expectedUpdatedAt?: string;
   /**
    * Conflict target for UPSERT replay (e.g. 'ward_id,sunday_date' for sunday_agendas, whose row id
    * is unknown while offline). INSERT replay always upserts on 'id'.

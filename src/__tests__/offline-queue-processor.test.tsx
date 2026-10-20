@@ -76,6 +76,11 @@ jest.mock('../lib/supabase', () => ({
   supabase: { from: (table: string) => mockMakeChain(table) },
 }));
 
+const mockLogAction = jest.fn(() => Promise.resolve());
+jest.mock('../lib/activityLog', () => ({
+  logAction: (...args: unknown[]) => mockLogAction(...(args as [])),
+}));
+
 jest.mock('../lib/appHealth', () => ({
   reportHealthEvent: (...args: unknown[]) => {
     mockHealthEvents.push(args);
@@ -130,6 +135,7 @@ beforeEach(async () => {
   mockFailTables.clear();
   mockErrorTables.clear();
   mockAuthTables.clear();
+  mockLogAction.mockClear();
 });
 
 describe('useOfflineQueueProcessor — when it runs', () => {
@@ -235,6 +241,49 @@ describe('useOfflineQueueProcessor — replay fidelity', () => {
 
     expect(calls.map((c) => c.table)).toEqual(['a', 'b', 'c']);
     expect(await getQueueSize()).toBe(0);
+  });
+
+  it('emits the queued log intent exactly once when the replay lands (CONF-11)', async () => {
+    await enqueue(
+      makeMutation({
+        operation: 'DELETE',
+        table: 'members',
+        data: { id: 'm7' },
+        logIntent: {
+          wardId: 'w1',
+          userId: 'u1',
+          userEmail: 'a@b.c',
+          userName: 'Me',
+          actionType: 'member:delete',
+          description: 'member:delete|nome=Ana',
+        },
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(mockLogAction).toHaveBeenCalledTimes(1);
+    expect(mockLogAction).toHaveBeenCalledWith(
+      'w1', 'u1', 'a@b.c', 'member:delete', 'member:delete|nome=Ana', 'Me'
+    );
+  });
+
+  it('does not emit the log intent when the replay is rejected (CONF-11)', async () => {
+    mockErrorTables.add('members');
+    await enqueue(
+      makeMutation({
+        operation: 'DELETE',
+        table: 'members',
+        data: { id: 'm7' },
+        logIntent: {
+          wardId: 'w1', userId: 'u1', userEmail: 'a@b.c', actionType: 'member:delete',
+          description: 'member:delete|nome=Ana',
+        },
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(mockLogAction).not.toHaveBeenCalled();
+    expect(await getQueueSize()).toBe(1);
   });
 
   it('refreshes the cache once after draining, not per mutation', async () => {

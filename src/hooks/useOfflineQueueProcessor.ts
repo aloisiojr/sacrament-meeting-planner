@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabase';
 import { AuthContext } from '../contexts/AuthContext';
 import { reportHealthEvent } from '../lib/appHealth';
 import { peek, dequeue, incrementRetry, type QueuedMutation } from '../lib/offlineQueue';
+import { logAction } from '../lib/activityLog';
 
 /**
  * Is this failure an expired/invalid session (HTTP 401) rather than a rejection of the
@@ -130,6 +131,19 @@ export function useOfflineQueueProcessor(isOnline: boolean): void {
           if (outcome === 'accepted') {
             await dequeue();
             replayedAny = true;
+            // CONF-11: the write has landed — emit its queued activity log exactly once
+            // (the entry is already dequeued, so no later drain can repeat it).
+            if (mutation.logIntent) {
+              const intent = mutation.logIntent;
+              await logAction(
+                intent.wardId,
+                intent.userId,
+                intent.userEmail,
+                intent.actionType,
+                intent.description,
+                intent.userName
+              );
+            }
             continue;
           }
 

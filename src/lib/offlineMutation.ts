@@ -42,7 +42,10 @@ export function isNetworkError(err: unknown): boolean {
 }
 
 /** What the queue needs to replay a write later. */
-export type OfflineMutationEntry = Pick<QueuedMutation, 'table' | 'operation' | 'data' | 'onConflict'>;
+export type OfflineMutationEntry = Pick<
+  QueuedMutation,
+  'table' | 'operation' | 'data' | 'onConflict' | 'logIntent' | 'expectedUpdatedAt'
+>;
 
 /**
  * A client-generated UUID for a queue entry (and, for INSERTs, the row itself). Giving the row its
@@ -94,6 +97,8 @@ export async function withOfflineQueue<T>(
           ? { ...entry.data, id }
           : entry.data,
       onConflict: entry.onConflict,
+      logIntent: entry.logIntent,
+      expectedUpdatedAt: entry.expectedUpdatedAt,
       timestamp,
     });
 

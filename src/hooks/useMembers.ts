@@ -264,19 +264,37 @@ export function useDeleteMember() {
   const queryClient = useQueryClient();
 
   return useClassifiedMutation('useDeleteMember', {
-    mutationFn: async ({ memberId, memberName }: { memberId: string; memberName: string }): Promise<string> => {
-      await withOfflineQueue(
-        { table: 'members', operation: 'DELETE', data: { id: memberId } },
+    mutationFn: async ({ memberId, memberName }: { memberId: string; memberName: string }): Promise<string | null> => {
+      // CONF-11: like the sibling hooks, null = queued offline — do NOT log yet. The
+      // queue carries the log intent and the processor logs once when the replay lands.
+      const description = buildLogDescription('member:delete', { nome: memberName });
+      const landed = await withOfflineQueue(
+        {
+          table: 'members',
+          operation: 'DELETE',
+          data: { id: memberId },
+          logIntent: user
+            ? {
+                wardId,
+                userId: user.id,
+                userEmail: user.email ?? '',
+                userName,
+                actionType: 'member:delete',
+                description,
+              }
+            : undefined,
+        },
         async () => {
           const { error } = await supabase.from('members').delete().eq('id', memberId);
           if (error) throw error;
           return true;
         }
       );
-      return memberName;
+      return landed ? memberName : null;
     },
     onSuccess: (memberName) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      if (!memberName) return; // queued offline — logged by the queue processor when it lands
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:delete', buildLogDescription('member:delete', { nome: memberName }), userName);
       }

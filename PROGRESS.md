@@ -7,6 +7,23 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-import-tx` (wave 4C) — COMPLETA, verificada, NÃO mergeada (sem push).**
+  `specs/import-tx.md` sobre `main` @443313d, 5 commits: CONF-07 (1) import incremental
+  em UMA RPC transacional `apply_member_import` (migration **060**: advisory lock por
+  ward, updates de telefone set-based, inserts idempotentes por chave natural
+  ward+nome normalizado — repetir não duplica; cliente sem escritas diretas, erro
+  propaga), (2) cascata de snapshot vira **trigger** em `members` na mesma 060
+  (mesma transação do UPDATE; replay offline da fila cascata no servidor; cliente
+  sem best-effort, só invalida), (3) `register-first-user` reparável (ward órfã sem
+  usuário é reutilizada; mesmo e-mail retoma com session e `resumed: true`; par
+  genuinamente ocupado segue 409), (4) `delete-user` ordenado (tokens → auth user →
+  RPC atômica `delete_ward_if_no_auth_users` com lock+recontagem em `auth.users`;
+  sem `listUsers`; falha da RPC = 200 `wardCleanup: 'pending'`, estado reparável
+  documentado). Migration 060 criada, **NÃO aplicada** em nenhum banco. Gates
+  (fechamento): tsc 0, lint 0 erros/5 warnings (baseline), jest 360 suítes/5.906
+  testes verdes (360/5.902 baseline + novos líquidos). Pendências
+  estacionadas: aplicar a 060, prova SQL das funções/trigger com JWT em staging,
+  ensaio de deletes concorrentes contra banco real.
 - **BRANCH `muse/smp-cutover-gate` (wave 4B) — COMPLETA, verificada, NÃO mergeada (sem push).**
   `specs/cutover-gate.md` sobre `main` @c576bf4, 5 commits por achado: CONF-08 (gate honesto:
   primeira resolução vence por checagem, rechecagem em `AppState 'active'`, versão ausente =

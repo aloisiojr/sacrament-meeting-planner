@@ -26,8 +26,8 @@ jest.mock('../lib/supabase', () => ({
 }));
 
 const mockedSupabase = jest.mocked(supabase);
-const rpcMock = mockedSupabase.rpc as ReturnType<typeof jest.fn>;
-const fromMock = mockedSupabase.from as ReturnType<typeof jest.fn>;
+const rpcMock = mockedSupabase.rpc as unknown as jest.Mock;
+const fromMock = mockedSupabase.from as unknown as jest.Mock;
 
 const APPLY = {
   inserts: [

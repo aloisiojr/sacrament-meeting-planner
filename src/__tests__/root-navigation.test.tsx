@@ -32,6 +32,7 @@ jest.mock('../providers/SyncProvider', () => ({
 }));
 jest.mock('../components/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { children?: React.ReactNode }) => children,
+  RootErrorBoundary: ({ children }: { children?: React.ReactNode }) => children,
 }));
 jest.mock('../components/UpdateRequiredScreen', () => ({ UpdateRequiredScreen: () => null }));
 jest.mock('../hooks/useVersionGate', () => ({ useVersionGate: () => 'ok' }));

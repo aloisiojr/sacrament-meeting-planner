@@ -369,7 +369,7 @@ export default function SettingsScreen() {
         onRequestClose={() => setAppLanguageModalVisible(false)}
       >
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: colors.scrim }]}
           onPress={() => setAppLanguageModalVisible(false)}
         >
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -409,7 +409,7 @@ export default function SettingsScreen() {
         onRequestClose={() => setWardLanguageModalVisible(false)}
       >
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: colors.scrim }]}
           onPress={() => setWardLanguageModalVisible(false)}
         >
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -495,8 +495,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {

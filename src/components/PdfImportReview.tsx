@@ -415,7 +415,7 @@ export function PdfImportReview({
 
       {/* Manual-phone dialog (step 1). */}
       {editingName && (
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
           <View style={[styles.dialog, { backgroundColor: colors.card }]}>
             <Text style={[styles.dialogTitle, { color: colors.text }]} numberOfLines={1}>{editingName}</Text>
             <View style={styles.dialogRow}>
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   },
   btn: { paddingVertical: 10, paddingHorizontal: 8, minWidth: 88, minHeight: 44, justifyContent: 'center' },
   btnText: { fontSize: fontSizes.subtitle },
-  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', padding: 24 },
   dialog: { width: '100%', maxWidth: 420, borderRadius: 14, padding: 20 },
   dialogTitle: { fontSize: fontSizes.subtitle, fontWeight: '700', marginBottom: 14 },
   dialogRow: { flexDirection: 'row', gap: 12 },

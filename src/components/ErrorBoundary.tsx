@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, useColorScheme } from 'react-native';
 import i18n from '../i18n';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
+import { lightColors, darkColors } from '../lib/theme';
 import { reportAppError } from '../lib/errorReporter';
 
 interface ErrorBoundaryProps {
@@ -71,6 +72,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return this.props.children;
   }
+}
+
+/**
+ * RootErrorBoundary: for the app root, which sits OUTSIDE ThemeProvider. Resolves the
+ * full token set from the system color scheme (the persisted in-app preference is not
+ * readable before the provider mounts; 'automatic' is the default mode, so the scheme
+ * is the right crash-time approximation). Never renders the unthemed #FFFFFF/#007AFF
+ * fallback in dark mode (BEL-11).
+ */
+export function RootErrorBoundary(props: Omit<ErrorBoundaryProps, 'colors'>) {
+  const scheme = useColorScheme();
+  return <ErrorBoundary {...props} colors={scheme === 'dark' ? darkColors : lightColors} />;
 }
 
 /**

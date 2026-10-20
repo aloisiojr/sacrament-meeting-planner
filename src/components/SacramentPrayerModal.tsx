@@ -46,7 +46,7 @@ export function SacramentPrayerModal({ visible, onClose, fontSizes }: SacramentP
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.scrim }]}>
         {/* Real blur of the screen behind (expo-blur). */}
         <BlurView
           intensity={100}
@@ -112,8 +112,7 @@ export function SacramentPrayerModal({ visible, onClose, fontSizes }: SacramentP
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
     padding: 28,
   },

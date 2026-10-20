@@ -73,7 +73,7 @@ export function InviteActionDropdown({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.scrim }]} onPress={onClose}>
         <View style={[styles.content, { backgroundColor: colors.card }]}>
           {/* Section: Change status */}
           <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
@@ -176,7 +176,7 @@ export function InviteActionDropdown({
             }}
           >
             <View style={styles.iconContainer}>
-              <WhatsAppIcon size={12} color={hasPhone ? '#25D366' : colors.textSecondary} />
+              <WhatsAppIcon size={12} color={hasPhone ? colors.whatsapp : colors.textSecondary} />
             </View>
             <Text
               style={[
@@ -196,8 +196,7 @@ export function InviteActionDropdown({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
   },

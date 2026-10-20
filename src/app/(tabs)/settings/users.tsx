@@ -595,7 +595,7 @@ export default function UserManagementScreen() {
         animationType="fade"
         onRequestClose={closeInviteModal}
       >
-        <Pressable style={styles.modalOverlay} onPress={closeInviteModal}>
+        <Pressable style={[styles.modalOverlay, { backgroundColor: colors.scrim }]} onPress={closeInviteModal}>
           <Pressable
             style={[styles.modalContent, { backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
@@ -871,8 +871,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {

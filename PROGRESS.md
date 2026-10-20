@@ -7,6 +7,22 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-reliability-rest` (wave 4A) — COMPLETA, verificada, NÃO mergeada (sem push).**
+  `specs/reliability-rest.md` sobre `main` @b7f049a, 7 commits por achado: CONF-04 (migration
+  **053** + claim atômico `processing`/limit 200 no `process-notifications`; `sent` só com
+  ticket ok, resto `failed` com attempts/last_error — teste antigo que aposentava em outage
+  foi reescrito), CONF-10 (**054**: trigger sobrescreve `assigned_by_role` com
+  `current_user_role()`, padrão 051), CONF-13 (**055**: dedup + UNIQUE em `expo_push_token`;
+  upsert do cliente transfere o dono), CONF-14 (`lib/fetchAllPages` em membros/hinos/tópicos;
+  índice `members(responsible_id)` já existia na 052), CONF-11 (fila carrega `logIntent`;
+  delete offline não loga, processor loga 1× ao aceitar), CONF-09/15 (**056**: publication
+  sem tabelas mortas + `wards`/`activity_log`; guarda `updated_at` em `useAgenda`/`AgendaForm`
+  e no replay — conflito vira `AgendaConflictError`/health event/dead-letter; realtime
+  invalida `['ward']` e `activity-log`, `wards` filtrado por `id=`). Migrations 053–056
+  criadas, **NÃO aplicadas** em nenhum banco. Gates (fechamento): tsc 0, lint 0 erros/
+  5 warnings (baseline), jest 358 suítes / 5.872 testes verdes (352/5.842 baseline + novos).
+  Nota de ambiente: worktree sem `node_modules` — testes rodaram com symlink temporário
+  para o `node_modules` do worktree irmão (removido; nada disso commitado).
 - **BRANCH `muse/smp-perf-queries` (wave 3B) — COMPLETA, verificada, NÃO mergeada (sem push).**
   `specs/perf-queries-cache-bundle.md` sobre `main` @ad110b5: RAP-04/DEC-02 (allowlist de
   persistência + buster por ala + teto 2 MiB com telemetria; sign-out já removia o cache

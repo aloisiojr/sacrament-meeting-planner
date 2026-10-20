@@ -1,3 +1,5 @@
+> **APOSENTADO (wave 7, 2026-10-20).** Retrato de 2026-07-30, anterior à auditoria v2.0 e às waves 1–7 de remediação. O estado vivo de release está em `PROGRESS.md` (seção Now), no `docs/CUTOVER_RUNBOOK.md` e nas specs das waves em `specs/`. Mantido abaixo só como histórico — não usar como retrato atual.
+
 # Release-Readiness Audit — v2.0 (2026-07-30)
 
 > ## Decisions & scope (locked 2026-07-30)

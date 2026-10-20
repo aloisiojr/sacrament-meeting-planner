@@ -3,7 +3,8 @@
  * QR-generation script cannot drift apart.
  *
  * A store with a `null` url is treated as unpublished: it produces no QR code and no footer entry.
- * To add Android, fill in `url` here and re-run `node scripts/generate-store-qr.mjs`.
+ * To add Android, fill in `url` here and add the QR asset as `assets/store-qr-android.png`
+ * (the iOS asset was generated externally — there is no QR script in this repo).
  */
 
 export interface StoreLink {

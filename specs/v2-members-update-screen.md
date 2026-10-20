@@ -1,6 +1,6 @@
 # Spec — "Atualizar lista de membros" screen + robust CSV import
 
-Status: **draft (GATE 1 — awaiting approval)** · Branch: `v2.0` · Date: 2026-07-29
+Status: **built** (contido na `main`; wave 7, 2026-10-20 — a tela de atualização de membros foi implementado e mergeado; o `draft (GATE 1)` era resíduo documental) · Branch: `v2.0` · Date: 2026-07-29
 
 Redesign the CSV members settings screen into a guided 3-step flow and make CSV import strict and
 highly informative — while guaranteeing an exported CSV always re-imports cleanly.

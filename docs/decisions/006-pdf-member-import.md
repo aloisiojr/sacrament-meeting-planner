@@ -1,6 +1,8 @@
 # ADR-006 — On-device PDF member import (LGPD / release considerations)
 
-Status: proposed · Date: 2026-07-31 · Advisor: mobile-release-advisor
+Status: Accepted · Date: 2026-07-31 · Advisor: mobile-release-advisor
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 Related: `specs/pdf-member-import.md`, `specs/pdf-member-import.reference.md`. Supersedes the removed
 third-party-AI import guide.
 

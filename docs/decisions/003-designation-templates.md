@@ -1,6 +1,8 @@
 # ADR 003 — Per-ward designation read-text templates (additive)
 
-Status: proposed · Date: 2026-07-29 · Advisor: mobile-release-advisor · Related: [ADR 001](001-v2-release-cutover.md), [ADR 002](002-designations-schema.md)
+Status: Accepted · Date: 2026-07-29 · Advisor: mobile-release-advisor · Related: [ADR 001](001-v2-release-cutover.md), [ADR 002](002-designations-schema.md)
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 
 ## Context
 Spec 3 lets a ward customize the four designation read-texts (Apoio/Desobrigação/Avanço/Novo

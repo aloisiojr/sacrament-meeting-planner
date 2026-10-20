@@ -1,6 +1,8 @@
 # ADR-005 — Enforce role-based write authorization at the database (RLS + import_members)
 
-Status: **Proposed** (mobile-release-advisor recommendation) · Date: 2026-07-30 · Relates to: P0-1 in
+Status: **Accepted** (mobile-release-advisor recommendation) · Date: 2026-07-30 · Relates to: P0-1 in
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 `docs/analysis/RELEASE_READINESS_v2.0.md`, ADR-001 (v2 cutover)
 
 ## Context

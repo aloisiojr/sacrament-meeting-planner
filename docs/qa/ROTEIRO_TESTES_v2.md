@@ -1,6 +1,6 @@
 # Roteiro de Testes Manuais — Sacrament Meeting Planner (v2.0 / staging)
 
-Passo-a-passo para validar **todas** as funcionalidades do app no ambiente **staging**, via Expo Go.
+Passo-a-passo para validar **todas** as funcionalidades do app no ambiente **staging**, no build **SMP Dev** (TestFlight, profile `development-testflight`). Expo Go **não** serve: desde o SDK 53 ele não recebe push remoto, e a seção 7 inteira é sobre push.
 Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Marque `[x]` ao passar.
 
 ## Legenda
@@ -11,7 +11,7 @@ Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Ma
 - `⚙️ BACKEND` — a validação real é no servidor; na UI confira que o botão/afeta some ou dá erro.
 
 ## Pré-requisitos
-1. App aberto no Expo Go apontando para o **Supabase staging** (o mesmo onde rodamos `db push`).
+1. App SMP Dev instalado pelo TestFlight, apontando para o **Supabase staging** (o mesmo onde rodamos `db push`).
 2. `⏸ SEED` **Contas de teste** — me peça para preparar 3 usuários no staging:
    - `bispado@teste` (papel **bishopric**)
    - `secretario@teste` (papel **secretary**)
@@ -163,6 +163,24 @@ Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Ma
 ### 4.6 Excluir membro
 - Passos: exclua um membro sem discursos futuros.
 - Esperado: some da lista.
+
+### 4.7 Importar PDF de membros do LCR (prova em aparelho — CLN-05)
+> Este é o fluxo que **só existe no aparelho**: a extração do PDF roda numa WebView
+> com pdf.js (fora do alcance da suíte). Sem este passo marcado, o import por PDF
+> segue "nunca provado em aparelho".
+- Pré: um PDF real de lista de membros do LCR (o mesmo usado no desenvolvimento)
+  disponível no aparelho (Arquivos/iCloud/WhatsApp).
+- Passos: Membros → Importar → escolher o PDF do LCR.
+- Esperado: a tela de revisão abre com a contagem de membros batendo com o PDF;
+  nomes e telefones alinhados às linhas certas (conferir 5 nomes sorteados contra o
+  PDF, incluindo um com telefone em branco e um com nome composto).
+- Passos: confirmar a importação e abrir a lista.
+- Esperado: membros criados/atualizados sem duplicar quem já existia por nome.
+- Passos: importar o MESMO PDF de novo.
+- Esperado: nenhuma duplicação (a RPC `apply_member_import` é idempotente por
+  ward+nome normalizado); telefones alterados no PDF atualizam, os demais não mudam.
+- `📴 OFFLINE`: repetir a escolha do PDF em modo avião.
+- Esperado: importação bloqueada com aviso honesto (nada enfileirado pela metade).
 
 ---
 

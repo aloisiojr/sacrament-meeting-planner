@@ -1,6 +1,8 @@
 # ADR 001 — v2.0 release cutover (breaking DB change, forced update)
 
-Status: proposed · Date: 2026-07-28 · Advisor: mobile-release-advisor
+Status: Accepted · Date: 2026-07-28 · Advisor: mobile-release-advisor
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 
 ## Context
 v2.0 makes a **breaking** DB change (drops `meeting_actors`, changes agenda references, adds member

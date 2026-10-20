@@ -305,6 +305,39 @@ describe('create-invitation — the response', () => {
     expect(res.body.invitation).toMatchObject({ id: 'inv1', email: 'new@ward.org' });
   });
 
+  it('answers 429 when the rate limiter says the (IP, email) pair is over the limit (CONF-12)', async () => {
+    asRole('bishopric');
+    responses.rpc = () => ({ data: false, error: null });
+    const res = await call(VALID);
+
+    expect(res.status).toBe(429);
+    expect(res.body).toMatchObject({ code: 'rate-limit/exceeded' });
+    expect(rec.inserts.filter((i) => i.table === 'invitations')).toHaveLength(0);
+    expect(rec.rpcCalls[0]).toMatchObject({ fn: 'check_rate_limit' });
+    expect(rec.rpcCalls[0].args).toMatchObject({
+      p_function: 'create-invitation',
+      p_email: 'new@ward.org',
+      p_max_hits: 20,
+      p_window_seconds: 3600,
+    });
+  });
+
+  it('names the missing env var instead of an opaque 500 (CONF-12)', async () => {
+    const deno = (globalThis as unknown as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
+    const originalGet = deno.env.get;
+    deno.env.get = (k: string) => (k === 'SUPABASE_URL' ? undefined : `test-${k}`);
+    const q = quiet();
+    try {
+      const res = await call(VALID);
+      expect(res.status).toBe(500);
+      expect(res.body).toMatchObject({ code: 'config/missing-env' });
+      expect(JSON.stringify(res.body)).toContain('SUPABASE_URL');
+    } finally {
+      deno.env.get = originalGet;
+      q.restore();
+    }
+  });
+
   it('reports a 500 when the insert fails, rather than handing back a token that was never stored', async () => {
     // A deep link whose token is not in the table is an invitation that can never be redeemed.
     responses.select = () => ({ data: null, error: { message: 'unique violation' } });

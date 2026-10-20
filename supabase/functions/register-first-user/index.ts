@@ -10,6 +10,68 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
+// CORS `*` is kept by decision (CONF-12, specs/cutover-gate.md): the mobile app sends no
+// Origin, so CORS is not the protection on this endpoint — auth (where present), the rate
+// limit below, and validation are. The helpers here are duplicated in the other public
+// functions: the repo has no supabase/functions/_shared/ and its pattern is minimal,
+// consistent duplication per function (cf. cronSecretOk).
+const RATE_LIMIT_MAX_HITS = 20;
+const RATE_LIMIT_WINDOW_SECONDS = 3600;
+
+/** Name of the first missing env var, or null. Checked at the top so a misconfigured
+ *  deploy fails with the variable NAMED instead of an opaque runtime 500 (CONF-12). */
+function missingEnv(names: string[]): string | null {
+  for (const name of names) {
+    if (!Deno.env.get(name)) return name;
+  }
+  return null;
+}
+
+function envErrorResponse(name: string): Response {
+  console.error(`Missing required environment variable: ${name}`);
+  return new Response(
+    JSON.stringify({
+      error: `Missing required environment variable: ${name}`,
+      code: 'config/missing-env',
+    }),
+    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+/** 429 Response when (function, IP, email) exceeds the limit, else null. A broken
+ *  limiter fails OPEN (logged): the brake must never take down the legitimate flow. */
+async function rateLimitResponse(
+  admin: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> },
+  req: Request,
+  functionName: string,
+  email: string
+): Promise<Response | null> {
+  try {
+    const ip = (req.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim() || 'unknown';
+    const { data, error } = await admin.rpc('check_rate_limit', {
+      p_function: functionName,
+      p_ip: ip,
+      p_email: email.trim().toLowerCase(),
+      p_max_hits: RATE_LIMIT_MAX_HITS,
+      p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+    });
+    if (error) {
+      console.error('Rate limit check failed (failing open):', error);
+      return null;
+    }
+    if (data === false) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests', code: 'rate-limit/exceeded' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    return null;
+  } catch (err) {
+    console.error('Rate limit check failed (failing open):', err);
+    return null;
+  }
+}
+
 // Writer roles allowed to self-register. Deno cannot import src/lib/permissions.ts
 // (WRITER_ROLES), so this literal is pinned by security-perms-concordance.test.ts.
 const ALLOWED_ROLES = ['bishopric', 'secretary'];
@@ -32,6 +94,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const missing = missingEnv(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
+    if (missing) return envErrorResponse(missing);
+
     const input: RegisterInput = await req.json();
 
     // Validate required fields
@@ -72,6 +137,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
+
+    const limited = await rateLimitResponse(supabaseAdmin, req, 'register-first-user', input.email);
+    if (limited) return limited;
 
     // Check if stake+ward combination already exists
     const { data: existingWard } = await supabaseAdmin

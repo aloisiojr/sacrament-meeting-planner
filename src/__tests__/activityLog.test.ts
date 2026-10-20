@@ -1,4 +1,5 @@
 import { logAction, createLogger, buildLogDescription, parseLogDescription, formatLogDescription } from '../lib/activityLog';
+import { parseActivitySearchDate } from '../lib/activitySearch';
 import type { TFunction } from 'i18next';
 
 // Mock supabase
@@ -251,5 +252,27 @@ describe('formatLogDescription', () => {
     const desc = buildLogDescription('sunday_type:change', { data: '2025-04-06', tipo: 'testimony_meeting' });
     const result = formatLogDescription(desc, t);
     expect(result).toBe('Sunday 2025-04-06 set to Testimony Meeting');
+  });
+});
+
+describe('parseActivitySearchDate (RAP-10 — date search by range, not timestamp cast)', () => {
+  it('parses an ISO date into a [day, nextDay) range', () => {
+    expect(parseActivitySearchDate('2026-02-15')).toEqual({
+      gte: '2026-02-15T00:00:00.000Z',
+      lt: '2026-02-16T00:00:00.000Z',
+    });
+  });
+
+  it('parses a DD/MM/YYYY date', () => {
+    expect(parseActivitySearchDate('15/02/2026')).toEqual({
+      gte: '2026-02-15T00:00:00.000Z',
+      lt: '2026-02-16T00:00:00.000Z',
+    });
+  });
+
+  it('rejects plain text and impossible dates', () => {
+    expect(parseActivitySearchDate('silva')).toBeNull();
+    expect(parseActivitySearchDate('31/02/2026')).toBeNull();
+    expect(parseActivitySearchDate('2026-13-01')).toBeNull();
   });
 });

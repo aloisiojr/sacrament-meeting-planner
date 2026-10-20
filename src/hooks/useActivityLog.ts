@@ -2,6 +2,7 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { parseActivitySearchDate } from '../lib/activitySearch';
 import type { ActivityLog } from '../types/database';
 
 const PAGE_SIZE = 30;
@@ -23,6 +24,8 @@ interface ActivityLogPage {
   nextCursor: number | null;
 }
 
+export { parseActivitySearchDate } from '../lib/activitySearch';
+
 /**
  * Hook for paginated activity log with real-time search.
  * Permission: history:read (Bishopric + Secretary).
@@ -43,14 +46,20 @@ export function useActivityLog({ search }: UseActivityLogOptions = {}) {
         .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
-      // Apply search filter (case-insensitive, across datetime, email, description)
+      // Apply search filter. Date terms use a created_at range (RAP-10, index-backed);
+      // text terms ilike the three trigram-indexed columns (migration 052).
       if (search && search.trim()) {
         // Sanitize search term: escape PostgREST filter special characters
         const term = search.trim().replace(/[,.*()%]/g, '');
         if (term) {
-          q = q.or(
-            `user_email.ilike.%${term}%,user_name.ilike.%${term}%,description.ilike.%${term}%,created_at::text.ilike.%${term}%`
-          );
+          const dateRange = parseActivitySearchDate(term);
+          if (dateRange) {
+            q = q.gte('created_at', dateRange.gte).lt('created_at', dateRange.lt);
+          } else {
+            q = q.or(
+              `user_email.ilike.%${term}%,user_name.ilike.%${term}%,description.ilike.%${term}%`
+            );
+          }
         }
       }
 

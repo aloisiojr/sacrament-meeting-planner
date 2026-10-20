@@ -20,7 +20,12 @@ import WhatsAppTemplateScreen from '../app/(tabs)/settings/whatsapp';
 const INFORMAL_TOKEN = '{nome informal}';
 const FULL_NAME_TOKEN = '{nome}';
 
-jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+// Partial mock: keep initReactI18next — the screen now transitively loads the real i18n init
+// (via useClassifiedMutation → lib/offlineGuard), which calls i18n.use(initReactI18next).
+jest.mock('react-i18next', () => {
+  const actual = (jest.requireActual('react-i18next')) as Record<string, unknown>;
+  return { ...actual, useTranslation: () => ({ t: (k: string) => k }) };
+});
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children?: React.ReactNode }) =>
     require('react').createElement('SafeAreaView', {}, children),

@@ -22,7 +22,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
-import { throwIfOffline, isRequiresConnectionError } from '../../../lib/offlineGuard';
+import { throwIfOffline, isRequiresConnectionError, isOfflineBlockedError } from '../../../lib/offlineGuard';
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons';
 import type { Role } from '../../../types/database';
@@ -89,7 +89,12 @@ export default function UserManagementScreen() {
     (err: unknown, fallbackKey: string) => {
       Alert.alert(
         t('common.error'),
-        isRequiresConnectionError(err) ? t('auth.requiresConnection') : t(fallbackKey)
+        // These edge-function ops are online-only AND classified blocked-offline (DEC-01): the
+        // wrapper now rejects with offline_blocked before callEdgeFunction's own guard runs.
+        // Both mean the same thing to the user here — "this needs a connection".
+        isRequiresConnectionError(err) || isOfflineBlockedError(err)
+          ? t('auth.requiresConnection')
+          : t(fallbackKey)
       );
     },
     [t]

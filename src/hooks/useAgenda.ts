@@ -57,6 +57,29 @@ export function isExcludedFromAgenda(reason: string): boolean {
 }
 
 /**
+ * Whether an Agenda card can be expanded. Online: every Sunday expands (including
+ * no-sacrament ones — they open so the Sunday type can be changed). Offline: only
+ * the next Sunday, the one the ward may need to conduct from cache. Extracted from
+ * agenda.tsx so the rule is tested against the production function (ARQ-02).
+ */
+export function isSundayExpandable(isOnline: boolean, date: string, nextSunday: string | null): boolean {
+  return isOnline || date === nextSunday;
+}
+
+/**
+ * The expanded card after connectivity changes: going offline collapses any
+ * expanded card that is not the next Sunday. Derived during render in agenda.tsx
+ * (no effect, no state write-back); extracted for direct testing (ARQ-02).
+ */
+export function resolveExpandedDate(
+  isOnline: boolean,
+  expandedDate: string | null,
+  nextSunday: string | null,
+): string | null {
+  return !isOnline && expandedDate && expandedDate !== nextSunday ? null : expandedDate;
+}
+
+/**
  * Check if a sunday is a special meeting type (not normal speeches).
  */
 export function isSpecialMeeting(reason: string | null): boolean {

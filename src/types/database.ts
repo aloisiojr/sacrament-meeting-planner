@@ -70,7 +70,7 @@ export type NotificationTargetRole =
   | 'bishopric'
   | 'secretary_and_bishopric';
 
-export type NotificationStatus = 'pending' | 'sent' | 'cancelled';
+export type NotificationStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled';
 
 // --- Table Types ---
 
@@ -129,11 +129,6 @@ export interface WardTopic {
   updated_at: string;
 }
 
-export interface GeneralCollection {
-  id: string;
-  name: string;
-  language: string;
-}
 
 export interface GeneralTopic {
   id: string;
@@ -262,18 +257,6 @@ export interface Invitation {
   created_at: string;
 }
 
-export interface DevicePushToken {
-  id: string;
-  user_id: string;
-  ward_id: string;
-  expo_push_token: string;
-  role: string | null;
-  app_version: string | null;
-  platform: string | null;
-  last_update_nudge_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface NotificationQueue {
   id: string;
@@ -365,4 +348,97 @@ export interface CreateTopicInput {
 export interface ImportResult {
   imported: number;
   deleted: number;
+}
+
+// --- Push tokens & health events (rows the client writes directly) ---
+
+/** device_push_tokens (001 + role added in 029; identity server-derived since 051). */
+export interface DevicePushToken {
+  id: string;
+  user_id: string;
+  ward_id: string;
+  expo_push_token: string;
+  role: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** general_collections (001): global topic collections by language. Row type for the
+ *  typed client — useTopics queries this table for every topic list. */
+export interface GeneralCollection {
+  id: string;
+  name: string;
+  language: string;
+}
+
+/** app_health_events (insert shape used by src/lib/appHealth.ts). */
+export interface AppHealthEvent {
+  id: string;
+  ward_id: string | null;
+  event_type: string;
+  details: unknown;
+  app_version: string | null;
+  platform: string | null;
+  created_at: string;
+}
+
+// --- Typed Supabase client (ARQ-01 / DEC-03) ---
+//
+// Interim hand-maintained schema map: Row types are the interfaces above, and
+// Insert/Update are Partial<Row> (permissive about server-defaulted columns — the
+// known interim limitation). The end state remains DEC-03's: replace this file's
+// table map with `supabase gen types` output from staging. What this already buys:
+// table/column names and select results are type-checked at every call site, and
+// the enum unions are locked to the migrations by database-types.test.ts (ARQ-07).
+
+// The Row types above are interfaces, which (unlike object type aliases) do NOT get
+// implicit index signatures and so are not assignable to postgrest-js'
+// Record<string, unknown> slots — the schema then collapses to never at every call
+// site. Intersecting each slot with Record<string, unknown> restores assignability
+// while keeping the concrete keys for column checking.
+type TableDef<Row> = {
+  Row: Row & Record<string, unknown>;
+  Insert: Partial<Row> & Record<string, unknown>;
+  Update: Partial<Row> & Record<string, unknown>;
+  Relationships: never[];
+};
+
+export interface Database {
+  public: {
+    Tables: {
+      wards: TableDef<Ward>;
+      members: TableDef<Member>;
+      ward_topics: TableDef<WardTopic>;
+      general_topics: TableDef<GeneralTopic>;
+      general_collections: TableDef<GeneralCollection>;
+      sunday_exceptions: TableDef<SundayException>;
+      speeches: TableDef<Speech>;
+      hymns: TableDef<Hymn>;
+      designations: TableDef<Designation>;
+      sunday_agendas: TableDef<SundayAgenda>;
+      activity_log: TableDef<ActivityLog>;
+      invitations: TableDef<Invitation>;
+      notification_queue: TableDef<NotificationQueue>;
+      device_push_tokens: TableDef<DevicePushToken>;
+      app_health_events: TableDef<AppHealthEvent>;
+    };
+    Views: Record<string, never>;
+    Functions: {
+      apply_member_import: {
+        Args: {
+          p_ward_id: string;
+          p_inserts?: unknown;
+          p_phone_updates?: unknown;
+          p_remove_ids?: string[];
+        };
+        Returns: unknown;
+      };
+      import_members: {
+        Args: Record<string, unknown>;
+        Returns: unknown;
+      };
+    };
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
 }

@@ -26,7 +26,7 @@ import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
 import { useSetSundayType, useRemoveSundayException, useAutoAssignMissingSundayTypes, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
 import { useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
-import { useLazyCreateAgenda, useUpdateAgendaByDate } from '../../hooks/useAgenda';
+import { isSundayExpandable, resolveExpandedDate, useLazyCreateAgenda, useUpdateAgendaByDate } from '../../hooks/useAgenda';
 import { useAgendaWindowData } from '../../hooks/useAgendaWindowData';
 import { AgendaExportPdfButton } from '../../components/AgendaExportPdfButton';
 import { AgendaForm } from '../../components/AgendaForm';
@@ -210,8 +210,7 @@ function AgendaTabContent() {
   // Auto-collapse a non-next-Sunday card while offline. Derived rather than written back from an
   // effect: the offline rule is a function of the current state, so computing it during render
   // avoids the extra pass (and the state can never be briefly wrong in a painted frame).
-  const expandedDate =
-    !isOnline && expandedDateState && expandedDateState !== nextSunday ? null : expandedDateState;
+  const expandedDate = resolveExpandedDate(isOnline, expandedDateState, nextSunday);
 
   const handleToggle = useCallback(
     (date: string) => {
@@ -276,9 +275,7 @@ function AgendaTabContent() {
       const sundayDate = new Date(date + 'T12:00:00');
       const isPast = sundayDate < today;
 
-      // All Sundays expand (no-sacrament ones open to the type dropdown so the type can be changed).
-      const baseExpandable = true;
-      const isExpandable = baseExpandable && (isOnline || date === nextSunday);
+      const isExpandable = isSundayExpandable(isOnline, date, nextSunday);
 
       return (
         <AgendaSundayCard

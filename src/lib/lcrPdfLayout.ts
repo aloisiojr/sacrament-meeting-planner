@@ -55,9 +55,11 @@ export function rowGapThreshold(freq: ReadonlyMap<number, number>): number {
 /**
  * Split baseline positions (top → bottom) into rows, breaking where the gap REACHES `threshold`.
  *
- * `>=` mirrors PdfTextExtractor exactly. With `>` the two disagreed on a gap landing precisely on
- * the threshold, so this helper — and the check script built on it — could call a file clean while
- * the app split a record inside it.
+ * The comparison is `>=` on purpose and is the canonical convention for this parser:
+ * with `>` a gap landing precisely on the threshold would split differently here than
+ * in the check script built on this helper, which could call a file clean while the
+ * app split a record inside it. (PdfTextExtractor no longer splits rows at all — it
+ * forwards raw fragments; grouping happens here.)
  *
  * With `Infinity` nothing ever splits and every line lands in ONE row: the deliberate "cannot
  * infer" fallback, which leaves the parser to anchor structurally on its own.

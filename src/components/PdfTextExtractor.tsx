@@ -5,9 +5,11 @@
  * page's drawn segments and filled rectangles, and its viewport transform. The raw PDF is never
  * persisted or uploaded (AC1, AC15).
  *
- * ⚠️ Nothing in this file can run under jest — it only executes inside a WebView, on a device. That
- * is exactly why it holds no logic: it reads and forwards. Everything that decides anything lives in
- * `src/lib/lcrPdfPage.ts` and its neighbours, as plain TS with tests.
+ * ⚠️ Nothing in this file can run under jest — it only executes inside a WebView, on a device. The
+ * BOOTSTRAP script below does the mechanical measurement (pdf.js operator walk, CTM coordinate
+ * transforms) and forwards raw fragments; it holds no DECISION logic — what a record is, where
+ * rows split, what gets kept lives in `src/lib/lcrPdfPage.ts` and its neighbours, as plain TS
+ * with tests.
  *
  * It used to build the record text in here, which cost a copy of `rowGapThreshold` as a literal
  * string — `${fn}` cannot be injected, because minification makes the function anonymous and Hermes

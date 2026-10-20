@@ -202,9 +202,6 @@ export function getFlagForCode(code: string): string {
 /**
  * Find a country entry by its unique label (e.g., 'United States (+1)').
  */
-export function getCountryByLabel(label: string): CountryCode | undefined {
-  return COUNTRY_CODES.find((c) => c.label === label);
-}
 
 /**
  * Build lookup sets grouped by digit length (longest first) from COUNTRY_CODES.

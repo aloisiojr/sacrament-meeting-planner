@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-import { PdfTextExtractor } from '../components/PdfTextExtractor';
+import { BOOTSTRAP, PdfTextExtractor } from '../components/PdfTextExtractor';
 import { EXTRACTION_TIMEOUT_MS, PDF_TIMEOUT, PDF_TOO_LARGE } from '../lib/pdfExtraction';
 import type { LcrRawPage } from '../lib/lcrPdfPage';
 
@@ -173,5 +173,16 @@ describe('PdfTextExtractor (RAP-01)', () => {
     expect(newResult).toHaveBeenCalledTimes(1);
     expect(oldResult).not.toHaveBeenCalled();
     act(() => r.unmount());
+  });
+});
+
+describe('PdfTextExtractor BOOTSTRAP (ARQ-03)', () => {
+  it('parses as valid JavaScript', () => {
+    expect(() => new Function(BOOTSTRAP)).not.toThrow();
+  });
+
+  it('defines the window.__runPdf entry point and posts readiness', () => {
+    expect(BOOTSTRAP).toContain('window.__runPdf');
+    expect(BOOTSTRAP).toContain('ReactNativeWebView.postMessage');
   });
 });

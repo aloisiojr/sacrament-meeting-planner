@@ -41,6 +41,17 @@ import {
   createWrapper,
 } from './integration/setup-integration';
 import { POLLING_INTERVAL_MS, SYNCED_TABLES, TABLE_TO_QUERY_KEYS, getQueryKeysForTable } from '../lib/sync';
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: () => Promise.resolve({ status: 'granted' }),
+  requestPermissionsAsync: () => Promise.resolve({ status: 'granted' }),
+  getExpoPushTokenAsync: () => Promise.resolve({ data: 'ExpoTok[A]' }),
+  setNotificationChannelAsync: () => Promise.resolve(),
+  AndroidImportance: { MAX: 5 },
+  addNotificationResponseReceivedListener: () => ({ remove: jest.fn() }),
+  getLastNotificationResponseAsync: () => Promise.resolve(null),
+}));
+import { shouldRegisterPushToken } from '../hooks/useNotifications';
 import { topicKeys } from '../hooks/useTopics';
 
 // --- Module mocks ---
@@ -325,19 +336,15 @@ describe('F064-S2: useRegisterPushToken includes role in upsert', () => {
     );
   });
 
-  it('EC-064-03: observer role is guarded - useRegisterPushToken skips registration', () => {
-    // The hook has guard: if (!user || !wardId || role === 'observer' ...) return;
-    // We verify the guard logic
-    function shouldRegister(role: string, user: any, wardId: string | null): boolean {
-      if (!user || !wardId || role === 'observer') return false;
-      return true;
-    }
-
-    expect(shouldRegister('observer', { id: 'u1' }, 'w1')).toBe(false);
-    expect(shouldRegister('bishopric', { id: 'u1' }, 'w1')).toBe(true);
-    expect(shouldRegister('secretary', { id: 'u1' }, 'w1')).toBe(true);
-    expect(shouldRegister('bishopric', null, 'w1')).toBe(false);
-    expect(shouldRegister('bishopric', { id: 'u1' }, null)).toBe(false);
+  it('EC-064-03: push registration is guarded by the production predicate', () => {
+    // ARQ-02: this block used to re-declare the guard locally (role-based) and assert
+    // the copy. Production gates on the push:receive PERMISSION (DEC-04) via
+    // shouldRegisterPushToken — imported and exercised here; the role->permission
+    // mapping itself is covered by permissions.test.ts.
+    expect(shouldRegisterPushToken({ userId: 'u1', wardId: 'w1', canReceivePush: false })).toBe(false);
+    expect(shouldRegisterPushToken({ userId: 'u1', wardId: 'w1', canReceivePush: true })).toBe(true);
+    expect(shouldRegisterPushToken({ userId: null, wardId: 'w1', canReceivePush: true })).toBe(false);
+    expect(shouldRegisterPushToken({ userId: 'u1', wardId: null, canReceivePush: true })).toBe(false);
   });
 });
 

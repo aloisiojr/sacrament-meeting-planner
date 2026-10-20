@@ -60,4 +60,11 @@ module.exports = {
     '!src/**/*.d.ts',
   ],
   coverageReporters: ['text-summary', 'json-summary', 'lcov'],
+  // ARQ-09 ratchet: measured 2026-10-20 (wave 6) at statements 76.8 / branches 68.5 /
+  // functions 72.0 / lines 78.4 across both platform projects. The floor sits just
+  // below the measurement so a coverage regression fails the run; raise it as
+  // coverage grows, never lower it silently.
+  coverageThreshold: {
+    global: { statements: 75, branches: 66, functions: 70, lines: 76 },
+  },
 };

@@ -59,14 +59,16 @@ function mockMakeChain(table: string) {
   return chain;
 }
 
-jest.mock('../lib/supabase', () => ({
-  supabase: {
+jest.mock('../lib/supabase', () => {
+  const client = {
     from: (table: string) => {
       net.fromCalls += 1;
       return mockMakeChain(table);
     },
-  },
-}));
+  };
+  // Production exports supabaseDynamic as the same client object (the replay seam).
+  return { supabase: client, supabaseDynamic: client };
+});
 
 jest.mock('../contexts/AuthContext', () => {
   const value = {

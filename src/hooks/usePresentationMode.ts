@@ -4,7 +4,7 @@
  * and checks if today is Sunday for button visibility.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useAgenda , isSpecialMeeting } from './useAgenda';
 import { useSpeeches } from './useSpeeches';
 import { useSundayExceptions } from './useSundayTypes';
@@ -274,15 +274,24 @@ export function buildPresentationCards(
  */
 export function usePresentationData(sundayDate: string) {
   const locale = getCurrentLanguage();
-  const { data: agenda, isLoading: agendaLoading } = useAgenda(sundayDate);
-  const { data: speeches, isLoading: speechesLoading } = useSpeeches({
+  // Full results for the three meeting-critical queries (EST-06): the screen must
+  // tell "still loading" and "backend failed" apart from "genuinely empty meeting",
+  // or the meeting gets conducted over `---` placeholders on a broken backend.
+  const agendaQ = useAgenda(sundayDate);
+  const speechesQ = useSpeeches({
     start: sundayDate,
     end: sundayDate,
   });
-  const { data: exceptions, isLoading: exceptionsLoading } = useSundayExceptions(
+  const exceptionsQ = useSundayExceptions(
     sundayDate,
     sundayDate
   );
+  const agenda = agendaQ.data;
+  const speeches = speechesQ.data;
+  const exceptions = exceptionsQ.data;
+  const agendaLoading = agendaQ.isLoading;
+  const speechesLoading = speechesQ.isLoading;
+  const exceptionsLoading = exceptionsQ.isLoading;
   const { data: allHymns } = useHymns(locale);
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
   const { data: members } = useMembers();
@@ -309,6 +318,16 @@ export function usePresentationData(sundayDate: string) {
   }, [allHymns, sacramentalHymns]);
 
   const isLoading = agendaLoading || speechesLoading || exceptionsLoading;
+  const failedQueries = [agendaQ, speechesQ, exceptionsQ].filter((q) => q.isError);
+  const isError = failedQueries.length > 0;
+  const error = failedQueries[0]?.error ?? null;
+  const refetch = useCallback(() => {
+    for (const q of [agendaQ, speechesQ, exceptionsQ]) {
+      if (q.isError) void q.refetch();
+    }
+    // Result objects change identity every render; see HomeTab retryFailed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaQ.isError, speechesQ.isError, exceptionsQ.isError]);
 
   return {
     agenda,
@@ -316,6 +335,9 @@ export function usePresentationData(sundayDate: string) {
     exception,
     isSpecial,
     isLoading,
+    isError,
+    error,
+    refetch,
     hymnLookup,
     members: members ?? [],
     sundayDate,

@@ -7,6 +7,18 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **Wave 2A `specs/fix-visibility-time.md` — BUILD COMPLETE, NÃO mergeada (branch
+  `muse/smp-fix-visibility-time`, 9 commits sobre `main` @7ccdea1).** Passos 1–9 do
+  `.plan.md` todos ✅: hoje local (EST-08/13), Home/Presentation com erro+retry
+  (EST-06/19), `errorReporter` integrado (EST-07: boundary + handler global + ward,
+  payload sem texto, throttle 60 s/teto 5/min), QueryClient singleton em
+  `lib/queryClient` (EST-26), AuthContext com `INITIAL_SESSION` nulo ignorado, idioma
+  de boot imposto e efeito da ala estável (EST-10/15, `settings/users` via `signOut`
+  do contexto), `getStartupGateState` puro consumido pelo NavigationGuard e
+  `QueryCache.onError` gateado por `__DEV__` (EST-20), e token de push com health
+  event `push_token_register_failed` + retentativa (EST-23). Gates: tsc 0, lint
+  0 erros/5 warnings, jest 338 suites/5742 testes verdes. Sem i18n novo, sem
+  migration, sem push/merge.
 - **BRANCH `fix/keyboard-safe-forms` — 16 commits, verificada, NÃO mergeada.**
   Teclado + ajustes no seletor de pessoas/temas. Suíte 290 suites / 5342 tests, tsc 0, lint no
   baseline (2 warnings pré-existentes em PdfTextExtractor).

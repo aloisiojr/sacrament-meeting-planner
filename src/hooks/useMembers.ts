@@ -11,6 +11,7 @@ import { logAction, buildLogDescription } from '../lib/activityLog';
 import { resolveContactSnapshot } from '../lib/contact';
 import { withOfflineQueue, createClientId } from '../lib/offlineMutation';
 import { speechKeys } from './useSpeeches';
+import { toISODateString } from '../lib/dateUtils';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
 // --- Query Keys ---
@@ -200,7 +201,7 @@ export function useUpdateMember() {
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
       }
-      const today = new Date().toISOString().split('T')[0];
+      const today = toISODateString(new Date());
       const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
       // v2.0: also recompute the contact-delegation snapshot for the member's not-yet-past
       // speeches, so editing a member's phone or delegation propagates to their not-yet-sent
@@ -237,7 +238,7 @@ export function useUpdateMember() {
  * Returns the count of future speeches.
  */
 export async function checkFutureSpeeches(memberId: string): Promise<number> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toISODateString(new Date());
   const { count, error } = await supabase
     .from('speeches')
     .select('*', { count: 'exact', head: true })

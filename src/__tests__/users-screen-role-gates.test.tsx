@@ -52,6 +52,7 @@ jest.mock('../contexts/AuthContext', () => ({
     session: { access_token: 'tok' },
     userName: 'Me',
     wardId: 'w1',
+    signOut: (...args: unknown[]) => mockSignOut(...args),
   }),
 }));
 

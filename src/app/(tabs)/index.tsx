@@ -13,7 +13,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Text, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { useRouter } from 'expo-router';
@@ -33,6 +33,7 @@ import { getNextSundays, toISODateString } from '../../lib/dateUtils';
 import { PlayIcon } from '../../components/icons';
 import type { SundayAgenda, Speech, SundayException } from '../../types/database';
 import { KeyboardAvoider } from '../../components/KeyboardAvoider';
+import { QueryErrorView } from '../../components/QueryErrorView';
 
 const NEXT_SUNDAYS_COUNT = 3;
 
@@ -55,9 +56,28 @@ function HomeTabContent() {
   const heroDate = nextSundays[0] ?? null;
 
   // Same hooks the Agendas tab / former NextSundaysSection used, across the 3-Sunday range.
-  const { data: speeches } = useSpeeches({ start: startDate, end: endDate });
-  const { data: exceptions } = useSundayExceptions(startDate, endDate);
-  const { data: agendas } = useAgendaRange(startDate, endDate);
+  // Full typed results (EST-06/19): loading/error/refetch per hook, so a failed section is
+  // visible and retryable instead of rendering as a silently empty card, and one failure
+  // never blanks the sections that did load.
+  const speechesQ = useSpeeches({ start: startDate, end: endDate });
+  const exceptionsQ = useSundayExceptions(startDate, endDate);
+  const agendasQ = useAgendaRange(startDate, endDate);
+  const speeches = speechesQ.data;
+  const exceptions = exceptionsQ.data;
+  const agendas = agendasQ.data;
+
+  const failedQueries = [speechesQ, exceptionsQ, agendasQ].filter((q) => q.isError);
+  const isLoadingAny = speechesQ.isLoading || exceptionsQ.isLoading || agendasQ.isLoading;
+  const hasAnyData = speeches !== undefined || exceptions !== undefined || agendas !== undefined;
+  const firstError = failedQueries[0]?.error ?? null;
+  const retryFailed = useCallback(() => {
+    for (const q of [speechesQ, exceptionsQ, agendasQ]) {
+      if (q.isError) void q.refetch();
+    }
+    // The query result objects change identity every render; the retry only
+    // needs the latest render's, which the button below always calls through.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speechesQ.isError, exceptionsQ.isError, agendasQ.isError]);
 
   const speechMap = useMemo(() => {
     const map = new Map<string, Speech[]>();
@@ -137,10 +157,42 @@ function HomeTabContent() {
     />
   );
 
+  // Loading / total-error / loaded are three distinct first screens (EST-06). Loaded-but-empty
+  // falls through to the cards below; a partial failure keeps them and adds a banner (EST-19).
+  if (!hasAnyData && failedQueries.length > 0 && !isLoadingAny) {
+    return (
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+        <QueryErrorView testID="home-query-error" error={firstError} onRetry={retryFailed} />
+      </SafeAreaView>
+    );
+  }
+  if (!hasAnyData && isLoadingAny) {
+    return (
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+        <View testID="home-loading" style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoider testID="home-keyboard-avoider">
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {failedQueries.length > 0 && (
+            <View testID="home-partial-error" style={[styles.partialError, { borderColor: colors.divider }]}>
+              <Text style={[styles.partialErrorText, { color: colors.text }]}>{t('errors.queryFailed')}</Text>
+              <Pressable
+                testID="home-partial-retry"
+                onPress={retryFailed}
+                accessibilityRole="button"
+                style={[styles.partialRetry, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.partialRetryText, { color: colors.onPrimary }]}>{t('common.retry')}</Text>
+              </Pressable>
+            </View>
+          )}
           <HomeMemberImportPrompt />
           <View>
             <Text style={[styles.sectionTitle, { color: colors.text }]} testID="home-agenda-title">
@@ -198,6 +250,37 @@ export default function HomeTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  partialError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  partialErrorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  partialRetry: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginLeft: 12,
+  },
+  partialRetryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   scroll: {
     paddingBottom: 24,

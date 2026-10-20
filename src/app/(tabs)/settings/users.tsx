@@ -80,7 +80,7 @@ export default function UserManagementScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
-  const { user: currentUser, session, userName, hasPermission } = useAuth();
+  const { user: currentUser, session, userName, hasPermission, signOut } = useAuth();
   const isOnline = useOnlineStatus();
   const queryClient = useQueryClient();
 
@@ -179,7 +179,7 @@ export default function UserManagementScreen() {
     },
     onSuccess: async (_data, variables) => {
       if (variables.targetUserId === currentUser?.id) {
-        await supabase.auth.signOut();
+        await signOut();
         return;
       }
       Alert.alert(t('common.success'), t('users.deleteSuccess'));

@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { QueryClient, QueryCache, MutationCache, onlineManager } from '@tanstack/react-query';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,57 +16,19 @@ import { useVersionGate } from '../hooks/useVersionGate';
 import i18n from '../i18n';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
-  CACHE_GC_TIME_MS,
   CACHE_MAX_AGE_MS,
   CACHE_STORAGE_KEY,
   CACHE_THROTTLE_MS,
-  STALE_TIME_MS,
   cacheBuster,
-  shouldAlertMutationError,
-  shouldRetryQuery,
 } from '../lib/queryConfig';
-import { isOfflineBlockedError } from '../lib/offlineGuard';
+import { installGlobalErrorHandler } from '../lib/errorReporter';
+import { queryClient } from '../lib/queryClient';
+import { getStartupGateState } from '../lib/startupGate';
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
   key: CACHE_STORAGE_KEY,
   throttleTime: CACHE_THROTTLE_MS,
-});
-
-const queryClient = new QueryClient({
-  queryCache: new QueryCache({
-    onError: (error) => {
-      console.error('[QueryCache] Error:', error.message);
-    },
-  }),
-  mutationCache: new MutationCache({
-    onError: (error, _variables, _context, mutation) => {
-      if (!shouldAlertMutationError(error, onlineManager.isOnline(), (mutation as any).meta)) {
-        return;
-      }
-      if (__DEV__) {
-        console.error('[MutationCache] Error:', error.message);
-      }
-      Alert.alert(
-        i18n.t('common.error'),
-        // A blocked-offline edit (DEC-01) already carries its translated "connect to save"
-        // message; the generic failure text would hide the one actionable fact.
-        isOfflineBlockedError(error) ? error.message : i18n.t('errors.mutationFailed')
-      );
-    },
-  }),
-  defaultOptions: {
-    queries: {
-      staleTime: STALE_TIME_MS,
-      gcTime: CACHE_GC_TIME_MS,
-      networkMode: 'offlineFirst' as const,
-      retry: (failureCount: number, error: any) =>
-        shouldRetryQuery(failureCount, error, onlineManager.isOnline()),
-    },
-    mutations: {
-      retry: 0,
-    },
-  },
 });
 
 /**
@@ -81,22 +42,22 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
 
+  // EST-20: efeito e render consomem a MESMA decisão pura.
+  const gate = getStartupGateState({
+    loading,
+    isAuthenticated: !!session,
+    inAuthGroup: segments[0] === '(auth)',
+  });
+
   useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const isAuthenticated = !!session;
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login
+    if (gate === 'redirect-login') {
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to home
+    } else if (gate === 'redirect-home') {
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments, router]);
+  }, [gate, router]);
 
-  if (loading) {
+  if (gate === 'loading') {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -151,6 +112,10 @@ function InnerLayout() {
  * Provider order: QueryClient > I18n > Theme > Auth > Navigation
  */
 export default function RootLayout() {
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>

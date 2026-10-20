@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { toISODateString } from '../lib/dateUtils';
 
 // --- Query Keys ---
 
@@ -26,10 +27,10 @@ export function useSpeechCounts(): { data: Record<string, number>; isLoading: bo
   const cutoffDate = useMemo(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 6);
-    return d.toISOString().split('T')[0];
+    return toISODateString(d);
   }, []);
 
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const today = useMemo(() => toISODateString(new Date()), []);
 
   const { data, isLoading } = useQuery({
     queryKey: speechCountKeys.byWard(wardId),

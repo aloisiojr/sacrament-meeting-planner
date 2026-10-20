@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +16,7 @@ import { hasPermission as checkPermission } from '../lib/permissions';
 import { changeLanguage, getCurrentLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Role, Permission } from '../types/database';
+import { setErrorReporterWardId } from '../lib/errorReporter';
 
 // --- Types ---
 
@@ -85,10 +87,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const wardId = extractWardId(user);
   const userName = extractUserName(user);
 
+  // EST-07: o reporter de erros carimba os eventos com a ala corrente.
+  useEffect(() => {
+    setErrorReporterWardId(wardId || null);
+  }, [wardId]);
+
   // Listen for auth state changes
   useEffect(() => {
+    let cancelled = false;
     // Get initial session
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (cancelled) return;
       setSession(initialSession);
       setLoading(false);
     });
@@ -97,6 +106,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // EST-15: um INITIAL_SESSION nulo pode chegar antes de o getSession resolver (ou
+      // depois de uma sessão restaurada); ignorá-lo evita derrubar a sessão e encerrar
+      // o loading cedo demais. O getSession é a fonte do estado inicial.
+      if (_event === 'INITIAL_SESSION' && !newSession) return;
       // On sign-out (explicit, self-delete, or server-revoked session) drop the query cache so
       // the next user on this device — even in the same ward — can't see the prior user's data.
       // The offline queue and the persisted cache get the same treatment (EST-05): pending writes
@@ -114,16 +127,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
     // queryClient from useQueryClient is stable; the listener should be set up once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // App language from user_metadata, ward language stored separately
+  // EST-10: primitivas estáveis — refresh de token troca o objeto `user` sem trocar
+  // id/idioma, e efeito com dep em objeto refazia fetch e reaplicava o idioma.
+  const userId = user?.id;
+  const savedLanguage = user?.user_metadata?.language as string | undefined;
+  const appliedLanguageRef = useRef<string | null>(null);
+  const wardAppliedRef = useRef<string | null>(null);
+
+  // Boot: impõe o idioma salvo em user_metadata assim que a sessão aparece, sem
+  // esperar (nem depender de) o fetch da ala.
+  useEffect(() => {
+    if (!userId || !savedLanguage) return;
+    if (!SUPPORTED_LANGUAGES.includes(savedLanguage as SupportedLanguage)) return;
+    const key = `${userId}:${savedLanguage}`;
+    if (appliedLanguageRef.current === key) return;
+    appliedLanguageRef.current = key;
+    changeLanguage(savedLanguage as SupportedLanguage);
+  }, [userId, savedLanguage]);
+
+  // App language from ward, ward language stored separately.
   // Language priority: user_metadata.language -> device locale -> ward language fallback
   useEffect(() => {
-    if (!wardId) return;
+    if (!wardId || !userId) return;
+    const fetchKey = `${userId}:${wardId}:${savedLanguage ?? ''}`;
+    if (wardAppliedRef.current === fetchKey) return;
+    let cancelled = false;
 
     // Fetch ward language and store it (for ward-level features like collections)
     supabase
@@ -131,7 +166,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       .select('language')
       .eq('id', wardId)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        // Erro da ala mantém o idioma (e a linguagem da ala) atuais — cair para
+        // en-US por uma falha transitória trocaria o app de idioma sem motivo.
+        if (error) return;
+        wardAppliedRef.current = fetchKey;
         const lang = data?.language;
         if (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
           setWardLanguage(lang);
@@ -140,26 +180,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         // Determine app language: user_metadata > device locale > ward language
-        const userLang = user?.user_metadata?.language as string | undefined;
-        if (userLang && SUPPORTED_LANGUAGES.includes(userLang as SupportedLanguage)) {
-          // User has explicit app language preference
-          changeLanguage(userLang as SupportedLanguage);
-        }
-        // If no user_metadata language, keep i18n's device locale detection (from i18n/index.ts init)
-        // which already ran at module load. If device locale is not supported, fallback to ward language.
-        else {
+        if (savedLanguage && SUPPORTED_LANGUAGES.includes(savedLanguage as SupportedLanguage)) {
+          const key = `${userId}:${savedLanguage}`;
+          if (appliedLanguageRef.current !== key) {
+            appliedLanguageRef.current = key;
+            changeLanguage(savedLanguage as SupportedLanguage);
+          }
+        } else {
           const currentLang = getCurrentLanguage();
-          // getCurrentLanguage returns whatever i18n detected at init (device locale or en-US fallback)
-          // If device locale was detected and is supported, keep it. Otherwise use ward language.
           if (!SUPPORTED_LANGUAGES.includes(currentLang as SupportedLanguage)) {
             const wardLangSafe = (lang && SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage))
               ? lang as SupportedLanguage
               : 'en-US';
-            changeLanguage(wardLangSafe);
+            const key = `${userId}:${wardLangSafe}`;
+            if (appliedLanguageRef.current !== key) {
+              appliedLanguageRef.current = key;
+              changeLanguage(wardLangSafe);
+            }
           }
         }
       });
-  }, [wardId, user]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wardId, userId, savedLanguage]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({

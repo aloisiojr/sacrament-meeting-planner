@@ -58,6 +58,22 @@ export function toISODateString(date: Date): string {
 }
 
 /**
+ * First and last calendar day of the month containing `date`, as ISO strings.
+ * Computed from LOCAL calendar fields (EST-13): a UTC-based computation puts
+ * late-evening dates west of Greenwich (e.g. 22:00 in America/Sao_Paulo) in the
+ * wrong month. `new Date(year, month + 1, 0)` is the last local day of the month.
+ */
+export function getMonthBounds(date: Date | string): { start: string; end: string } {
+  const d = typeof date === 'string' ? parseLocalDate(date) : date;
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  return {
+    start: toISODateString(new Date(year, month, 1)),
+    end: toISODateString(new Date(year, month + 1, 0)),
+  };
+}
+
+/**
  * Zero-pad a number to 2 digits.
  * @example zeroPad(8) => '08', zeroPad(12) => '12'
  */

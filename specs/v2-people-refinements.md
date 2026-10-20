@@ -1,6 +1,6 @@
 # Spec — v2 People Refinements
 
-Status: **draft (GATE 1 — awaiting approval)** · Branch: `v2.0` · Date: 2026-07-28
+Status: **built** (contido na `main`; wave 7, 2026-10-20 — os refinamentos de pessoas foi implementado e mergeado; o `draft (GATE 1)` era resíduo documental) · Branch: `v2.0` · Date: 2026-07-28
 
 Refinements to the v2.0 unified people model (picker + editor + presentation), plus one additive
 schema field (`calling`). Builds on `specs/v2-member-management.md`. UI-only except the additive

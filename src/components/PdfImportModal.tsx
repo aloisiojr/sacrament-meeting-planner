@@ -4,7 +4,7 @@
  * base64 + the codes, extracts on-device (WebView+pdf.js), builds the merge plan, and shows the
  * review. The raw PDF stays in memory and is never persisted/uploaded (AC1/AC15). Online-only.
  *
- * The WebView extraction can't run under vitest; the tested logic lives in the pure S1–S5 modules
+ * The WebView extraction can't run under jest; the tested logic lives in the pure S1–S5 modules
  * and PdfImportReview. Validate the extraction end-to-end on device.
  */
 import React, { useState } from 'react';

@@ -1,6 +1,8 @@
 # ADR-007 — Canal de diagnóstico do app (`app_health_events`)
 
-Status: **Proposed** (mobile-release-advisor recommendation) · Date: 2026-08-17 · Relates to:
+Status: **Accepted** (mobile-release-advisor recommendation) · Date: 2026-08-17 · Relates to:
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 ADR-001 (cutover v2), ADR-005 (RLS write authz), `specs/pdf-import-table-grid.md`
 
 ## Context

@@ -1,5 +1,7 @@
 # Spec — GitHub Pages guide: populate the member list with AI
 
+> **Status (wave 7, 2026-10-20): NÃO CONSTRUÍDO — spec aposentada.** A página `docs/public/import-members.html` nunca foi criada e a branch `UX-2.0` foi deletada por decisão do dono (19/10/2026). O import atual é pelo PDF do LCR dentro do app (ADR-006). Se o guia voltar a ser desejado, reabrir como spec nova.
+
 **Slug:** `members-import-guide-page` · **Type:** feature (static site) · **Branch:** UX-2.0
 **Scope:** one new static HTML page under `docs/public/` (the live GitHub-Pages site). No app code,
 no DB, no tests pipeline. Must not break existing pages.

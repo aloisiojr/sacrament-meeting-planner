@@ -1,6 +1,8 @@
 # ADR 004 — Remove collection-visibility (drop ward_collection_config)
 
-Status: proposed · Date: 2026-07-30 · Advisor: mobile-release-advisor · Related: [ADR 001](001-v2-release-cutover.md)
+Status: Accepted · Date: 2026-07-30 · Advisor: mobile-release-advisor · Related: [ADR 001](001-v2-release-cutover.md)
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 
 ## Context
 The topics overhaul (Spec 2) removes the "hide/show collections" feature: every collection and topic

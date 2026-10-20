@@ -1,6 +1,6 @@
 # Spec — Unified Sunday cards, speeches-as-screen, Home & Play refinements
 
-Status: **draft (GATE 1 — awaiting approval)** · Branch: `v2.0` · Date: 2026-07-29
+Status: **built** (contido na `main`; wave 7, 2026-10-20 — os cards unificados de domingo foi implementado e mergeado; o `draft (GATE 1)` era resíduo documental) · Branch: `v2.0` · Date: 2026-07-29
 
 Big UI/navigation refactor of the Agendas + "Discursos e Orações" area. UI-only (no schema/RPC/
 persistence change → no mobile-release-advisor needed; the sacrament-prayer texts are static i18n).

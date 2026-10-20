@@ -1,6 +1,8 @@
 # ADR 002 — Supports & releases: structured `designations` (v2 schema)
 
-Status: proposed · Date: 2026-07-29 · Advisor: mobile-release-advisor · Extends: [ADR 001](001-v2-release-cutover.md)
+Status: Accepted · Date: 2026-07-29 · Advisor: mobile-release-advisor · Extends: [ADR 001](001-v2-release-cutover.md)
+
+> Status atualizado na wave 7 (2026-10-20): a decisão vigorou e foi implementada; o `proposed` era resíduo documental.
 
 ## Context
 Today the agenda stores supports/releases ("apoios e desobrigações") as a single free-text

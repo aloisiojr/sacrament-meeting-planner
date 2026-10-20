@@ -406,7 +406,7 @@ export default function MembersScreen() {
                         onChangeText={setCountryCode}
                         keyboardType="phone-pad"
                         placeholder="+55"
-                        placeholderTextColor={colors.textTertiary}
+                        placeholderTextColor={colors.placeholder}
                         testID="pdf-country-code"
                       />
                     </View>
@@ -418,7 +418,7 @@ export default function MembersScreen() {
                         onChangeText={setAreaCode}
                         keyboardType="phone-pad"
                         placeholder="11"
-                        placeholderTextColor={colors.textTertiary}
+                        placeholderTextColor={colors.placeholder}
                         testID="pdf-area-code"
                       />
                     </View>

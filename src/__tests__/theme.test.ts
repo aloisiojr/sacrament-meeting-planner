@@ -32,10 +32,23 @@ describe('ThemeContext - Color Palettes', () => {
   describe('Light mode colors', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-      for (const [_key, value] of Object.entries(lightColors)) {
+      for (const [key, value] of Object.entries(lightColors)) {
+        if (key === 'scrim') continue; // rgba overlay, not a hex color (BEL-13)
         const vals = typeof value === 'string' ? [value] : Object.values(value);
         for (const v of vals) expect(v).toMatch(hexRegex);
       }
+    });
+
+    it('onPrimary/onError meet AA (4.5:1) on primary/error (BEL-01)', () => {
+      expect(contrastRatio(lightColors.onPrimary, lightColors.primary)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightColors.onError, lightColors.error)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('warningText meets AA on card and hero, placeholder/tab/input meet thresholds (BEL-02/03/08/09)', () => {
+      expect(contrastRatio(lightColors.placeholder, lightColors.inputBackground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightColors.tabBarInactive, lightColors.tabBar)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(lightColors.inputBorder, lightColors.inputBackground)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(lightColors.whatsapp, lightColors.card)).toBeGreaterThanOrEqual(4.5);
     });
 
     // The highlighted hero card uses primaryContainer as its background, so status dots + success/
@@ -79,10 +92,25 @@ describe('ThemeContext - Color Palettes', () => {
   describe('Dark mode colors', () => {
     it('should have valid hex colors for all properties', () => {
       const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-      for (const [_key, value] of Object.entries(darkColors)) {
+      for (const [key, value] of Object.entries(darkColors)) {
+        if (key === 'scrim') continue; // rgba overlay, not a hex color (BEL-13)
         const vals = typeof value === 'string' ? [value] : Object.values(value);
         for (const v of vals) expect(v).toMatch(hexRegex);
       }
+    });
+
+    it('onPrimary/onError meet AA (4.5:1) on primary/error (BEL-01)', () => {
+      expect(contrastRatio(darkColors.onPrimary, darkColors.primary)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(darkColors.onError, darkColors.error)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('warningText/placeholder/tab/input meet thresholds on dark surfaces (BEL-02/03/08/09)', () => {
+      for (const bg of [darkColors.card, darkColors.primaryContainer]) {
+        expect(contrastRatio(darkColors.warningText, bg)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrastRatio(darkColors.placeholder, darkColors.inputBackground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(darkColors.tabBarInactive, darkColors.tabBar)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(darkColors.inputBorder, darkColors.inputBackground)).toBeGreaterThanOrEqual(3);
     });
 
     it('status dots meet ≥3:1 on the dark card (incl. gave_up, H2)', () => {
@@ -124,6 +152,7 @@ describe('ThemeContext - Color Palettes', () => {
       'primaryContainer',
       'onPrimary',
       'error',
+      'onError',
       'errorContainer',
       'success',
       'warning',

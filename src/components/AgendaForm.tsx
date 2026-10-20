@@ -458,7 +458,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             value={agenda.baby_blessing_names ?? ''}
             onSave={(text) => updateField('baby_blessing_names', text)}
             placeholder={t('agenda.names', 'Names')}
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={colors.placeholder}
             editable={!isObserver}
             onFocus={() => handleTextFocus(textInputRef1)}
           />
@@ -479,7 +479,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
             value={agenda.baptism_confirmation_names ?? ''}
             onSave={(text) => updateField('baptism_confirmation_names', text)}
             placeholder={t('agenda.names', 'Names')}
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={colors.placeholder}
             editable={!isObserver}
             onFocus={() => handleTextFocus(textInputRef2)}
           />
@@ -542,7 +542,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
                 value={agenda.special_presentation_description ?? ''}
                 onSave={(text) => updateField('special_presentation_description', text)}
                 placeholder={t('agenda.musicalNumber')}
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={colors.placeholder}
                 editable={!isObserver}
                 onFocus={() => handleTextFocus(textInputRef3)}
               />

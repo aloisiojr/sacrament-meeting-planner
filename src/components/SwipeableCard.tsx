@@ -173,7 +173,7 @@ export function SwipeableCard({
             accessibilityLabel={deleteLabel ?? 'Delete'}
             testID="swipeable-delete-button"
           >
-            <TrashIcon size={20} color="#FFFFFF" />
+            <TrashIcon size={20} color={colors.onError} />
           </Pressable>
         )}
       </View>

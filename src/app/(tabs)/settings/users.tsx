@@ -361,7 +361,7 @@ export default function UserManagementScreen() {
                 accessibilityLabel={t('users.inviteUser')}
                 testID="users-invite-button"
               >
-                <Text style={styles.inviteButtonText}>{t('users.inviteUser')}</Text>
+                <Text style={[styles.inviteButtonText, { color: colors.onPrimary }]}>{t('users.inviteUser')}</Text>
               </Pressable>
             )}
           </View>
@@ -383,7 +383,7 @@ export default function UserManagementScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.retry')}
               >
-                <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+                <Text style={[styles.retryButtonText, { color: colors.onPrimary }]}>{t('common.retry')}</Text>
               </Pressable>
             </View>
           )}
@@ -479,9 +479,9 @@ export default function UserManagementScreen() {
                           accessibilityRole="button"
                         >
                           {updateNameMutation.isPending ? (
-                            <ActivityIndicator color="#FFFFFF" size="small" />
+                            <ActivityIndicator color={colors.onPrimary} size="small" />
                           ) : (
-                            <Text style={styles.saveButtonText}>
+                            <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>
                               {t('common.save')}
                             </Text>
                           )}
@@ -541,7 +541,7 @@ export default function UserManagementScreen() {
                                   styles.roleOptionText,
                                   {
                                     color:
-                                      u.role === role ? '#FFFFFF' : colors.text,
+                                      u.role === role ? colors.onPrimary : colors.text,
                                   },
                                 ]}
                               >
@@ -562,7 +562,7 @@ export default function UserManagementScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={t('users.deleteMyAccount')}
                       >
-                        <Text style={styles.deleteButtonText}>
+                        <Text style={[styles.deleteButtonText, { color: colors.onError }]}>
                           {t('users.deleteMyAccount')}
                         </Text>
                       </Pressable>
@@ -574,7 +574,7 @@ export default function UserManagementScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={t('users.deleteUser')}
                       >
-                        <Text style={styles.deleteButtonText}>
+                        <Text style={[styles.deleteButtonText, { color: colors.onError }]}>
                           {t('users.deleteUser')}
                         </Text>
                       </Pressable>
@@ -646,7 +646,7 @@ export default function UserManagementScreen() {
                         style={[
                           styles.roleOptionText,
                           {
-                            color: inviteRole === role ? '#FFFFFF' : colors.text,
+                            color: inviteRole === role ? colors.onPrimary : colors.text,
                           },
                         ]}
                       >
@@ -671,9 +671,9 @@ export default function UserManagementScreen() {
                   testID="users-invite-submit-button"
                 >
                   {inviteMutation.isPending ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={colors.onPrimary} size="small" />
                   ) : (
-                    <Text style={styles.submitButtonText}>
+                    <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>
                       {t('users.inviteUser')}
                     </Text>
                   )}
@@ -702,7 +702,7 @@ export default function UserManagementScreen() {
                     accessibilityRole="button"
                     testID="users-invite-copy-button"
                   >
-                    <Text style={styles.linkButtonText}>{t('users.copyLink')}</Text>
+                    <Text style={[styles.linkButtonText, { color: colors.onPrimary }]}>{t('users.copyLink')}</Text>
                   </Pressable>
                   {Platform.OS !== 'web' && (
                     <Pressable
@@ -710,7 +710,7 @@ export default function UserManagementScreen() {
                       onPress={() => handleShareLink(inviteResult.deepLink)}
                       accessibilityRole="button"
                     >
-                      <Text style={styles.linkButtonText}>
+                      <Text style={[styles.linkButtonText, { color: colors.onPrimary }]}>
                         {t('users.shareLink')}
                       </Text>
                     </Pressable>
@@ -760,7 +760,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   inviteButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -778,7 +777,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -850,7 +848,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -867,7 +864,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -908,7 +904,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -936,7 +931,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   linkButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

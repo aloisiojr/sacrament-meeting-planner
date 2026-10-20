@@ -27,11 +27,27 @@ jest.mock('../lib/supabase', () => ({
   },
 }));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider } from '../contexts/AuthContext';
+import { enqueue, getQueueSize, incrementRetry, getDeadLetterCount } from '../lib/offlineQueue';
+import { CACHE_STORAGE_KEY } from '../lib/queryConfig';
 
-beforeEach(() => {
+beforeEach(async () => {
   mockAuthHandler.fn = null;
+  await AsyncStorage.clear();
 });
+
+function renderAuth(queryClient: QueryClient) {
+  act(() => {
+    TestRenderer.create(
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        React.createElement(AuthProvider, null, null)
+      )
+    );
+  });
+}
 
 describe('AuthProvider clears query cache on sign-out (P2)', () => {
   it('drops cached queries when SIGNED_OUT fires', async () => {
@@ -78,5 +94,53 @@ describe('AuthProvider clears query cache on sign-out (P2)', () => {
     });
 
     expect(queryClient.getQueryData(['members', 'w1'])).toEqual([{ id: 'keep' }]);
+  });
+});
+
+describe('AuthProvider clears the offline queue on sign-out (EST-05)', () => {
+  it("drops the pending queue, the dead-letter list and the persisted query cache of the user who left", async () => {
+    // The leaving user has: one edit dead-lettered after exhausting retries, one edit still
+    // pending, and a persisted query cache on disk. None of it may survive into the next
+    // session — the pending write would otherwise replay under the next user's credentials.
+    await enqueue({
+      id: 'dead1', table: 'speeches', operation: 'UPDATE',
+      data: { id: 'sp0', topic_title: 'Old' }, timestamp: 1,
+    });
+    await incrementRetry();
+    await incrementRetry();
+    await incrementRetry();
+    await enqueue({
+      id: 'pend1', table: 'speeches', operation: 'UPDATE',
+      data: { id: 'sp1', topic_title: 'Faith' }, timestamp: 2,
+    });
+    await AsyncStorage.setItem(CACHE_STORAGE_KEY, '{"clientState":"prior-user"}');
+    expect(await getQueueSize()).toBe(1);
+    expect(await getDeadLetterCount()).toBe(1);
+
+    renderAuth(new QueryClient());
+    await act(async () => {
+      mockAuthHandler.fn!('SIGNED_OUT', null);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(await getQueueSize()).toBe(0);
+    expect(await getDeadLetterCount()).toBe(0);
+    expect(await AsyncStorage.getItem(CACHE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('keeps the queue intact on a token refresh', async () => {
+    await enqueue({
+      id: 'pend1', table: 'speeches', operation: 'UPDATE',
+      data: { id: 'sp1', topic_title: 'Faith' }, timestamp: 2,
+    });
+
+    renderAuth(new QueryClient());
+    await act(async () => {
+      mockAuthHandler.fn!('TOKEN_REFRESHED', null);
+      await Promise.resolve();
+    });
+
+    expect(await getQueueSize()).toBe(1);
   });
 });

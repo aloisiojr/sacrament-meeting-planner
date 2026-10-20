@@ -20,6 +20,12 @@ const mockState = {
   exceptions: [] as { date: string; reason: string; custom_reason?: string | null }[],
   speeches: [] as { id: string; position: number }[] | undefined,
   rendered: [] as { position: number; isPrayer: boolean }[],
+  // EST-02: the toggle's three writes, as awaited mutation spies, plus the captured toggle prop.
+  removeAssignment: jest.fn().mockResolvedValue({}),
+  assignTopic: jest.fn().mockResolvedValue(null),
+  updateAgenda: jest.fn().mockResolvedValue(null),
+  toggleSecondSpeech: null as null | ((enabled: boolean) => void),
+  callOrder: [] as string[],
 };
 
 function makeSpeech(position: number) {
@@ -80,8 +86,17 @@ jest.mock('../components/PeoplePicker', () => ({ PeoplePicker: () => null }));
 
 // SpeechSlot mock: record each rendered row (position + prayer flag).
 jest.mock('../components/SpeechSlot', () => ({
-  SpeechSlot: ({ position, isPrayer }: { position: number; isPrayer?: boolean }) => {
+  SpeechSlot: ({
+    position,
+    isPrayer,
+    onToggleSecondSpeech,
+  }: {
+    position: number;
+    isPrayer?: boolean;
+    onToggleSecondSpeech?: (enabled: boolean) => void;
+  }) => {
     mockState.rendered.push({ position, isPrayer: !!isPrayer });
+    if (onToggleSecondSpeech) mockState.toggleSecondSpeech = onToggleSecondSpeech;
     return require('react').createElement('SpeechSlot', { testID: `slot-${position}` });
   },
 }));
@@ -89,7 +104,13 @@ jest.mock('../components/SpeechSlot', () => ({
 jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: [] }) }));
 jest.mock('../hooks/useAgenda', () => ({
   useAgenda: () => ({ data: { has_second_speech: true } }),
-  useUpdateAgendaByDate: () => ({ mutate: jest.fn() }),
+  useUpdateAgendaByDate: () => ({
+    mutate: jest.fn(),
+    mutateAsync: (...args: unknown[]) => {
+      mockState.callOrder.push('agenda');
+      return mockState.updateAgenda(...args);
+    },
+  }),
 }));
 jest.mock('../hooks/useSundayTypes', () => ({
   useSundayExceptions: () => ({ data: mockState.exceptions, isError: false, error: null, refetch: jest.fn() }),
@@ -101,13 +122,33 @@ jest.mock('../hooks/useSpeeches', () => {
     useSpeeches: () => ({ data: mockState.speeches, isError: false, error: null, refetch: jest.fn() }),
     useLazyCreateSpeeches: () => ({ mutate: jest.fn() }),
     useAssignSpeaker: () => ({ mutate: jest.fn() }),
-    useAssignTopic: () => ({ mutate: jest.fn() }),
+    useAssignTopic: () => ({
+      mutate: jest.fn(),
+      mutateAsync: (...args: unknown[]) => {
+        mockState.callOrder.push('topic');
+        return mockState.assignTopic(...args);
+      },
+    }),
     useChangeStatus: () => ({ mutate: jest.fn() }),
-    useRemoveAssignment: () => ({ mutate: jest.fn() }),
+    useRemoveAssignment: () => ({
+      mutate: jest.fn(),
+      mutateAsync: (...args: unknown[]) => {
+        mockState.callOrder.push('remove');
+        return mockState.removeAssignment(...args);
+      },
+    }),
     useWardManagePrayers: () => ({ managePrayers: mockState.managePrayers, isLoading: false }),
   };
 });
-jest.mock('../lib/supabase', () => ({ supabase: {} }));
+// EST-02 removed the screen's direct supabase writes; a from() call here would throw and fail
+// the toggle tests below, which is the point — the writes must go through the hooks.
+jest.mock('../lib/supabase', () => ({
+  supabase: {
+    from: () => {
+      throw new Error('direct supabase write from the speeches screen');
+    },
+  },
+}));
 
 function render() {
   let renderer!: TestRenderer.ReactTestRenderer;
@@ -126,6 +167,11 @@ beforeEach(() => {
   mockState.exceptions = [];
   mockState.speeches = [0, 1, 2, 3, 4].map(makeSpeech);
   mockState.rendered = [];
+  mockState.removeAssignment = jest.fn().mockResolvedValue({});
+  mockState.assignTopic = jest.fn().mockResolvedValue(null);
+  mockState.updateAgenda = jest.fn().mockResolvedValue(null);
+  mockState.toggleSecondSpeech = null;
+  mockState.callOrder = [];
 });
 
 describe('Speeches edit screen (N2)', () => {
@@ -156,5 +202,50 @@ describe('Speeches edit screen (N2)', () => {
     mockState.exceptions = [{ date: DATE, reason: 'testimony_meeting' }];
     render();
     expect(mockState.rendered.length).toBe(0);
+  });
+
+  it('EST-02: disabling the 2nd speech runs remove → clear topic → agenda as one awaited sequence', async () => {
+    render();
+    expect(mockState.toggleSecondSpeech).not.toBeNull();
+
+    await act(async () => {
+      mockState.toggleSecondSpeech?.(false);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockState.callOrder).toEqual(['remove', 'topic', 'agenda']);
+    expect(mockState.removeAssignment).toHaveBeenCalledWith({ speechId: 'sp2' });
+    expect(mockState.assignTopic).toHaveBeenCalledWith({
+      speechId: 'sp2',
+      topicTitle: '',
+      topicLink: '',
+      topicCollection: '',
+    });
+    expect(mockState.updateAgenda).toHaveBeenCalledWith({
+      sundayDate: DATE,
+      updates: { has_second_speech: false },
+    });
+  });
+
+  it('EST-02: when the first write rejects, the later steps never run and the error is shown', async () => {
+    mockState.removeAssignment = jest.fn().mockRejectedValue(new Error('server refused'));
+    const renderer = render();
+
+    await act(async () => {
+      mockState.toggleSecondSpeech?.(false);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The old code fired all three writes uncoordinated (one with an empty .then()), so a
+    // partial failure orphaned the topic/agenda state. Now the sequence aborts in place.
+    expect(mockState.assignTopic).not.toHaveBeenCalled();
+    expect(mockState.updateAgenda).not.toHaveBeenCalled();
+    const errors = renderer.root.findAllByProps({ testID: 'speeches-edit-error' });
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some((e) => e.props.children === 'speeches.saveFailed')).toBe(true);
   });
 });

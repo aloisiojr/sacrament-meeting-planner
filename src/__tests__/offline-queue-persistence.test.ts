@@ -18,6 +18,10 @@ import {
   getQueueSize,
   clearQueue,
   incrementRetry,
+  readDeadLetter,
+  getDeadLetterCount,
+  readQuarantine,
+  onDeadLetterChange,
   getMaxQueueSize,
   getMaxRetries,
   type QueuedMutation,
@@ -109,7 +113,7 @@ describe('offlineQueue — capacity', () => {
   });
 });
 
-describe('offlineQueue — retry exhaustion (three strikes then discard)', () => {
+describe('offlineQueue — retry exhaustion (three strikes then dead-letter, EST-04)', () => {
   it('reports "keep retrying" while under the limit and leaves the entry in place', async () => {
     await enqueue(makeMutation({ id: 'a' }));
 
@@ -118,7 +122,7 @@ describe('offlineQueue — retry exhaustion (three strikes then discard)', () =>
     expect(await getQueueSize()).toBe(1);
   });
 
-  it('discards the entry on the attempt that reaches the limit', async () => {
+  it('moves the entry to the persisted dead-letter list on the attempt that reaches the limit', async () => {
     await enqueue(makeMutation({ id: 'a' }));
     await enqueue(makeMutation({ id: 'b' }));
 
@@ -128,10 +132,34 @@ describe('offlineQueue — retry exhaustion (three strikes then discard)', () =>
       result = await incrementRetry();
     }
 
-    // The last call returns false AND drops the head — a user's edit is lost here, silently.
+    // The last call returns false and removes the head from the queue — but the edit is NOT
+    // lost: it sits in the dead-letter list, countable, until sign-out clears it.
     expect(result).toBe(false);
     expect(await getQueueSize()).toBe(1);
     expect((await peek())?.id).toBe('b');
+
+    expect(await getDeadLetterCount()).toBe(1);
+    const dead = await readDeadLetter();
+    expect(dead[0]).toMatchObject({ id: 'a', table: 'speeches', retryCount: max });
+    expect(typeof dead[0].failedAt).toBe('number');
+    // Persisted, not in-memory: the raw key holds it across a cold start.
+    expect(await AsyncStorage.getItem('@offline_mutation_dead_letter')).toContain('"a"');
+  });
+
+  it('notifies dead-letter listeners when an entry lands and when the list is cleared', async () => {
+    const seen: number[] = [];
+    const unsubscribe = onDeadLetterChange((n) => seen.push(n));
+
+    await enqueue(makeMutation({ id: 'a' }));
+    for (let i = 0; i < getMaxRetries(); i++) {
+      await incrementRetry();
+    }
+    expect(seen).toEqual([1]);
+
+    await clearQueue();
+    expect(seen).toEqual([1, 0]);
+    expect(await getDeadLetterCount()).toBe(0);
+    unsubscribe();
   });
 
   it('only ever affects the head entry', async () => {
@@ -165,5 +193,49 @@ describe('offlineQueue — corrupt storage', () => {
     await AsyncStorage.setItem(QUEUE_KEY, 'garbage');
     expect(await enqueue(makeMutation({ id: 'fresh' }))).toBe(true);
     expect((await peek())?.id).toBe('fresh');
+  });
+
+  it('quarantines the corrupt payload instead of crystallising it as [] (EST-04)', async () => {
+    // The old read returned [] and the next ordinary write persisted [] over the user's
+    // pending edits — unrecoverable and invisible. The raw bytes must survive for diagnosis.
+    await AsyncStorage.setItem(QUEUE_KEY, 'not json{');
+    expect(await readQueue()).toEqual([]);
+    expect(await readQuarantine()).toBe('not json{');
+
+    // A later enqueue persists the new entry and never touches the quarantine.
+    await enqueue(makeMutation({ id: 'fresh' }));
+    expect((await peek())?.id).toBe('fresh');
+    expect(await readQuarantine()).toBe('not json{');
+  });
+});
+
+describe('offlineQueue — concurrent writes (mutex, EST-04)', () => {
+  it('keeps every entry when enqueues overlap instead of losing all but one', async () => {
+    // Without serialization, overlapping read-modify-write cycles read the same snapshot and
+    // each write erases the previous one — under the AsyncStorage mock this reliably lost
+    // entries. All 10 must survive, in call order.
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => enqueue(makeMutation({ id: `c${i}` })))
+    );
+
+    expect(results).toEqual(Array(10).fill(true));
+    expect((await readQueue()).map((m) => m.id)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `c${i}`)
+    );
+  });
+
+  it('clearQueue also empties the dead-letter list (sign-out, EST-05)', async () => {
+    await enqueue(makeMutation({ id: 'a' }));
+    for (let i = 0; i < getMaxRetries(); i++) {
+      await incrementRetry();
+    }
+    await enqueue(makeMutation({ id: 'b' }));
+    expect(await getDeadLetterCount()).toBe(1);
+
+    await clearQueue();
+
+    expect(await getQueueSize()).toBe(0);
+    expect(await getDeadLetterCount()).toBe(0);
+    expect(await AsyncStorage.getItem('@offline_mutation_dead_letter')).toBeNull();
   });
 });

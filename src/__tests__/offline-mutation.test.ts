@@ -113,6 +113,30 @@ describe('withOfflineQueue', () => {
     expect(await readQueue()).toHaveLength(getMaxQueueSize());
   });
 
+  it('stamps a client UUID onto a queued INSERT row so the replay can upsert it (EST-04)', async () => {
+    await withOfflineQueue(
+      { table: 'members', operation: 'INSERT', data: { ward_id: 'w1', full_name: 'Ana' } },
+      () => Promise.reject(new TypeError('Network request failed'))
+    );
+
+    const [queued] = await readQueue();
+    // A replay without the row id would insert a SECOND member if the first attempt had in
+    // fact landed. The stamped id is a UUID — and it is the queue entry's own id.
+    expect(queued.data.id).toBe(queued.id);
+    expect(queued.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(queued.data).toMatchObject({ ward_id: 'w1', full_name: 'Ana' });
+  });
+
+  it('keeps a caller-assigned row id on a queued INSERT instead of replacing it', async () => {
+    await withOfflineQueue(
+      { table: 'members', operation: 'INSERT', data: { id: 'given-id', full_name: 'Ana' } },
+      () => Promise.reject(new TypeError('Network request failed'))
+    );
+
+    const [queued] = await readQueue();
+    expect(queued.data.id).toBe('given-id');
+  });
+
   it('queues a DELETE with only the id, which is all the replay needs', async () => {
     await withOfflineQueue(
       { table: 'members', operation: 'DELETE', data: { id: 'm7' } },

@@ -25,6 +25,7 @@ const mockCalls: Record<string, unknown[]> = {
   useNotificationHandler: [],
   OnlineStatusProvider: [],
   OfflineBanner: [],
+  SyncIssuesBanner: [],
 };
 
 jest.mock('../hooks/useConnection', () => ({
@@ -61,6 +62,14 @@ jest.mock('../components/OfflineBanner', () => ({
       { testID: 'offline-banner' },
       String(props.visible)
     );
+  },
+}));
+jest.mock('../components/SyncIssuesBanner', () => ({
+  // The real banner reads the dead-letter store and the theme; here only its presence in the
+  // composition matters (EST-04 "N unsynced" badge). Its own behavior is covered elsewhere.
+  SyncIssuesBanner: () => {
+    mockCalls.SyncIssuesBanner.push(true);
+    return null;
   },
 }));
 jest.mock('../contexts/OnlineStatusContext', () => ({
@@ -101,6 +110,8 @@ describe('SyncProvider — composition', () => {
     expect(mockCalls.useOfflinePrefetch).toHaveLength(1);
     expect(mockCalls.useRegisterPushToken).toHaveLength(1);
     expect(mockCalls.useNotificationHandler).toHaveLength(1);
+    // The unsynced-changes badge is part of the shell: always mounted, self-hiding at zero.
+    expect(mockCalls.SyncIssuesBanner).toHaveLength(1);
   });
 });
 

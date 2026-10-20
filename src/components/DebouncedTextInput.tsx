@@ -45,15 +45,20 @@ export function DebouncedTextInput({
     }
   }, [value]);
 
-  const flush = useCallback(() => {
+  // EST-25: ONE flush path, ref-driven. Timer, blur and unmount all land here. The
+  // persisted `value` (tracked in savedValueRef) decides whether there is anything to
+  // save, and a successful emit advances savedValueRef immediately — so a later blur or
+  // unmount cannot re-save the same text while the parent has not re-rendered yet.
+  const flushPending = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (latestValueRef.current !== value) {
-      onSave(latestValueRef.current);
+    if (latestValueRef.current !== savedValueRef.current) {
+      savedValueRef.current = latestValueRef.current;
+      onSaveRef.current(latestValueRef.current);
     }
-  }, [value, onSave]);
+  }, []);
 
   const handleChangeText = useCallback(
     (text: string) => {
@@ -63,12 +68,9 @@ export function DebouncedTextInput({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-      timerRef.current = setTimeout(() => {
-        onSave(text);
-        timerRef.current = null;
-      }, delay);
+      timerRef.current = setTimeout(flushPending, delay);
     },
-    [delay, onSave]
+    [delay, flushPending]
   );
 
   const handleFocus = useCallback(
@@ -82,24 +84,18 @@ export function DebouncedTextInput({
   const handleBlur = useCallback(
     (e: Parameters<NonNullable<TextInputProps['onBlur']>>[0]) => {
       isFocusedRef.current = false;
-      flush();
+      flushPending();
       onBlur?.(e);
     },
-    [flush, onBlur]
+    [flushPending, onBlur]
   );
 
-  // Cleanup on unmount - flush pending changes
+  // Cleanup on unmount — flush the pending edit through the same path.
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (latestValueRef.current !== savedValueRef.current) {
-        onSaveRef.current(latestValueRef.current);
-      }
+      flushPending();
     };
-  }, []);
+  }, [flushPending]);
 
   return (
     <TextInput

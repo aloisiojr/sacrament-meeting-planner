@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { fontSizes } from '../../../lib/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { supabase } from '../../../lib/supabase';
@@ -565,11 +566,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   title: {
-    fontSize: 22,
+    fontSize: fontSizes.titleLarge,
     fontWeight: '700',
   },
   backButton: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     fontWeight: '600',
   },
   scrollContent: {
@@ -577,7 +578,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   count: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     fontWeight: '600',
     marginBottom: 20,
   },
@@ -598,11 +599,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   cardTitle: {
-    fontSize: 17,
+    fontSize: fontSizes.subtitleLarge,
     fontWeight: '700',
   },
   cardSubtitle: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     lineHeight: 18,
     marginTop: 2,
   },
@@ -611,17 +612,17 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   pdfPrivacy: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     lineHeight: 19,
     marginBottom: 16,
   },
   pdfInstrTitle: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     lineHeight: 20,
     marginBottom: 8,
   },
   pdfStep: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     lineHeight: 20,
     marginBottom: 8,
   },
@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   codeLabel: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -646,19 +647,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     minHeight: 44,
   },
   step: {
     marginBottom: 28,
   },
   stepTitle: {
-    fontSize: 17,
+    fontSize: fontSizes.subtitleLarge,
     fontWeight: '700',
     marginBottom: 8,
   },
   stepDesc: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -671,7 +672,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   csvButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   warningBox: {
@@ -681,7 +682,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   warningText: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     lineHeight: 19,
     fontWeight: '500',
   },
@@ -693,7 +694,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   errorLine: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     lineHeight: 18,
   },
   errorMore: {

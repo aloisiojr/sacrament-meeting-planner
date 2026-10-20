@@ -18,6 +18,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { fontSizes } from '../../../lib/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -747,11 +748,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 22,
+    fontSize: fontSizes.titleLarge,
     fontWeight: '700',
   },
   backButton: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     fontWeight: '600',
   },
   inviteButton: {
@@ -760,7 +761,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   inviteButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   centered: {
@@ -768,7 +769,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     marginBottom: 12,
   },
   retryButton: {
@@ -777,11 +778,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
   },
   userCard: {
     marginHorizontal: 16,
@@ -800,15 +801,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userDisplayName: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     fontWeight: '500',
   },
   userRole: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     marginTop: 2,
   },
   expandIcon: {
-    fontSize: 12,
+    fontSize: fontSizes.caption,
     marginLeft: 8,
   },
   expandedSection: {
@@ -820,13 +821,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: fontSizes.caption,
     fontWeight: '600',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   fieldValue: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   roleSelector: {
     flexDirection: 'row',
@@ -838,7 +839,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   roleOptionText: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     fontWeight: '500',
   },
   deleteButton: {
@@ -848,14 +849,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   nameInput: {
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     marginBottom: 8,
   },
   saveButton: {
@@ -864,7 +865,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   // Modal styles
@@ -880,7 +881,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: fontSizes.title,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 16,
@@ -889,7 +890,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     marginBottom: 12,
   },
   inviteRoleSelector: {
@@ -904,16 +905,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitButtonText: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     fontWeight: '600',
   },
   successText: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
     textAlign: 'center',
     marginBottom: 12,
   },
   linkText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     padding: 12,
     borderRadius: 8,
     textAlign: 'center',
@@ -931,7 +932,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   linkButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '600',
   },
   closeButton: {
@@ -941,7 +942,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '500',
   },
 });

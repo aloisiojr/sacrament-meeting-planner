@@ -19,6 +19,7 @@ import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
+import { fontSizes } from '../lib/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
 import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment, useLazyCreateSpeeches } from '../hooks/useSpeeches';
@@ -997,7 +998,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -1005,12 +1006,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: fontSizes.caption,
     fontWeight: '600',
     marginBottom: 4,
   },
   fieldValue: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   selectorField: {
     flexDirection: 'row',
@@ -1021,11 +1022,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   selectorText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     flex: 1,
   },
   clearButton: {
-    fontSize: 20,
+    fontSize: fontSizes.title,
     fontWeight: '300',
     paddingHorizontal: 4,
   },
@@ -1034,7 +1035,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     minHeight: 36,
   },
   indented: {
@@ -1060,8 +1061,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   hymnTopBarBtn: { paddingVertical: 8, minWidth: 72 },
-  hymnTopBarText: { fontSize: 16 },
-  hymnTitle: { flex: 1, fontSize: 19, fontWeight: '600', textAlign: 'center' },
+  hymnTopBarText: { fontSize: fontSizes.subtitle },
+  hymnTitle: { flex: 1, fontSize: fontSizes.titleMedium, fontWeight: '600', textAlign: 'center' },
   hymnSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1083,10 +1084,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   modalItemText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     textAlign: 'center',
     paddingVertical: 20,
   },
@@ -1100,12 +1101,12 @@ const styles = StyleSheet.create({
   },
   speakerReadText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   speakerIconBtn: {
     paddingHorizontal: 4,
   },
   speakerIcon: {
-    fontSize: 18,
+    fontSize: fontSizes.titleSmall,
   },
 });

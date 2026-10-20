@@ -35,3 +35,20 @@ describe('BEL-03: textTertiary is never a placeholder color', () => {
     });
   }
 });
+
+describe('BEL-05: migrated files take fontSize from the theme scale', () => {
+  const migrated = [
+    'app/(tabs)/settings/users.tsx',
+    'components/PersonEditor.tsx',
+    'components/PdfImportReview.tsx',
+    'app/(tabs)/settings/members.tsx',
+    'components/AgendaForm.tsx',
+  ];
+  for (const file of migrated) {
+    it(`${file} has no fontSize numeric literal`, () => {
+      const content = read(file);
+      expect(content).not.toMatch(/fontSize:\s*\d/);
+      expect(content).toContain('fontSizes.');
+    });
+  }
+});

@@ -13,7 +13,6 @@ import type { Hymn } from '../types/database';
 export const hymnKeys = {
   all: ['hymns'] as const,
   list: (language: string) => ['hymns', 'list', language] as const,
-  sacramental: (language: string) => ['hymns', 'sacramental', language] as const,
 };
 
 // --- Search Utilities ---
@@ -75,18 +74,19 @@ export function useHymns(language: string, search?: string) {
 }
 
 /**
- * Fetch only sacramental hymns for a given language.
- * Used when selecting the sacrament hymn in the agenda.
+ * Sacramental hymns for a given language, derived from the shared `list` query
+ * (RAP-09): one fetch and one cache entry per language — the sacramental subset
+ * is a `select` over the list, not a second query. Used when selecting the
+ * sacrament hymn in the agenda.
  */
 export function useSacramentalHymns(language: string, search?: string) {
   return useQuery({
-    queryKey: hymnKeys.sacramental(language),
+    queryKey: hymnKeys.list(language),
     queryFn: async (): Promise<Hymn[]> => {
       const { data, error } = await supabase
         .from('hymns')
         .select('*')
         .eq('language', language)
-        .eq('is_sacramental', true)
         .order('number', { ascending: true });
 
       if (error) throw error;
@@ -94,7 +94,8 @@ export function useSacramentalHymns(language: string, search?: string) {
     },
     enabled: !!language,
     select: (data: Hymn[]) => {
-      return search ? filterHymns(data, search) : data;
+      const sacramental = data.filter((h) => h.is_sacramental);
+      return search ? filterHymns(sacramental, search) : sacramental;
     },
   });
 }

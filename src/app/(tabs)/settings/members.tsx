@@ -46,6 +46,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useMembers, memberKeys } from '../../../hooks/useMembers';
 import { PdfImportModal } from '../../../components/PdfImportModal';
 import { guessWardCodes } from '../../../lib/wardPhoneCodes';
+import { MAX_PDF_BYTES } from '../../../lib/pdfExtraction';
 import { ChevronRightIcon } from '../../../components/icons';
 
 // Sentinel thrown by the import mutation when the CSV fails validation, so the error handler can
@@ -136,6 +137,12 @@ export default function MembersScreen() {
       });
       if (result.canceled || !result.assets?.[0]) return;
       const picked = new File(result.assets[0].uri);
+      // RAP-01: ceiling BEFORE reading the whole file into base64 memory.
+      const size = result.assets[0].size ?? picked.size;
+      if (typeof size === 'number' && size > MAX_PDF_BYTES) {
+        Alert.alert(t('common.error'), t('pdfImport.tooLarge'));
+        return;
+      }
       setPdfBase64(await picked.base64());
     } catch (err: any) {
       const msg = (err?.message ?? '').toLowerCase();

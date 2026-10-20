@@ -7,224 +7,36 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
-- **BRANCH `muse/smp-import-tx` (wave 4C) — COMPLETA, verificada, NÃO mergeada (sem push).**
-  `specs/import-tx.md` sobre `main` @443313d, 5 commits: CONF-07 (1) import incremental
-  em UMA RPC transacional `apply_member_import` (migration **060**: advisory lock por
-  ward, updates de telefone set-based, inserts idempotentes por chave natural
-  ward+nome normalizado — repetir não duplica; cliente sem escritas diretas, erro
-  propaga), (2) cascata de snapshot vira **trigger** em `members` na mesma 060
-  (mesma transação do UPDATE; replay offline da fila cascata no servidor; cliente
-  sem best-effort, só invalida), (3) `register-first-user` reparável (ward órfã sem
-  usuário é reutilizada; mesmo e-mail retoma com session e `resumed: true`; par
-  genuinamente ocupado segue 409), (4) `delete-user` ordenado (tokens → auth user →
-  RPC atômica `delete_ward_if_no_auth_users` com lock+recontagem em `auth.users`;
-  sem `listUsers`; falha da RPC = 200 `wardCleanup: 'pending'`, estado reparável
-  documentado). Migration 060 criada, **NÃO aplicada** em nenhum banco. Gates
-  (fechamento): tsc 0, lint 0 erros/5 warnings (baseline), jest 360 suítes/5.906
-  testes verdes (360/5.902 baseline + novos líquidos). Pendências
-  estacionadas: aplicar a 060, prova SQL das funções/trigger com JWT em staging,
-  ensaio de deletes concorrentes contra banco real.
-- **BRANCH `muse/smp-cutover-gate` (wave 4B) — COMPLETA, verificada, NÃO mergeada (sem push).**
-  `specs/cutover-gate.md` sobre `main` @c576bf4, 5 commits por achado: CONF-08 (gate honesto:
-  primeira resolução vence por checagem, rechecagem em `AppState 'active'`, versão ausente =
-  fail-open explícito e logado — sem `0.0.0` espúria), DEC-08 (migration **057**: `app_config`
-  ganha `writes_blocked_below` NULL, `app_write_allowed()` lê `x-app-version` de
-  `request.headers`, policies RESTRICTIVE de escrita em 11 tabelas — **desligada por
-  default, comportamento idêntico até o dono ligar na janela**; cliente envia o header
-  global em `lib/supabase`; `app-config` já lia `app_config` desde a 036, sem mudança),
-  CONF-12 (migration **058** `public_rate_limits` fechada + `check_rate_limit`; lookup do
-  `send-reset-email` por e-mail via Admin API sem scan `listUsers`; env nomeado na subida e
-  429 acima de 20/h por função+IP+e-mail nas 3 públicas, fail-open logado; CORS `*` mantido
-  e documentado na spec) e CONF-06 (`docs/CUTOVER_RUNBOOK.md` na ordem do CLAUDE.md com
-  restore ensaiado como passo explícito, `scripts/cutover/preflight-name-collisions.sql`
-  READ-ONLY, migration **059** de crons guardados — sem `pg_cron`, NOTICE nomeado, nunca
-  silêncio). Migrations 057–059 criadas, **NÃO aplicadas** em nenhum banco. Pendências
-  estacionadas por credencial/dispositivo: aplicar migrations, prova SQL com JWT, ensaio
-  de restore em staging, `CRON_SECRET`/jobs de dashboard, builds EAS.
-- **BRANCH `muse/smp-reliability-rest` (wave 4A) — COMPLETA, verificada, NÃO mergeada (sem push).**
-  `specs/reliability-rest.md` sobre `main` @b7f049a, 7 commits por achado: CONF-04 (migration
-  **053** + claim atômico `processing`/limit 200 no `process-notifications`; `sent` só com
-  ticket ok, resto `failed` com attempts/last_error — teste antigo que aposentava em outage
-  foi reescrito), CONF-10 (**054**: trigger sobrescreve `assigned_by_role` com
-  `current_user_role()`, padrão 051), CONF-13 (**055**: dedup + UNIQUE em `expo_push_token`;
-  upsert do cliente transfere o dono), CONF-14 (`lib/fetchAllPages` em membros/hinos/tópicos;
-  índice `members(responsible_id)` já existia na 052), CONF-11 (fila carrega `logIntent`;
-  delete offline não loga, processor loga 1× ao aceitar), CONF-09/15 (**056**: publication
-  sem tabelas mortas + `wards`/`activity_log`; guarda `updated_at` em `useAgenda`/`AgendaForm`
-  e no replay — conflito vira `AgendaConflictError`/health event/dead-letter; realtime
-  invalida `['ward']` e `activity-log`, `wards` filtrado por `id=`). Migrations 053–056
-  criadas, **NÃO aplicadas** em nenhum banco. Gates (fechamento): tsc 0, lint 0 erros/
-  5 warnings (baseline), jest 358 suítes / 5.872 testes verdes (352/5.842 baseline + novos).
-  Nota de ambiente: worktree sem `node_modules` — testes rodaram com symlink temporário
-  para o `node_modules` do worktree irmão (removido; nada disso commitado).
-- **BRANCH `muse/smp-perf-queries` (wave 3B) — COMPLETA, verificada, NÃO mergeada (sem push).**
-  `specs/perf-queries-cache-bundle.md` sobre `main` @ad110b5: RAP-04/DEC-02 (allowlist de
-  persistência + buster por ala + teto 2 MiB com telemetria; sign-out já removia o cache
-  persistido — travado pelo teste EST-05 existente), RAP-03/DEC-06 (agenda abre 3+6 meses,
-  `useAgendaWindowData` por segmentos delta, `AGENDA_LIST_COLUMNS` na lista), RAP-02
-  (virtualização de hinos), RAP-09 (sacramentais via `select` da `list`), RAP-11 (polling
-  45 s só speeches/agendas; SUBSCRIBED sem invalidateAll), RAP-13 (OnlineStatus memoizado),
-  RAP-12 (4 pacotes p/ devDependencies + lock), RAP-05 (favicon 192/48 da fonte única,
-  PNGs −26,3% com pixels idênticos, artes de loja em `assets/store/`), RAP-10/14
-  (migration **052** criada, NÃO aplicada; busca por data em range), RAP-06 (export:
-  `.hbc` 5.514.070 B / 2.037 sources vs baseline 5.460.946 B / 2.046), RAP-15 (aceito
-  como está, gatilho registrado na spec). Gates (uma rodada): tsc 0, lint 0 erros/
-  5 warnings (baseline), jest 352 suítes / 5.842 testes verdes, `expo export` ok.
-- **BRANCH `muse/smp-perf-pdf` (wave 3A) — COMPLETA, verificada, NÃO mergeada (sem push).**
-  `specs/perf-pdf-fast-safe.md`: RAP-01 (teto 10 MB antes do base64, timeout 75 s com
-  retry visível, mensagens por página, cache de módulo dos assets, callbacks via ref),
-  DEC-07/ARQ-11 (`scripts/copy-pdfjs.mjs` + `assets/pdfjs/VERSION`, fonte `legacy/build`
-  do pdfjs-dist 4.10.38 medida por sha256; inline mantido — `localUri` gated pela CLN-05)
-  e RAP-07 (3 listas da revisão em FlatList + linha memo, contador de render em teste).
-  3 commits por achado (`9a28b90`, `5bd49e0`, `651b3c8`) sobre `main` @329665e.
-  Gates (uma rodada): tsc 0, lint 0 erros/5 warnings (baseline), jest 352 suítes /
-  5.794 testes verdes (+22 novos). Sem migration. Falta: prova em aparelho (CLN-05).
-- **Wave 2A `specs/fix-visibility-time.md` — BUILD COMPLETE, MERGEADA na main do 104 (merge 1621284; branch
-  `muse/smp-fix-visibility-time`, 10 commits sobre `main` @7ccdea1).** Passos 1–9 do
-  `.plan.md` todos ✅: hoje local (EST-08/13), Home/Presentation com erro+retry
-  (EST-06/19), `errorReporter` integrado (EST-07: boundary + handler global + ward,
-  payload sem texto, throttle 60 s/teto 5/min), QueryClient singleton em
-  `lib/queryClient` (EST-26), AuthContext com `INITIAL_SESSION` nulo ignorado, idioma
-  de boot imposto e efeito da ala estável (EST-10/15, `settings/users` via `signOut`
-  do contexto), `getStartupGateState` puro consumido pelo NavigationGuard e
-  `QueryCache.onError` gateado por `__DEV__` (EST-20), e token de push com health
-  event `push_token_register_failed` + retentativa (EST-23). Gates: tsc 0, lint
-  0 erros/5 warnings, jest 338 suites/5742 testes verdes. Sem i18n novo, sem migration, sem push.
-- **BRANCH `muse/smp-fix-state-integrity` (wave 2B) — COMPLETA, verificada, MERGEADA na main do 104 junto com a 2A.**
-  EST-12/14/16/17/18/21/22/24/25 em 8 commits por achado + 1 test-only (`e101b4c`).
-  Gates: tsc limpo, lint 0 erros, jest 324 suítes / 5.710 testes verdes.
-  Detalhe: `specs/fix-state-integrity.plan.md` (seção Estado). Sem push.
-- **BRANCH `fix/keyboard-safe-forms` — 16 commits, verificada, NÃO mergeada.**
-  Teclado + ajustes no seletor de pessoas/temas. Suíte 290 suites / 5342 tests, tsc 0, lint no
-  baseline (2 warnings pré-existentes em PdfTextExtractor).
-  - **EXIGE BUILD NATIVO** antes de testar no Android: `softwareKeyboardLayoutMode: 'resize'`.
-  - Tela de apoios usa mecanismo DIFERENTE das outras 7: `automaticallyAdjustKeyboardInsets` +
-    `scrollToEnd` no foco, porque `KeyboardAvoidingView` não move campo em formulário curto
-    alinhado ao topo (a folga não depende do offset). Os dois nunca podem coexistir.
-  - **CORREÇÃO DE REGISTRO — a mensagem do commit `6dde262` está errada.** Ela afirma que o
-    primeiro toque engolido no seletor de pessoas foi causado pelo autofocus e corrigido ali.
-    Falso: `keyboardShouldPersistTaps="handled"` já existia no `main` no PeoplePicker,
-    TopicSelectorModal e HymnSelector. Minha varredura deu falso positivo porque parava no
-    primeiro `>`, que aparece dentro de `renderItem={({ item }) =>`. O commit ADICIONOU a prop em
-    10 outras listas (correto e útil), mas **se o toque engolido foi visto no seletor de pessoas,
-    não está corrigido e a causa é desconhecida.**
-  - Lacuna conhecida: a aba de agenda é a única das 8 telas sem teste que afirme o wrapper —
-    nenhum teste a renderiza.
-- **IN FLIGHT — `specs/whatsapp-informal-name-placeholder.md`: placeholder "Nome Informal".**
-  Branch `feat/whatsapp-informal-name` (a partir de `main`, após o merge de `export-pdf`).
-  Stage: **build COMPLETE, aguardando verify-change**. Plan: `.plan.md` (4 passos, todos ✅).
-  - Step 1 ✅ `whatsappUtils`: campo `speakerInformalName` + alias `informalName` (resolvido ANTES
-    de `name`). `{nome}` passa a ser o nome COMPLETO; `{nome informal}` cai no completo se vazio.
-  - Step 2 ✅ `InviteManagementSection`: passa os dois nomes separados (antes colapsava em um).
-  - Step 3 ✅ chip nas 5 abas (orações: `slice(0,2)` → `slice(0,3)`) + chave i18n nos 3 locales +
-    teste novo `settings-whatsapp-templates.test.tsx` (a tela não tinha teste).
-  - Step 4 ✅ 15 textos padrão reescritos (3 discursos + 2 orações × 3 línguas).
-  - Suíte **284 suites / 5202 tests** verde (base `main`: 282/5170). tsc 0, lint 0 erros.
-  - Sem migração, sem deploy. **Decisão aceita pelo usuário:** alas que já personalizaram com
-    `{nome}` passam a enviar o nome completo — sem migração de texto nem aviso in-app.
-  - Step 5 ✅ (após verify-change reprovar) `register-first-user` semeia `{nome informal}`.
-    **REQUER REDEPLOY** de `register-first-user` — sem ele, alas novas saúdam pelo nome completo.
-  - Achado registrado e FORA do escopo: `whatsapp_template_delegation_wrapper` é usado em
-    `InviteManagementSection` mas não tem aba na tela de configurações — ninguém consegue editá-lo.
-  - Débito RESOLVIDO pela mudança seguinte (era: textos semeados divergiam dos defaults do código).
-- **IN FLIGHT — `specs/whatsapp-unify-default-templates.md`: texto padrão num lugar só.**
-  Mesma branch, empilhado. Stage: **build COMPLETE, verify APPROVED, i18n audit APPROVED**;
-  re-verificação pendente porque a redação mudou depois do verdict.
-  - A edge function `register-first-user` NÃO tem mais strings próprias: importa
-    `getDefaultSpeechTemplate`/`getDefaultPrayerTemplate` de `../../../src/lib/whatsappUtils.ts`.
-    Funciona porque esse arquivo tem ZERO imports e `supabase/functions` está fora do tsc.
-  - Redação nova escrita pelo usuário + auditoria de terminologia da Igreja (zero P1).
-  - **RESOLVIDO 2026-08-06:** o deploy rodou e passou — o bundler aceita o import para fora de
-    `supabase/`. O plano B (semear NULL) fica só como alternativa se uma CLI futura recusar.
-  - **P2 aberto:** o invariante "whatsappUtils não pode ganhar imports" só existe em comentário.
-    Se alguém importar algo ali, tsc/lint/jest seguem verdes e só quebra no Deno. Guarda possível
-    sem violar a regra de não assertar texto-fonte: inspecionar `require.cache[...].children`.
-  - Deploy de `register-first-user` **já feito** (2026-08-06).
-- **IN FLIGHT — `specs/whatsapp-stop-seeding-templates.md` (plano B): ala nova nasce com NULL.**
-  Branch `feat/stop-seeding-templates`, a partir de `main` em `3558d59`.
-  - REVERTE o mecanismo dos dois specs anteriores: a edge function não importa mais o
-    `whatsappUtils` nem semeia as 5 colunas. Motivo: o deploy empacotava uma CÓPIA CONGELADA do
-    texto, que envelhecia em silêncio com o teste de contrato verde.
-  - Removida a guarda `whatsapp-utils-dependency-free.test.ts` (existia só pelo import;
-    recuperável em `3558d59`). `whatsapp-informal-name-placeholder.md` AC14 marcado como superado.
-  - Verify reprovou com 2 P1 de cobertura, ambos corrigidos e provados por mutação: o fallback da
-    ORAÇÃO não tinha teste nenhum (trocá-lo por '' deixava 2606 testes verdes) e o AC4 do editor
-    idem. Também coberto o fallback de idioma desconhecido nas posições 2 e 3.
-  - **REQUER DEPLOY** de `register-first-user` — a última vez; depois disso mudar redação nunca
-    mais exige deploy.
-- **IN FLIGHT — `specs/v2-supports-releases.md` (Spec 1 of 3): structured Apoios e Desobrigações.**
-  Branch `v2.0`. Stage: **build-change**. Plan: `specs/v2-supports-releases.plan.md` (5 steps).
-  - Step 1 ✅ types + `src/lib/designations.ts` (formatDesignationLines/Summary).
-  - Step 2 ✅ edit screen `src/app/designations/[date].tsx` (type→person→fields, calling prompt) + i18n.
-  - Step 3 ✅ `DesignationListField` display component.
-  - Step 4 ✅ wired into AgendaForm (replaces free-text wardBusiness field).
-  - Step 5 ✅ removed `sustaining_releasing` (type + Play builder + fixtures); migration
-    `041_designations.sql` (add `designations jsonb`, drop old column). Obsolete f067/f068/f071
-    free-text tests converted to `designations` (3 vacuous f067 tests removed). 1984 tests green.
-  - **Spec 1 COMPLETE + verified (APPROVED).** Migration 041 applied to STAGING (designations jsonb
-    added, sustaining_releasing dropped). Prod only at v2 cutover (ADR 001/002).
-  - **Spec 2 (`specs/v2-designations-play.md`) build COMPLETE** — Play interstitial:
-    - Step 1 ✅ `buildDesignationReadText` + verbatim templates (3 locales) + `orderDesignations`.
-    - Step 2 ✅ `DesignationReadModal` (clone of SacramentPrayerModal) + canonical ordering.
-    - Step 3 ✅ `useWardName`; flagged/ordered Play bullet list; icon + modal wiring in presentation.tsx.
-    - Order: release→sustain→priesthood→new_member. Grouping deferred (too custom). 2002 tests green.
-    - **Next: verify-change (Spec 2), then GATE 3.**
-  - **Spec 2 verified (APPROVED)** — client-only, no deploy.
-  - Post-Spec-2 polish (committed): dim non-selected type/office options; highlight person/calling
-    fields when filled; interstitial title → "Assuntos de Ala".
-  - **Spec 3 (`specs/v2-designations-templates.md`) build COMPLETE** — configurable templates:
-    - Step 1 ✅ migration 042 (4 nullable `wards.designation_template_*`, additive/ADR 003) + Ward
-      type + `settings:designations` perm (bishopric+secretary); perm-count tests 26→27.
-    - Step 2 ✅ `useWardDesignationTemplates` + override applied in the Play interstitial.
-    - Step 3 ✅ Settings "Ward Business Templates" editor (prefill override/default, auto-save,
-      restore-default, token hint) + index entry gated by the perm. 2013 tests green.
-    - **Spec 3 verified (APPROVED)** after a fix round (P1 prefill race + P2 blur-overwrite fixed;
-      AC8 hint test added). Migration 042 APPLIED to STAGING (4 designation_template_* columns).
-  - **v2 Supports & Releases feature COMPLETE across all 3 specs** (entry + Play interstitial +
-    Settings templates). Nothing merged to main; prod at v2 cutover (ADR 001).
-  - **Post-refinements (committed, verified APPROVED):** localized placeholder tokens
-    ({nome}/{chamado}/…) with all-locale-alias substitution; Settings "Modelos de Textos"
-    expandable group; **unified WhatsApp + Ward Business screens onto a shared
-    `TemplateEditorScreen`** (tabs + chips + preview + restore-default + autosave; saveMode
-    raw|collapse). Fixed verify P1 (raw restore persists NULL, not default text). 2023 tests green;
-    client-only (no migration).
-- **Card layout + Topics overhaul (both verified APPROVED, on `v2.0`):**
-  - `specs/v2-card-layout.md` — Home upcoming cards hide the status block; expanded agenda header
-    restructured (DateBlock+attendance | Play "Iniciar" | collapse chevron) + "Tipo de Domingo"
-    section for all Sundays. Client-only.
-  - `specs/v2-topics-overhaul.md` (+ADR 004) — removed Settings "Temas" + collection-visibility;
-    all libraries always available, ordered by parsed month/year (custom→evergreen→conferences desc);
-    rebuilt TopicSelectorModal (PeoplePicker-style: search title+library, add, inline edit title+link,
-    delete-on-clear dialog); removed `collection:toggle` (perms 27→26); migration **043** drops
-    `ward_collection_config` (APPLIED to staging). Verify caught + fixed dangling table refs in
-    settings ward-language mutation + realtime sync. ~1933 tests green.
-- Branch: `main` (baseline restored 2026-07-27 from the 2026-03-29 state).
-- Adopted the **dev-flow** engine; removed the old devteam metadata. Thin layer installed
-  (CLAUDE.md, .claude/settings.json hooks, CI, specs/, this file).
-- Password reset bug (root cause = Resend had no verified domain):
-  1. `specs/reset-email-gmail-smtp.md` — **DONE & VERIFIED IN PROD.** Switched transport
-     Resend → Gmail SMTP (denomailer). Code committed (f09bbe6); secrets set
-     (`GMAIL_USER=sacr.meet.plan@gmail.com`, `GMAIL_APP_PASSWORD`); function deployed. Live test:
-     external user igor 500 → 200, email delivered. Server-side only, shipped apps unaffected.
-  2. `specs/reset-email-error-visibility.md` — client error hardening (APPROVED, actionable
-     wording). **Queued** — blocked until the tsc baseline is clean (it edits `src/`).
-- **`specs/fix-test-typecheck-baseline.md` — DONE & COMMITTED (`544138a`).** All 51 tsc errors
-  fixed (incl. the `src/app/(tabs)/_layout.tsx` `tabBarTestID`→`tabBarButtonTestID` prod bug,
-  accepted by user); `tsc --noEmit` = 0, 1832 tests green. Per-edit typecheck gate now GREEN.
-- **`specs/reset-email-error-visibility.md` — DONE & COMMITTED (`18dc9cf`).** Client logs the real
-  error in the `catch` (was swallowed) + shows an actionable, enumeration-safe message; success
-  path unchanged. `auth.resetFailed` reworded in all 3 locales. Built the project's first
-  component render-test infra: `react-native` aliased to a local stub
-  (`src/__tests__/stubs/react-native.tsx`) in `vitest.config.ts` → screens render via
-  react-test-renderer in `node` (no jsdom, no new deps); added a behavioral test for
-  ForgotPasswordScreen (failure logs+message, success). Adversarially verified (APPROVED; AC1
-  assertion tightened per the P2). Suite now **68 files / 1834 tests green**, tsc 0.
-
-- **`specs/fix-lint-baseline.md` — DONE & COMMITTED (`31b3ed1`).** All 166 ESLint problems fixed
-  (3 errors + 163 warnings) → `npm run lint` = 0 problems. exhaustive-deps: 11 real deps added (all
-  stable refs) + 8 justified disables; no behavior change. tsc 0; 68 files / 1834 tests green.
-
-Password-reset bug resolved (Gmail SMTP live) + tsc/lint baselines clean, on `origin/main`.
+- **ESTADO (2026-10-20): remediação da auditoria v2.0 COMPLETA em código — waves 1–7
+  mergeadas na `main`.** Os 121 achados foram tratados (código, documento ou
+  estacionados com motivo registrado). Gates: tsc 0 erros, jest 368 suítes / 5.930
+  testes, lint 0 erros / 5 warnings, cobertura acima do piso (75/66/70/76).
+  Registro por wave: `specs/fix-security-perms.md`, `specs/fix-silent-writes.md`,
+  `specs/fix-visibility-time.md`, `specs/fix-state-integrity.md`,
+  `specs/fix-perf-*.md`, `specs/reliability-rest.md`, `specs/cutover-gate.md`,
+  `specs/import-tx.md`, `specs/beauty-a11y-wave5.md`, `specs/architecture-wave6.md`,
+  `specs/cleanup-wave7.md`. Migrations **049–060 criadas; NENHUMA aplicada** a
+  banco algum.
+- **Falta — operacional (credencial / aparelho / decisão do dono):**
+  1. **Push ao GitHub:** cadastrar a deploy key do LXC 104 no repo; sem isso o
+     GitHub segue na `main` de agosto (`178bac4`).
+  2. **Staging:** aplicar as migrations 049–060; configurar o `CRON_SECRET` nas
+     functions e nos chamadores (pg_cron com o header); provas vivas — CONF-01/02
+     com JWT de observer, barreira da 057, rate-limit da 058, ensaio de restore do
+     `docs/CUTOVER_RUNBOOK.md`.
+  3. **Aparelho:** build SMP Dev (TestFlight) e o roteiro
+     `docs/qa/ROTEIRO_TESTES_v2.md` — incluindo a prova do import de PDF em
+     aparelho (CLN-05; o passo-a-passo está no roteiro).
+  4. **Branches remotas** `feature/pdf-member-import`, `v1.x` e `v2.0`: todas
+     **contidas na main** (verificado por merge-base; refs locais, sem fetch) —
+     recomendação: deletar no GitHub quando houver acesso (CLN-23).
+  5. **No Mac do dono:** deletar as refs locais da UX-2.0
+     (`git branch -D UX-2.0`; `git tag -d archive/UX-2.0-2026-06-07`).
+  6. **Fases seguintes do lançamento:** features novas (a definir pelo dono),
+     mídia/metadados da loja, release + cutover na ordem do `CLAUDE.md`/ADR-001.
+- **Débitos de código/documento restantes:** `docs/DEBITOS-RESTANTES.md` (lista única).
+- As seções abaixo (branches `v2.0`/`v1.x`, decisões, grade do PDF, canal de
+  diagnóstico) são **histórico** de trabalho já contido na main — registro, não estado.
 
 ## v2.0 (branch `v2.0`) — BUILD COMPLETE & VERIFIED (deploy gated by v1.x adoption)
 Unified people model: actors+speakers → `members` with capability flags + contact-delegation;
@@ -289,19 +101,22 @@ Built in 6 atomic commits (`27c01e3`..`aa68757`), fresh subagent per step, kept 
   `039` ships to prod at the v2 cutover with 037/038.
 
 ## Decisions
-- 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline. Recoverable via
-  branch `UX-2.0` and tag `archive/UX-2.0-2026-06-07` (tip `9b652db`).
+- 2026-07-27: Discarded UX-2.0 (463 commits) and returned to the main baseline.
+  Atualização (19/10/2026, decisão do dono): branch `UX-2.0` e tag
+  `archive/UX-2.0-2026-06-07` **deletadas** na cópia de trabalho — não são mais
+  recuperáveis aqui; refs locais podem restar apenas no Mac do dono.
 - 2026-07-27: Replaced devteam with dev-flow. Deleted `.devteam/` and
   `docs/{specs,arch,plans,qa,tests,reviews,code}` + `docs/CHANGE_REQUESTS.yaml` (recoverable via git history).
 
 ## Resolved
 - `RESEND_*` secrets removed from Supabase (unused after Gmail SMTP switch).
 - Gmail App Password rotation: **user declined** (deliberate) — current password stays in use.
-- Lint + tsc baselines clean; all work pushed to `origin/main`.
+- Lint + tsc baselines clean. (Push a `origin/main`: pendente desde ago/2026 — ver Now.)
 
 ## Open issues
-- The archived `UX-2.0` snapshot (`9b652db`) committed `.claude/settings.local.json` with Supabase
-  keys locally (never pushed). Rotate if desired — low priority, local-only.
+- ~~The archived `UX-2.0` snapshot committed `.claude/settings.local.json` with Supabase
+  keys locally (never pushed)~~ — o snapshot foi deletado nesta cópia (19/10/2026); se a
+  cópia do Mac ainda existir, rotacionar as chaves segue disponível como higiene.
 - `f021-topic-library-overhaul.test.ts` asserts source text (`function normalizeForSearch`) via
   fs/string-matching — against the "behavioral tests only" rule; keeps dead code alive in
   `useTopics.ts`. Worth revisiting (test + dead code) as a future cleanup.

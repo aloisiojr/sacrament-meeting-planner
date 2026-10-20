@@ -72,19 +72,19 @@ logic into `src/lib/`.
 
 - **Sunday / meeting** with a *sunday type* (regular, fast & testimony, …).
 - **Speech / speaker** with topic and assignment status; **prayers** (opening/closing);
-  **hymns** (incl. intermediate); **actors** (people in roles); **agenda**; **members** (importable);
+  **hymns** (incl. intermediate); **agenda**; **members** (importable);
   **invitations** / user management; **presentation mode**; activity log/history; WhatsApp
   messaging; push notifications.
 
 ## Release & versioning — READ BEFORE TOUCHING MIGRATIONS
 
-Shipped versions, as of 2026-08-03:
+Shipped versions, as of 2026-10-20:
 
 | Version | State | Why it matters |
 |---------|-------|----------------|
 | **1.0.0** | live in the stores | **has no version gate** |
-| **1.1.0** | in store review | introduces the version gate (`useVersionGate`, `app-config` edge function, `app_config.min_supported_version`) |
-| **2.0.0** | in development | needs migrations that **break 1.x.x clients** |
+| **1.1.0** | live in the stores (2026-08-05) | introduces the version gate (`useVersionGate`, `app-config` edge function, `app_config.min_supported_version`) |
+| **2.0.0** | code-complete (audit remediation waves 1–7 merged); migrations 049–060 written, none applied | needs migrations that **break 1.x.x clients** |
 
 **The cutover order is not negotiable — the gate goes live BEFORE the breaking migrations:**
 
@@ -117,11 +117,14 @@ is untouched until the cutover. Staging has all migrations applied, so it is the
 answer to "does this table/policy exist" — check the database, not the migration files.
 
 **UX-2.0 is discarded permanently and will never be merged into `main`.** The branch `UX-2.0` and
-the tag `archive/UX-2.0-2026-06-07` are archive only.
+the tag `archive/UX-2.0-2026-06-07` were **deleted** from the working copy on 2026-10-19 (owner's
+decision); local refs may remain only on the owner's Mac.
 
 ## Deploy notes
 
-- Supabase migrations in `supabase/migrations/` (46 in repo). **The applied set is not tracked
+- Supabase migrations in `supabase/migrations/` (60 in repo: 001–060). `google-services.json`
+  is versioned on purpose: it is Firebase *client* configuration, public by design (same model
+  as ADR-008) — server secrets never go in it. **The applied set is not tracked
   here — verify against the database before assuming.** Edge functions in `supabase/functions/`
   deploy via Supabase CLI. Secrets live in `.claude/settings.local.json` (gitignored) — never
   commit them.

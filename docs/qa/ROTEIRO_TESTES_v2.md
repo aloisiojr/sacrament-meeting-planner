@@ -164,6 +164,24 @@ Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Ma
 - Passos: exclua um membro sem discursos futuros.
 - Esperado: some da lista.
 
+### 4.7 Importar PDF de membros do LCR (prova em aparelho — CLN-05)
+> Este é o fluxo que **só existe no aparelho**: a extração do PDF roda numa WebView
+> com pdf.js (fora do alcance da suíte). Sem este passo marcado, o import por PDF
+> segue "nunca provado em aparelho".
+- Pré: um PDF real de lista de membros do LCR (o mesmo usado no desenvolvimento)
+  disponível no aparelho (Arquivos/iCloud/WhatsApp).
+- Passos: Membros → Importar → escolher o PDF do LCR.
+- Esperado: a tela de revisão abre com a contagem de membros batendo com o PDF;
+  nomes e telefones alinhados às linhas certas (conferir 5 nomes sorteados contra o
+  PDF, incluindo um com telefone em branco e um com nome composto).
+- Passos: confirmar a importação e abrir a lista.
+- Esperado: membros criados/atualizados sem duplicar quem já existia por nome.
+- Passos: importar o MESMO PDF de novo.
+- Esperado: nenhuma duplicação (a RPC `apply_member_import` é idempotente por
+  ward+nome normalizado); telefones alterados no PDF atualizam, os demais não mudam.
+- `📴 OFFLINE`: repetir a escolha do PDF em modo avião.
+- Esperado: importação bloqueada com aviso honesto (nada enfileirado pela metade).
+
 ---
 
 ## 5. Papéis e permissões (rode o app com cada conta)

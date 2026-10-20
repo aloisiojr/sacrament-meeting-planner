@@ -53,7 +53,8 @@ o contrato de resposta não muda. A 057 portanto ALTERA/ESTENDE, não recria:
   authenticated chamando a função, nas tabelas de dados da ala existentes no ponto do
   cutover: `wards`, `members`, `ward_topics`, `sunday_exceptions`, `speeches`, `hymns`,
   `sunday_agendas`, `activity_log`, `invitations`, `device_push_tokens`,
-  `notification_queue`, `designations`, `designation_templates`. RESTRICTIVE soma-se
+  `notification_queue` (11 tabelas; designações são JSONB em `sunday_agendas`, 041).
+  RESTRICTIVE soma-se
   (AND) às policies existentes sem reescrevê-las; `service_role` tem BYPASSRLS e não é
   afetado (edge functions/crons seguem escrevendo). Fora por desenho: `app_config`
   (config, escrita já é service-only), `app_health_events` (canal de diagnóstico com
@@ -156,7 +157,7 @@ o contrato de resposta não muda. A 057 portanto ALTERA/ESTENDE, não recria:
    `expoConfig`; sem versão, nenhum header `x-app-version` é enviado.
 5. DEC-08 (SQL, conferido por leitura — sem banco): 057 estende `app_config` sem
    recriar, função lê `request.headers`, NULL/sem header libera, policies RESTRICTIVE
-   nas 13 tabelas listadas, default desligada documentada.
+   nas 11 tabelas listadas, default desligada documentada.
 6. `send-reset-email`: nenhum `listUsers`; usuário achado pela Admin API por e-mail
    recebe o e-mail no endereço canônico; desconhecido ⇒ mesma resposta de sucesso;
    env ausente ⇒ 500 nomeando a variável.

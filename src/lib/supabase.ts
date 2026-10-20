@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
@@ -59,7 +60,18 @@ const resilientStorage = {
   },
 };
 
+/**
+ * App version sent on every PostgREST request as `x-app-version` (DEC-08): the server-side
+ * cutover barrier (`public.app_write_allowed()`, migration 057) reads it from
+ * `request.headers`. No version in expoConfig ⇒ no header at all — never a spurious value,
+ * and the barrier treats a missing header as allowed (pre-header clients).
+ */
+const APP_VERSION = Constants.expoConfig?.version;
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    headers: APP_VERSION ? { 'x-app-version': APP_VERSION } : {},
+  },
   auth: {
     storage: resilientStorage,
     autoRefreshToken: true,

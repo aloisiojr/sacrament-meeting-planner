@@ -37,6 +37,19 @@ Notifications.setNotificationHandler({
  * Token is upserted: updated on every login/app open.
  * Deferred to next app opening if offline.
  */
+/**
+ * Whether push-token registration may proceed. Permission-based (DEC-04): the
+ * caller passes the result of the push:receive permission check; observers lack
+ * it and never register. Extracted so the guard is tested, not copied (ARQ-02).
+ */
+export function shouldRegisterPushToken(args: {
+  userId: string | null | undefined;
+  wardId: string | null | undefined;
+  canReceivePush: boolean;
+}): boolean {
+  return Boolean(args.userId && args.wardId && args.canReceivePush);
+}
+
 export function useRegisterPushToken(isOnline: boolean): void {
   const { user, role, wardId, hasPermission } = useAuth();
   // Remember which identity we last registered for, so an in-session ward/role switch
@@ -45,7 +58,7 @@ export function useRegisterPushToken(isOnline: boolean): void {
 
   useEffect(() => {
     // Gate by permission, not role: observers lack push:receive and don't register.
-    if (!user || !wardId || !hasPermission('push:receive')) return;
+    if (!user || !shouldRegisterPushToken({ userId: user.id, wardId, canReceivePush: hasPermission('push:receive') })) return;
     const registrationKey = `${user.id}:${wardId}:${role}`;
     if (registeredKeyRef.current === registrationKey) return;
     if (!isOnline) return; // Defer to next app opening with connection

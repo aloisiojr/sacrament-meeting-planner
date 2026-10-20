@@ -21,7 +21,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { AuthContext } from '../contexts/AuthContext';
 import { reportHealthEvent } from '../lib/appHealth';
-import { peek, dequeue, incrementRetry, type QueuedMutation } from '../lib/offlineQueue';
+import {
+  peek,
+  dequeue,
+  incrementRetry,
+  deadLetterHead,
+  type QueuedMutation,
+} from '../lib/offlineQueue';
 import { logAction } from '../lib/activityLog';
 
 /**
@@ -36,7 +42,7 @@ export function isAuthError(err: unknown): boolean {
   return typeof e.message === 'string' && /jwt|unauthorized|invalid.*token/i.test(e.message);
 }
 
-type ReplayOutcome = 'accepted' | 'rejected' | 'auth-expired';
+type ReplayOutcome = 'accepted' | 'rejected' | 'auth-expired' | 'conflict';
 
 /**
  * Replay one mutation.
@@ -65,11 +71,24 @@ async function replay(mutation: QueuedMutation): Promise<ReplayOutcome> {
       if (error) throw error;
     } else if (operation === 'UPDATE') {
       const { id, ...rest } = data;
-      const { error } = await supabase
-        .from(table)
-        .update(rest)
-        .eq('id', id as string);
-      if (error) throw error;
+      if (mutation.expectedUpdatedAt) {
+        // CONF-09: guarded replay — 0 rows means another device changed the row since
+        // the edit was queued. That is a conflict, not a success and not a retry.
+        const { data: rows, error } = await supabase
+          .from(table)
+          .update(rest)
+          .eq('id', id as string)
+          .eq('updated_at', mutation.expectedUpdatedAt)
+          .select('id');
+        if (error) throw error;
+        if (!rows || rows.length === 0) return 'conflict';
+      } else {
+        const { error } = await supabase
+          .from(table)
+          .update(rest)
+          .eq('id', id as string);
+        if (error) throw error;
+      }
     } else if (operation === 'DELETE') {
       const { error } = await supabase
         .from(table)
@@ -144,6 +163,15 @@ export function useOfflineQueueProcessor(isOnline: boolean): void {
                 intent.userName
               );
             }
+            continue;
+          }
+
+          // CONF-09: a guarded replay that landed 0 rows is a visible conflict — the row
+          // moved on another device. Dead-letter it (badge-visible, not silently dropped
+          // and not retried into a last-write-wins overwrite) and keep draining.
+          if (outcome === 'conflict') {
+            await deadLetterHead();
+            await reportHealthEvent(wardIdRef.current, 'offline_queue_conflict', {});
             continue;
           }
 

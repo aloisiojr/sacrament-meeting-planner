@@ -105,7 +105,9 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
           event: '*',
           schema: 'public',
           table,
-          filter: `ward_id=eq.${wardId}`,
+          // CONF-09/15: wards is the ward row itself — it has no ward_id column, so it
+          // is filtered by its own id; every other synced table is ward_id-scoped.
+          filter: table === 'wards' ? `id=eq.${wardId}` : `ward_id=eq.${wardId}`,
         },
         (payload) => {
           invalidateForTable(payload.table);

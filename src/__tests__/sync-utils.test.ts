@@ -5,13 +5,20 @@
 import { SYNCED_TABLES, getQueryKeysForTable, POLLING_INTERVAL_MS } from '../lib/sync';
 
 describe('SYNCED_TABLES', () => {
-  it('contains all 5 synced tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(5);
+  it('contains all 7 synced tables (CONF-09/15 adds wards + activity_log)', () => {
+    expect(SYNCED_TABLES).toHaveLength(7);
     expect(SYNCED_TABLES).toContain('members');
     expect(SYNCED_TABLES).toContain('ward_topics');
     expect(SYNCED_TABLES).toContain('sunday_exceptions');
     expect(SYNCED_TABLES).toContain('speeches');
     expect(SYNCED_TABLES).toContain('sunday_agendas');
+    expect(SYNCED_TABLES).toContain('wards');
+    expect(SYNCED_TABLES).toContain('activity_log');
+  });
+
+  it('wards invalidates the ward root; activity_log invalidates history (CONF-09/15)', () => {
+    expect(getQueryKeysForTable('wards')).toEqual([['ward']]);
+    expect(getQueryKeysForTable('activity_log')).toEqual([['activity-log']]);
   });
 });
 

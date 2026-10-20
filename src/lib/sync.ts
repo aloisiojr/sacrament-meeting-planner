@@ -9,6 +9,7 @@ import { sundayTypeKeys } from '../hooks/useSundayTypes';
 import { speechKeys } from '../hooks/useSpeeches';
 import { speechCountKeys } from '../hooks/useSpeechCounts';
 import { agendaKeys } from '../hooks/useAgenda';
+import { activityLogKeys } from '../hooks/useActivityLog';
 
 // --- Types ---
 
@@ -17,7 +18,10 @@ export type SyncedTable =
   | 'ward_topics'
   | 'sunday_exceptions'
   | 'speeches'
-  | 'sunday_agendas';
+  | 'sunday_agendas'
+  | 'wards'
+  | 'activity_log';
+
 
 // --- Constants ---
 
@@ -30,6 +34,8 @@ export const SYNCED_TABLES: readonly SyncedTable[] = [
   'sunday_exceptions',
   'speeches',
   'sunday_agendas',
+  'wards',
+  'activity_log',
 ] as const;
 
 /**
@@ -42,6 +48,10 @@ export const TABLE_TO_QUERY_KEYS: Record<SyncedTable, readonly (readonly string[
   sunday_exceptions: [sundayTypeKeys.all],
   speeches: [speechKeys.all, speechCountKeys.all],
   sunday_agendas: [agendaKeys.all],
+  // CONF-09/15: a ward-row change (language/timezone/name/templates) refreshes every
+  // ['ward', wardId, …] query via the shared root prefix; activity_log refreshes history.
+  wards: [['ward']],
+  activity_log: [activityLogKeys.all],
 };
 
 /**

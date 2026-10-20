@@ -23,7 +23,7 @@ jest.mock('../lib/supabase', () => ({
     from: () => {
       const fail = () => Promise.reject(new TypeError('Network request failed'));
       const chain: Record<string, unknown> = {};
-      for (const m of ['update', 'insert', 'delete', 'eq', 'select', 'single']) {
+      for (const m of ['update', 'insert', 'delete', 'eq', 'select', 'single', 'maybeSingle']) {
         chain[m] = () => chain;
       }
       chain.then = (...args: unknown[]) =>

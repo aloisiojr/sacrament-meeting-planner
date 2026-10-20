@@ -129,11 +129,6 @@ export interface WardTopic {
   updated_at: string;
 }
 
-export interface GeneralCollection {
-  id: string;
-  name: string;
-  language: string;
-}
 
 export interface GeneralTopic {
   id: string;
@@ -262,18 +257,6 @@ export interface Invitation {
   created_at: string;
 }
 
-export interface DevicePushToken {
-  id: string;
-  user_id: string;
-  ward_id: string;
-  expo_push_token: string;
-  role: string | null;
-  app_version: string | null;
-  platform: string | null;
-  last_update_nudge_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface NotificationQueue {
   id: string;

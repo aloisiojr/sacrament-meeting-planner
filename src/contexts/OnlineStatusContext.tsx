@@ -4,7 +4,7 @@
  * Consumed by tabs, AgendaForm, SpeechSlot to gate write operations.
  */
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
 
 interface OnlineStatusContextValue {
   isOnline: boolean;
@@ -21,8 +21,11 @@ export function OnlineStatusProvider({
   isOnline: boolean;
   children: React.ReactNode;
 }) {
+  // RAP-13: memoized value — a fresh object per render would re-render every
+  // consumer on any provider render, even when connectivity did not change.
+  const value = useMemo(() => ({ isOnline }), [isOnline]);
   return (
-    <OnlineStatusContext.Provider value={{ isOnline }}>
+    <OnlineStatusContext.Provider value={value}>
       {children}
     </OnlineStatusContext.Provider>
   );

@@ -4,6 +4,7 @@
 
 import {
   addMonths,
+  buildDateWindows,
   findNextSunday,
   getInitialDateRange,
 } from '../hooks/useSundayList';
@@ -65,13 +66,46 @@ describe('findNextSunday', () => {
 });
 
 describe('getInitialDateRange', () => {
-  it('returns 12 months past and 12 months future', () => {
+  it('returns 3 months past and 6 months future (RAP-03 short opening window)', () => {
     const today = new Date(2026, 1, 15); // Feb 15, 2026
     const { start, end } = getInitialDateRange(today);
 
     expect(start.getFullYear()).toBe(2025);
-    expect(start.getMonth()).toBe(1); // Feb 2025
-    expect(end.getFullYear()).toBe(2027);
-    expect(end.getMonth()).toBe(1); // Feb 2027
+    expect(start.getMonth()).toBe(10); // Nov 2025
+    expect(end.getFullYear()).toBe(2026);
+    expect(end.getMonth()).toBe(7); // Aug 2026
+  });
+});
+
+describe('buildDateWindows (RAP-03 delta segments)', () => {
+  const today = new Date(2026, 1, 15); // Feb 15, 2026
+
+  it('opens with a single short window', () => {
+    expect(buildDateWindows(today, 3, 6)).toEqual([
+      { start: '2025-11-15', end: '2026-08-15' },
+    ]);
+  });
+
+  it('extends the future with one delta segment, leaving prior segments untouched', () => {
+    const before = buildDateWindows(today, 3, 6);
+    const after = buildDateWindows(today, 3, 12);
+    expect(after[0]).toEqual(before[0]);
+    expect(after).toHaveLength(2);
+    expect(after[1]).toEqual({ start: '2026-08-15', end: '2027-02-15' });
+  });
+
+  it('extends the past with one delta segment at the head', () => {
+    const after = buildDateWindows(today, 9, 6);
+    expect(after).toHaveLength(2);
+    expect(after[0]).toEqual({ start: '2025-05-15', end: '2025-11-15' });
+    expect(after[1]).toEqual({ start: '2025-11-15', end: '2026-08-15' });
+  });
+
+  it('segments chain on shared boundaries so earlier queryKeys never change', () => {
+    const windows = buildDateWindows(today, 15, 18);
+    expect(windows.length).toBe(5);
+    for (let i = 1; i < windows.length; i++) {
+      expect(windows[i].start).toBe(windows[i - 1].end);
+    }
   });
 });

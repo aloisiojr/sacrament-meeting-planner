@@ -939,7 +939,6 @@ function HymnSelectorModal({
               ref={listRef}
               style={styles.hymnList}
               data={filtered}
-              initialNumToRender={filtered.length}
               keyExtractor={(item) => item.id}
               getItemLayout={(_, index) => ({
                 length: HYMN_ITEM_HEIGHT,

@@ -2,7 +2,7 @@
  * Agenda tab: Infinite scroll list of sundays with agenda forms.
  * Shows all sundays including Gen Conf / Stake Conf (non-expandable).
  * Includes Testimony Meeting, Ward Conference, Special Program.
- * 12 months past + 12 months future, +6 on scroll.
+ * 3 months past + 6 months future, +6 per delta segment on scroll (RAP-03).
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
@@ -24,9 +24,10 @@ import { ThemedErrorBoundary } from '../../components/ErrorBoundary';
 import { QueryErrorView } from '../../components/QueryErrorView';
 import { SundayTypeDropdown } from '../../components/SundayCard';
 import { useSundayList } from '../../hooks/useSundayList';
-import { useSundayExceptions, useSetSundayType, useRemoveSundayException, useAutoAssignMissingSundayTypes, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
-import { useSpeeches, useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
-import { useLazyCreateAgenda, useAgendaRange, useUpdateAgendaByDate } from '../../hooks/useAgenda';
+import { useSetSundayType, useRemoveSundayException, useAutoAssignMissingSundayTypes, SUNDAY_TYPE_SPEECHES } from '../../hooks/useSundayTypes';
+import { useDeleteSpeechesByDate, useWardManagePrayers } from '../../hooks/useSpeeches';
+import { useLazyCreateAgenda, useUpdateAgendaByDate } from '../../hooks/useAgenda';
+import { useAgendaWindowData } from '../../hooks/useAgendaWindowData';
 import { AgendaExportPdfButton } from '../../components/AgendaExportPdfButton';
 import { AgendaForm } from '../../components/AgendaForm';
 import { UnifiedSundayCard } from '../../components/UnifiedSundayCard';
@@ -59,8 +60,7 @@ function AgendaTabContent() {
 
   const {
     sundays,
-    startDate,
-    endDate,
+    windows,
     loadMoreFuture,
     loadMorePast,
     hasMoreFuture,
@@ -68,9 +68,16 @@ function AgendaTabContent() {
     nextSunday,
   } = useSundayList();
 
-  const { data: exceptions, isError: exceptionsError, error: exceptionsErr, refetch: refetchExceptions } = useSundayExceptions(startDate, endDate);
-  const { data: allSpeeches } = useSpeeches({ start: startDate, end: endDate });
-  const { data: allAgendas } = useAgendaRange(startDate, endDate);
+  // RAP-03/DEC-06: per-window delta queries — extending the list fetches only the new
+  // segment; the initial window is 3 months back + 6 ahead (see useSundayList).
+  const {
+    exceptions,
+    speeches: allSpeeches,
+    agendas: allAgendas,
+    exceptionsError,
+    exceptionsErr,
+    refetchExceptions,
+  } = useAgendaWindowData(windows);
   const lazyCreate = useLazyCreateAgenda();
   const updateAgendaByDate = useUpdateAgendaByDate();
   const setSundayType = useSetSundayType();

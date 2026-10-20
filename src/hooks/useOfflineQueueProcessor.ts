@@ -24,14 +24,28 @@ import { reportHealthEvent } from '../lib/appHealth';
 import { peek, dequeue, incrementRetry, type QueuedMutation } from '../lib/offlineQueue';
 
 /**
- * Replay one mutation. Returns true when the server accepted it.
+ * Is this failure an expired/invalid session (HTTP 401) rather than a rejection of the
+ * write itself? PostgREST reports it as status 401 / code PGRST301 ("JWT expired").
+ */
+export function isAuthError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { status?: unknown; code?: unknown; message?: unknown };
+  if (e.status === 401 || e.status === '401') return true;
+  if (e.code === 'PGRST301') return true;
+  return typeof e.message === 'string' && /jwt|unauthorized|invalid.*token/i.test(e.message);
+}
+
+type ReplayOutcome = 'accepted' | 'rejected' | 'auth-expired';
+
+/**
+ * Replay one mutation.
  *
  * supabase-js v2 does NOT throw on a rejected write — it resolves `{ data, error }`. The previous
  * implementation discarded that result, so an RLS denial, a foreign-key violation or a duplicate
  * key was indistinguishable from success and the entry was dropped silently. The try/catch is kept
  * for genuine transport failures, which do reject.
  */
-async function replay(mutation: QueuedMutation): Promise<boolean> {
+async function replay(mutation: QueuedMutation): Promise<ReplayOutcome> {
   const { table, operation, data, onConflict } = mutation;
 
   try {
@@ -62,10 +76,10 @@ async function replay(mutation: QueuedMutation): Promise<boolean> {
         .eq('id', data.id as string);
       if (error) throw error;
     }
-    return true;
+    return 'accepted';
   } catch (err) {
     console.warn('[OfflineQueue] Replay rejected:', err);
-    return false;
+    return isAuthError(err) ? 'auth-expired' : 'rejected';
   }
 }
 
@@ -112,10 +126,19 @@ export function useOfflineQueueProcessor(isOnline: boolean): void {
           const mutation = await peek();
           if (!mutation) break;
 
-          if (await replay(mutation)) {
+          const outcome = await replay(mutation);
+          if (outcome === 'accepted') {
             await dequeue();
             replayedAny = true;
             continue;
+          }
+
+          // EST-17: a 401 is the session's fault, not the entry's. Pause the drain WITHOUT
+          // spending a retry — otherwise good edits would be dead-lettered just because the
+          // user needs to sign in again. The next drain (after re-auth) retries from here.
+          if (outcome === 'auth-expired') {
+            await reportHealthEvent(wardIdRef.current, 'offline_queue_paused_auth', {});
+            break;
           }
 
           // Rejected: spend one retry. `incrementRetry` moves the entry to the persisted

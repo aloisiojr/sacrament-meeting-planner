@@ -7,6 +7,15 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-perf-pdf` (wave 3A) — COMPLETA, verificada, NÃO mergeada (sem push).**
+  `specs/perf-pdf-fast-safe.md`: RAP-01 (teto 10 MB antes do base64, timeout 75 s com
+  retry visível, mensagens por página, cache de módulo dos assets, callbacks via ref),
+  DEC-07/ARQ-11 (`scripts/copy-pdfjs.mjs` + `assets/pdfjs/VERSION`, fonte `legacy/build`
+  do pdfjs-dist 4.10.38 medida por sha256; inline mantido — `localUri` gated pela CLN-05)
+  e RAP-07 (3 listas da revisão em FlatList + linha memo, contador de render em teste).
+  3 commits por achado (`9a28b90`, `5bd49e0`, `651b3c8`) sobre `main` @329665e.
+  Gates (uma rodada): tsc 0, lint 0 erros/5 warnings (baseline), jest 352 suítes /
+  5.794 testes verdes (+22 novos). Sem migration. Falta: prova em aparelho (CLN-05).
 - **Wave 2A `specs/fix-visibility-time.md` — BUILD COMPLETE, MERGEADA na main do 104 (merge 1621284; branch
   `muse/smp-fix-visibility-time`, 10 commits sobre `main` @7ccdea1).** Passos 1–9 do
   `.plan.md` todos ✅: hoje local (EST-08/13), Home/Presentation com erro+retry

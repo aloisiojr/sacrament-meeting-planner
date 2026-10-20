@@ -10,7 +10,7 @@
  * first step) + Próximo → Concluir (right), kept clear of the device's rounded corners. Only the
  * name list scrolls — the step header + master toggle stay fixed. Empty steps are skipped.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, FlatList, StyleSheet, Alert } from 'react-native';
 import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
@@ -206,7 +206,9 @@ export function PdfImportReview({
   };
 
   const manualEntryRef = useRef(manualEntry);
-  manualEntryRef.current = manualEntry;
+  useEffect(() => {
+    manualEntryRef.current = manualEntry;
+  }, [manualEntry]);
   const openEditor = useCallback(
     (name: string) => {
       const e = manualEntryRef.current[name];

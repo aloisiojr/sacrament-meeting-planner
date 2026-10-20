@@ -37,7 +37,6 @@ jest.mock('expo-asset', () => ({
 
 jest.mock('expo-file-system', () => ({
   File: class MockFile {
-    constructor(..._args: unknown[]) {}
     async base64(): Promise<string> {
       mockState.fileBase64Calls += 1;
       return 'b64-asset-content';

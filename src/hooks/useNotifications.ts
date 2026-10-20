@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { reportHealthEvent } from '../lib/appHealth';
 
 // --- Notification display configuration ---
 
@@ -106,12 +107,17 @@ export function useRegisterPushToken(isOnline: boolean): void {
           );
 
         if (error) {
+          // EST-23: falha de registro era só console.warn (invisível em produção) e
+          // agora vira health event; NÃO marca como registrado, então a próxima
+          // abertura tenta de novo.
           console.warn('Failed to register push token:', error.message);
+          void reportHealthEvent(wardId, 'push_token_register_failed', { fromUpsert: true });
         } else {
           registeredKeyRef.current = registrationKey;
         }
       } catch (err) {
         console.warn('Push token registration error:', err);
+        void reportHealthEvent(wardId, 'push_token_register_failed', { fromUpsert: false });
       }
     }
 
@@ -137,10 +143,12 @@ export function useNotificationsEnabled(): { enabled: boolean; isLoading: boolea
   const { data, isLoading } = useQuery({
     queryKey: notificationPrefKey(user?.id),
     queryFn: async (): Promise<boolean> => {
+      const userId = user?.id;
+      if (!userId) return true; // sem usuário, o default é ligado e nada é consultado
       const { data, error } = await supabase
         .from('device_push_tokens')
         .select('notifications_enabled')
-        .eq('user_id', user!.id);
+        .eq('user_id', userId);
       if (error) throw error;
       if (!data || data.length === 0) return true; // no devices yet → default on
       return data.some((t) => t.notifications_enabled);
@@ -161,10 +169,12 @@ export function useSetNotificationsEnabled() {
 
   return useClassifiedMutation('useSetNotificationsEnabled', {
     mutationFn: async (enabled: boolean) => {
+      const userId = user?.id;
+      if (!userId) throw new Error('push/no-user');
       const { error } = await supabase
         .from('device_push_tokens')
         .update({ notifications_enabled: enabled })
-        .eq('user_id', user!.id);
+        .eq('user_id', userId);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -22,6 +22,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  BackHandler,
   Keyboard,
   Platform,
 } from 'react-native';
@@ -149,7 +150,32 @@ function DesignationEditContent() {
     date,
   ]);
 
+  // EST-21: ONE back path. The header "Back" button and the Android hardware back
+  // button must behave identically — both go through handleBack.
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  useEffect(() => {
+    // BackHandler only fires on Android; registering unconditionally keeps one code path.
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleBack]);
+
   const scrollRef = useRef<ScrollView>(null);
+  const keyboardSubRef = useRef<ReturnType<typeof Keyboard.addListener> | null>(null);
+
+  // EST-21: the one-shot keyboard listener below must not outlive the screen when the
+  // keyboard never appears.
+  useEffect(() => {
+    return () => {
+      keyboardSubRef.current?.remove();
+      keyboardSubRef.current = null;
+    };
+  }, []);
 
   /**
    * Raise the focused field above the keyboard.
@@ -172,10 +198,13 @@ function DesignationEditContent() {
       return;
     }
     // The inset only exists once the keyboard is up; scrolling before that is a no-op.
+    keyboardSubRef.current?.remove();
     const sub = Keyboard.addListener('keyboardDidShow', () => {
       sub.remove();
+      if (keyboardSubRef.current === sub) keyboardSubRef.current = null;
       toEnd();
     });
+    keyboardSubRef.current = sub;
   }, []);
 
   const handleSave = useCallback(() => {
@@ -249,7 +278,7 @@ function DesignationEditContent() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.divider }]}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityRole="button"
           hitSlop={12}
           testID="designation-edit-back-button"

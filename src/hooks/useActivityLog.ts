@@ -79,6 +79,7 @@ export function useActivityLog({ search }: UseActivityLogOptions = {}) {
     fetchNextPage: query.fetchNextPage,
     error: query.error,
     refetch: query.refetch,
+    isRefetching: query.isRefetching,
     canRead,
   };
 }

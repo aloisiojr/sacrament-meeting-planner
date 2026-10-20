@@ -2,12 +2,18 @@ import { logAction, createLogger, buildLogDescription, parseLogDescription, form
 import type { TFunction } from 'i18next';
 
 // Mock supabase
+const mockInsert = jest.fn().mockResolvedValue({ data: null, error: null });
 jest.mock('../lib/supabase', () => ({
   supabase: {
     from: () => ({
-      insert: jest.fn().mockResolvedValue({ data: null, error: null }),
+      insert: mockInsert,
     }),
   },
+}));
+
+const mockReportHealthEvent = jest.fn().mockResolvedValue(undefined);
+jest.mock('../lib/appHealth', () => ({
+  reportHealthEvent: (...args: unknown[]) => mockReportHealthEvent(...args),
 }));
 
 describe('logAction', () => {
@@ -32,6 +38,18 @@ describe('logAction', () => {
     await expect(
       logAction('ward-1', 'user-1', 'user@test.com', 'member:create', 'Created member')
     ).resolves.not.toThrow();
+  });
+
+  // EST-12: supabase-js resolve com {error} em vez de lançar — ler o erro e sinalizar.
+  it('emits a health event when the insert resolves with an error, without throwing', async () => {
+    mockReportHealthEvent.mockClear();
+    mockInsert.mockResolvedValueOnce({ data: null, error: { message: 'rls denied' } });
+
+    await expect(
+      logAction('ward-1', 'user-1', 'user@test.com', 'member:create', 'Created member')
+    ).resolves.not.toThrow();
+
+    expect(mockReportHealthEvent).toHaveBeenCalledWith('ward-1', 'activity_log_failed', {});
   });
 });
 

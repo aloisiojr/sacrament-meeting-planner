@@ -6,10 +6,15 @@ import {
   FlatList,
   ActivityIndicator,
   Pressable,
+  RefreshControl,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
+import { supabase } from '../../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchInput } from '../../../components/SearchInput';
 import { useActivityLog, useActivityLogSearch } from '../../../hooks/useActivityLog';
@@ -17,18 +22,25 @@ import { formatLogDescription } from '../../../lib/activityLog';
 import type { ActivityLog } from '../../../types/database';
 
 /**
- * Format a datetime string to "YYYY-MM-DD HH:MM" in ward timezone.
- * Falls back to a basic formatting if timezone conversion isn't available.
+ * Format a datetime string to "YYYY-MM-DD HH:MM" in the ward's timezone (EST-14).
+ * `wards.timezone` is editable in settings; formatting with the device clock showed
+ * another ward's "now" to anyone travelling. Without a loaded timezone, fall back to
+ * the device's local time rather than hiding the entry.
  */
-function formatDateTime(isoString: string): string {
+export function formatDateTime(isoString: string, timeZone?: string | null): string {
   try {
     const date = new Date(isoString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone ?? undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
   } catch {
     return isoString;
   }
@@ -37,16 +49,18 @@ function formatDateTime(isoString: string): string {
 function ActivityLogEntry({
   item,
   colors,
+  timeZone,
 }: {
   item: ActivityLog;
   colors: ReturnType<typeof useTheme>['colors'];
+  timeZone?: string | null;
 }) {
   const { t } = useTranslation();
   return (
     <View style={[styles.entry, { backgroundColor: colors.card }]}>
       <View style={styles.entryHeader}>
         <Text style={[styles.entryDate, { color: colors.textSecondary }]}>
-          {formatDateTime(item.created_at)}
+          {formatDateTime(item.created_at, timeZone)}
         </Text>
         <Text style={[styles.entryEmail, { color: colors.textSecondary }]}>
           {item.user_name || item.user_email}
@@ -63,7 +77,24 @@ export default function ActivityLogScreen() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const router = useRouter();
+  const { wardId } = useAuth();
+  const isOnline = useOnlineStatus();
   const { searchText, debouncedSearch, updateSearch } = useActivityLogSearch();
+
+  // Ward timezone for entry timestamps — same queryKey as settings/timezone.tsx (EST-14).
+  const { data: wardTimezone } = useQuery({
+    queryKey: ['ward-timezone', wardId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('wards')
+        .select('timezone')
+        .eq('id', wardId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.timezone ?? null;
+    },
+    enabled: !!wardId,
+  });
 
   const {
     entries,
@@ -72,7 +103,21 @@ export default function ActivityLogScreen() {
     hasNextPage,
     fetchNextPage,
     error,
+    refetch,
+    isRefetching,
   } = useActivityLog({ search: debouncedSearch });
+
+  // EST-14: returning to this screen shows what happened since, not the snapshot from
+  // the first mount. Pull-to-refresh below covers the explicit gesture.
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch])
+  );
+
+  const handleRefresh = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -82,9 +127,9 @@ export default function ActivityLogScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityLog }) => (
-      <ActivityLogEntry item={item} colors={colors} />
+      <ActivityLogEntry item={item} colors={colors} timeZone={wardTimezone} />
     ),
-    [colors]
+    [colors, wardTimezone]
   );
 
   const keyExtractor = useCallback((item: ActivityLog) => item.id, []);
@@ -103,6 +148,18 @@ export default function ActivityLogScreen() {
         </Text>
         <View style={styles.headerSpacer} />
       </View>
+
+      {/* EST-14: offline banner reads the real connection state */}
+      {!isOnline && (
+        <View
+          testID="history-offline-banner"
+          style={[styles.offlineBanner, { backgroundColor: colors.card }]}
+        >
+          <Text style={[styles.offlineBannerText, { color: colors.textSecondary }]}>
+            {t('common.offlineMessage')}
+          </Text>
+        </View>
+      )}
 
       {/* Search field */}
       <View style={styles.searchContainer}>
@@ -149,6 +206,13 @@ export default function ActivityLogScreen() {
           keyExtractor={keyExtractor}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
           contentContainerStyle={styles.listContent}
           ListFooterComponent={
             isFetchingNextPage ? (
@@ -186,6 +250,16 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 50,
+  },
+  offlineBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 10,
+    padding: 12,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   searchContainer: {
     flexDirection: 'row',

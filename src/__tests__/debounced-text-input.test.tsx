@@ -54,6 +54,22 @@ describe('DebouncedTextInput', () => {
     expect(onSave).toHaveBeenLastCalledWith('hi');
   });
 
+  // EST-25: one flush path. After the debounce timer saves, blur and unmount must not save
+  // the same text again just because the parent has not re-rendered with the new `value` yet.
+  it('saves exactly once across timer, blur and unmount for the same text (EST-25)', () => {
+    const onSave = jest.fn();
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<DebouncedTextInput value="A" onSave={onSave} delay={800} />); });
+
+    act(() => input(r).props.onFocus({}));
+    act(() => input(r).props.onChangeText('B'));
+    act(() => { jest.advanceTimersByTime(800); }); // timer saves 'B'
+    act(() => input(r).props.onBlur({}));          // blur must not re-save
+    act(() => { r.unmount(); });                   // unmount must not re-save
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenLastCalledWith('B');
+  });
+
   it('flushes a pending typed edit on unmount', () => {
     const onSave = jest.fn();
     let r!: TestRenderer.ReactTestRenderer;

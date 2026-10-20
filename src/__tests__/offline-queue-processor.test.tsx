@@ -19,13 +19,21 @@ const mockFailTables = new Set<string>();
  * throwing mode is what let the original defect hide.
  */
 const mockErrorTables = new Set<string>();
+/** Tables whose writes resolve with a 401 auth error (expired session, EST-17). */
+const mockAuthTables = new Set<string>();
 
 /** Records what the processor asks Supabase to do, so replay can be asserted precisely. */
 function mockMakeChain(table: string) {
-  const result = () =>
-    mockErrorTables.has(table)
+  const result = () => {
+    if (mockAuthTables.has(table)) {
+      return Promise.resolve({
+        error: { message: 'JWT expired', code: 'PGRST301', status: 401 },
+      });
+    }
+    return mockErrorTables.has(table)
       ? Promise.resolve({ error: { message: 'new row violates row-level security policy' } })
       : Promise.resolve({ error: null });
+  };
 
   const chain = {
     insert: (payload: unknown) => {
@@ -121,6 +129,7 @@ beforeEach(async () => {
   mockHealthEvents.length = 0;
   mockFailTables.clear();
   mockErrorTables.clear();
+  mockAuthTables.clear();
 });
 
 describe('useOfflineQueueProcessor — when it runs', () => {
@@ -318,5 +327,22 @@ describe('useOfflineQueueProcessor — failure handling', () => {
 
     // And it is registered server-side (counts only — never the member payload).
     expect(mockHealthEvents).toContainEqual([null, 'offline_dead_letter', { retries: 3 }]);
+  });
+
+  it('does NOT spend a retry on a 401: an expired session pauses the drain (EST-17)', async () => {
+    // A 401 is not the entry's fault — the session is gone. Burning the retry budget would
+    // dead-letter perfectly good edits just because the user needs to sign in again.
+    mockAuthTables.add('speeches');
+    await enqueue(makeMutation({ id: 'q1', operation: 'UPDATE', table: 'speeches' }));
+    await enqueue(makeMutation({ id: 'q2', operation: 'INSERT', table: 'ok', data: { id: '2' } }));
+
+    await reconnectTimes(3); // would exhaust MAX_RETRIES if 401 spent budget
+
+    expect(await getQueueSize()).toBe(2);
+    expect((await peek())?.retryCount).toBe(0);
+    expect(await readDeadLetter()).toHaveLength(0);
+    // The drain paused at q1: q2 was never attempted out of order.
+    expect(calls.map((c) => c.table)).not.toContain('ok');
+    expect(mockHealthEvents).toContainEqual([null, 'offline_queue_paused_auth', {}]);
   });
 });

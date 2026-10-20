@@ -7,8 +7,8 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
-- **Wave 2A `specs/fix-visibility-time.md` — BUILD COMPLETE, NÃO mergeada (branch
-  `muse/smp-fix-visibility-time`, 9 commits sobre `main` @7ccdea1).** Passos 1–9 do
+- **Wave 2A `specs/fix-visibility-time.md` — BUILD COMPLETE, MERGEADA na main do 104 (merge 1621284; branch
+  `muse/smp-fix-visibility-time`, 10 commits sobre `main` @7ccdea1).** Passos 1–9 do
   `.plan.md` todos ✅: hoje local (EST-08/13), Home/Presentation com erro+retry
   (EST-06/19), `errorReporter` integrado (EST-07: boundary + handler global + ward,
   payload sem texto, throttle 60 s/teto 5/min), QueryClient singleton em
@@ -17,8 +17,11 @@
   do contexto), `getStartupGateState` puro consumido pelo NavigationGuard e
   `QueryCache.onError` gateado por `__DEV__` (EST-20), e token de push com health
   event `push_token_register_failed` + retentativa (EST-23). Gates: tsc 0, lint
-  0 erros/5 warnings, jest 338 suites/5742 testes verdes. Sem i18n novo, sem
-  migration, sem push/merge.
+  0 erros/5 warnings, jest 338 suites/5742 testes verdes. Sem i18n novo, sem migration, sem push.
+- **BRANCH `muse/smp-fix-state-integrity` (wave 2B) — COMPLETA, verificada, MERGEADA na main do 104 junto com a 2A.**
+  EST-12/14/16/17/18/21/22/24/25 em 8 commits por achado + 1 test-only (`e101b4c`).
+  Gates: tsc limpo, lint 0 erros, jest 324 suítes / 5.710 testes verdes.
+  Detalhe: `specs/fix-state-integrity.plan.md` (seção Estado). Sem push.
 - **BRANCH `fix/keyboard-safe-forms` — 16 commits, verificada, NÃO mergeada.**
   Teclado + ajustes no seletor de pessoas/temas. Suíte 290 suites / 5342 tests, tsc 0, lint no
   baseline (2 warnings pré-existentes em PdfTextExtractor).

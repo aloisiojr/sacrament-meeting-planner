@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react-native';
-import { Alert, Keyboard, Platform, ScrollView } from 'react-native';
+import { Alert, BackHandler, Keyboard, Platform, ScrollView } from 'react-native';
 import DesignationEditScreen from '../app/designations/[date]';
 import type { Member, Designation } from '../types/database';
 
@@ -339,5 +339,32 @@ describe('Designation edit screen (step 2)', () => {
     const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
     expect(item).toMatchObject({ type: 'sustain', person_name: 'Convidado Externo', calling: 'Líder' });
     expect(mockState.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes the Android hardware back through the same back path as the header button (EST-21)', async () => {
+    let hardwareHandler: (() => boolean) | null = null;
+    const remove = jest.fn();
+    const spy = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation(((_event: string, handler: () => boolean) => {
+        hardwareHandler = handler;
+        return { remove };
+      }) as unknown as typeof BackHandler.addEventListener);
+
+    const view = await rtlRender(React.createElement(DesignationEditScreen));
+    expect(hardwareHandler).not.toBeNull();
+
+    // Hardware back: handled (returns true) and navigates back exactly like the header.
+    let handled = false;
+    await act(async () => {
+      handled = hardwareHandler!();
+    });
+    expect(handled).toBe(true);
+    expect(mockState.back).toHaveBeenCalledTimes(1);
+
+    // The subscription is removed on unmount.
+    await view.unmount();
+    expect(remove).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

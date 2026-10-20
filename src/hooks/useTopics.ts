@@ -12,6 +12,7 @@ import { logAction, buildLogDescription } from '../lib/activityLog';
 import { toDbLocale } from '../i18n';
 import { compareActiveTopics } from '../lib/topics';
 import { toISODateString } from '../lib/dateUtils';
+import { fetchAllPages } from '../lib/fetchAllPages';
 import type {
   WardTopic,
   GeneralTopic,
@@ -55,17 +56,19 @@ export function useWardTopics() {
 
   return useQuery({
     queryKey: topicKeys.wardTopics(wardId),
-    queryFn: async (): Promise<WardTopic[]> => {
-      const { data, error } = await supabase
-        .from('ward_topics')
-        .select('*')
-        .eq('ward_id', wardId)
-        .order('is_default', { ascending: false })
-        .order('title', { ascending: true });
+    queryFn: async (): Promise<WardTopic[]> =>
+      fetchAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from('ward_topics')
+          .select('*')
+          .eq('ward_id', wardId)
+          .order('is_default', { ascending: false })
+          .order('title', { ascending: true })
+          .range(from, to);
 
-      if (error) throw error;
-      return data ?? [];
-    },
+        if (error) throw error;
+        return data ?? [];
+      }),
     enabled: !!wardId,
   });
 }

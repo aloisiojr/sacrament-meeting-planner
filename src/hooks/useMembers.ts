@@ -12,6 +12,7 @@ import { resolveContactSnapshot } from '../lib/contact';
 import { withOfflineQueue, createClientId } from '../lib/offlineMutation';
 import { speechKeys } from './useSpeeches';
 import { toISODateString } from '../lib/dateUtils';
+import { fetchAllPages } from '../lib/fetchAllPages';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
 // --- Query Keys ---
@@ -97,16 +98,19 @@ export function useMembers(search?: string) {
 
   return useQuery({
     queryKey: memberKeys.list(wardId),
-    queryFn: async (): Promise<Member[]> => {
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .eq('ward_id', wardId)
-        .order('full_name', { ascending: true });
+    queryFn: async (): Promise<Member[]> =>
+      // CONF-14: paginate past the 1000-row PostgREST cap instead of truncating.
+      fetchAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from('members')
+          .select('*')
+          .eq('ward_id', wardId)
+          .order('full_name', { ascending: true })
+          .range(from, to);
 
-      if (error) throw error;
-      return data ?? [];
-    },
+        if (error) throw error;
+        return data ?? [];
+      }),
     enabled: !!wardId,
     select: (data: Member[]) => {
       const sorted = sortMembers(data);

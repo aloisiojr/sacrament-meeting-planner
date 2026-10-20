@@ -6,7 +6,22 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { fetchAllPages } from '../lib/fetchAllPages';
 import type { Hymn } from '../types/database';
+
+async function fetchAllHymns(language: string): Promise<Hymn[]> {
+  return fetchAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from('hymns')
+      .select('*')
+      .eq('language', language)
+      .order('number', { ascending: true })
+      .range(from, to);
+
+    if (error) throw error;
+    return data ?? [];
+  });
+}
 
 // --- Query Keys ---
 
@@ -56,16 +71,7 @@ export function filterHymns(hymns: Hymn[], search: string): Hymn[] {
 export function useHymns(language: string, search?: string) {
   return useQuery({
     queryKey: hymnKeys.list(language),
-    queryFn: async (): Promise<Hymn[]> => {
-      const { data, error } = await supabase
-        .from('hymns')
-        .select('*')
-        .eq('language', language)
-        .order('number', { ascending: true });
-
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<Hymn[]> => fetchAllHymns(language),
     enabled: !!language,
     select: (data: Hymn[]) => {
       return search ? filterHymns(data, search) : data;
@@ -82,16 +88,7 @@ export function useHymns(language: string, search?: string) {
 export function useSacramentalHymns(language: string, search?: string) {
   return useQuery({
     queryKey: hymnKeys.list(language),
-    queryFn: async (): Promise<Hymn[]> => {
-      const { data, error } = await supabase
-        .from('hymns')
-        .select('*')
-        .eq('language', language)
-        .order('number', { ascending: true });
-
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<Hymn[]> => fetchAllHymns(language),
     enabled: !!language,
     select: (data: Hymn[]) => {
       const sacramental = data.filter((h) => h.is_sacramental);

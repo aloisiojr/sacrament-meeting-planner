@@ -1,10 +1,15 @@
 /**
- * Tests for the useUpdateMember future-speeches cascade (v2.0).
- *
- * Editing a member cascades speaker_* AND the contact-delegation snapshot
- * (contact_phone / is_delegated / delegate_for_name) onto that member's
- * not-yet-past speeches, so not-yet-sent invites stay consistent with the
- * member's live phone/delegation state.
+ * CONF-07 — the speech-snapshot cascade moved from this hook to a database trigger on
+ * `members` (migration 060), running in the same transaction as the UPDATE. These tests
+ * pin the client side of that contract:
+ *  - the hook issues NO update of its own against `speeches` (no second round-trip that
+ *    could be swallowed "best-effort" or skipped by the offline replay);
+ *  - a rejected member UPDATE — which is how a failing cascade now surfaces, since the
+ *    trigger aborts the transaction — rejects the mutation instead of looking successful;
+ *  - members and speeches queries are invalidated so the server-cascaded snapshots are
+ *    refetched.
+ * The snapshot computation itself (delegated vs own phone) stays covered by the
+ * `resolveContactSnapshot` unit tests in contact tests, mirrored by the trigger.
  */
 
 import {
@@ -17,6 +22,7 @@ import {
 
 import { supabase } from '../lib/supabase';
 import { useUpdateMember, memberKeys } from '../hooks/useMembers';
+import { speechKeys } from '../hooks/useSpeeches';
 import type { Member } from '../types/database';
 
 // --- Module mocks ---
@@ -57,53 +63,40 @@ jest.mock('react-i18next', () => ({
 }));
 
 const mockedSupabase = jest.mocked(supabase);
+const fromMock = mockedSupabase.from as ReturnType<typeof jest.fn>;
 
-// Capture the payload passed to the speeches cascade update.
-let lastSpeechesUpdate: Record<string, unknown> | null = null;
+let memberUpdateError: { message: string } | null;
+let tablesTouched: string[];
 
 function setupMocks(updatedMember: Member) {
-  lastSpeechesUpdate = null;
-
-  // members: update().eq().select().single()
-  const memberSingle = jest.fn().mockResolvedValue({ data: updatedMember, error: null });
+  tablesTouched = [];
+  const memberSingle = jest.fn().mockImplementation(async () =>
+    memberUpdateError
+      ? { data: null, error: memberUpdateError }
+      : { data: updatedMember, error: null }
+  );
   const memberSelect = jest.fn().mockReturnValue({ single: memberSingle });
   const memberEq = jest.fn().mockReturnValue({ select: memberSelect });
   const memberUpdate = jest.fn().mockReturnValue({ eq: memberEq });
 
-  // speeches: update().eq().gte()  → awaited
-  const speechGte = jest.fn().mockResolvedValue({ data: null, error: null });
-  const speechEq = jest.fn().mockReturnValue({ gte: speechGte });
-  const speechUpdate = jest.fn().mockImplementation((payload: Record<string, unknown>) => {
-    lastSpeechesUpdate = payload;
-    return { eq: speechEq };
-  });
-
-  (mockedSupabase.from as ReturnType<typeof jest.fn>).mockImplementation((table: string) => {
+  fromMock.mockImplementation((table: string) => {
+    tablesTouched.push(table);
     if (table === 'members') return { update: memberUpdate };
-    if (table === 'speeches') return { update: speechUpdate };
     return {};
   });
 }
 
-describe('useUpdateMember — contact-snapshot cascade', () => {
+describe('useUpdateMember — snapshot cascade is server-side (trigger)', () => {
   let queryClient: ReturnType<typeof createTestQueryClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     queryClient = createTestQueryClient();
-    lastSpeechesUpdate = null;
+    memberUpdateError = null;
+    tablesTouched = [];
   });
 
-  it('recomputes the DELEGATED contact snapshot for future speeches when a member is edited', async () => {
-    const responsible = createMockMember({
-      id: 'resp-1',
-      full_name: 'Responsible Parent',
-      country_code: '+55',
-      phone: '11999998888',
-    });
-    // Seed the member cache so the cascade can resolve the responsible.
-    queryClient.setQueryData(memberKeys.list('ward-1'), [responsible]);
-
+  it('updates only members and invalidates members+speeches; no client cascade write', async () => {
     const updatedMember = createMockMember({
       id: 'm1',
       full_name: 'Ana Menor',
@@ -114,6 +107,7 @@ describe('useUpdateMember — contact-snapshot cascade', () => {
       responsible_id: 'resp-1',
     });
     setupMocks(updatedMember);
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
     const wrapper = createWrapper({}, queryClient);
     const { result } = renderHook(() => useUpdateMember(), { wrapper });
@@ -122,74 +116,22 @@ describe('useUpdateMember — contact-snapshot cascade', () => {
       await result.current.mutateAsync({ id: 'm1', full_name: 'Ana Menor' });
     });
 
-    expect(lastSpeechesUpdate).not.toBeNull();
-    expect(lastSpeechesUpdate).toMatchObject({
-      speaker_name: 'Ana Menor',
-      speaker_informal_name: 'Ana',
-      contact_phone: '+5511999998888',
-      is_delegated: true,
-      delegate_for_name: 'Ana',
-    });
+    expect(tablesTouched).toEqual(['members']);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: memberKeys.list('ward-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: speechKeys.all });
   });
 
-  it('recomputes a NON-delegated contact snapshot (own phone) for a direct member', async () => {
-    const updatedMember = createMockMember({
-      id: 'm2',
-      full_name: 'Direct Member',
-      informal_name: 'Direct',
-      country_code: '+55',
-      phone: '11987654321',
-      contact_via_responsible: false,
-      responsible_id: null,
-    });
-    setupMocks(updatedMember);
+  it('propagates a rejected UPDATE (cascade failure aborts it) instead of swallowing it', async () => {
+    memberUpdateError = { message: 'cascade trigger failed' };
+    setupMocks(createMockMember({ id: 'm1' }));
 
     const wrapper = createWrapper({}, queryClient);
     const { result } = renderHook(() => useUpdateMember(), { wrapper });
 
-    await act(async () => {
-      await result.current.mutateAsync({ id: 'm2', full_name: 'Direct Member' });
-    });
-
-    expect(lastSpeechesUpdate).not.toBeNull();
-    expect(lastSpeechesUpdate).toMatchObject({
-      contact_phone: '+5511987654321',
-      is_delegated: false,
-      delegate_for_name: null,
-    });
-  });
-
-  it('falls back to own phone (not delegated) when the responsible has no phone', async () => {
-    const responsible = createMockMember({
-      id: 'resp-2',
-      full_name: 'Phoneless Parent',
-      phone: null,
-    });
-    queryClient.setQueryData(memberKeys.list('ward-1'), [responsible]);
-
-    const updatedMember = createMockMember({
-      id: 'm3',
-      full_name: 'Ana',
-      informal_name: 'Ana',
-      country_code: '+55',
-      phone: '11987654321',
-      contact_via_responsible: true,
-      responsible_id: 'resp-2',
-    });
-    setupMocks(updatedMember);
-
-    const wrapper = createWrapper({}, queryClient);
-    const { result } = renderHook(() => useUpdateMember(), { wrapper });
-
-    await act(async () => {
-      await result.current.mutateAsync({ id: 'm3', full_name: 'Ana' });
-    });
-
-    expect(lastSpeechesUpdate).not.toBeNull();
-    expect(lastSpeechesUpdate).toMatchObject({
-      contact_phone: '+5511987654321',
-      is_delegated: false,
-      delegate_for_name: null,
-    });
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({ id: 'm1', full_name: 'Ana Menor' });
+      })
+    ).rejects.toMatchObject({ message: 'cascade trigger failed' });
   });
 });

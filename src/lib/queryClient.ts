@@ -18,7 +18,11 @@ import { isOfflineBlockedError } from './offlineGuard';
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
-      console.error('[QueryCache] Error:', error.message);
+      // EST-20: sem dump em produção — o erro já chega às telas via QueryErrorView
+      // e ao diagnóstico via errorReporter; console em release é ruído invisível.
+      if (__DEV__) {
+        console.error('[QueryCache] Error:', error.message);
+      }
     },
   }),
   mutationCache: new MutationCache({

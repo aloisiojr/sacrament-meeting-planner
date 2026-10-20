@@ -23,6 +23,7 @@ import {
 } from '../lib/queryConfig';
 import { installGlobalErrorHandler } from '../lib/errorReporter';
 import { queryClient } from '../lib/queryClient';
+import { getStartupGateState } from '../lib/startupGate';
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
@@ -41,22 +42,22 @@ function NavigationGuard({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
 
+  // EST-20: efeito e render consomem a MESMA decisão pura.
+  const gate = getStartupGateState({
+    loading,
+    isAuthenticated: !!session,
+    inAuthGroup: segments[0] === '(auth)',
+  });
+
   useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    const isAuthenticated = !!session;
-
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login
+    if (gate === 'redirect-login') {
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to home
+    } else if (gate === 'redirect-home') {
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments, router]);
+  }, [gate, router]);
 
-  if (loading) {
+  if (gate === 'loading') {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />

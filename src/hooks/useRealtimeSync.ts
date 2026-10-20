@@ -1,7 +1,8 @@
 /**
  * RealtimeSync: subscribes to Supabase Realtime channels for ward-scoped tables.
  * Maps events to TanStack Query cache invalidation.
- * Falls back to polling (2.5s) when WebSocket is disconnected.
+ * Falls back to polling (POLLING_INTERVAL_MS = 10s, src/lib/sync.ts) when the
+ * WebSocket is disconnected. (EST-24: this comment used to claim 2.5s.)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -27,7 +28,8 @@ interface UseRealtimeSyncOptions {
  * Falls back to polling when WebSocket is unavailable.
  */
 export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtimeSyncOptions): void {
-  const { wardId } = useAuth();
+  const { wardId, user } = useAuth();
+  const userId = user?.id ?? null;
   const queryClient = useQueryClient();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -88,8 +90,10 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
       return;
     }
 
-    // Create Realtime channel for this ward, subscribing per-table
-    const channel = supabase.channel(`ward-sync-${wardId}`);
+    // EST-18: one channel named per ward+user. A topic shared across sessions/devices of
+    // the same ward let a connection flap stack duplicate handlers on the same topic;
+    // scoping the name to this user keeps each subscription's lifecycle independent.
+    const channel = supabase.channel(`ward-sync-${wardId}-${userId ?? 'anon'}`);
 
     for (const table of SYNCED_TABLES) {
       channel.on(
@@ -131,13 +135,15 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
 
     return () => {
       stopPolling();
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      // EST-18: remove EXACTLY the channel this effect created. Reading channelRef here
+      // could remove a newer channel (or none) if a later effect already replaced it.
+      void supabase.removeChannel(channel);
+      if (channelRef.current === channel) {
         channelRef.current = null;
       }
       setWebSocketConnected(false);
     };
-  }, [wardId, isOnline, invalidateForTable, invalidateAll, setWebSocketConnected, startPolling, stopPolling]);
+  }, [wardId, userId, isOnline, invalidateForTable, invalidateAll, setWebSocketConnected, startPolling, stopPolling]);
 
   // When going offline, stop polling and cleanup
   useEffect(() => {

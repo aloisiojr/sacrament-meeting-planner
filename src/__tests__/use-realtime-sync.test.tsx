@@ -22,7 +22,10 @@ const mockChannelState: {
   handlers: ChangeHandler[];
   subscribeCb: SubscribeCb | null;
   removed: number;
-} = { name: null, tables: [], configs: [], handlers: [], subscribeCb: null, removed: 0 };
+  /** EST-18: every channel instance created / passed to removeChannel, by identity. */
+  channels: unknown[];
+  removedChannels: unknown[];
+} = { name: null, tables: [], configs: [], handlers: [], subscribeCb: null, removed: 0, channels: [], removedChannels: [] };
 
 const mockInvalidated: unknown[][] = [];
 const mockWardId = { value: 'w1' };
@@ -43,10 +46,12 @@ jest.mock('../lib/supabase', () => ({
           return channel;
         },
       };
+      mockChannelState.channels.push(channel);
       return channel;
     },
-    removeChannel: () => {
+    removeChannel: (ch: unknown) => {
       mockChannelState.removed += 1;
+      mockChannelState.removedChannels.push(ch);
     },
   },
 }));
@@ -60,7 +65,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 
 jest.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ wardId: mockWardId.value }),
+  useAuth: () => ({ wardId: mockWardId.value, user: { id: 'u1' } }),
 }));
 
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
@@ -97,6 +102,8 @@ beforeEach(() => {
   mockChannelState.handlers = [];
   mockChannelState.subscribeCb = null;
   mockChannelState.removed = 0;
+  mockChannelState.channels = [];
+  mockChannelState.removedChannels = [];
   mockInvalidated.length = 0;
   mockWardId.value = 'w1';
   setWebSocketConnected.mockReset();
@@ -110,8 +117,18 @@ describe('useRealtimeSync — subscription', () => {
   it('opens one ward-scoped channel and subscribes to every synced table', async () => {
     await render(<Harness isOnline />);
 
-    expect(mockChannelState.name).toBe('ward-sync-w1');
+    // EST-18: the channel is named per ward+user.
+    expect(mockChannelState.name).toBe('ward-sync-w1-u1');
     expect(mockChannelState.tables).toEqual([...SYNCED_TABLES]);
+  });
+
+  it('removes exactly the channel it created on unmount (EST-18)', async () => {
+    const view = await render(<Harness isOnline />);
+    expect(mockChannelState.channels).toHaveLength(1);
+
+    await view.unmount();
+
+    expect(mockChannelState.removedChannels).toEqual([mockChannelState.channels[0]]);
   });
 
   it('scopes every subscription to this ward — the tenancy boundary', async () => {

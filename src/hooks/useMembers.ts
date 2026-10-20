@@ -8,7 +8,6 @@ import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
-import { resolveContactSnapshot } from '../lib/contact';
 import { withOfflineQueue, createClientId } from '../lib/offlineMutation';
 import { speechKeys } from './useSpeeches';
 import { toISODateString } from '../lib/dateUtils';
@@ -197,41 +196,18 @@ export function useUpdateMember() {
         }
       );
     },
-    onSuccess: async (data) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
-      // null = queued offline. The speech-snapshot cascade below needs the stored row and its own
-      // network round-trip, so it is deferred until the queued update actually lands.
+      // CONF-07: the speech-snapshot cascade is a database trigger on members (migration
+      // 060), running in the SAME transaction as this UPDATE — so it also fires when the
+      // offline queue replays the update, and a cascade failure aborts the UPDATE and
+      // propagates as this mutation's error instead of being swallowed "best-effort".
+      // The client only invalidates so the server-cascaded snapshots are refetched.
+      queryClient.invalidateQueries({ queryKey: speechKeys.all });
+      // null = queued offline — logged when it lands.
       if (!data) return;
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:update', buildLogDescription('member:update', { nome: data.full_name }), userName);
-      }
-      const today = toISODateString(new Date());
-      const fullPhone = data.phone ? `${data.country_code}${data.phone}` : null;
-      // v2.0: also recompute the contact-delegation snapshot for the member's not-yet-past
-      // speeches, so editing a member's phone or delegation propagates to their not-yet-sent
-      // invites (consistent with how speaker_* already cascades). The responsible is looked up
-      // from the member cache by the (possibly updated) responsible_id.
-      const cachedMembers = queryClient.getQueryData<Member[]>(memberKeys.list(wardId));
-      const responsible = data.responsible_id
-        ? cachedMembers?.find((m) => m.id === data.responsible_id) ?? null
-        : null;
-      const contact = resolveContactSnapshot(data, responsible);
-      try {
-        await supabase
-          .from('speeches')
-          .update({
-            speaker_name: data.full_name,
-            speaker_phone: fullPhone,
-            speaker_informal_name: data.informal_name,
-            contact_phone: contact.contact_phone,
-            is_delegated: contact.is_delegated,
-            delegate_for_name: contact.delegate_for_name,
-          })
-          .eq('member_id', data.id)
-          .gte('sunday_date', today);
-        queryClient.invalidateQueries({ queryKey: speechKeys.all });
-      } catch {
-        // Best-effort: member update already succeeded
       }
     },
   });

@@ -69,12 +69,15 @@ jest.mock('../contexts/AuthContext', () => ({
 }));
 
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
-import { SYNCED_TABLES, POLLING_INTERVAL_MS, getQueryKeysForTable } from '../lib/sync';
+import { SYNCED_TABLES, POLLING_TABLES, POLLING_INTERVAL_MS, getQueryKeysForTable } from '../lib/sync';
 
 const setWebSocketConnected = jest.fn();
 
 /** How many invalidations one full refresh across every synced table produces. */
 const KEYS_PER_FULL_REFRESH = SYNCED_TABLES.flatMap(getQueryKeysForTable).length;
+
+/** How many invalidations one polling tick produces (RAP-11 scoped tables only). */
+const KEYS_PER_POLLING_REFRESH = POLLING_TABLES.flatMap(getQueryKeysForTable).length;
 
 function Harness({ isOnline }: { isOnline: boolean }) {
   useRealtimeSync({ isOnline, setWebSocketConnected });
@@ -202,13 +205,20 @@ describe('useRealtimeSync — change events map to cache invalidation', () => {
 });
 
 describe('useRealtimeSync — socket status drives the polling fallback', () => {
-  it('SUBSCRIBED marks the socket connected and refetches everything once', async () => {
+  it('SUBSCRIBED marks the socket connected without invalidating anything (RAP-11)', async () => {
     await render(<Harness isOnline />);
     await status('SUBSCRIBED');
 
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(true);
-    // Exactly one full refresh — not zero, and not one per table on top of it.
-    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
+    // No refetch burst on (re)subscribe: realtime events and staleTime drive refresh.
+    expect(mockInvalidated).toHaveLength(0);
+  });
+
+  it('polling refreshes only speeches and agendas, never the full table set (RAP-11)', () => {
+    expect(POLLING_TABLES).toEqual(['speeches', 'sunday_agendas']);
+    expect(KEYS_PER_POLLING_REFRESH).toBeLessThan(KEYS_PER_FULL_REFRESH);
+    expect(POLLING_INTERVAL_MS).toBeGreaterThanOrEqual(30000);
+    expect(POLLING_INTERVAL_MS).toBeLessThanOrEqual(60000);
   });
 
   it('does not poll while the socket is healthy', async () => {
@@ -230,8 +240,8 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
 
       mockInvalidated.length = 0;
       await advance(POLLING_INTERVAL_MS);
-      // One tick refreshes every synced table exactly once.
-      expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
+      // One tick refreshes only the scoped polling tables exactly once (RAP-11).
+      expect(mockInvalidated).toHaveLength(KEYS_PER_POLLING_REFRESH);
     }
   );
 
@@ -245,7 +255,7 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
     expect(setWebSocketConnected).toHaveBeenLastCalledWith(false);
     mockInvalidated.length = 0;
     await advance(POLLING_INTERVAL_MS);
-    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
+    expect(mockInvalidated).toHaveLength(KEYS_PER_POLLING_REFRESH);
   });
 
   it('stops polling once the socket comes back', async () => {
@@ -267,7 +277,7 @@ describe('useRealtimeSync — socket status drives the polling fallback', () => 
     mockInvalidated.length = 0;
     await advance(POLLING_INTERVAL_MS);
     // One interval's worth of work, not three.
-    expect(mockInvalidated).toHaveLength(KEYS_PER_FULL_REFRESH);
+    expect(mockInvalidated).toHaveLength(KEYS_PER_POLLING_REFRESH);
   });
 });
 

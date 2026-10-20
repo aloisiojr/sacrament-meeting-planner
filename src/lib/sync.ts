@@ -55,6 +55,14 @@ export function getQueryKeysForTable(table: string): readonly (readonly string[]
 }
 
 /**
- * Default polling interval (ms) for fallback mode.
+ * Polling interval (ms) for fallback mode (RAP-11: was 10 s invalidating everything;
+ * 45 s sits well inside the 5-minute staleTime, so a tick only refetches what is stale).
  */
-export const POLLING_INTERVAL_MS = 10000;
+export const POLLING_INTERVAL_MS = 45000;
+
+/**
+ * Tables the polling fallback refreshes (RAP-11): the fast-moving ones. Members, topics
+ * and sunday types change rarely and are covered by realtime events when the socket is
+ * up; polling them on a timer only burned battery and bandwidth.
+ */
+export const POLLING_TABLES: readonly SyncedTable[] = ['speeches', 'sunday_agendas'] as const;

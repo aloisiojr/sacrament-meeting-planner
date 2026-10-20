@@ -167,7 +167,7 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
         value={editTitle}
         onChangeText={setEditTitle}
         placeholder={t('topics.topicTitle')}
-        placeholderTextColor={colors.textTertiary}
+        placeholderTextColor={colors.placeholder}
         autoFocus
       />
       <TextInput
@@ -176,7 +176,7 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
         value={editLink}
         onChangeText={setEditLink}
         placeholder={t('topics.topicLink')}
-        placeholderTextColor={colors.textTertiary}
+        placeholderTextColor={colors.placeholder}
         autoCapitalize="none"
         autoCorrect={false}
       />

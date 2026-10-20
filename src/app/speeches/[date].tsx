@@ -355,7 +355,7 @@ function SpeechesEditContent() {
             {renderPrayerSlot(4)}
           </>
         ) : (
-          <Text style={[styles.emptyText, { color: colors.warning }]}>
+          <Text style={[styles.emptyText, { color: colors.warningText }]}>
             {exception && exception.reason === 'other' && exception.custom_reason
               ? exception.custom_reason
               : t(`sundayExceptions.${exception?.reason}`)}

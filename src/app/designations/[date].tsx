@@ -394,7 +394,7 @@ function DesignationEditContent() {
               value={calling}
               onChangeText={setCalling}
               placeholder={t('agenda.designations.callingPlaceholder')}
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={colors.placeholder}
             />
           </>
         )}

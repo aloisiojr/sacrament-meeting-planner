@@ -362,7 +362,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
               value={customReason}
               onChangeText={setCustomReason}
               placeholder={t('sundayExceptions.otherPlaceholder')}
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={colors.placeholder}
               autoFocus
             />
             <View style={styles.otherModalButtons}>
@@ -483,7 +483,7 @@ export const SundayCard = React.memo(function SundayCard({
             return (
               <>
                 <Text
-                  style={[styles.exceptionText, { color: colors.warning }]}
+                  style={[styles.exceptionText, { color: colors.warningText }]}
                   numberOfLines={1}
                 >
                   {exception
@@ -536,7 +536,7 @@ export const SundayCard = React.memo(function SundayCard({
           {/* Non-speeches types: show exception text (unless testimony/primary with managePrayers handled above) */}
           {!isSpeechesType && !(isTestimonyOrPrimary && managePrayers && !expanded) && (
             <Text
-              style={[styles.exceptionText, { color: colors.warning }]}
+              style={[styles.exceptionText, { color: colors.warningText }]}
               numberOfLines={1}
             >
               {exception

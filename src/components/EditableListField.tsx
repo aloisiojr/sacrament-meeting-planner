@@ -249,7 +249,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
           onBlur={handleAdd}
           onFocus={handleInputFocus}
           placeholder={placeholder}
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor={colors.placeholder}
           returnKeyType="done"
           multiline
           blurOnSubmit

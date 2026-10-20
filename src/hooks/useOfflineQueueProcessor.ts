@@ -82,7 +82,9 @@ export function useOfflineQueueProcessor(isOnline: boolean): void {
   const wasOfflineRef = useRef(false);
   const mountedRef = useRef(false);
   const wardIdRef = useRef(wardId);
-  wardIdRef.current = wardId;
+  useEffect(() => {
+    wardIdRef.current = wardId;
+  }, [wardId]);
 
   useEffect(() => {
     if (!isOnline) {

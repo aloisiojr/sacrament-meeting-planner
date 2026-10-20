@@ -244,7 +244,7 @@ describe('Speeches edit screen (N2)', () => {
     // partial failure orphaned the topic/agenda state. Now the sequence aborts in place.
     expect(mockState.assignTopic).not.toHaveBeenCalled();
     expect(mockState.updateAgenda).not.toHaveBeenCalled();
-    const errors = renderer.root.findAllByProps({ testID: 'speeches-edit-error' });
+    const errors = renderer.root.findAll((node) => node.props?.testID === 'speeches-edit-error');
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some((e) => e.props.children === 'speeches.saveFailed')).toBe(true);
   });

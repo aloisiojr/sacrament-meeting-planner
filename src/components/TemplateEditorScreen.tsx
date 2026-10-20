@@ -69,11 +69,15 @@ export function TemplateEditorScreen({
   // flush working with the latest props without re-subscribing.
   const editsRef = useRef<Record<string, string>>({});
   const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
   const saveModeRef = useRef(saveMode);
-  saveModeRef.current = saveMode;
+  // Kept current in an effect (never during render): the refs are only read from event
+  // handlers, timers and the unmount cleanup, all of which run after commit.
+  useEffect(() => {
+    tabsRef.current = tabs;
+    onSaveRef.current = onSave;
+    saveModeRef.current = saveMode;
+  });
 
   const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
 
@@ -127,7 +131,9 @@ export function TemplateEditorScreen({
 
   // Leaving the screen must not lose an edit still inside its debounce window.
   const flushAllRef = useRef(flushAll);
-  flushAllRef.current = flushAll;
+  useEffect(() => {
+    flushAllRef.current = flushAll;
+  });
   useEffect(
     () => () => {
       flushAllRef.current();

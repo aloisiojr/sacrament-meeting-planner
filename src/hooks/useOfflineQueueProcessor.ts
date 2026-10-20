@@ -18,7 +18,7 @@
 
 import { useContext, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { supabaseDynamic, supabase } from '../lib/supabase';
 import { AuthContext } from '../contexts/AuthContext';
 import { reportHealthEvent } from '../lib/appHealth';
 import {
@@ -61,11 +61,11 @@ async function replay(mutation: QueuedMutation): Promise<ReplayOutcome> {
       // dropped, this updates that very row instead of inserting a duplicate.
       const { error } =
         data.id != null
-          ? await supabase.from(table).upsert(data, { onConflict: 'id' })
-          : await supabase.from(table).insert(data);
+          ? await supabaseDynamic.from(table).upsert(data, { onConflict: 'id' })
+          : await supabaseDynamic.from(table).insert(data);
       if (error) throw error;
     } else if (operation === 'UPSERT') {
-      const { error } = await supabase
+      const { error } = await supabaseDynamic
         .from(table)
         .upsert(data, onConflict ? { onConflict } : undefined);
       if (error) throw error;
@@ -74,7 +74,7 @@ async function replay(mutation: QueuedMutation): Promise<ReplayOutcome> {
       if (mutation.expectedUpdatedAt) {
         // CONF-09: guarded replay — 0 rows means another device changed the row since
         // the edit was queued. That is a conflict, not a success and not a retry.
-        const { data: rows, error } = await supabase
+        const { data: rows, error } = await supabaseDynamic
           .from(table)
           .update(rest)
           .eq('id', id as string)
@@ -83,14 +83,14 @@ async function replay(mutation: QueuedMutation): Promise<ReplayOutcome> {
         if (error) throw error;
         if (!rows || rows.length === 0) return 'conflict';
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseDynamic
           .from(table)
           .update(rest)
           .eq('id', id as string);
         if (error) throw error;
       }
     } else if (operation === 'DELETE') {
-      const { error } = await supabase
+      const { error } = await supabaseDynamic
         .from(table)
         .delete()
         .eq('id', data.id as string);

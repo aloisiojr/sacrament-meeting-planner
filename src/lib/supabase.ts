@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -68,7 +69,7 @@ const resilientStorage = {
  */
 const APP_VERSION = Constants.expoConfig?.version;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   global: {
     headers: APP_VERSION ? { 'x-app-version': APP_VERSION } : {},
   },
@@ -79,3 +80,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+/**
+ * Untyped view of the same client, for the ONE dynamic seam in the app: the
+ * offline queue replay (useOfflineQueueProcessor), where the table name and the
+ * payload come from the persisted queue and cannot be statically typed. Every
+ * other call site uses the typed `supabase` above (ARQ-01).
+ */
+export const supabaseDynamic = supabase as unknown as SupabaseClient;

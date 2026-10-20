@@ -84,18 +84,61 @@ describe('Database Types', () => {
     });
   });
 
-  describe('SundayExceptionReason type', () => {
-    it('should define all 6 exception reasons matching migration CHECK constraint', () => {
-      const reasons: SundayExceptionReason[] = [
-        'testimony_meeting',
-        'general_conference',
-        'stake_conference',
-        'ward_conference',
-        'primary_presentation',
-        'other',
-      ];
-      expect(reasons).toHaveLength(6);
-    });
+  describe('migrations x types concordance (ARQ-01/ARQ-07)', () => {
+    // The previous version of this block asserted SIX SundayExceptionReason values
+    // while the type has SEVEN — and passed, because it compared a literal list
+    // against itself. This version parses BOTH sides from their sources of truth:
+    // the CHECK constraints in supabase/migrations (latest definition wins) and
+    // the union members in src/types/database.ts.
+    const { readFileSync, readdirSync } = require('fs') as typeof import('fs');
+    const { join } = require('path') as typeof import('path');
+    const repoRoot = join(__dirname, '..', '..');
+
+    function latestCheckValues(table: string, column: string): string[] {
+      const dir = join(repoRoot, 'supabase', 'migrations');
+      const files = readdirSync(dir).filter((f: string) => f.endsWith('.sql')).sort();
+      let values: string[] | null = null;
+      for (const file of files) {
+        const sql = readFileSync(join(dir, file), 'utf8');
+        const sectionRe = /(?:CREATE TABLE|ALTER TABLE)\s+(?:public\.)?(\w+)/g;
+        const starts: { table: string; index: number }[] = [];
+        let sm: RegExpExecArray | null;
+        while ((sm = sectionRe.exec(sql)) !== null) starts.push({ table: sm[1], index: sm.index });
+        for (let i = 0; i < starts.length; i++) {
+          if (starts[i].table !== table) continue;
+          const section = sql.slice(starts[i].index, i + 1 < starts.length ? starts[i + 1].index : undefined);
+          const checkRe = new RegExp(`CHECK \\(\\s*${column} IN \\(([^)]*)\\)`, 'g');
+          let cm: RegExpExecArray | null;
+          while ((cm = checkRe.exec(section)) !== null) {
+            values = cm[1].split(',').map((v) => v.trim().replace(/^'|'$/g, ''));
+          }
+        }
+      }
+      if (values === null) throw new Error(`no CHECK found for ${table}.${column}`);
+      return values;
+    }
+
+    function unionMembers(typeName: string): string[] {
+      const ts = readFileSync(join(repoRoot, 'src', 'types', 'database.ts'), 'utf8');
+      const m = new RegExp(`export type ${typeName} =([^;]+);`).exec(ts);
+      if (!m) throw new Error(`type ${typeName} not found`);
+      return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    }
+
+    const pairs: [string, string, string][] = [
+      ['sunday_exceptions', 'reason', 'SundayExceptionReason'],
+      ['speeches', 'status', 'SpeechStatus'],
+      ['invitations', 'role', 'Role'],
+      ['notification_queue', 'type', 'NotificationType'],
+      ['notification_queue', 'target_role', 'NotificationTargetRole'],
+      ['notification_queue', 'status', 'NotificationStatus'],
+    ];
+
+    for (const [table, column, typeName] of pairs) {
+      it(`${typeName} matches the latest ${table}.${column} CHECK`, () => {
+        expect(unionMembers(typeName).sort()).toEqual(latestCheckValues(table, column).sort());
+      });
+    }
   });
 
   describe('NotificationType type', () => {

@@ -18,7 +18,7 @@
 
 import { useContext, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabaseDynamic, supabase } from '../lib/supabase';
+import { supabaseDynamic } from '../lib/supabase';
 import { AuthContext } from '../contexts/AuthContext';
 import { reportHealthEvent } from '../lib/appHealth';
 import {

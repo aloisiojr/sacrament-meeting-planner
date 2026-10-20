@@ -86,9 +86,11 @@ function mockMakeChain(table: string) {
   return chain;
 }
 
-jest.mock('../lib/supabase', () => ({
-  supabase: { from: (table: string) => mockMakeChain(table) },
-}));
+jest.mock('../lib/supabase', () => {
+  const client = { from: (table: string) => mockMakeChain(table) };
+  // Production exports supabaseDynamic as the same client object (the replay seam).
+  return { supabase: client, supabaseDynamic: client };
+});
 
 const mockLogAction = jest.fn(() => Promise.resolve());
 jest.mock('../lib/activityLog', () => ({

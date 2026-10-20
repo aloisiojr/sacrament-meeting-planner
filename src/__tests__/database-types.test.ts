@@ -2,7 +2,6 @@ import type {
   Role,
   Permission,
   SpeechStatus,
-  SundayExceptionReason,
   NotificationType,
   NotificationTargetRole,
   NotificationStatus,
@@ -20,6 +19,8 @@ import type {
   UpdateMemberInput,
   ImportResult,
 } from '../types/database';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Tests that database type definitions match the expected schema from
@@ -90,8 +91,6 @@ describe('Database Types', () => {
     // against itself. This version parses BOTH sides from their sources of truth:
     // the CHECK constraints in supabase/migrations (latest definition wins) and
     // the union members in src/types/database.ts.
-    const { readFileSync, readdirSync } = require('fs') as typeof import('fs');
-    const { join } = require('path') as typeof import('path');
     const repoRoot = join(__dirname, '..', '..');
 
     function latestCheckValues(table: string, column: string): string[] {

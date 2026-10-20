@@ -29,3 +29,17 @@ só no baseline e no fechamento.
 
 ## Fechamento
 tsc + lint + jest full (`--maxWorkers=2`), ≥ 5.680 testes. Sem push, sem merge.
+
+## Estado (2026-10-20, wave 2B continuação)
+- ✅ Commits 2–9 do plano aplicados (8 commits por achado) + `e101b4c`
+  test-only: cast do mock de BackHandler via `unknown` (tsc).
+- Correções ao WIP (só harness de teste, nenhum código de produção alterado):
+  testes novos usavam `view.unmount()` síncrono (RNTL v14 exige `await`),
+  `await import('react-test-renderer')` (proibido sem `--experimental-vm-modules`
+  → `act`/`waitFor` estáticos de `setup-integration`), `getByText` sem espera
+  (→ `findByText`) e settle por microtasks insuficiente (→ `waitFor`).
+  Adicionado o teste de pull-to-refresh que faltava (EST-14).
+- Gates: `npx tsc --noEmit` limpo · `npm run lint` 0 erros (5 warnings
+  pré-existentes fora dos arquivos tocados) · `npx jest --ci --maxWorkers=2`:
+  **324 suítes / 5.710 testes verdes** (baseline 5.680 + 30 novos).
+- Sem push, sem merge. Insumos (`AUDIT-INPUT.md`, streams) não commitados.

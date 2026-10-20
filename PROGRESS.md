@@ -7,6 +7,10 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-fix-state-integrity` (wave 2B) — COMPLETA, verificada, NÃO mergeada.**
+  EST-12/14/16/17/18/21/22/24/25 em 8 commits por achado + 1 test-only (`e101b4c`).
+  Gates: tsc limpo, lint 0 erros, jest 324 suítes / 5.710 testes verdes.
+  Detalhe: `specs/fix-state-integrity.plan.md` (seção Estado). Sem push/merge.
 - **BRANCH `fix/keyboard-safe-forms` — 16 commits, verificada, NÃO mergeada.**
   Teclado + ajustes no seletor de pessoas/temas. Suíte 290 suites / 5342 tests, tsc 0, lint no
   baseline (2 warnings pré-existentes em PdfTextExtractor).

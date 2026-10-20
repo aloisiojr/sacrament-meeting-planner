@@ -21,8 +21,12 @@ import {
   STALE_TIME_MS,
   CACHE_STORAGE_KEY,
   CACHE_THROTTLE_MS,
+  CACHE_MAX_BYTES,
   DEFAULT_CACHE_BUSTER,
   cacheBuster,
+  shouldPersistQuery,
+  shouldDehydratePersistedQuery,
+  prunePersistedCache,
   shouldRetryQuery,
   shouldAlertMutationError,
 } from '../lib/queryConfig';
@@ -143,5 +147,93 @@ describe('shouldAlertMutationError', () => {
   it('alerts on an error with no message rather than swallowing it', () => {
     expect(shouldAlertMutationError({}, true)).toBe(true);
     expect(shouldAlertMutationError(null, true)).toBe(true);
+  });
+});
+
+describe('RAP-04/DEC-02 — persisted cache allowlist', () => {
+  const ward = 'ward-A';
+
+  it.each([
+    [['agendas', 'byDateRange', ward, '2026-01-04', '2026-07-05']],
+    [['agendas', 'bySunday', ward, '2026-01-04']],
+    [['speeches', 'byDateRange', ward, '2026-01-04', '2026-07-05']],
+    [['members', 'list', ward]],
+    [['topics', 'ward', ward]],
+    [['topics', 'active', ward, 'en']],
+    [['hymns', 'list', 'en-US']],
+  ])('persists the offline query %p', (key) => {
+    expect(shouldPersistQuery(key as readonly unknown[], ward)).toBe(true);
+  });
+
+  it('never persists the paginated activity log', () => {
+    expect(shouldPersistQuery(['activity-log', 'list'], ward)).toBe(false);
+    expect(shouldPersistQuery(['activity-log', 'list', 'silva'], ward)).toBe(false);
+  });
+
+  it('never persists search queries', () => {
+    expect(shouldPersistQuery(['members', 'search', ward, 'ana'], ward)).toBe(false);
+  });
+
+  it('never persists another ward\u2019s queries', () => {
+    expect(shouldPersistQuery(['members', 'list', 'ward-B'], ward)).toBe(false);
+    expect(shouldPersistQuery(['agendas', 'bySunday', 'ward-B', '2026-01-04'], ward)).toBe(false);
+    expect(shouldPersistQuery(['topics', 'active', 'ward-B', 'en'], ward)).toBe(false);
+  });
+
+  it('persists no ward-scoped query before the ward is known, but hymns still persist', () => {
+    expect(shouldPersistQuery(['members', 'list', ward], null)).toBe(false);
+    expect(shouldPersistQuery(['hymns', 'list', 'pt-BR'], null)).toBe(true);
+  });
+
+  it('only dehydrates successful allowlisted queries', () => {
+    const ok = { queryKey: ['members', 'list', ward], state: { status: 'success' } };
+    const pending = { queryKey: ['members', 'list', ward], state: { status: 'pending' } };
+    const log = { queryKey: ['activity-log', 'list'], state: { status: 'success' } };
+    expect(shouldDehydratePersistedQuery(ok, ward)).toBe(true);
+    expect(shouldDehydratePersistedQuery(pending, ward)).toBe(false);
+    expect(shouldDehydratePersistedQuery(log, ward)).toBe(false);
+  });
+
+  it('scopes the buster by ward so another ward\u2019s cache is never restored', () => {
+    expect(cacheBuster('2.0.0', 'ward-A')).not.toBe(cacheBuster('2.0.0', 'ward-B'));
+    expect(cacheBuster('2.0.0', 'ward-A')).not.toBe(cacheBuster('2.0.0', null));
+    expect(cacheBuster('2.0.0', 'ward-A')).toContain('ward-A');
+  });
+});
+
+describe('RAP-04 — persisted cache size cap', () => {
+  it('has a finite cap', () => {
+    expect(CACHE_MAX_BYTES).toBeGreaterThan(0);
+    expect(CACHE_MAX_BYTES).toBeLessThanOrEqual(4 * 1024 * 1024);
+  });
+
+  it('leaves a payload under the cap untouched', () => {
+    const small = JSON.stringify({ clientState: { queries: [] } });
+    const result = prunePersistedCache(small, 1024);
+    expect(result.dropped).toBe(0);
+    expect(result.value).toBe(small);
+  });
+
+  it('drops the oldest queries first until the payload fits', () => {
+    const payload = JSON.stringify({
+      timestamp: 1,
+      buster: '2.0.0:ward-A',
+      clientState: {
+        queries: [
+          { queryKey: ['members', 'list', 'ward-A'], state: { dataUpdatedAt: 100, data: 'x'.repeat(200) } },
+          { queryKey: ['hymns', 'list', 'en-US'], state: { dataUpdatedAt: 300, data: 'y'.repeat(200) } },
+          { queryKey: ['topics', 'ward', 'ward-A'], state: { dataUpdatedAt: 200, data: 'z'.repeat(200) } },
+        ],
+        mutations: [],
+      },
+    });
+    const result = prunePersistedCache(payload, 500);
+    expect(result.dropped).toBeGreaterThan(0);
+    expect(result.value.length).toBeLessThanOrEqual(500 + 64);
+    const kept = JSON.parse(result.value).clientState.queries.map(
+      (q: { state: { dataUpdatedAt: number } }) => q.state.dataUpdatedAt
+    );
+    expect(kept).not.toContain(100);
+    expect(kept).toContain(300);
   });
 });

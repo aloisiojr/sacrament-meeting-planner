@@ -349,7 +349,7 @@ describe('Designation edit screen (step 2)', () => {
       .mockImplementation(((_event: string, handler: () => boolean) => {
         hardwareHandler = handler;
         return { remove };
-      }) as typeof BackHandler.addEventListener);
+      }) as unknown as typeof BackHandler.addEventListener);
 
     const view = await rtlRender(React.createElement(DesignationEditScreen));
     expect(hardwareHandler).not.toBeNull();

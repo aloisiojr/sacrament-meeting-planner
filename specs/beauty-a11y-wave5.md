@@ -53,3 +53,32 @@ Os números do relatório são a especificação; só se confere o que for alter
   `QueryErrorView` com retry.
 - **AC11:** gates finais — tsc 0, lint sem erros novos, jest completo 1× verde,
   paridade i18n (3 locales, mesmo nº de chaves).
+
+
+## Completion record (2026-10-20)
+
+Wave executed in two parts: steps 1–2 by a Muse run (interrupted by the weekly
+quota limit), steps 3–6 by Groing directly under the repo's branch/commit/gate discipline.
+All 17 BEL findings are closed:
+
+- BEL-01/02/03/08/09 — tokens + contrast assertions (steps 1–2).
+- BEL-04/06/07/12 — `a11y.*` keys in 3 locales; role+label on the 9 icon-only buttons;
+  StatusLED labels from `speechStatus.*`, duplicated `STATUS_COLORS` deleted, theme is
+  the single source; hitSlop completes 44pt on the LED and presentation controls.
+- BEL-05 — `fontSizes`/`spacing`/`radii` scales in theme.ts; the 5 worst files migrated
+  (79 literals) with an anti-regression guard. Remaining files migrate incrementally.
+- BEL-10 — global `maxFontSizeMultiplier` cap of 1.8 (`src/lib/fontScaling.ts`, installed
+  at the root). Per-screen verification at 200% still requires a device (CLN-05 family).
+- BEL-11 — `RootErrorBoundary`: the root sits outside ThemeProvider, so colors resolve
+  from the system color scheme (full token sets from lib/theme) — no #FFFFFF/#007AFF.
+- BEL-13/14 — `colors.scrim` at all 8 overlays; `colors.whatsapp` in the invite dropdown.
+- BEL-15 — splash moved to the expo-splash-screen plugin with a dark variant
+  (#0F172A). Adaptive-icon background intentionally left white (home-screen art).
+- BEL-16 — timezone search gains `ListEmptyComponent`; History error uses
+  `QueryErrorView` with retry.
+- BEL-17 — `about.supportUrl` filled in 3 locales (the GitHub Pages support page is
+  live, HTTP 200). History date format was already localized by EST-14
+  (`formatDateTime` uses Intl). FOLLOW-UP registered: `notificationUtils.ts` keeps
+  ordinal/conjunction tables keyed by an explicit language parameter passed by
+  callers (push composition); migrating it to i18next touches edge-function push
+  text and is deliberately out of this wave's contained scope.

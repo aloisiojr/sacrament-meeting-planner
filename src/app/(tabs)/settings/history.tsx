@@ -17,6 +17,7 @@ import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { supabase } from '../../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchInput } from '../../../components/SearchInput';
+import { QueryErrorView } from '../../../components/QueryErrorView';
 import { useActivityLog, useActivityLogSearch } from '../../../hooks/useActivityLog';
 import { formatLogDescription } from '../../../lib/activityLog';
 import type { ActivityLog } from '../../../types/database';
@@ -182,11 +183,7 @@ export default function ActivityLogScreen() {
       )}
 
       {error && (
-        <View style={styles.centered}>
-          <Text style={[styles.errorText, { color: colors.error }]}>
-            {t('common.error')}
-          </Text>
-        </View>
+        <QueryErrorView error={error} onRetry={() => void refetch()} />
       )}
 
       {!isLoading && !error && entries.length === 0 && (

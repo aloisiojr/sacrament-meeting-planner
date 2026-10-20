@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
 import { toDbLocale } from '../i18n';
 import { compareActiveTopics } from '../lib/topics';
+import { toISODateString } from '../lib/dateUtils';
 import type {
   WardTopic,
   GeneralTopic,
@@ -135,7 +136,7 @@ export function useUpdateWardTopic() {
  * Check if a ward topic has future speeches.
  */
 export async function checkTopicFutureSpeeches(topicTitle: string, wardId: string): Promise<number> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toISODateString(new Date());
   const { count, error } = await supabase
     .from('speeches')
     .select('*', { count: 'exact', head: true })

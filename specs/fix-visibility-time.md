@@ -93,7 +93,9 @@ Sem Sentry (nenhum SDK novo). Reusa `app_health_events` via `reportHealthEvent`
   sobre as funções públicas (`checkFutureSpeeches`, `checkTopicFutureSpeeches`, `useSpeechCounts`)
   que falha no código antigo. Varredura: nenhum `toISOString()` restante em `src/` fora de testes.
 - AC5 (EST-13): `getMonthBounds(date)` retorna primeiro/último dia do mês em hora **local**
-  (teste em `America/Sao_Paulo` e em fuso positivo extremo); o cutoff de `useSpeechCounts`
+  (teste às 22h em `America/Sao_Paulo`, onde a implementação UTC erra o mês; o espelho
+  leste-de-UTC não é expressável sob jest — troca de `TZ` no meio do processo não é relida
+  depois do primeiro uso de `Date`); o cutoff de `useSpeechCounts`
   deixa de passar por UTC (coberto pelo AC4).
 - AC6 (EST-10): o efeito de idioma usa deps primitivas (`user?.id` + string do idioma salvo),
   guarda `cancelled`, guarda de "já aplicado" (mesmo usuário+ala+idioma não reaplica nem

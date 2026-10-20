@@ -9,6 +9,7 @@ import {
   generateSundayRange,
   getNextSundays,
   getPreviousSundays,
+  getMonthBounds,
 } from '../lib/dateUtils';
 
 describe('dateUtils', () => {
@@ -228,6 +229,34 @@ describe('dateUtils', () => {
       const dates = sundays.map((d) => toISODateString(d));
       // Jan 4 2026 is Sunday, previous is Dec 28 2025
       expect(dates).toEqual(['2025-12-28', '2026-01-04']);
+    });
+  });
+
+  describe('getMonthBounds (EST-13: local, not UTC)', () => {
+    // The discriminating case is west-of-UTC (Brazil, where the app's users
+    // are): a UTC implementation returns November below and fails. The
+    // east-of-UTC mirror cannot be expressed here — under jest a
+    // mid-process TZ switch is not re-read once Date has been used.
+    // Restore by SETTING the captured zone: deleting process.env.TZ does
+    // not reset Node's cached zone.
+    const ORIGINAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    beforeAll(() => {
+      process.env.TZ = 'America/Sao_Paulo';
+    });
+    afterAll(() => {
+      process.env.TZ = ORIGINAL_TZ;
+    });
+
+    it('returns first/last day of the LOCAL month late at night west of UTC', () => {
+      // 2026-11-01T01:00Z is still 2026-10-31 22:00 locally: bounds are October's.
+      expect(getMonthBounds(new Date('2026-11-01T01:00:00.000Z'))).toEqual({
+        start: '2026-10-01',
+        end: '2026-10-31',
+      });
+    });
+
+    it('handles February in a leap year and ISO string input', () => {
+      expect(getMonthBounds('2028-02-15')).toEqual({ start: '2028-02-01', end: '2028-02-29' });
     });
   });
 });

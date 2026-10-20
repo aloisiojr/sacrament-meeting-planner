@@ -65,13 +65,15 @@ jest.mock('react-i18next', () => ({
 // ==========================================================================
 
 describe('Sync configuration integration', () => {
-  it('SYNCED_TABLES contains all 5 tables', () => {
-    expect(SYNCED_TABLES).toHaveLength(5);
+  it('SYNCED_TABLES contains all 7 tables (CONF-09/15 adds wards + activity_log)', () => {
+    expect(SYNCED_TABLES).toHaveLength(7);
     expect(SYNCED_TABLES).toContain('members');
     expect(SYNCED_TABLES).toContain('ward_topics');
     expect(SYNCED_TABLES).toContain('sunday_exceptions');
     expect(SYNCED_TABLES).toContain('speeches');
     expect(SYNCED_TABLES).toContain('sunday_agendas');
+    expect(SYNCED_TABLES).toContain('wards');
+    expect(SYNCED_TABLES).toContain('activity_log');
   });
 
   it('TABLE_TO_QUERY_KEYS maps every synced table', () => {
@@ -88,6 +90,8 @@ describe('Sync configuration integration', () => {
     expect(getQueryKeysForTable('sunday_agendas')).toEqual([['agendas']]);
     expect(getQueryKeysForTable('sunday_exceptions')).toEqual([['sundayTypes']]);
     expect(getQueryKeysForTable('ward_topics')).toEqual([['topics']]);
+    expect(getQueryKeysForTable('wards')).toEqual([['ward']]);
+    expect(getQueryKeysForTable('activity_log')).toEqual([['activity-log']]);
   });
 
   it('getQueryKeysForTable returns empty for unknown table', () => {

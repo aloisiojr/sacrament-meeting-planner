@@ -153,11 +153,60 @@ describe('register-first-user — self-registration cannot pick an arbitrary rol
 describe('register-first-user — a stake+ward pair is claimed once', () => {
   it('refuses a duplicate with 409, and creates nothing', async () => {
     // Two wards with the same name in the same stake would be indistinguishable to their members.
+    // The pair is genuinely claimed: a user with ANOTHER e-mail already belongs to it.
     existingWard = { id: 'already-there' };
+    responses.listUsers = () => ({
+      data: { users: [{ email: 'someone@else.org', app_metadata: { ward_id: 'already-there' } }] },
+      error: null,
+    });
     const res = await call(VALID);
 
     expect(res.status).toBe(409);
     expect(res.body).toMatchObject({ error: 'stake_ward_exists' });
+    expect(wardInsert()).toBeUndefined();
+    expect(rec.createdAuthUsers).toEqual([]);
+  });
+
+  it('repairs an orphaned ward (no user bound) by reusing it instead of blocking or duplicating', async () => {
+    // A previous attempt died after creating the ward but before creating the user.
+    // The retry must complete that partial: same ward, no second ward insert.
+    existingWard = { id: 'already-there' };
+    const res = await call(VALID);
+
+    expect(res.status).toBe(201);
+    expect(wardInsert()).toBeUndefined();
+    expect(rec.createdAuthUsers).toHaveLength(1);
+    expect(rec.createdAuthUsers[0]).toMatchObject({ app_metadata: { ward_id: 'already-there' } });
+    expect(res.body.ward).toMatchObject({ id: 'already-there' });
+  });
+
+  it('resumes a completed registration for the same e-mail without a second ward or user', async () => {
+    existingWard = { id: 'already-there' };
+    responses.listUsers = () => ({
+      data: { users: [{ id: 'new-user', email: VALID.email, app_metadata: { ward_id: 'already-there' } }] },
+      error: null,
+    });
+    const res = await call(VALID);
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ resumed: true });
+    expect(res.body.session).toMatchObject({ access_token: 'at' });
+    expect(wardInsert()).toBeUndefined();
+    expect(rec.createdAuthUsers).toEqual([]);
+  });
+
+  it('does not resume when the same-e-mail retry brings the wrong password', async () => {
+    existingWard = { id: 'already-there' };
+    responses.listUsers = () => ({
+      data: { users: [{ id: 'new-user', email: VALID.email, app_metadata: { ward_id: 'already-there' } }] },
+      error: null,
+    });
+    responses.signInWithPassword = () => ({ data: { session: null }, error: { message: 'bad password' } });
+    const spy = quiet();
+    const res = await call(VALID);
+    spy.mockRestore();
+
+    expect(res.status).toBe(409);
     expect(wardInsert()).toBeUndefined();
     expect(rec.createdAuthUsers).toEqual([]);
   });

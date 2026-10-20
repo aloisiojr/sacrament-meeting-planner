@@ -141,61 +141,133 @@ Deno.serve(async (req) => {
     const limited = await rateLimitResponse(supabaseAdmin, req, 'register-first-user', input.email);
     if (limited) return limited;
 
-    // Check if stake+ward combination already exists
+    // Anon client for sign-in (also used at the end of the fresh path).
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    );
+
+    // CONF-07 repairable registration: the (stake, ward) pair is the natural key, and a
+    // ward with NO auth user bound to it is a partial left by an earlier attempt that
+    // died between creating the ward and creating the user. Such an orphan must not
+    // block a retry forever: the retry REUSES it instead of creating a second ward.
     const { data: existingWard } = await supabaseAdmin
       .from('wards')
-      .select('id')
+      .select('id, name, stake_name, language, timezone')
       .eq('stake_name', input.stakeName)
       .eq('name', input.wardName)
       .maybeSingle();
 
+    let ward = existingWard as { id: string; language?: string } | null;
+    let reusingOrphan = false;
+
     if (existingWard) {
-      return new Response(
-        JSON.stringify({ error: 'stake_ward_exists' }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      // Who already belongs to this ward? (paginated, same pattern as list-users)
+      const wardUsers: { email?: string; app_metadata?: Record<string, unknown> }[] = [];
+      let page = 1;
+      while (true) {
+        const { data: { users: pageUsers }, error: listError } =
+          await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
+        if (listError) throw listError;
+        wardUsers.push(
+          ...(pageUsers as { email?: string; app_metadata?: Record<string, unknown> }[])
+            .filter((u) => u.app_metadata?.ward_id === existingWard.id)
+        );
+        if (pageUsers.length < 50) break;
+        page++;
+      }
+
+      const sameEmailUser = wardUsers.find(
+        (u) => (u.email ?? '').toLowerCase() === input.email.trim().toLowerCase()
       );
+      if (sameEmailUser) {
+        // Retry of a registration that actually completed: sign in and hand back the
+        // same ward — never a second ward or a second account for this e-mail.
+        const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+          email: input.email,
+          password: input.password,
+        });
+        if (signInError || !signInData.session) {
+          return new Response(
+            JSON.stringify({ error: 'email_exists' }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            user: (signInData as { user?: unknown }).user ?? sameEmailUser,
+            ward: existingWard,
+            session: signInData.session,
+            resumed: true,
+          }),
+          { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (wardUsers.length > 0) {
+        // Genuinely claimed by someone else.
+        return new Response(
+          JSON.stringify({ error: 'stake_ward_exists' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      // Orphan from a partial attempt: reuse it (below) instead of inserting a second ward.
+      reusingOrphan = true;
     }
 
-    // Create the ward
+    // Create the ward (fresh path only)
     const wardLanguage = input.language || 'en-US';
 
-    const { data: ward, error: wardError } = await supabaseAdmin
-      .from('wards')
-      .insert({
-        name: input.wardName,
-        stake_name: input.stakeName,
-        language: wardLanguage,
-        timezone: input.timezone || 'America/Sao_Paulo',
-        // The whatsapp_template_* columns are deliberately left NULL. Seeding them would bake a
-        // copy of the wording into the deployed function, and that copy silently goes stale the
-        // first time the app's text changes without a redeploy. NULL means the app's own default
-        // is the single source; whatsapp_template_delegation_wrapper has worked this way all along.
-      })
-      .select()
-      .single();
+    if (!ward) {
+      const { data: createdWard, error: wardError } = await supabaseAdmin
+        .from('wards')
+        .insert({
+          name: input.wardName,
+          stake_name: input.stakeName,
+          language: wardLanguage,
+          timezone: input.timezone || 'America/Sao_Paulo',
+          // The whatsapp_template_* columns are deliberately left NULL. Seeding them would bake a
+          // copy of the wording into the deployed function, and that copy silently goes stale the
+          // first time the app's text changes without a redeploy. NULL means the app's own default
+          // is the single source; whatsapp_template_delegation_wrapper has worked this way all along.
+        })
+        .select()
+        .single();
 
-    if (wardError) {
-      console.error('Ward creation error:', wardError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create ward' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (wardError) {
+        console.error('Ward creation error:', wardError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create ward' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      ward = createdWard;
     }
 
-    // Insert default ward topics
+    // Insert default ward topics (on an orphan reuse, only if the partial attempt
+    // died before seeding them — otherwise the retry would duplicate the defaults).
     const defaultTopicTitles: Record<string, string[]> = {
       'pt-BR': ['Tema livre', 'Seu testemunho'],
       'en-US': ['Open Topic', 'Your Testimony'],
       'es-LA': ['Tema libre', 'Tu testimonio'],
     };
     const topicTitles = defaultTopicTitles[wardLanguage] ?? defaultTopicTitles['en-US'];
-    await supabaseAdmin
-      .from('ward_topics')
-      .insert(topicTitles.map(title => ({
-        ward_id: ward.id,
-        title,
-        is_default: true,
-      })));
+    let shouldSeedTopics = true;
+    if (reusingOrphan) {
+      const { data: existingTopics } = await supabaseAdmin
+        .from('ward_topics')
+        .select('id')
+        .eq('ward_id', ward!.id);
+      shouldSeedTopics = !existingTopics || (existingTopics as unknown[]).length === 0;
+    }
+    if (shouldSeedTopics) {
+      await supabaseAdmin
+        .from('ward_topics')
+        .insert(topicTitles.map(title => ({
+          ward_id: ward!.id,
+          title,
+          is_default: true,
+        })));
+    }
 
     // Create the user with app_metadata
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -203,7 +275,7 @@ Deno.serve(async (req) => {
       password: input.password,
       email_confirm: true,
       app_metadata: {
-        ward_id: ward.id,
+        ward_id: ward!.id,
         role: input.role,
         full_name: input.fullName.trim(),
       },
@@ -213,8 +285,11 @@ Deno.serve(async (req) => {
     });
 
     if (authError) {
-      // Clean up ward if user creation fails
-      await supabaseAdmin.from('wards').delete().eq('id', ward.id);
+      // Clean up a ward WE just created if user creation fails. A reused orphan is
+      // kept: it is the repairable partial the next retry will complete.
+      if (!reusingOrphan) {
+        await supabaseAdmin.from('wards').delete().eq('id', ward!.id);
+      }
 
       if (authError.message.includes('already been registered') ||
           authError.message.includes('already exists')) {
@@ -239,12 +314,7 @@ Deno.serve(async (req) => {
     // v2: the old "auto-create bishopric presider actor" step was removed with meeting_actors.
     // Presiders now come from members with can_preside (managed in the People picker).
 
-    // Sign in the new user to get a session
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
-
+    // Sign in the new user to get a session (anon client created above).
     const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
       email: input.email,
       password: input.password,

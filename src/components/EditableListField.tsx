@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { XIcon, GripIcon } from './icons';
 
 // --- Helpers ---
@@ -44,6 +45,7 @@ interface EditableListFieldProps {
 // --- Component ---
 
 export function EditableListField({ value, onSave, disabled, placeholder, onItemPress, onAddPress, onFieldFocus, renderItemLabel }: EditableListFieldProps) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const [items, setItems] = useState<string[]>(() => parseItems(value));
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -211,6 +213,7 @@ export function EditableListField({ value, onSave, disabled, placeholder, onItem
             // reader and to any query that is not walking the raw element tree.
             testID={`editable-list-delete-${idx}`}
             accessibilityRole="button"
+            accessibilityLabel={t('common.delete')}
           >
             <XIcon size={18} color={colors.textSecondary} />
           </Pressable>

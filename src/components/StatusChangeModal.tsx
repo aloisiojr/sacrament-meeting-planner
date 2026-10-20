@@ -74,7 +74,7 @@ export function StatusChangeModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable style={[styles.overlay, { backgroundColor: colors.scrim }]} onPress={onClose}>
         <View style={[styles.content, { backgroundColor: colors.card }]}>
           <Text style={[styles.title, { color: colors.text }]}>
             {t('speeches.changeStatus')}
@@ -135,8 +135,7 @@ export function StatusChangeModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
   },

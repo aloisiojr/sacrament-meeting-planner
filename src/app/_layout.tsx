@@ -9,7 +9,7 @@ import Constants from 'expo-constants';
 import { I18nextProvider } from 'react-i18next';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
-import { ErrorBoundary } from '../components/ErrorBoundary';
+import { RootErrorBoundary } from '../components/ErrorBoundary';
 import { SyncProvider } from '../providers/SyncProvider';
 import { UpdateRequiredScreen } from '../components/UpdateRequiredScreen';
 import { useVersionGate } from '../hooks/useVersionGate';
@@ -24,6 +24,7 @@ import {
   shouldDehydratePersistedQuery,
 } from '../lib/queryConfig';
 import { installGlobalErrorHandler } from '../lib/errorReporter';
+import { installFontScalingCap } from '../lib/fontScaling';
 import { queryClient } from '../lib/queryClient';
 import { getStartupGateState } from '../lib/startupGate';
 import { supabase } from '../lib/supabase';
@@ -171,11 +172,12 @@ export default function RootLayout() {
   );
 
   useEffect(() => {
+    installFontScalingCap();
     installGlobalErrorHandler();
   }, []);
 
   return (
-    <ErrorBoundary>
+    <RootErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <PersistQueryClientProvider
           key={cacheWardId || 'anon'}
@@ -197,7 +199,7 @@ export default function RootLayout() {
           </I18nextProvider>
         </PersistQueryClientProvider>
       </GestureHandlerRootView>
-    </ErrorBoundary>
+    </RootErrorBoundary>
   );
 }
 

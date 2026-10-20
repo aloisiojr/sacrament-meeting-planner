@@ -117,27 +117,27 @@ export default function PresentationScreen() {
           </Text>
         </View>
         <Pressable
-          testID="presentation-edit-button"
+          testID="presentation-edit-button" hitSlop={4}
           style={[styles.pencilButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.push({ pathname: '/(tabs)/agenda', params: { expandDate: sundayDate } })}
           accessibilityRole="button"
-          accessibilityLabel="Edit agenda"
+          accessibilityLabel={t('a11y.editAgenda')}
         >
           <PencilIcon size={16} color={colors.text} />
         </Pressable>
         <Pressable
-          testID="presentation-font-toggle-button"
+          testID="presentation-font-toggle-button" hitSlop={4}
           style={[styles.fontToggleButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => setFontSizeMode(m => m === 'normal' ? 'large' : 'normal')}
           accessibilityRole="button"
-          accessibilityLabel="Toggle font size"
+          accessibilityLabel={t('a11y.toggleFontSize')}
         >
           <Text testID="presentation-font-toggle-text" style={[styles.fontToggleText, { color: colors.text }]}>
             {fontSizeMode === 'normal' ? 'Aa' : 'AA'}
           </Text>
         </Pressable>
         <Pressable
-          testID="presentation-close-button"
+          testID="presentation-close-button" hitSlop={4}
           style={[styles.closeButton, { backgroundColor: colors.surfaceVariant }]}
           onPress={() => router.back()}
           accessibilityRole="button"

@@ -15,6 +15,7 @@ import { View, Text, Pressable, TextInput, FlatList, StyleSheet, Alert } from 'r
 import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { fontSizes } from '../lib/theme';
 import { PencilIcon } from './icons';
 import type { MergePlan } from '../lib/memberMergePlan';
 import type { MemberImportApply, MemberImportPhoneUpdate } from '../hooks/useApplyMemberImport';
@@ -414,7 +415,7 @@ export function PdfImportReview({
 
       {/* Manual-phone dialog (step 1). */}
       {editingName && (
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
           <View style={[styles.dialog, { backgroundColor: colors.card }]}>
             <Text style={[styles.dialogTitle, { color: colors.text }]} numberOfLines={1}>{editingName}</Text>
             <View style={styles.dialogRow}>
@@ -459,16 +460,16 @@ export function PdfImportReview({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  topAction: { fontSize: 16, width: 72, paddingVertical: 10 },
-  topTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  topAction: { fontSize: fontSizes.subtitle, width: 72, paddingVertical: 10 },
+  topTitle: { flex: 1, fontSize: fontSizes.subtitleLarge, fontWeight: '700', textAlign: 'center' },
   topSpacer: { width: 72 },
   info: { paddingHorizontal: 16, paddingBottom: 10 },
-  summary: { fontSize: 14, textAlign: 'center' },
-  warn: { fontSize: 13, textAlign: 'center', marginTop: 8 },
-  pending: { fontSize: 13, textAlign: 'center', marginTop: 6, fontWeight: '600' },
+  summary: { fontSize: fontSizes.body, textAlign: 'center' },
+  warn: { fontSize: fontSizes.bodySmall, textAlign: 'center', marginTop: 8 },
+  pending: { fontSize: fontSizes.bodySmall, textAlign: 'center', marginTop: 6, fontWeight: '600' },
   stepHeader: { paddingHorizontal: 16 },
-  stepTitle: { fontSize: 22, fontWeight: '700', marginTop: 6, marginBottom: 4 },
-  hint: { fontSize: 13, marginBottom: 8 },
+  stepTitle: { fontSize: fontSizes.titleLarge, fontWeight: '700', marginTop: 6, marginBottom: 4 },
+  hint: { fontSize: fontSizes.bodySmall, marginBottom: 8 },
   masterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -479,15 +480,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   masterRowRight: { justifyContent: 'flex-end' },
-  masterLabel: { fontSize: 14, fontWeight: '600' },
+  masterLabel: { fontSize: fontSizes.body, fontWeight: '600' },
   scroll: { flex: 1 },
   body: { paddingHorizontal: 16, paddingBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  name: { fontSize: 15, flex: 1, marginRight: 12 },
-  savedPhone: { fontSize: 14, marginRight: 10 },
+  name: { fontSize: fontSizes.bodyLarge, flex: 1, marginRight: 12 },
+  savedPhone: { fontSize: fontSizes.body, marginRight: 10 },
   conflict: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'transparent' },
   conflictRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 6 },
-  phoneText: { fontSize: 14, flex: 1 },
+  phoneText: { fontSize: fontSizes.body, flex: 1 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -497,14 +498,14 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   btn: { paddingVertical: 10, paddingHorizontal: 8, minWidth: 88, minHeight: 44, justifyContent: 'center' },
-  btnText: { fontSize: 16 },
-  overlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  btnText: { fontSize: fontSizes.subtitle },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', padding: 24 },
   dialog: { width: '100%', maxWidth: 420, borderRadius: 14, padding: 20 },
-  dialogTitle: { fontSize: 16, fontWeight: '700', marginBottom: 14 },
+  dialogTitle: { fontSize: fontSizes.subtitle, fontWeight: '700', marginBottom: 14 },
   dialogRow: { flexDirection: 'row', gap: 12 },
   ccField: { width: 96 },
   phoneFieldWrap: { flex: 1 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, minHeight: 44 },
+  fieldLabel: { fontSize: fontSizes.caption, fontWeight: '600', marginBottom: 6 },
+  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: fontSizes.subtitle, minHeight: 44 },
   dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 18 },
 });

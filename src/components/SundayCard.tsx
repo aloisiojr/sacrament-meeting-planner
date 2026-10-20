@@ -298,7 +298,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
         onRequestClose={() => setModalVisible(false)}
       >
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: colors.scrim }]}
           onPress={() => setModalVisible(false)}
         >
           <View
@@ -342,7 +342,7 @@ export function SundayTypeDropdown({ currentType, onSelect, onRevertToSpeeches, 
         onRequestClose={() => setOtherModalVisible(false)}
       >
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: colors.scrim }]}
           onPress={() => setOtherModalVisible(false)}
         >
           <View
@@ -737,8 +737,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
   },

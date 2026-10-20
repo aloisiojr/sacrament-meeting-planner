@@ -22,6 +22,7 @@ import {
 import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
+import { fontSizes } from '../lib/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { SearchInput } from './SearchInput';
 import {
@@ -673,11 +674,11 @@ const styles = StyleSheet.create({
     minWidth: 64,
   },
   headerBtnText: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
   },
   title: {
     flex: 1,
-    fontSize: 17,
+    fontSize: fontSizes.subtitleLarge,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -691,10 +692,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
   },
   label: {
-    fontSize: 13,
+    fontSize: fontSizes.bodySmall,
     marginBottom: 6,
     marginTop: 4,
   },
@@ -703,7 +704,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     marginBottom: 12,
   },
   phoneRow: {
@@ -717,7 +718,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionHeader: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 8,
@@ -729,7 +730,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleLabel: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   capRow: {
     flexDirection: 'row',
@@ -739,10 +740,10 @@ const styles = StyleSheet.create({
   },
   capLabel: {
     flex: 1,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   responsibleForItem: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     paddingVertical: 4,
   },
   deleteBtn: {
@@ -754,11 +755,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   deleteBtnText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     fontWeight: '600',
   },
   pickerTitle: {
-    fontSize: 17,
+    fontSize: fontSizes.subtitleLarge,
     fontWeight: '600',
     paddingHorizontal: 16,
     paddingBottom: 8,
@@ -772,7 +773,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   selectorText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   pickerHeader: {
     flexDirection: 'row',
@@ -787,7 +788,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   memberItem: {
     paddingHorizontal: 16,
@@ -795,13 +796,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   memberName: {
-    fontSize: 16,
+    fontSize: fontSizes.subtitle,
   },
   empty: {
     padding: 40,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
 });

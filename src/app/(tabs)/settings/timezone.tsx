@@ -150,6 +150,11 @@ export default function TimezoneScreen() {
         renderItem={renderItem}
         style={[styles.list, { backgroundColor: colors.card }]}
         keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t('common.noResults')}
+          </Text>
+        }
       />
     </SafeAreaView>
   );
@@ -204,6 +209,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  emptyText: {
+    textAlign: 'center',
+    paddingVertical: 24,
+    fontSize: 14,
   },
   item: {
     flexDirection: 'row',

@@ -159,6 +159,47 @@ export const darkColors: ThemeColors = {
   whatsapp: '#25D366',          // brand green, high contrast on dark surfaces (BEL-14)
 };
 
+// --- Design scales (BEL-05) ---
+// Value-preserving tokens for the sizes the app already uses. New UI code must take
+// fontSize/spacing/radius from here — literals in the migrated files are guarded by test.
+
+export const fontSizes = {
+  micro: 10,
+  caption: 12,
+  bodySmall: 13,
+  body: 14,
+  bodyLarge: 15,
+  subtitle: 16,
+  subtitleLarge: 17,
+  titleSmall: 18,
+  titleMedium: 19,
+  title: 20,
+  titleLarge: 22,
+  headline: 24,
+  display: 28,
+  hero: 32,
+} as const;
+export type FontSize = (typeof fontSizes)[keyof typeof fontSizes];
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+} as const;
+export type Spacing = (typeof spacing)[keyof typeof spacing];
+
+export const radii = {
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 20,
+  pill: 999,
+} as const;
+export type Radius = (typeof radii)[keyof typeof radii];
+
 // --- Storage ---
 
 export const THEME_STORAGE_KEY = '@theme_preference';

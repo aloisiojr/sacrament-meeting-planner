@@ -19,6 +19,7 @@ import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
+import { fontSizes } from '../lib/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useAgenda, useUpdateAgenda, isSpecialMeeting } from '../hooks/useAgenda';
 import { useSpeeches, useWardManagePrayers, useAssignSpeaker, useRemoveAssignment, useLazyCreateSpeeches } from '../hooks/useSpeeches';
@@ -381,7 +382,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(0)?.speaker_name || t('agenda.openingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}
@@ -644,7 +645,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(4)?.speaker_name || t('agenda.closingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}
@@ -776,6 +777,7 @@ function SelectorField({
   testID?: string;
   onFieldFocus?: (touchY: number) => void;
 }) {
+  const { t } = useTranslation();
   const viewRef = useRef<View>(null);
 
   const handlePress = useCallback(() => {
@@ -805,7 +807,7 @@ function SelectorField({
         {value || placeholder}
       </Text>
       {onClear && hasValue && (
-        <Pressable hitSlop={8} onPress={onClear}>
+        <Pressable hitSlop={8} onPress={onClear} accessibilityRole="button" accessibilityLabel={t('a11y.clearField')}>
           <XIcon size={18} color={colors.textSecondary} />
         </Pressable>
       )}
@@ -826,6 +828,7 @@ function ReadOnlySpeakerRow({
   colors: ThemeColors;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <FieldRow label={label} colors={colors}>
       <View style={[styles.speakerReadRow, { borderColor: colors.border }, disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
@@ -840,7 +843,7 @@ function ReadOnlySpeakerRow({
           {speakerName || label}
         </Text>
         {!disabled && (
-          <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
+          <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
             <PencilIcon size={16} color={colors.textSecondary} />
           </Pressable>
         )}
@@ -995,7 +998,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -1003,12 +1006,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: fontSizes.caption,
     fontWeight: '600',
     marginBottom: 4,
   },
   fieldValue: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   selectorField: {
     flexDirection: 'row',
@@ -1019,11 +1022,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   selectorText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     flex: 1,
   },
   clearButton: {
-    fontSize: 20,
+    fontSize: fontSizes.title,
     fontWeight: '300',
     paddingHorizontal: 4,
   },
@@ -1032,7 +1035,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
     minHeight: 36,
   },
   indented: {
@@ -1058,8 +1061,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   hymnTopBarBtn: { paddingVertical: 8, minWidth: 72 },
-  hymnTopBarText: { fontSize: 16 },
-  hymnTitle: { flex: 1, fontSize: 19, fontWeight: '600', textAlign: 'center' },
+  hymnTopBarText: { fontSize: fontSizes.subtitle },
+  hymnTitle: { flex: 1, fontSize: fontSizes.titleMedium, fontWeight: '600', textAlign: 'center' },
   hymnSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1081,10 +1084,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   modalItemText: {
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: fontSizes.body,
     textAlign: 'center',
     paddingVertical: 20,
   },
@@ -1098,12 +1101,12 @@ const styles = StyleSheet.create({
   },
   speakerReadText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: fontSizes.bodyLarge,
   },
   speakerIconBtn: {
     paddingHorizontal: 4,
   },
   speakerIcon: {
-    fontSize: 18,
+    fontSize: fontSizes.titleSmall,
   },
 });

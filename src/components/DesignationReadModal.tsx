@@ -51,7 +51,7 @@ export function DesignationReadModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.scrim }]}>
         {/* Real blur of the screen behind (expo-blur). */}
         <BlurView
           intensity={100}
@@ -118,8 +118,7 @@ export function DesignationReadModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+        justifyContent: 'center',
     alignItems: 'center',
     padding: 28,
   },

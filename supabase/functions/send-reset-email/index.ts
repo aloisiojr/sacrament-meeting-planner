@@ -12,6 +12,68 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
+// CORS `*` is kept by decision (CONF-12, specs/cutover-gate.md): the mobile app sends no
+// Origin, so CORS is not the protection on this public endpoint — the rate limit below and
+// the anti-enumeration identical response are. The helpers here are duplicated in
+// register-first-user / create-invitation: the repo has no supabase/functions/_shared/
+// and its pattern is minimal, consistent duplication per function (cf. cronSecretOk).
+const RATE_LIMIT_MAX_HITS = 20;
+const RATE_LIMIT_WINDOW_SECONDS = 3600;
+
+/** Name of the first missing env var, or null. Checked at the top so a misconfigured
+ *  deploy fails with the variable NAMED instead of an opaque runtime 500 (CONF-12). */
+function missingEnv(names: string[]): string | null {
+  for (const name of names) {
+    if (!Deno.env.get(name)) return name;
+  }
+  return null;
+}
+
+function envErrorResponse(name: string): Response {
+  console.error(`Missing required environment variable: ${name}`);
+  return new Response(
+    JSON.stringify({
+      error: `Missing required environment variable: ${name}`,
+      code: 'config/missing-env',
+    }),
+    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+/** 429 Response when (function, IP, email) exceeds the limit, else null. A broken
+ *  limiter fails OPEN (logged): the brake must never take down the legitimate flow. */
+async function rateLimitResponse(
+  admin: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> },
+  req: Request,
+  functionName: string,
+  email: string
+): Promise<Response | null> {
+  try {
+    const ip = (req.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim() || 'unknown';
+    const { data, error } = await admin.rpc('check_rate_limit', {
+      p_function: functionName,
+      p_ip: ip,
+      p_email: email.trim().toLowerCase(),
+      p_max_hits: RATE_LIMIT_MAX_HITS,
+      p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+    });
+    if (error) {
+      console.error('Rate limit check failed (failing open):', error);
+      return null;
+    }
+    if (data === false) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests', code: 'rate-limit/exceeded' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    return null;
+  } catch (err) {
+    console.error('Rate limit check failed (failing open):', err);
+    return null;
+  }
+}
+
 function getEmailTemplate(
   language: string,
   deepLink: string
@@ -89,6 +151,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const missing = missingEnv(['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GMAIL_USER', 'GMAIL_APP_PASSWORD']);
+    if (missing) return envErrorResponse(missing);
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -119,40 +184,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Lookup user by email (paginated: Supabase defaults to max 50 per page)
-    let user = null;
-    let page = 1;
-    while (!user) {
-      const { data, error: listError } =
-        await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
+    const limited = await rateLimitResponse(supabaseAdmin, req, 'send-reset-email', trimmedEmail);
+    if (limited) return limited;
 
-      if (listError) {
-        console.error('Error listing users:', listError);
-        return new Response(
-          JSON.stringify({ error: 'Internal server error' }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
+    // Direct lookup by email via the Admin API (CONF-12): generateLink resolves the
+    // account server-side by its indexed email — no paginated listUsers scan. The
+    // returned `user` carries the metadata for the template language and the canonical
+    // address. A "user not found" error is the anti-enumeration path below; any other
+    // error is a real failure and stays a 500.
+    const { data: linkData, error: linkError } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: trimmedEmail,
+      });
 
-      user = data.users.find(
-        (u: { email?: string }) =>
-          u.email?.toLowerCase() === trimmedEmail
-      ) ?? null;
-
-      if (user || data.users.length < 50) break;
-      page++;
-    }
-
-    // Anti-enumeration: return success even if user not found
-    if (!user) {
+    const linkErrorStatus = (linkError as { status?: number } | null)?.status;
+    const userNotFound =
+      !!linkError &&
+      (linkErrorStatus === 404 || /not found/i.test(linkError.message ?? ''));
+    if (userNotFound) {
+      // Anti-enumeration: return success even if user not found
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    if (linkError || !linkData?.user) {
+      console.error('Error generating recovery link:', linkError);
+      return new Response(
+        JSON.stringify({ error: 'Internal server error' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    const user = linkData.user;
 
     // Get language for email template
     // Priority: user_metadata.language > ward.language > 'en-US'
@@ -170,24 +237,6 @@ Deno.serve(async (req) => {
           .single();
         language = ward?.language ?? 'en-US';
       }
-    }
-
-    // Generate recovery token
-    const { data: linkData, error: linkError } =
-      await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: user.email!,
-      });
-
-    if (linkError || !linkData) {
-      console.error('Error generating recovery link:', linkError);
-      return new Response(
-        JSON.stringify({ error: 'Internal server error' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
     }
 
     const hashed_token = linkData.properties?.hashed_token;
@@ -209,20 +258,9 @@ Deno.serve(async (req) => {
     // Get email template
     const template = getEmailTemplate(language, deepLink);
 
-    // Check Gmail SMTP env vars
+    // Gmail env was already validated (named) at the top of the handler (CONF-12).
     const GMAIL_USER = Deno.env.get('GMAIL_USER');
     const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD');
-
-    if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-      console.error('Missing GMAIL_USER or GMAIL_APP_PASSWORD');
-      return new Response(
-        JSON.stringify({ error: 'Email service not configured' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
 
     // Send email via Gmail SMTP (authenticated with an App Password)
     const smtp = new SMTPClient({

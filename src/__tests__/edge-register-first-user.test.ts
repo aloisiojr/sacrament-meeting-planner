@@ -318,6 +318,39 @@ describe('register-first-user — the account it creates', () => {
 // reading the implementation, they recorded dead code as intended behaviour.
 
 
+describe('register-first-user — public-endpoint brake (CONF-12)', () => {
+  it('answers 429 when the rate limiter says the (IP, email) pair is over the limit', async () => {
+    responses.rpc = () => ({ data: false, error: null });
+    const res = await call(VALID);
+
+    expect(res.status).toBe(429);
+    expect(res.body).toMatchObject({ code: 'rate-limit/exceeded' });
+    expect(rec.inserts.filter((i) => i.table === 'wards')).toHaveLength(0);
+    expect(rec.rpcCalls[0]).toMatchObject({ fn: 'check_rate_limit' });
+    expect(rec.rpcCalls[0].args).toMatchObject({
+      p_function: 'register-first-user',
+      p_max_hits: 20,
+      p_window_seconds: 3600,
+    });
+  });
+
+  it('names the missing env var instead of an opaque 500', async () => {
+    const deno = (globalThis as { Deno: { env: { get: (k: string) => string | undefined } } }).Deno;
+    const originalGet = deno.env.get;
+    deno.env.get = (k: string) => (k === 'SUPABASE_SERVICE_ROLE_KEY' ? undefined : `test-${k}`);
+    const spy = quiet();
+    try {
+      const res = await call(VALID);
+      expect(res.status).toBe(500);
+      expect(res.body).toMatchObject({ code: 'config/missing-env' });
+      expect(JSON.stringify(res.body)).toContain('SUPABASE_SERVICE_ROLE_KEY');
+    } finally {
+      deno.env.get = originalGet;
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('register-first-user — the session', () => {
   it('returns the ward and a session so the user lands signed in', async () => {
     const res = await call(VALID);

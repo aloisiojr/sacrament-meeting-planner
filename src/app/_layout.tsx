@@ -27,6 +27,7 @@ import {
   shouldRetryQuery,
 } from '../lib/queryConfig';
 import { isOfflineBlockedError } from '../lib/offlineGuard';
+import { installGlobalErrorHandler } from '../lib/errorReporter';
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
@@ -151,6 +152,10 @@ function InnerLayout() {
  * Provider order: QueryClient > I18n > Theme > Auth > Navigation
  */
 export default function RootLayout() {
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>

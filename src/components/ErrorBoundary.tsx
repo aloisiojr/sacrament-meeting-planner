@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import i18n from '../i18n';
 import { useTheme, type ThemeColors } from '../contexts/ThemeContext';
+import { reportAppError } from '../lib/errorReporter';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -29,8 +30,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+  componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
+    reportAppError(error, 'boundary');
+    if (__DEV__) {
+      console.error('ErrorBoundary caught:', error);
+    }
   }
 
   handleReset = () => {

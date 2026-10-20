@@ -15,6 +15,7 @@ import { hasPermission as checkPermission } from '../lib/permissions';
 import { changeLanguage, getCurrentLanguage, SUPPORTED_LANGUAGES, type SupportedLanguage } from '../i18n';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Role, Permission } from '../types/database';
+import { setErrorReporterWardId } from '../lib/errorReporter';
 
 // --- Types ---
 
@@ -84,6 +85,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const role = extractRole(user);
   const wardId = extractWardId(user);
   const userName = extractUserName(user);
+
+  // EST-07: o reporter de erros carimba os eventos com a ala corrente.
+  useEffect(() => {
+    setErrorReporterWardId(wardId || null);
+  }, [wardId]);
 
   // Listen for auth state changes
   useEffect(() => {

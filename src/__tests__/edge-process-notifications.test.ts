@@ -76,8 +76,12 @@ afterEach(() => {
   fetchSpy.mockRestore();
 });
 
-async function run() {
-  const res = await handlerRef.current!(new Request('https://example.test/fn', { method: 'POST' }));
+async function run(
+  headers: Record<string, string> = { 'x-cron-secret': 'test-CRON_SECRET' }
+) {
+  const res = await handlerRef.current!(
+    new Request('https://example.test/fn', { method: 'POST', headers })
+  );
   return { status: res.status, body: JSON.parse(await res.text()) };
 }
 
@@ -99,6 +103,25 @@ function entry(over: Record<string, unknown> = {}) {
 
 /** All messages sent, flattened. */
 const allMessages = () => pushed.flat();
+
+describe('process-notifications — cron authentication (CONF-03)', () => {
+  it('rejects a request without the cron secret, touching nothing', async () => {
+    pendingQueue = [entry()];
+    const res = await run({});
+    expect(res.status).toBe(401);
+    expect(rec.selects).toEqual([]);
+    expect(rec.updates).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a wrong cron secret', async () => {
+    pendingQueue = [entry()];
+    const res = await run({ 'x-cron-secret': 'test-CRON_SECRET-but-wrong' });
+    expect(res.status).toBe(401);
+    expect(rec.selects).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
 
 describe('process-notifications — the queue read', () => {
   it('does nothing at all when the queue is empty', async () => {

@@ -10,6 +10,10 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
+// Writer roles (settings:users). Deno cannot import src/lib/permissions.ts
+// (WRITER_ROLES), so this literal is pinned by security-perms-concordance.test.ts.
+const ALLOWED_ROLES = ['bishopric', 'secretary'];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -53,7 +57,7 @@ Deno.serve(async (req) => {
     }
 
     // Check permission: Bishopric and Secretary can list users
-    if (!['bishopric', 'secretary'].includes(userRole)) {
+    if (!ALLOWED_ROLES.includes(userRole)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,6 +1,6 @@
 # Roteiro de Testes Manuais — Sacrament Meeting Planner (v2.0 / staging)
 
-Passo-a-passo para validar **todas** as funcionalidades do app no ambiente **staging**, via Expo Go.
+Passo-a-passo para validar **todas** as funcionalidades do app no ambiente **staging**, no build **SMP Dev** (TestFlight, profile `development-testflight`). Expo Go **não** serve: desde o SDK 53 ele não recebe push remoto, e a seção 7 inteira é sobre push.
 Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Marque `[x]` ao passar.
 
 ## Legenda
@@ -11,7 +11,7 @@ Cada item tem **Passos** (o que fazer) e **Esperado** (o que deve acontecer). Ma
 - `⚙️ BACKEND` — a validação real é no servidor; na UI confira que o botão/afeta some ou dá erro.
 
 ## Pré-requisitos
-1. App aberto no Expo Go apontando para o **Supabase staging** (o mesmo onde rodamos `db push`).
+1. App SMP Dev instalado pelo TestFlight, apontando para o **Supabase staging** (o mesmo onde rodamos `db push`).
 2. `⏸ SEED` **Contas de teste** — me peça para preparar 3 usuários no staging:
    - `bispado@teste` (papel **bishopric**)
    - `secretario@teste` (papel **secretary**)

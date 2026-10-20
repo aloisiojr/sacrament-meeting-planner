@@ -1,6 +1,6 @@
 # Spec — Hymn number scrubber (fast-scroll rail)
 
-**Slug:** `v2-hymn-scrubber` · **Type:** feature (UI) · **Branch:** UX-2.0
+**Slug:** `v2-hymn-scrubber` · **Type:** feature (UI) · **Status:** built — contido na `main` (`HymnScrubberRail.tsx` + `lib/hymnScrubber.ts`, integrado ao AgendaForm; wave 7, 2026-10-20). A referência original à branch `UX-2.0` era resíduo: a branch foi deletada e a feature vive na main.
 **Baseline:** main = 67 test files / 1832 tests; working tree green (item 4 committed `0414dca`).
 **Compatibility:** client-local UI only — no DB / API / persisted-data change. No release-advisor gate needed.
 

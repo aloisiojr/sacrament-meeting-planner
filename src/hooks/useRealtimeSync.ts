@@ -1,15 +1,16 @@
 /**
  * RealtimeSync: subscribes to Supabase Realtime channels for ward-scoped tables.
  * Maps events to TanStack Query cache invalidation.
- * Falls back to polling (POLLING_INTERVAL_MS = 10s, src/lib/sync.ts) when the
- * WebSocket is disconnected. (EST-24: this comment used to claim 2.5s.)
+ * Falls back to scoped polling (POLLING_TABLES every 45 s, src/lib/sync.ts) when the
+ * WebSocket is disconnected. (EST-24: this comment used to claim 2.5s; RAP-11 scoped
+ * the old 10 s invalidate-everything fallback and removed the SUBSCRIBED refetch.)
  */
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { SYNCED_TABLES, getQueryKeysForTable, POLLING_INTERVAL_MS } from '../lib/sync';
+import { SYNCED_TABLES, POLLING_TABLES, getQueryKeysForTable, POLLING_INTERVAL_MS } from '../lib/sync';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // --- Types ---
@@ -46,9 +47,11 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
     [queryClient]
   );
 
-  // Invalidate ALL synced table queries (on reconnect)
-  const invalidateAll = useCallback(() => {
-    for (const table of SYNCED_TABLES) {
+  // RAP-11: the polling fallback refreshes only the fast-moving tables, and relies on
+  // staleTime — invalidateQueries refetches only stale queries, so a tick inside the
+  // 5-minute freshness window is a no-op instead of a full reload.
+  const invalidatePollingTables = useCallback(() => {
+    for (const table of POLLING_TABLES) {
       invalidateForTable(table);
     }
   }, [invalidateForTable]);
@@ -59,9 +62,9 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
     isPollingRef.current = true;
 
     pollingRef.current = setInterval(() => {
-      invalidateAll();
+      invalidatePollingTables();
     }, POLLING_INTERVAL_MS);
-  }, [invalidateAll]);
+  }, [invalidatePollingTables]);
 
   // Stop polling fallback
   const stopPolling = useCallback(() => {
@@ -114,8 +117,9 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
         if (status === 'SUBSCRIBED') {
           setWebSocketConnected(true);
           stopPolling();
-          // Immediate refetch on subscribe/reconnect
-          invalidateAll();
+          // RAP-11: no invalidateAll here — (re)subscribing used to refetch every table
+          // on every reconnect. Realtime events drive invalidation from now on, and
+          // anything stale refetches on its own schedule via staleTime.
         } else if (
           status === 'CLOSED' ||
           status === 'CHANNEL_ERROR' ||
@@ -143,7 +147,7 @@ export function useRealtimeSync({ isOnline, setWebSocketConnected }: UseRealtime
       }
       setWebSocketConnected(false);
     };
-  }, [wardId, userId, isOnline, invalidateForTable, invalidateAll, setWebSocketConnected, startPolling, stopPolling]);
+  }, [wardId, userId, isOnline, invalidateForTable, setWebSocketConnected, startPolling, stopPolling]);
 
   // When going offline, stop polling and cleanup
   useEffect(() => {

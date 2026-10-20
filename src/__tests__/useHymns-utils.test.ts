@@ -94,7 +94,8 @@ describe('useHymns utilities', () => {
     it('should generate correct query keys', () => {
       expect(hymnKeys.all).toEqual(['hymns']);
       expect(hymnKeys.list('pt-BR')).toEqual(['hymns', 'list', 'pt-BR']);
-      expect(hymnKeys.sacramental('en-US')).toEqual(['hymns', 'sacramental', 'en-US']);
+      // RAP-09: no separate sacramental key — the subset derives from `list` via select.
+      expect('sacramental' in hymnKeys).toBe(false);
     });
 
     it('should generate unique keys for different languages', () => {

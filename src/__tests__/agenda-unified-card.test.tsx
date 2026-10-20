@@ -93,6 +93,7 @@ jest.mock('../components/DateBlock', () => ({
 jest.mock('../hooks/useSundayList', () => ({
   useSundayList: () => ({
     sundays: mockState.sundays,
+    windows: [{ start: mockState.sundays[0] ?? '', end: mockState.sundays[mockState.sundays.length - 1] ?? '' }],
     startDate: mockState.sundays[0] ?? '',
     endDate: mockState.sundays[mockState.sundays.length - 1] ?? '',
     loadMoreFuture: jest.fn(),
@@ -118,6 +119,16 @@ jest.mock('../hooks/useSpeeches', () => ({
 // pull useHymns/useMembers/useWardName — real React Query reads — into every card under test.
 jest.mock('../hooks/useAgendaPdfExport', () => ({
   useAgendaPdfExport: () => ({ exportAgenda: jest.fn(), isExporting: false }),
+}));
+jest.mock('../hooks/useAgendaWindowData', () => ({
+  useAgendaWindowData: () => ({
+    exceptions: mockState.exceptions,
+    speeches: mockState.speeches,
+    agendas: mockState.agendas,
+    exceptionsError: false,
+    exceptionsErr: null,
+    refetchExceptions: jest.fn(),
+  }),
 }));
 jest.mock('../hooks/useAgenda', () => {
   const actual = (jest.requireActual('../hooks/useAgenda')) as Record<string, unknown>;

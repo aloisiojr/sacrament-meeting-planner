@@ -54,7 +54,7 @@ describe('getQueryKeysForTable', () => {
 });
 
 describe('POLLING_INTERVAL_MS', () => {
-  it('is 10000ms', () => {
-    expect(POLLING_INTERVAL_MS).toBe(10000);
+  it('is 45000ms (RAP-11)', () => {
+    expect(POLLING_INTERVAL_MS).toBe(45000); // RAP-11: 45s scoped polling
   });
 });

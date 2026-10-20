@@ -7,6 +7,19 @@
 - Engine docs: `~/.claude/dev-flow/README.md`. Per-change docs: `specs/<slug>.md` (+ `.plan.md`).
 
 ## Now
+- **BRANCH `muse/smp-perf-queries` (wave 3B) — COMPLETA, verificada, NÃO mergeada (sem push).**
+  `specs/perf-queries-cache-bundle.md` sobre `main` @ad110b5: RAP-04/DEC-02 (allowlist de
+  persistência + buster por ala + teto 2 MiB com telemetria; sign-out já removia o cache
+  persistido — travado pelo teste EST-05 existente), RAP-03/DEC-06 (agenda abre 3+6 meses,
+  `useAgendaWindowData` por segmentos delta, `AGENDA_LIST_COLUMNS` na lista), RAP-02
+  (virtualização de hinos), RAP-09 (sacramentais via `select` da `list`), RAP-11 (polling
+  45 s só speeches/agendas; SUBSCRIBED sem invalidateAll), RAP-13 (OnlineStatus memoizado),
+  RAP-12 (4 pacotes p/ devDependencies + lock), RAP-05 (favicon 192/48 da fonte única,
+  PNGs −26,3% com pixels idênticos, artes de loja em `assets/store/`), RAP-10/14
+  (migration **052** criada, NÃO aplicada; busca por data em range), RAP-06 (export:
+  `.hbc` 5.514.070 B / 2.037 sources vs baseline 5.460.946 B / 2.046), RAP-15 (aceito
+  como está, gatilho registrado na spec). Gates (uma rodada): tsc 0, lint 0 erros/
+  5 warnings (baseline), jest 352 suítes / 5.842 testes verdes, `expo export` ok.
 - **BRANCH `muse/smp-perf-pdf` (wave 3A) — COMPLETA, verificada, NÃO mergeada (sem push).**
   `specs/perf-pdf-fast-safe.md`: RAP-01 (teto 10 MB antes do base64, timeout 75 s com
   retry visível, mensagens por página, cache de módulo dos assets, callbacks via ref),

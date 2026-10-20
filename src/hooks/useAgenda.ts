@@ -265,6 +265,18 @@ export function useUpdateAgendaByDate() {
 }
 
 /**
+ * Columns the collapsed agenda card reads (RAP-03/RAP-14): identifiers, the role/hymn
+ * presence fields behind the status counts (`buildUnifiedCardData`), speaker overrides
+ * and attendance. The expanded form fetches the full row via useAgenda (bySunday), so
+ * the list query stays narrow without losing any editable field.
+ */
+export const AGENDA_LIST_COLUMNS =
+  'id, ward_id, sunday_date, presiding_name, conducting_name, pianist_name, conductor_name, ' +
+  'opening_hymn_id, sacrament_hymn_id, intermediate_hymn_id, closing_hymn_id, ' +
+  'has_second_speech, has_intermediate_hymn, has_special_presentation, ' +
+  'speaker_1_override, speaker_2_override, speaker_3_override, attendance';
+
+/**
  * Fetch all agendas for a date range.
  * Used by agenda tab to show status lines on collapsed cards
  * without requiring each card to be expanded first.
@@ -277,14 +289,15 @@ export function useAgendaRange(startDate: string, endDate: string) {
     queryFn: async (): Promise<SundayAgenda[]> => {
       const { data, error } = await supabase
         .from('sunday_agendas')
-        .select('*')
+        .select(AGENDA_LIST_COLUMNS)
         .eq('ward_id', wardId)
         .gte('sunday_date', startDate)
         .lte('sunday_date', endDate)
         .order('sunday_date');
 
       if (error) throw error;
-      return data ?? [];
+      // Narrow column list: the client is untyped, so the row subset is asserted here.
+      return (data ?? []) as unknown as SundayAgenda[];
     },
     enabled: !!wardId && !!startDate && !!endDate,
   });

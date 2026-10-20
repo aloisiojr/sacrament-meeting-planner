@@ -97,17 +97,25 @@ export function getAvailableStatuses(current: SpeechStatus): SpeechStatus[] {
  * Query the ward's manage_prayers flag.
  * Returns false as default when loading or no data.
  */
-export function useWardManagePrayers(): { managePrayers: boolean; isLoading: boolean } {
+export function useWardManagePrayers(): {
+  managePrayers: boolean;
+  isLoading: boolean;
+  error: Error | null;
+} {
   const { wardId } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: wardKeys.managePrayers(wardId),
     queryFn: async () => {
+      // EST-16: maybeSingle — "no ward row" is a legitimate `false`, not an exception.
+      // With .single() it threw, the error was swallowed into the `false` default, and
+      // prayers silently disappeared from the whole UI. A real failure surfaces via
+      // `error`, exactly like the speeches query.
       const { data, error } = await supabase
         .from('wards')
         .select('manage_prayers')
         .eq('id', wardId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data?.manage_prayers ?? false;
@@ -115,7 +123,7 @@ export function useWardManagePrayers(): { managePrayers: boolean; isLoading: boo
     enabled: !!wardId,
   });
 
-  return { managePrayers: data ?? false, isLoading };
+  return { managePrayers: data ?? false, isLoading, error };
 }
 
 /**

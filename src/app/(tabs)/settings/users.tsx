@@ -14,14 +14,15 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
-import { throwIfOffline, isRequiresConnectionError } from '../../../lib/offlineGuard';
+import { throwIfOffline, isRequiresConnectionError, isOfflineBlockedError } from '../../../lib/offlineGuard';
 import { logAction, buildLogDescription } from '../../../lib/activityLog';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/icons';
 import type { Role } from '../../../types/database';
@@ -88,7 +89,12 @@ export default function UserManagementScreen() {
     (err: unknown, fallbackKey: string) => {
       Alert.alert(
         t('common.error'),
-        isRequiresConnectionError(err) ? t('auth.requiresConnection') : t(fallbackKey)
+        // These edge-function ops are online-only AND classified blocked-offline (DEC-01): the
+        // wrapper now rejects with offline_blocked before callEdgeFunction's own guard runs.
+        // Both mean the same thing to the user here — "this needs a connection".
+        isRequiresConnectionError(err) || isOfflineBlockedError(err)
+          ? t('auth.requiresConnection')
+          : t(fallbackKey)
       );
     },
     [t]
@@ -120,7 +126,7 @@ export default function UserManagementScreen() {
   });
 
   // Invite user mutation
-  const inviteMutation = useMutation({
+  const inviteMutation = useClassifiedMutation('settings.inviteUser', {
     mutationFn: async ({ email, role }: { email: string; role: Role }) => {
       return callEdgeFunction('create-invitation', { email, role }, isOnline);
     },
@@ -138,7 +144,7 @@ export default function UserManagementScreen() {
   });
 
   // Change role mutation
-  const changeRoleMutation = useMutation({
+  const changeRoleMutation = useClassifiedMutation('settings.changeUserRole', {
     mutationFn: async ({
       targetUserId,
       newRole,
@@ -167,7 +173,7 @@ export default function UserManagementScreen() {
   });
 
   // Delete user mutation
-  const deleteUserMutation = useMutation({
+  const deleteUserMutation = useClassifiedMutation('settings.deleteUser', {
     mutationFn: async ({ targetUserId, targetName, targetEmail }: { targetUserId: string; targetName: string; targetEmail: string }) => {
       return callEdgeFunction('delete-user', { targetUserId }, isOnline);
     },
@@ -196,7 +202,7 @@ export default function UserManagementScreen() {
   });
 
   // Update own name mutation
-  const updateNameMutation = useMutation({
+  const updateNameMutation = useClassifiedMutation('settings.updateUserName', {
     mutationFn: async (newName: string) => {
       return callEdgeFunction('update-user-name', {
         fullName: newName.trim(),

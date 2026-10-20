@@ -4,6 +4,7 @@ import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import { useOfflineQueueProcessor } from '../hooks/useOfflineQueueProcessor';
 import { useRegisterPushToken, useNotificationHandler } from '../hooks/useNotifications';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { SyncIssuesBanner } from '../components/SyncIssuesBanner';
 import { OnlineStatusProvider } from '../contexts/OnlineStatusContext';
 import { useOfflinePrefetch } from '../hooks/useOfflinePrefetch';
 
@@ -41,6 +42,7 @@ export function SyncProvider({ children }: SyncProviderProps) {
   return (
     <OnlineStatusProvider isOnline={isOnline}>
       <OfflineBanner visible={showOfflineBanner} />
+      <SyncIssuesBanner />
       {children}
     </OnlineStatusProvider>
   );

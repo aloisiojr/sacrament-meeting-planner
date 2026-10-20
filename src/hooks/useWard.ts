@@ -2,7 +2,8 @@
  * Ward-level lookups. `useWardName` fetches the current ward's display name (used e.g. to fill the
  * {ward} token in designation read-texts). Cached via React Query like the other ward hooks.
  */
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import type { DesignationType } from '../types/database';
@@ -68,7 +69,7 @@ export function useUpdateWardInfo() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateWardInfo', {
     mutationFn: async (input: Partial<WardInfo>) => {
       const { error } = await supabase
         .from('wards')
@@ -127,7 +128,7 @@ export function useUpdateWardDesignationTemplate() {
   const { wardId } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateWardDesignationTemplate', {
     mutationFn: async ({ type, value }: { type: DesignationType; value: string | null }) => {
       const column = DESIGNATION_TEMPLATE_COLUMN[type];
       const { error } = await supabase

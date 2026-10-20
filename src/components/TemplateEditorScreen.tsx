@@ -9,7 +9,7 @@
  * shows a stale default before the ward query resolves and only fields the user actually edited are
  * persisted.
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -62,6 +62,23 @@ export function TemplateEditorScreen({
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // EST-09: the flush's source of truth is this ref, updated synchronously with every keystroke.
+  // Reading pending edits from inside a setState updater was the bug — an updater may never run
+  // after unmount (and its side effects are not guaranteed to fire exactly once), so editing and
+  // leaving quickly silently dropped the save. Refs for tabs/onSave/saveMode keep the unmount
+  // flush working with the latest props without re-subscribing.
+  const editsRef = useRef<Record<string, string>>({});
+  const tabsRef = useRef(tabs);
+  const onSaveRef = useRef(onSave);
+  const saveModeRef = useRef(saveMode);
+  // Kept current in an effect (never during render): the refs are only read from event
+  // handlers, timers and the unmount cleanup, all of which run after commit.
+  useEffect(() => {
+    tabsRef.current = tabs;
+    onSaveRef.current = onSave;
+    saveModeRef.current = saveMode;
+  });
+
   const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
 
   const clearRestored = useCallback((key: string) => {
@@ -83,27 +100,51 @@ export function TemplateEditorScreen({
   );
   const currentText = activeTab ? displayValue(activeTab) : '';
 
-  const computeSave = useCallback(
-    (tab: TemplateTab, text: string): string | null =>
-      saveMode === 'collapse' ? (text.trim() && text !== tab.defaultText ? text : null) : text,
-    [saveMode]
-  );
-
   const flush = useCallback(
     (key: string) => {
       if (timers.current[key]) {
         clearTimeout(timers.current[key]);
         delete timers.current[key];
       }
-      setEdits((e) => {
-        if (!(key in e)) return e;
-        const tab = tabs.find((tb) => tb.key === key);
-        if (tab) onSave(key, computeSave(tab, e[key]));
-        return e;
-      });
+      // Synchronous, from the ref — never from inside a setState updater (EST-09).
+      if (!(key in editsRef.current)) return;
+      const tab = tabsRef.current.find((tb) => tb.key === key);
+      if (!tab) return;
+      const text = editsRef.current[key];
+      const value =
+        saveModeRef.current === 'collapse'
+          ? text.trim() && text !== tab.defaultText
+            ? text
+            : null
+          : text;
+      onSaveRef.current(key, value);
     },
-    [tabs, onSave, computeSave]
+    []
   );
+
+  /** Persist every pending edit right now (back button / unmount), cancelling all debounce timers. */
+  const flushAll = useCallback(() => {
+    Object.keys(editsRef.current).forEach((key) => flush(key));
+    Object.values(timers.current).forEach((timer) => clearTimeout(timer));
+    timers.current = {};
+  }, [flush]);
+
+  // Leaving the screen must not lose an edit still inside its debounce window.
+  const flushAllRef = useRef(flushAll);
+  useEffect(() => {
+    flushAllRef.current = flushAll;
+  });
+  useEffect(
+    () => () => {
+      flushAllRef.current();
+    },
+    []
+  );
+
+  const handleBack = useCallback(() => {
+    flushAll();
+    router.back();
+  }, [flushAll, router]);
 
   const schedule = useCallback(
     (key: string) => {
@@ -115,7 +156,8 @@ export function TemplateEditorScreen({
 
   const handleChange = useCallback(
     (text: string) => {
-      setEdits((e) => ({ ...e, [activeKey]: text }));
+      editsRef.current = { ...editsRef.current, [activeKey]: text };
+      setEdits(editsRef.current);
       clearRestored(activeKey);
       schedule(activeKey);
     },
@@ -128,7 +170,8 @@ export function TemplateEditorScreen({
       const before = currentText.slice(0, pos);
       const after = currentText.slice(pos);
       const next = before + token + after;
-      setEdits((e) => ({ ...e, [activeKey]: next }));
+      editsRef.current = { ...editsRef.current, [activeKey]: next };
+      setEdits(editsRef.current);
       clearRestored(activeKey);
       schedule(activeKey);
       const np = pos + token.length;
@@ -145,12 +188,12 @@ export function TemplateEditorScreen({
     }
     // Drop any pending edit and mark restored (shows the default) — it must NOT be re-saved on the
     // next flush, or raw mode would persist the default text instead of the cleared NULL.
-    setEdits((e) => {
-      if (!(activeKey in e)) return e;
-      const n = { ...e };
+    if (activeKey in editsRef.current) {
+      const n = { ...editsRef.current };
       delete n[activeKey];
-      return n;
-    });
+      editsRef.current = n;
+      setEdits(n);
+    }
     setRestored((r) => new Set(r).add(activeKey));
     onSave(activeKey, null);
   }, [activeTab, activeKey, onSave]);
@@ -173,7 +216,7 @@ export function TemplateEditorScreen({
       <KeyboardAvoider testID="template-editor-keyboard-avoider">
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} accessibilityRole="button" hitSlop={12} testID="template-editor-back">
+            <Pressable onPress={handleBack} accessibilityRole="button" hitSlop={12} testID="template-editor-back">
               <Text style={[styles.backButton, { color: colors.primary }]}>{t('common.back')}</Text>
             </Pressable>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>

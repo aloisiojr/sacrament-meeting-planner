@@ -25,7 +25,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
@@ -217,7 +218,7 @@ export default function MembersScreen() {
   }, [members, t, i18n.language]);
 
   // CSV Import mutation (destructive atomic overwrite via RPC — full dump).
-  const importMutation = useMutation({
+  const importMutation = useClassifiedMutation('settings.membersImport', {
     mutationFn: async (csvContent: string) => {
       const result = parseCsv(csvContent);
 

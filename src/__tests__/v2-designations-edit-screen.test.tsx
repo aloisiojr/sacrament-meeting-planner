@@ -17,11 +17,14 @@ const DATE = '2026-08-02';
 const mockState = {
   params: { date: '2026-08-02' } as { date?: string; index?: string },
   designations: [] as Designation[],
-  updateAgenda: jest.fn(),
-  updateMember: jest.fn(),
+  // EST-01: the screen AWAITS these (mutateAsync); resolve by default, reject per test.
+  updateAgenda: jest.fn().mockResolvedValue(null),
+  updateMember: jest.fn().mockResolvedValue(null),
   back: jest.fn(),
   pickerOnSelect: null as null | ((m: Member) => void),
   canWrite: true,
+  // EST-11: true simulates a cold cache — the agenda query has not resolved yet.
+  agendaLoading: false,
 };
 
 function makeMember(overrides: Partial<Member> = {}): Member {
@@ -79,11 +82,15 @@ jest.mock('../components/PeoplePicker', () => ({
   },
 }));
 jest.mock('../hooks/useAgenda', () => ({
-  useAgenda: () => ({ data: { id: 'a1', sunday_date: DATE, designations: mockState.designations } }),
-  useUpdateAgendaByDate: () => ({ mutate: mockState.updateAgenda }),
+  useAgenda: () => ({
+    data: mockState.agendaLoading
+      ? undefined
+      : { id: 'a1', sunday_date: DATE, designations: mockState.designations },
+  }),
+  useUpdateAgendaByDate: () => ({ mutateAsync: mockState.updateAgenda }),
 }));
 jest.mock('../hooks/useMembers', () => ({
-  useUpdateMember: () => ({ mutate: mockState.updateMember }),
+  useUpdateMember: () => ({ mutateAsync: mockState.updateMember }),
 }));
 
 async function render() {
@@ -108,11 +115,12 @@ async function selectPerson(member: Member) {
 beforeEach(() => {
   mockState.params = { date: DATE };
   mockState.designations = [];
-  mockState.updateAgenda = jest.fn();
-  mockState.updateMember = jest.fn();
+  mockState.updateAgenda = jest.fn().mockResolvedValue(null);
+  mockState.updateMember = jest.fn().mockResolvedValue(null);
   mockState.back = jest.fn();
   mockState.pickerOnSelect = null;
   mockState.canWrite = true;
+  mockState.agendaLoading = false;
   jest.restoreAllMocks();
 });
 
@@ -277,5 +285,59 @@ describe('Designation edit screen (step 2)', () => {
     expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);
     // Edited in place at index 0 (not appended).
     expect((mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[]).length).toBe(1);
+  });
+
+  it('EST-01: a rejected save keeps the user on the screen with an inline error and the edits intact', async () => {
+    // First attempt refuses; the retry (same screen, edits intact) succeeds.
+    mockState.updateAgenda = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('server refused'))
+      .mockResolvedValue(null);
+    const r = await render();
+    await press(r, 'designation-type-priesthood');
+    await selectPerson(makeMember());
+    await press(r, 'designation-office-deacon');
+
+    await press(r, 'designation-edit-save-button');
+
+    // No navigation away from an unconfirmed write; the failure is visible in place.
+    expect(mockState.back).not.toHaveBeenCalled();
+    expect(screen.getByTestId('designation-edit-error')).toHaveTextContent(
+      'agenda.designations.saveFailed'
+    );
+    // The form is still there to retry from — and a successful retry does navigate back.
+    await press(r, 'designation-edit-save-button');
+    expect(mockState.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('EST-11: with a cold cache the editor shows loading and cannot save until the agenda arrives', async () => {
+    mockState.params = { date: DATE, index: '0' };
+    mockState.designations = [
+      { type: 'sustain', person_name: 'Convidado Externo', member_id: null, calling: 'Líder', office: null },
+    ];
+    mockState.agendaLoading = true;
+
+    const view = await rtlRender(React.createElement(DesignationEditScreen));
+
+    // Nothing editable yet: opening blank here is how a save used to overwrite unseen fields.
+    expect(screen.getByTestId('designation-edit-loading')).toBeOnTheScreen();
+    expect(screen.queryByTestId('designation-edit-save-button')).toBeNull();
+    expect(mockState.updateAgenda).not.toHaveBeenCalled();
+
+    // The agenda arrives: the existing item hydrates the fields.
+    mockState.agendaLoading = false;
+    await act(async () => {
+      await view.rerender(React.createElement(DesignationEditScreen));
+    });
+
+    expect(screen.queryByTestId('designation-edit-loading')).toBeNull();
+    expect(screen.getByTestId('designation-calling-input').props.value).toBe('Líder');
+
+    // Saving now writes back the hydrated item — the person/calling were never blanked.
+    await press(view, 'designation-edit-save-button');
+    expect(mockState.updateAgenda).toHaveBeenCalledTimes(1);
+    const item = (mockState.updateAgenda.mock.calls[0][0].updates.designations as Designation[])[0];
+    expect(item).toMatchObject({ type: 'sustain', person_name: 'Convidado Externo', calling: 'Líder' });
+    expect(mockState.back).toHaveBeenCalledTimes(1);
   });
 });

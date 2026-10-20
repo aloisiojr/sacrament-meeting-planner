@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Alert, Modal } from 'rea
 import { AppSwitch } from '../../../components/AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useOnlineStatus } from '../../../contexts/OnlineStatusContext';
@@ -66,7 +67,7 @@ export default function SettingsScreen() {
 
   const { managePrayers } = useWardManagePrayers();
 
-  const toggleManagePrayersMutation = useMutation({
+  const toggleManagePrayersMutation = useClassifiedMutation('settings.toggleManagePrayers', {
     mutationFn: async (enabled: boolean) => {
       const { error } = await supabase
         .from('wards')
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
   });
 
   // F116: Ward language change mutation (Bispado/Secretario only)
-  const wardLanguageChangeMutation = useMutation({
+  const wardLanguageChangeMutation = useClassifiedMutation('settings.wardLanguageChange', {
     mutationFn: async (newLanguage: SupportedLanguage) => {
       const oldLanguage = wardLanguage as SupportedLanguage;
       if (newLanguage === oldLanguage) return;

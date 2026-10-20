@@ -125,6 +125,32 @@ describe('TemplateEditorScreen', () => {
   });
 });
 
+describe('TemplateEditorScreen — leaving quickly (EST-09)', () => {
+  it('flushes a pending edit when the back button is pressed inside the debounce window', async () => {
+    const { r, onSave } = await render({ saveMode: 'raw' });
+    await fireEvent.changeText(screen.getByTestId('template-editor'), 'typed then left');
+
+    // No blur, no waiting out the 800ms debounce: the old screen read pending edits from a
+    // setState updater that might never run after unmount, losing this save silently.
+    await press(r, 'template-editor-back');
+
+    expect(onSave).toHaveBeenCalledWith('a', 'typed then left');
+  });
+
+  it('flushes a pending edit on unmount', async () => {
+    const onSave = jest.fn();
+    const view = await rtlRender(
+      React.createElement(TemplateEditorScreen, { title: 'Templates', tabs: makeTabs(), onSave })
+    );
+    await fireEvent.changeText(screen.getByTestId('template-editor'), 'unmounted with edit');
+    expect(onSave).not.toHaveBeenCalled();
+
+    await view.unmount();
+
+    expect(onSave).toHaveBeenCalledWith('a', 'unmounted with edit');
+  });
+});
+
 describe('keyboard reachability', () => {
   /*
    * Removing the KeyboardAvoider from every screen used to leave the whole suite green — the

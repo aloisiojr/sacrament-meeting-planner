@@ -7,8 +7,10 @@ import { render, act } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const calls: { op: string; table: string; payload?: unknown; eqArgs?: unknown[] }[] = [];
+const calls: { op: string; table: string; payload?: unknown; eqArgs?: unknown[]; opts?: unknown }[] = [];
 const mockInvalidateQueries = jest.fn();
+/** Health events the processor reports (dead-letter visibility beyond the device, EST-04). */
+const mockHealthEvents: unknown[][] = [];
 /** Tables whose writes REJECT — a transport failure. */
 const mockFailTables = new Set<string>();
 /**
@@ -29,6 +31,11 @@ function mockMakeChain(table: string) {
     insert: (payload: unknown) => {
       if (mockFailTables.has(table)) throw new Error('insert failed');
       calls.push({ op: 'insert', table, payload });
+      return result();
+    },
+    upsert: (payload: unknown, opts?: unknown) => {
+      if (mockFailTables.has(table)) throw new Error('upsert failed');
+      calls.push({ op: 'upsert', table, payload, opts });
       return result();
     },
     update: (payload: unknown) => {
@@ -61,6 +68,13 @@ jest.mock('../lib/supabase', () => ({
   supabase: { from: (table: string) => mockMakeChain(table) },
 }));
 
+jest.mock('../lib/appHealth', () => ({
+  reportHealthEvent: (...args: unknown[]) => {
+    mockHealthEvents.push(args);
+    return Promise.resolve();
+  },
+}));
+
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     get invalidateQueries() {
@@ -70,7 +84,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 
 import { useOfflineQueueProcessor } from '../hooks/useOfflineQueueProcessor';
-import { enqueue, getQueueSize, peek } from '../lib/offlineQueue';
+import { enqueue, getQueueSize, peek, readDeadLetter } from '../lib/offlineQueue';
 
 function Harness({ isOnline }: { isOnline: boolean }) {
   useOfflineQueueProcessor(isOnline);
@@ -104,6 +118,7 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   calls.length = 0;
   mockInvalidateQueries.mockReset();
+  mockHealthEvents.length = 0;
   mockFailTables.clear();
   mockErrorTables.clear();
 });
@@ -120,17 +135,19 @@ describe('useOfflineQueueProcessor — when it runs', () => {
     expect(await getQueueSize()).toBe(1);
   });
 
-  it('does nothing when it mounts already online (no offline->online transition)', async () => {
+  it('drains leftover entries when it mounts already online (cold start, EST-04)', async () => {
+    // Entries left by a previous session (app killed while offline) must not wait for the next
+    // network flap: the first online mount drains them.
     await enqueue(makeMutation());
     await render(<Harness isOnline />);
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
+      await Promise.resolve();
     });
 
-    // The queue is only drained on a reconnect, not on a cold start.
-    expect(calls).toHaveLength(0);
-    expect(await getQueueSize()).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(await getQueueSize()).toBe(0);
   });
 
   it('drains on the offline -> online transition', async () => {
@@ -143,17 +160,40 @@ describe('useOfflineQueueProcessor — when it runs', () => {
 });
 
 describe('useOfflineQueueProcessor — replay fidelity', () => {
-  it('replays an INSERT with the full payload', async () => {
+  it('replays an INSERT as an upsert on the client-assigned id, with the full payload (EST-04)', async () => {
+    // If the original insert actually landed before the connection dropped, upserting on the
+    // client id updates that row instead of duplicating it or hitting a UNIQUE violation.
     await enqueue(
       makeMutation({ operation: 'INSERT', table: 'members', data: { id: 'm1', full_name: 'Ana' } })
     );
     await goOfflineThenOnline();
 
     expect(calls[0]).toMatchObject({
-      op: 'insert',
+      op: 'upsert',
       table: 'members',
       payload: { id: 'm1', full_name: 'Ana' },
+      opts: { onConflict: 'id' },
     });
+  });
+
+  it('replays a UPSERT on its recorded conflict target (agenda by date)', async () => {
+    await enqueue(
+      makeMutation({
+        operation: 'UPSERT',
+        table: 'sunday_agendas',
+        onConflict: 'ward_id,sunday_date',
+        data: { ward_id: 'w1', sunday_date: '2026-08-02', has_second_speech: false },
+      })
+    );
+    await goOfflineThenOnline();
+
+    expect(calls[0]).toMatchObject({
+      op: 'upsert',
+      table: 'sunday_agendas',
+      payload: { ward_id: 'w1', sunday_date: '2026-08-02', has_second_speech: false },
+      opts: { onConflict: 'ward_id,sunday_date' },
+    });
+    expect(await getQueueSize()).toBe(0);
   });
 
   it('replays an UPDATE with id stripped from the payload and used as the filter', async () => {
@@ -257,23 +297,26 @@ describe('useOfflineQueueProcessor — failure handling', () => {
     expect(mockInvalidateQueries).not.toHaveBeenCalled();
   });
 
-  it('drops a permanently failing entry after the retry budget and then unblocks the queue', async () => {
-    // The stop-at-failure rule must not let one poison entry wedge the queue forever.
+  it('dead-letters a permanently failing entry after the retry budget and drains past it in the same pass (EST-04)', async () => {
+    // The stop-at-failure rule must not let one poison entry wedge the queue forever — and the
+    // poisoned edit must not vanish either: it lands in the persisted dead-letter list.
     mockFailTables.add('broken');
     await enqueue(makeMutation({ id: 'q1', operation: 'INSERT', table: 'broken', data: { id: '1' } }));
     await enqueue(makeMutation({ id: 'q2', operation: 'INSERT', table: 'ok', data: { id: '2' } }));
 
     await reconnectTimes(3); // MAX_RETRIES
 
-    // q1 is gone; q2 was never touched while q1 was ahead of it.
-    expect(await getQueueSize()).toBe(1);
-    expect((await peek())?.id).toBe('q2');
-    expect(calls).toHaveLength(0);
-
-    await reconnectTimes(1);
-
-    // With the poison cleared, the healthy mutation finally lands.
-    expect(calls.map((c) => c.table)).toEqual(['ok']);
+    // On the drain that exhausts q1's budget, q1 moves to the dead-letter list and the SAME
+    // drain continues: q2 lands without waiting for another reconnect.
     expect(await getQueueSize()).toBe(0);
+    expect(calls.map((c) => c.table)).toEqual(['ok']);
+
+    const dead = await readDeadLetter();
+    expect(dead).toHaveLength(1);
+    expect(dead[0]).toMatchObject({ id: 'q1', table: 'broken', retryCount: 3 });
+    expect(typeof dead[0].failedAt).toBe('number');
+
+    // And it is registered server-side (counts only — never the member payload).
+    expect(mockHealthEvents).toContainEqual([null, 'offline_dead_letter', { retries: 3 }]);
   });
 });

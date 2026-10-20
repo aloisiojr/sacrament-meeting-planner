@@ -44,7 +44,6 @@ import {
   useRemoveAssignment,
   useWardManagePrayers,
 } from '../../hooks/useSpeeches';
-import { supabase } from '../../lib/supabase';
 import type {
   Member,
   TopicWithCollection,
@@ -180,9 +179,45 @@ function SpeechesEditContent() {
     [assignTopic]
   );
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   // 2nd-speech toggle (mirrors handleToggleSecondSpeech from the inline tab).
+  // EST-02: the three writes (remove speaker → clear topic → flip the agenda flag) used to be
+  // uncoordinated, and the topic write was a direct Supabase call with an empty `.then()` — which
+  // discards the resolved `{error}` (supabase-js v2 does not reject). A partial failure left an
+  // orphaned speaker/topic. Now they run as ONE awaited sequence through the existing (queued)
+  // hooks; a failure aborts the remaining steps and surfaces an inline error.
   const handleToggleSecondSpeech = useCallback(
     (enabled: boolean) => {
+      const run = async () => {
+        setSaveError(null);
+        try {
+          if (!enabled) {
+            const speech2 = speechesForDay.find((s) => s.position === 2);
+            if (speech2) {
+              await removeAssignment.mutateAsync({ speechId: speech2.id });
+              await assignTopic.mutateAsync({
+                speechId: speech2.id,
+                topicTitle: '',
+                topicLink: '',
+                topicCollection: '',
+              });
+            }
+            await updateAgenda.mutateAsync({
+              sundayDate: date,
+              updates: { has_second_speech: false },
+            });
+          } else {
+            await updateAgenda.mutateAsync({
+              sundayDate: date,
+              updates: { has_second_speech: true },
+            });
+          }
+        } catch {
+          setSaveError(t('speeches.saveFailed'));
+        }
+      };
+
       if (!enabled) {
         const speech2 = speechesForDay.find((s) => s.position === 2);
         const hasAssignments = !!(speech2?.speaker_name || speech2?.topic_title);
@@ -197,34 +232,17 @@ function SpeechesEditContent() {
                 text: t('common.confirm'),
                 style: 'destructive',
                 onPress: () => {
-                  if (speech2) {
-                    removeAssignment.mutate({ speechId: speech2.id });
-                    supabase
-                      .from('speeches')
-                      .update({ topic_title: '', topic_link: '', topic_collection: '' })
-                      .eq('id', speech2.id)
-                      .then();
-                  }
-                  updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
+                  void run();
                 },
               },
             ]
           );
           return;
         }
-        if (speech2) {
-          supabase
-            .from('speeches')
-            .update({ topic_title: '', topic_link: '', topic_collection: '' })
-            .eq('id', speech2.id)
-            .then();
-        }
-        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: false } });
-      } else {
-        updateAgenda.mutate({ sundayDate: date, updates: { has_second_speech: true } });
       }
+      void run();
     },
-    [speechesForDay, t, removeAssignment, updateAgenda, date]
+    [speechesForDay, t, removeAssignment, assignTopic, updateAgenda, date]
   );
 
   // Picker context for the open speaker/prayer selector.
@@ -299,6 +317,11 @@ function SpeechesEditContent() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {saveError && (
+          <Text testID="speeches-edit-error" style={[styles.saveError, { color: colors.error }]}>
+            {saveError}
+          </Text>
+        )}
         {speeches === undefined ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
@@ -412,6 +435,10 @@ const styles = StyleSheet.create({
   loading: {
     paddingVertical: 40,
     alignItems: 'center',
+  },
+  saveError: {
+    fontSize: 14,
+    marginVertical: 8,
   },
   emptyText: {
     fontSize: 15,

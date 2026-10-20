@@ -3,12 +3,13 @@
  * All operations are scoped by ward_id via RLS and AuthContext.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from './useClassifiedMutation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { logAction, buildLogDescription } from '../lib/activityLog';
 import { resolveContactSnapshot } from '../lib/contact';
-import { withOfflineQueue } from '../lib/offlineMutation';
+import { withOfflineQueue, createClientId } from '../lib/offlineMutation';
 import { speechKeys } from './useSpeeches';
 import type { Member, CreateMemberInput, UpdateMemberInput } from '../types/database';
 
@@ -120,33 +121,45 @@ export function useCreateMember() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (input: CreateMemberInput): Promise<Member> => {
-      const { data, error } = await supabase
-        .from('members')
-        .insert({
-          ward_id: wardId,
-          full_name: input.full_name,
-          informal_name: input.informal_name || input.full_name.split(' ')[0],
-          country_code: input.country_code,
-          phone: input.phone ?? null,
-          can_preside: input.can_preside ?? false,
-          can_conduct: input.can_conduct ?? false,
-          can_lead_music: input.can_lead_music ?? false,
-          can_play_piano: input.can_play_piano ?? false,
-          can_be_recognized: input.can_be_recognized ?? false,
-          contact_via_responsible: input.contact_via_responsible ?? false,
-          responsible_id: input.responsible_id ?? null,
-          calling: input.calling ?? null,
-        })
-        .select()
-        .single();
+  return useClassifiedMutation('useCreateMember', {
+    mutationFn: async (input: CreateMemberInput): Promise<Member | null> => {
+      // The row gets its id on the client (EST-03/EST-04): if the insert lands but the
+      // connection drops before the response, the queued replay upserts on this very id
+      // instead of creating a duplicate member. Joins update/delete, which already queue.
+      const row = {
+        id: createClientId(),
+        ward_id: wardId,
+        full_name: input.full_name,
+        informal_name: input.informal_name || input.full_name.split(' ')[0],
+        country_code: input.country_code,
+        phone: input.phone ?? null,
+        can_preside: input.can_preside ?? false,
+        can_conduct: input.can_conduct ?? false,
+        can_lead_music: input.can_lead_music ?? false,
+        can_play_piano: input.can_play_piano ?? false,
+        can_be_recognized: input.can_be_recognized ?? false,
+        contact_via_responsible: input.contact_via_responsible ?? false,
+        responsible_id: input.responsible_id ?? null,
+        calling: input.calling ?? null,
+      };
 
-      if (error) throw error;
-      return data;
+      return withOfflineQueue(
+        { table: 'members', operation: 'INSERT', data: row },
+        async () => {
+          const { data, error } = await supabase
+            .from('members')
+            .insert(row)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+      );
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: memberKeys.list(wardId) });
+      if (!data) return; // queued offline — logged when it lands
       if (user) {
         logAction(wardId, user.id, user.email ?? '', 'member:create', buildLogDescription('member:create', { nome: data.full_name }), userName);
       }
@@ -161,7 +174,7 @@ export function useUpdateMember() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useUpdateMember', {
     mutationFn: async (input: UpdateMemberInput): Promise<Member | null> => {
       const { id, ...fields } = input;
       return withOfflineQueue(
@@ -245,7 +258,7 @@ export function useDeleteMember() {
   const { wardId, user, userName } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useClassifiedMutation('useDeleteMember', {
     mutationFn: async ({ memberId, memberName }: { memberId: string; memberName: string }): Promise<string> => {
       await withOfflineQueue(
         { table: 'members', operation: 'DELETE', data: { id: memberId } },

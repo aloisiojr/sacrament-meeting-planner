@@ -6,7 +6,8 @@
  */
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useClassifiedMutation } from '../../../hooks/useClassifiedMutation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { logAction } from '../../../lib/activityLog';
@@ -64,7 +65,7 @@ export default function WhatsAppTemplateScreen() {
     enabled: !!wardId,
   });
 
-  const save = useMutation({
+  const save = useClassifiedMutation('settings.whatsappTemplateSave', {
     mutationFn: async ({ column, value }: { column: string; value: string | null; key: string }) => {
       const { error } = await supabase.from('wards').update({ [column]: value }).eq('id', wardId);
       if (error) throw error;

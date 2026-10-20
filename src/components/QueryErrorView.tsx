@@ -7,14 +7,15 @@ interface QueryErrorViewProps {
   error: Error | null;
   onRetry: () => void;
   message?: string;
+  testID?: string;
 }
 
-export function QueryErrorView({ error, onRetry, message }: QueryErrorViewProps) {
+export function QueryErrorView({ error, onRetry, message, testID }: QueryErrorViewProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View testID={testID} style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={styles.icon}>{'\u26A0'}</Text>
       <Text style={[styles.title, { color: colors.text }]}>
         {t('errors.queryFailed')}

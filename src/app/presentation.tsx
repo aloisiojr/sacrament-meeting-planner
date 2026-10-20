@@ -25,6 +25,7 @@ import {
 import { AccordionCard } from '../components/AccordionCard';
 import { SacramentPrayerModal } from '../components/SacramentPrayerModal';
 import { DesignationReadModal } from '../components/DesignationReadModal';
+import { QueryErrorView } from '../components/QueryErrorView';
 import { useWardName, useWardDesignationTemplates } from '../hooks/useWard';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
@@ -64,6 +65,9 @@ export default function PresentationScreen() {
     speeches,
     exception,
     isLoading,
+    isError,
+    error,
+    refetch,
     hymnLookup,
     members,
   } = usePresentationData(sundayDate);
@@ -143,11 +147,14 @@ export default function PresentationScreen() {
         </Pressable>
       </View>
 
-      {/* Content */}
+      {/* Content: loading, error and loaded are distinct — never conduct over '---'
+          on a failed backend (EST-06). */}
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : isError ? (
+        <QueryErrorView testID="presentation-query-error" error={error ?? null} onRetry={() => void refetch?.()} />
       ) : (
         <AccordionCard
           cards={accordionCards}

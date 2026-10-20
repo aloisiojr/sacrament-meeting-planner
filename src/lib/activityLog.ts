@@ -14,6 +14,7 @@
  */
 
 import { supabase } from './supabase';
+import { reportHealthEvent } from './appHealth';
 import type { TFunction } from 'i18next';
 
 // --- Structured Log Description ---
@@ -177,7 +178,9 @@ export async function logAction(
   userName?: string
 ): Promise<void> {
   try {
-    await supabase.from('activity_log').insert({
+    // EST-12: supabase-js resolves `{ error }` instead of throwing on a rejected insert.
+    // Discarding it left holes in the audit trail with no signal anywhere.
+    const { error } = await supabase.from('activity_log').insert({
       ward_id: wardId,
       user_id: userId,
       user_email: userEmail,
@@ -185,9 +188,12 @@ export async function logAction(
       action_type: actionType,
       description,
     });
+    if (error) throw error;
   } catch (err) {
-    // Non-fatal: log creation should never block the main operation
+    // Non-fatal: log creation should never block the main operation — but it is recorded
+    // server-side so a broken audit trail is visible instead of silently incomplete.
     console.error('Activity log error:', err);
+    void reportHealthEvent(wardId, 'activity_log_failed', {});
   }
 }
 

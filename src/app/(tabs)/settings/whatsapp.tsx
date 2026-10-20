@@ -99,6 +99,8 @@ export default function WhatsAppTemplateScreen() {
     });
     const base: TemplateTab[] = [speechTab(1), speechTab(2), speechTab(3)];
     return managePrayers ? [...base, prayerTab('opening'), prayerTab('closing')] : base;
+    // The tab builders are inline closures over the listed inputs; the helpers they
+    // call (getDefault*Template, toPlaceholders) are module-level and stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, ward, lang, managePrayers]);
 

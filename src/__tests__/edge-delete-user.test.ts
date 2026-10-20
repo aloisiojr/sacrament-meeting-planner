@@ -40,6 +40,11 @@ interface FakeState {
   tableDeletes: string[];
   deletedAuthUsers: string[];
   listUsersError: unknown;
+  /** Result of the `delete_ward_if_no_auth_users` RPC. */
+  rpcResult: { data: unknown; error: unknown };
+  rpcCalls: { fn: string; args: unknown }[];
+  /** Ordered log across auth deletes and rpc calls, for ordering assertions. */
+  sequence: string[];
 }
 
 const state: FakeState = {
@@ -52,6 +57,9 @@ const state: FakeState = {
   tableDeletes: [],
   deletedAuthUsers: [],
   listUsersError: null,
+  rpcResult: { data: false, error: null },
+  rpcCalls: [],
+  sequence: [],
 };
 
 function makeAdminClient() {
@@ -78,9 +86,15 @@ function makeAdminClient() {
         deleteUser: async (id: string) => {
           if (state.deleteUserError) return { error: state.deleteUserError };
           state.deletedAuthUsers.push(id);
+          state.sequence.push(`auth-delete:${id}`);
           return { error: null };
         },
       },
+    },
+    rpc: async (fn: string, args: unknown) => {
+      state.rpcCalls.push({ fn, args });
+      state.sequence.push(`rpc:${fn}`);
+      return state.rpcResult;
     },
     from: (table: string) => ({
       delete: () => ({
@@ -119,6 +133,9 @@ beforeEach(() => {
   state.listUsersError = null;
   state.tableDeletes = [];
   state.deletedAuthUsers = [];
+  state.rpcResult = { data: false, error: null };
+  state.rpcCalls = [];
+  state.sequence = [];
 });
 
 /** Invoke the handler and return `{ status, body }`. */
@@ -294,66 +311,53 @@ describe('delete-user — self-deletion is allowed to every role (ADR-061)', () 
     expect(state.deletedAuthUsers).toEqual(['me']);
   });
 
-  it('deletes only the push tokens when other members remain', async () => {
-    state.userPages = [[{ app_metadata: { ward_id: 'w1' } }, { app_metadata: { ward_id: 'w1' } }]];
-    await call({ targetUserId: 'me' });
+  it('keeps the ward when the atomic RPC says a member remains (concurrent delete)', async () => {
+    // CONF-07: the last-member decision is the RPC's (row lock + recount in one
+    // transaction), not a client-side count another delete can race past.
+    state.rpcResult = { data: false, error: null };
+    const res = await call({ targetUserId: 'me' });
 
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ success: true, wardDeleted: false });
     expect(state.tableDeletes).toContain('device_push_tokens:user_id=me');
     expect(state.tableDeletes.some((d) => d.startsWith('wards:'))).toBe(false);
+    expect(state.rpcCalls).toEqual([
+      { fn: 'delete_ward_if_no_auth_users', args: { p_ward_id: 'w1' } },
+    ]);
   });
 
-  it('deletes the ward when the caller is its last member', async () => {
-    state.userPages = [[{ app_metadata: { ward_id: 'w1' } }]];
-    await call({ targetUserId: 'me' });
+  it('deletes the auth user BEFORE asking the RPC to delete the ward', async () => {
+    state.rpcResult = { data: true, error: null };
+    const res = await call({ targetUserId: 'me' });
 
-    expect(state.tableDeletes).toContain('wards:id=w1');
-  });
-
-  it('does not count members of other wards towards "last member"', async () => {
-    // The check that stops an unrelated ward's user population from saving this ward from
-    // deletion — and, in the other direction, from causing an orphaned ward to survive.
-    state.userPages = [
-      [{ app_metadata: { ward_id: 'w1' } }, { app_metadata: { ward_id: 'OTHER' } }],
-    ];
-    await call({ targetUserId: 'me' });
-
-    expect(state.tableDeletes).toContain('wards:id=w1');
-  });
-
-  it('pages through more than 50 users before deciding (ADR-062)', async () => {
-    // A ward whose members sit on page 2 must not be judged "last member" from page 1 alone.
-    const full = Array.from({ length: 50 }, () => ({ app_metadata: { ward_id: 'OTHER' } }));
-    state.userPages = [
-      [...full.slice(0, 49), { app_metadata: { ward_id: 'w1' } }], // exactly 50 => keep paging
-      [{ app_metadata: { ward_id: 'w1' } }], // a second w1 member
-    ];
-    await call({ targetUserId: 'me' });
-
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ success: true, wardDeleted: true });
+    // The ward is never deleted directly by the edge function, and never before the
+    // auth user is gone — the old order cascaded the ward away first.
     expect(state.tableDeletes.some((d) => d.startsWith('wards:'))).toBe(false);
-    expect(state.tableDeletes).toContain('device_push_tokens:user_id=me');
+    expect(state.sequence).toEqual(['auth-delete:me', 'rpc:delete_ward_if_no_auth_users']);
   });
 
-  it('deletes the ward when page 2 confirms there is nobody else', async () => {
-    const full = Array.from({ length: 50 }, () => ({ app_metadata: { ward_id: 'OTHER' } }));
-    state.userPages = [
-      [...full.slice(0, 49), { app_metadata: { ward_id: 'w1' } }],
-      [{ app_metadata: { ward_id: 'OTHER' } }],
-    ];
-    await call({ targetUserId: 'me' });
-
-    expect(state.tableDeletes).toContain('wards:id=w1');
-  });
-
-  it('aborts without deleting anything when the member count cannot be established', async () => {
-    // Guessing here would either orphan a ward or destroy a populated one.
-    state.listUsersError = { message: 'rate limited' };
+  it('does not touch the ward at all when the auth delete fails (retryable)', async () => {
+    state.deleteUserError = { message: 'boom' };
     const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const res = await call({ targetUserId: 'me' });
     spy.mockRestore();
 
     expect(res.status).toBe(500);
-    expect(state.tableDeletes).toEqual([]);
-    expect(state.deletedAuthUsers).toEqual([]);
+    expect(state.rpcCalls).toEqual([]);
+    expect(state.tableDeletes.some((d) => d.startsWith('wards:'))).toBe(false);
+  });
+
+  it('reports a repairable pending ward cleanup when the RPC fails after the auth delete', async () => {
+    state.rpcResult = { data: null, error: { message: 'rpc down' } };
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await call({ targetUserId: 'me' });
+    spy.mockRestore();
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ success: true, wardDeleted: false, wardCleanup: 'pending' });
+    expect(state.deletedAuthUsers).toEqual(['me']);
   });
 
   it('reports a 500 when the auth delete fails, rather than claiming success', async () => {

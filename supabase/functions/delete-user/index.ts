@@ -1,6 +1,13 @@
 // Edge Function: delete-user
 // Hard deletes a user from Supabase Auth.
-// Self-deletion: any role allowed (ADR-061). Last-member detection via paginated listUsers (ADR-062).
+// Self-deletion: any role allowed (ADR-061). CONF-07 ordering: push tokens → AUTH USER
+// FIRST → the ward is deleted only by the atomic `delete_ward_if_no_auth_users` RPC
+// (migration 060), which locks the ward row and recounts its auth users in one
+// transaction — so concurrent deletes can never delete a ward with a member left,
+// and the ward never disappears while its last auth user is still alive. If that RPC
+// fails after the auth delete, the leftover ward has zero users and is repairable
+// (register-first-user reuses such orphans; the RPC can be re-run) — reported as
+// `wardCleanup: 'pending'` instead of pretending or failing the whole deletion.
 // Non-self deletion: requires Bishopric role (settings:users permission).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -70,30 +77,12 @@ Deno.serve(async (req) => {
 
     if (input.targetUserId === caller.id) {
       // Self-deletion: any role allowed (ADR-061)
-      // Count ward members using paginated listUsers (ADR-062)
-      let wardMemberCount = 0;
-      let page = 1;
-      while (true) {
-        const { data: { users: pageUsers }, error } =
-          await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
-        if (error) throw error;
-        wardMemberCount += pageUsers.filter(
-          (u: any) => u.app_metadata?.ward_id === wardId
-        ).length;
-        if (pageUsers.length < 50) break;
-        page++;
-      }
+      // 1) Push tokens for this user.
+      await supabaseAdmin.from('device_push_tokens').delete()
+        .eq('user_id', caller.id);
 
-      if (wardMemberCount === 1) {
-        // Last member: delete ward (CASCADE clears all data)
-        await supabaseAdmin.from('wards').delete().eq('id', wardId);
-      } else {
-        // Not last member: delete push tokens only
-        await supabaseAdmin.from('device_push_tokens').delete()
-          .eq('user_id', caller.id);
-      }
-
-      // Delete auth user
+      // 2) Auth user FIRST. If this fails, nothing destructive has happened to the
+      //    ward and the whole operation can simply be retried.
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(caller.id);
       if (deleteError) {
         console.error('Self-deletion error:', deleteError);
@@ -103,8 +92,33 @@ Deno.serve(async (req) => {
         );
       }
 
+      // 3) Ward last: the RPC re-checks, atomically and under the ward row lock, that
+      //    no auth user remains in the ward before deleting it (CASCADE).
+      const { data: wardDeleted, error: rpcError } = await supabaseAdmin.rpc(
+        'delete_ward_if_no_auth_users',
+        { p_ward_id: wardId }
+      );
+      if (rpcError) {
+        // Repairable intermediate state (documented in the header): the auth user is
+        // gone and the ward is an empty orphan — never a deleted ward with live users.
+        console.error('Ward cleanup pending after self-deletion:', rpcError);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deletedUserId: caller.id,
+            wardDeleted: false,
+            wardCleanup: 'pending',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ success: true, deletedUserId: caller.id }),
+        JSON.stringify({
+          success: true,
+          deletedUserId: caller.id,
+          wardDeleted: wardDeleted === true,
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {

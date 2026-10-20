@@ -11,6 +11,7 @@ import {
   StyleSheet,
   type TextInputProps,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { XIcon } from './icons';
 
@@ -21,6 +22,7 @@ export interface SearchInputProps extends Omit<TextInputProps, 'value' | 'onChan
 
 export function SearchInput({ value, onChangeText, style, ...rest }: SearchInputProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
@@ -46,7 +48,7 @@ export function SearchInput({ value, onChangeText, style, ...rest }: SearchInput
           style={styles.clearButton}
           onPress={() => onChangeText('')}
           hitSlop={8}
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('a11y.clearSearch')}
           accessibilityRole="button"
         >
           <XIcon size={18} color={colors.textSecondary} />

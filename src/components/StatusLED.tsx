@@ -3,12 +3,9 @@
  * 5 states with flat solid color and fading animation for assigned_not_invited.
  * Supports reduced motion accessibility preference.
  *
- * States:
- * - not_assigned: gray (#9CA3AF)
- * - assigned_not_invited: orange (#F97316) with ~2s fading animation
- * - assigned_invited: yellow (#EAB308) solid
- * - assigned_confirmed: green (#22C55E) solid
- * - gave_up: dark wine (#7F1D1D) solid
+ * States (colors come from the theme's `status` tokens — single source of truth):
+ * - not_assigned / assigned_not_invited (fading ~2s) / assigned_invited /
+ *   assigned_confirmed / gave_up
  */
 
 import React, { useEffect, useState } from 'react';
@@ -27,6 +24,7 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import type { SpeechStatus } from '../types/database';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -43,16 +41,6 @@ export interface StatusLEDProps {
   disabled?: boolean;
 }
 
-// --- Color Map ---
-
-const STATUS_COLORS: Record<SpeechStatus, string> = {
-  not_assigned: '#9CA3AF',
-  assigned_not_invited: '#F97316',
-  assigned_invited: '#EAB308',
-  assigned_confirmed: '#22C55E',
-  gave_up: '#7F1D1D',
-};
-
 // --- Component ---
 
 export function StatusLED({
@@ -62,7 +50,8 @@ export function StatusLED({
   disabled = false,
 }: StatusLEDProps) {
   const { colors } = useTheme();
-  const dotColor = colors.status?.[status] ?? STATUS_COLORS[status];
+  const { t } = useTranslation();
+  const dotColor = colors.status[status];
   const fadeOpacity = useSharedValue(1);
   // State (not a ref) so the animation effect re-runs once the async check resolves — a ref
   // read at mount was still false and the animation played even with reduce-motion enabled.
@@ -109,14 +98,6 @@ export function StatusLED({
     opacity: fadeOpacity.value,
   }));
 
-  const statusLabels: Record<SpeechStatus, string> = {
-    not_assigned: 'Not assigned',
-    assigned_not_invited: 'Assigned, not invited',
-    assigned_invited: 'Assigned, invited',
-    assigned_confirmed: 'Assigned, confirmed',
-    gave_up: 'Gave up',
-  };
-
   const content = (
     <Animated.View
       style={[
@@ -137,9 +118,9 @@ export function StatusLED({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={statusLabels[status]}
-        accessibilityHint="Change speech status"
-        hitSlop={8}
+        accessibilityLabel={t(`speechStatus.${status}`)}
+        accessibilityHint={t('a11y.changeSpeechStatus')}
+        hitSlop={Math.max(0, Math.ceil((44 - size) / 2))}
       >
         {content}
       </Pressable>
@@ -149,7 +130,7 @@ export function StatusLED({
   return (
     <View
       accessibilityRole="image"
-      accessibilityLabel={statusLabels[status]}
+      accessibilityLabel={t(`speechStatus.${status}`)}
     >
       {content}
     </View>

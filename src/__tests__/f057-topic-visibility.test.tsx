@@ -27,6 +27,10 @@ jest.mock('../contexts/ThemeContext', () => ({
       error: '#f00', errorContainer: '#300', surfaceVariant: '#222', divider: '#333',
       inputBackground: '#111', inputBorder: '#222', placeholder: '#555',
       primaryContainer: '#013', success: '#0a0', warning: '#fa0',
+      status: {
+        not_assigned: '#6B7280', assigned_not_invited: '#C2410C',
+        assigned_invited: '#A16207', assigned_confirmed: '#15803D', gave_up: '#7F1D1D',
+      },
     },
   }),
 }));

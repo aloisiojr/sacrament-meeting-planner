@@ -381,7 +381,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(0)?.speaker_name || t('agenda.openingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}
@@ -644,7 +644,7 @@ export const AgendaForm = React.memo(function AgendaForm({ sundayDate, exception
               {getSpeech(4)?.speaker_name || t('agenda.closingPrayer')}
             </Text>
             {!isObserver && (
-              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn}>
+              <Pressable hitSlop={12} onPress={() => router.push({ pathname: '/speeches/[date]', params: { date: sundayDate } })} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
                 <PencilIcon size={16} color={colors.textSecondary} />
               </Pressable>
             )}
@@ -776,6 +776,7 @@ function SelectorField({
   testID?: string;
   onFieldFocus?: (touchY: number) => void;
 }) {
+  const { t } = useTranslation();
   const viewRef = useRef<View>(null);
 
   const handlePress = useCallback(() => {
@@ -805,7 +806,7 @@ function SelectorField({
         {value || placeholder}
       </Text>
       {onClear && hasValue && (
-        <Pressable hitSlop={8} onPress={onClear}>
+        <Pressable hitSlop={8} onPress={onClear} accessibilityRole="button" accessibilityLabel={t('a11y.clearField')}>
           <XIcon size={18} color={colors.textSecondary} />
         </Pressable>
       )}
@@ -826,6 +827,7 @@ function ReadOnlySpeakerRow({
   colors: ThemeColors;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <FieldRow label={label} colors={colors}>
       <View style={[styles.speakerReadRow, { borderColor: colors.border }, disabled && { backgroundColor: colors.surfaceVariant, opacity: 0.5 }]}>
@@ -840,7 +842,7 @@ function ReadOnlySpeakerRow({
           {speakerName || label}
         </Text>
         {!disabled && (
-          <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn}>
+          <Pressable hitSlop={12} onPress={onNavigate} style={styles.speakerIconBtn} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
             <PencilIcon size={16} color={colors.textSecondary} />
           </Pressable>
         )}

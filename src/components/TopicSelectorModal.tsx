@@ -257,7 +257,7 @@ export function TopicSelectorModal({ visible, onSelect, onClose }: TopicSelector
                     </Text>
                   </Pressable>
                   {isWard && canManage && (
-                    <Pressable hitSlop={8} onPress={() => startEdit(item)} testID={`topic-edit-${item.id}`}>
+                    <Pressable hitSlop={8} onPress={() => startEdit(item)} testID={`topic-edit-${item.id}`} accessibilityRole="button" accessibilityLabel={t('common.edit')}>
                       <PencilIcon size={18} color={colors.textSecondary} />
                     </Pressable>
                   )}

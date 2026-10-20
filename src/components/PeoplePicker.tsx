@@ -360,6 +360,8 @@ export function PeoplePicker({
                 testID={`people-picker-edit-${item.id}`}
                 hitSlop={12}
                 onPress={() => openEditor(item)}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.edit')}
               >
                 <PencilIcon size={18} color={colors.textSecondary} />
               </Pressable>

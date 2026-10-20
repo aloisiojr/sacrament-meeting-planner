@@ -87,6 +87,8 @@ export function DesignationListField({
             hitSlop={6}
             testID={`designation-remove-${idx}`}
             onPress={() => onRemove(idx)}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.delete')}
           >
             <XIcon size={18} color={colors.textSecondary} />
           </Pressable>

@@ -15,6 +15,13 @@ jest.mock('../contexts/ThemeContext', () => ({ useTheme: () => ({ colors: { card
 jest.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ wardId: 'w1', hasPermission: () => mockState.canManage }) }));
 jest.mock('../hooks/useMembers', () => ({ useMembers: () => ({ data: mockState.members, isSuccess: true }) }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPushMock }) }));
+const mockHealthEvents: unknown[][] = [];
+jest.mock('../lib/appHealth', () => ({
+  reportHealthEvent: (...args: unknown[]) => {
+    mockHealthEvents.push(args);
+    return Promise.resolve();
+  },
+}));
 // Getter: babel-jest hoists this factory above `const mockAsyncStore`, and it runs while the
 // component module is being imported — an eager read would capture undefined.
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -40,6 +47,7 @@ beforeEach(() => {
   mockPushMock.mockClear();
   mockAsyncStore.getItem.mockClear().mockResolvedValue(null);
   mockAsyncStore.setItem.mockClear().mockResolvedValue(undefined);
+  mockHealthEvents.length = 0;
 });
 
 describe('HomeMemberImportPrompt (AC14)', () => {
@@ -71,6 +79,15 @@ describe('HomeMemberImportPrompt (AC14)', () => {
     await fireEvent.press(screen.getByTestId('home-import-prompt-dismiss'));
     expect(find(r, 'home-import-prompt')).toHaveLength(0);
     expect(mockAsyncStore.setItem).toHaveBeenCalledWith('pdf-import-prompt-dismissed:w1', '1');
+  });
+
+  it('reports a health event when persisting the dismissal fails (EST-22)', async () => {
+    mockAsyncStore.setItem.mockRejectedValueOnce(new Error('storage full'));
+    const r = await render();
+    await fireEvent.press(screen.getByTestId('home-import-prompt-dismiss'));
+    await act(async () => { await Promise.resolve(); });
+    expect(find(r, 'home-import-prompt')).toHaveLength(0); // still hides for this session
+    expect(mockHealthEvents).toContainEqual(['w1', 'home_import_prompt_dismiss_failed', {}]);
   });
 
   it('import navigates to the members screen', async () => {

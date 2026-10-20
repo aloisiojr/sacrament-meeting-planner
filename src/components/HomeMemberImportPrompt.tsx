@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useMembers } from '../hooks/useMembers';
+import { reportHealthEvent } from '../lib/appHealth';
 import { XIcon } from './icons';
 
 const dismissKey = (wardId: string) => `pdf-import-prompt-dismissed:${wardId}`;
@@ -24,6 +25,9 @@ export function HomeMemberImportPrompt() {
   const [dismissed, setDismissed] = useState<boolean | null>(null); // null = loading
 
   useEffect(() => {
+    // EST-22: without a ward (auth/profile still loading) there is no per-ward key to
+    // read — stay in the "loading" state and render nothing instead of guessing.
+    if (!wardId) return;
     let cancelled = false;
     AsyncStorage.getItem(dismissKey(wardId))
       .then((v) => !cancelled && setDismissed(v === '1'))
@@ -39,7 +43,11 @@ export function HomeMemberImportPrompt() {
 
   const dismiss = () => {
     setDismissed(true);
-    AsyncStorage.setItem(dismissKey(wardId), '1').catch(() => {});
+    // EST-22: was the codebase's only empty `.catch(() => {})`. A failed persist means
+    // the card reappears next launch — invisible unless recorded.
+    AsyncStorage.setItem(dismissKey(wardId), '1').catch(() => {
+      void reportHealthEvent(wardId, 'home_import_prompt_dismiss_failed', {});
+    });
   };
 
   return (

@@ -19,6 +19,12 @@ import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 
 import type { LcrRawPage } from '../lib/lcrPdfPage';
+import {
+  EXTRACTION_TIMEOUT_MS,
+  PDF_TIMEOUT,
+  PDF_TOO_LARGE,
+  isBase64TooLarge,
+} from '../lib/pdfExtraction';
 
 export interface PdfTextExtractorProps {
   /** Base64 of the picked PDF. */
@@ -44,7 +50,6 @@ export const BOOTSTRAP = `
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
       const OPS = pdfjsLib.OPS;
       const round = (n) => Math.round(n * 100) / 100;
-      const pages = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         // Text fragments. Keep the advance width and glyph size: pdf.js emits accents (ç/ã/é) as
@@ -119,9 +124,14 @@ export const BOOTSTRAP = `
           }
         }
         const view = page.getViewport({ scale: 1 });
-        pages.push({ width: view.width, height: view.height, items, segments, rects });
+        // One message per page, not one giant postMessage at the end: a ward-sized PDF
+        // would otherwise cross the bridge as a single multi-hundred-KB string.
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'page', index: p - 1,
+          page: { width: view.width, height: view.height, items, segments, rects },
+        }));
       }
-      window.ReactNativeWebView.postMessage(JSON.stringify({ ok: true, pages: pages }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'done', ok: true, numPages: doc.numPages }));
     } catch (e) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ ok: false, error: String((e && e.message) || e) }));
     }
@@ -142,19 +152,63 @@ async function loadPdfJsBase64(): Promise<{ lib: string; worker: string }> {
   return { lib, worker };
 }
 
+// Module-level cache: lib+worker (≈2,4 MB em base64) are read ONCE per process, not per mount.
+// A failure clears the cache so a retry can try reading again.
+let assetsPromise: Promise<{ lib: string; worker: string }> | null = null;
+function loadPdfJsAssets(): Promise<{ lib: string; worker: string }> {
+  if (!assetsPromise) {
+    assetsPromise = loadPdfJsBase64().catch((e) => {
+      assetsPromise = null;
+      throw e;
+    });
+  }
+  return assetsPromise;
+}
+
 export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractorProps) {
   const ref = useRef<WebView>(null);
   const [assets, setAssets] = useState<{ lib: string; worker: string } | null>(null);
+  // Stable callbacks: parents pass inline closures, so the latest callback lives in a ref and
+  // the extraction effect depends only on `base64` — a parent re-render never restarts it.
+  const onResultRef = useRef(onResult);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onResultRef.current = onResult;
+    onErrorRef.current = onError;
+  }, [onResult, onError]);
+  const settledRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pagesRef = useRef<(LcrRawPage | undefined)[]>([]);
+
+  const tooLarge = isBase64TooLarge(base64);
 
   useEffect(() => {
+    settledRef.current = false;
+    pagesRef.current = [];
+    if (tooLarge) {
+      settledRef.current = true;
+      onErrorRef.current(PDF_TOO_LARGE);
+      return;
+    }
+    timerRef.current = setTimeout(() => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      onErrorRef.current(PDF_TIMEOUT);
+    }, EXTRACTION_TIMEOUT_MS);
     let cancelled = false;
-    loadPdfJsBase64()
+    loadPdfJsAssets()
       .then((a) => !cancelled && setAssets(a))
-      .catch((e) => !cancelled && onError(String(e?.message ?? e)));
+      .catch((e) => {
+        if (cancelled || settledRef.current) return;
+        settledRef.current = true;
+        if (timerRef.current) clearTimeout(timerRef.current);
+        onErrorRef.current(String(e?.message ?? e));
+      });
     return () => {
       cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [onError]);
+  }, [base64, tooLarge]);
 
   const html = useMemo(() => {
     if (!assets) return null;
@@ -165,8 +219,24 @@ export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractor
     </script></body></html>`;
   }, [assets]);
 
+  const settleError = (message: string) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onErrorRef.current(message);
+  };
+
   const handleMessage = (event: WebViewMessageEvent) => {
-    let msg: { ready?: boolean; ok?: boolean; pages?: LcrRawPage[]; error?: string };
+    if (settledRef.current) return; // late message after timeout/error: ignore
+    let msg: {
+      ready?: boolean;
+      ok?: boolean;
+      type?: string;
+      index?: number;
+      page?: LcrRawPage;
+      numPages?: number;
+      error?: string;
+    };
     try {
       msg = JSON.parse(event.nativeEvent.data);
     } catch {
@@ -175,14 +245,24 @@ export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractor
     if (msg.ready) {
       // Inject the (in-memory) PDF and run extraction. JSON.stringify escapes the base64 safely.
       ref.current?.injectJavaScript(`window.__runPdf(${JSON.stringify(base64)}); true;`);
-    } else if (msg.ok) {
-      onResult(msg.pages ?? []);
+    } else if (msg.type === 'page' && typeof msg.index === 'number' && msg.page) {
+      pagesRef.current[msg.index] = msg.page;
+    } else if (msg.type === 'done') {
+      const expected = msg.numPages ?? pagesRef.current.length;
+      const pages = pagesRef.current.slice(0, expected);
+      if (pages.length < expected || pages.some((p) => !p)) {
+        settleError('PDF extraction failed');
+        return;
+      }
+      settledRef.current = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      onResultRef.current(pages as LcrRawPage[]);
     } else if (msg.ok === false) {
-      onError(msg.error ?? 'PDF extraction failed');
+      settleError(msg.error ?? 'PDF extraction failed');
     }
   };
 
-  if (!html) return null;
+  if (tooLarge || !html) return null;
   return (
     <WebView
       ref={ref}
@@ -190,7 +270,7 @@ export function PdfTextExtractor({ base64, onResult, onError }: PdfTextExtractor
       originWhitelist={['*']}
       javaScriptEnabled
       onMessage={handleMessage}
-      onError={() => onError('WebView failed to load')}
+      onError={() => settleError('WebView failed to load')}
       // Hidden, off-screen: it only runs the extraction, never shown.
       style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
     />

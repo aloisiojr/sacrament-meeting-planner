@@ -21,6 +21,7 @@ import { repairPhones } from '../lib/lcrPhoneRepair';
 import { buildMergePlan, type MergePlan, type ParsedMember } from '../lib/memberMergePlan';
 import { normalizeName } from '../lib/csvUtils';
 import { PdfTextExtractor } from './PdfTextExtractor';
+import { PDF_TIMEOUT, PDF_TOO_LARGE } from '../lib/pdfExtraction';
 import { PdfImportReview, type BlankPhoneEntry } from './PdfImportReview';
 
 export interface PdfImportModalProps {
@@ -39,6 +40,8 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
   const apply = useApplyMemberImport();
 
   const [step, setStep] = useState<'extracting' | 'review'>('extracting');
+  const [extractError, setExtractError] = useState<'too-large' | 'timeout' | 'failed' | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [plan, setPlan] = useState<MergePlan | null>(null);
   const [blanks, setBlanks] = useState<BlankPhoneEntry[]>([]);
   const [countWarning, setCountWarning] = useState<{ expected: number; parsed: number } | null>(null);
@@ -52,6 +55,8 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
     setLastOpened(openKey);
     if (openKey) {
       setStep('extracting');
+      setExtractError(null);
+      setAttempt(0);
       setPlan(null);
       setBlanks([]);
       setCountWarning(null);
@@ -108,17 +113,43 @@ export function PdfImportModal({ visible, base64, countryCode, areaCode, onClose
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {step === 'extracting' && (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.extracting')}</Text>
-            {visible && base64 && (
-              <PdfTextExtractor
-                base64={base64}
-                onResult={onExtracted}
-                onError={() => {
-                  Alert.alert(t('common.error'), t('pdfImport.extractFailed'));
-                  onClose();
-                }}
-              />
+            {extractError ? (
+              <>
+                <Text style={[styles.hint, { color: colors.error }]} testID="pdf-extract-error">
+                  {extractError === 'too-large'
+                    ? t('pdfImport.tooLarge')
+                    : extractError === 'timeout'
+                      ? t('pdfImport.extractTimeout')
+                      : t('pdfImport.extractFailed')}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setExtractError(null);
+                    setAttempt((a) => a + 1);
+                  }}
+                  style={styles.cancel}
+                  testID="pdf-extract-retry"
+                >
+                  <Text style={{ color: colors.primary, fontWeight: '700' }}>{t('common.retry')}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.extracting')}</Text>
+                {visible && base64 && (
+                  <PdfTextExtractor
+                    key={attempt}
+                    base64={base64}
+                    onResult={onExtracted}
+                    onError={(message) => {
+                      setExtractError(
+                        message === PDF_TOO_LARGE ? 'too-large' : message === PDF_TIMEOUT ? 'timeout' : 'failed'
+                      );
+                    }}
+                  />
+                )}
+              </>
             )}
             <Pressable onPress={onClose} style={styles.cancel} testID="pdf-extract-cancel">
               <Text style={{ color: colors.textSecondary }}>{t('common.cancel')}</Text>

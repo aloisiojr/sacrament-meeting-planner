@@ -10,8 +10,8 @@
  * first step) + Próximo → Concluir (right), kept clear of the device's rounded corners. Only the
  * name list scrolls — the step header + master toggle stay fixed. Empty steps are skipped.
  */
-import React, { useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, TextInput, FlatList, StyleSheet, Alert } from 'react-native';
 import { AppSwitch } from './AppSwitch';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -45,6 +45,96 @@ interface ManualEntry {
 }
 
 const digits = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '');
+
+// RAP-07: memoized rows with primitive props + stable callbacks — toggling one row of a
+// ward-sized list must not re-render the others.
+interface BlankRowProps {
+  index: number;
+  name: string;
+  savedPhone: string | null;
+  editLabel: string;
+  textColor: string;
+  secondaryColor: string;
+  dividerColor: string;
+  primaryColor: string;
+  onEdit: (name: string) => void;
+}
+const BlankRow = React.memo(function BlankRow(p: BlankRowProps) {
+  return (
+    <View style={[styles.row, { borderBottomColor: p.dividerColor }]}>
+      <Text style={[styles.name, { color: p.textColor }]} numberOfLines={1}>{p.name}</Text>
+      {p.savedPhone && (
+        <Text style={[styles.savedPhone, { color: p.secondaryColor }]} numberOfLines={1}>
+          {p.savedPhone}
+        </Text>
+      )}
+      <Pressable
+        onPress={() => p.onEdit(p.name)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={p.editLabel}
+        testID={`pdf-blank-edit-${p.index}`}
+      >
+        <PencilIcon size={18} color={p.primaryColor} />
+      </Pressable>
+    </View>
+  );
+});
+
+interface ConflictRowProps {
+  memberId: string;
+  name: string;
+  pdfPhone: string;
+  appPhone: string;
+  value: boolean;
+  textColor: string;
+  secondaryColor: string;
+  primaryColor: string;
+  onToggle: (memberId: string, v: boolean) => void;
+}
+const ConflictRow = React.memo(function ConflictRow(p: ConflictRowProps) {
+  return (
+    <View style={styles.conflict}>
+      <Text style={[styles.name, { color: p.textColor }]} numberOfLines={1}>{p.name}</Text>
+      <View style={styles.conflictRow}>
+        <Text style={[styles.phoneText, { color: p.secondaryColor }]} numberOfLines={1}>{p.pdfPhone}</Text>
+        <AppSwitch
+          testID={`pdf-conflict-toggle-${p.memberId}`}
+          accessibilityLabel={p.name}
+          value={p.value}
+          onValueChange={(v) => p.onToggle(p.memberId, v)}
+          trackColor={{ false: p.primaryColor, true: p.primaryColor }}
+          ios_backgroundColor={p.primaryColor}
+        />
+        <Text style={[styles.phoneText, { color: p.textColor, textAlign: 'right' }]} numberOfLines={1}>+{p.appPhone}</Text>
+      </View>
+    </View>
+  );
+});
+
+interface RemovalRowProps {
+  memberId: string;
+  name: string;
+  value: boolean;
+  textColor: string;
+  dividerColor: string;
+  errorColor: string;
+  onToggle: (memberId: string, v: boolean) => void;
+}
+const RemovalRow = React.memo(function RemovalRow(p: RemovalRowProps) {
+  return (
+    <View style={[styles.row, { borderBottomColor: p.dividerColor }]}>
+      <Text style={[styles.name, { color: p.textColor, flex: 1 }]} numberOfLines={1}>{p.name}</Text>
+      <AppSwitch
+        testID={`pdf-remove-${p.memberId}`}
+        accessibilityLabel={p.name}
+        value={p.value}
+        onValueChange={(v) => p.onToggle(p.memberId, v)}
+        trackColor={{ true: p.errorColor }}
+      />
+    </View>
+  );
+});
 
 export function PdfImportReview({
   plan,
@@ -115,12 +205,27 @@ export function PdfImportReview({
     ]);
   };
 
-  const openEditor = (name: string) => {
-    const e = manualEntry[name];
-    setDraftCc(e?.cc ?? countryCode);
-    setDraftPhone(e?.phone ?? areaCode);
-    setEditingName(name);
-  };
+  const manualEntryRef = useRef(manualEntry);
+  useEffect(() => {
+    manualEntryRef.current = manualEntry;
+  }, [manualEntry]);
+  const openEditor = useCallback(
+    (name: string) => {
+      const e = manualEntryRef.current[name];
+      setDraftCc(e?.cc ?? countryCode);
+      setDraftPhone(e?.phone ?? areaCode);
+      setEditingName(name);
+    },
+    [countryCode, areaCode]
+  );
+  const toggleConflict = useCallback(
+    (memberId: string, v: boolean) => setUseApp((s) => ({ ...s, [memberId]: v })),
+    []
+  );
+  const toggleRemoval = useCallback(
+    (memberId: string, v: boolean) => setToRemove((s) => ({ ...s, [memberId]: v })),
+    []
+  );
   const saveEditor = () => {
     if (editingName) setManualEntry((s) => ({ ...s, [editingName]: { cc: draftCc, phone: draftPhone } }));
     setEditingName(null);
@@ -130,6 +235,54 @@ export function PdfImportReview({
   const allRemove = plan.absentInDb.length > 0 && plan.absentInDb.every((m) => toRemove[m.id]);
   const setAllApp = (v: boolean) => setUseApp(Object.fromEntries(plan.phoneConflicts.map((c) => [c.member.id, v])));
   const setAllRemove = (v: boolean) => setToRemove(Object.fromEntries(plan.absentInDb.map((m) => [m.id, v])));
+
+  const renderBlank = useCallback(
+    ({ item, index }: { item: BlankPhoneEntry; index: number }) => (
+      <BlankRow
+        index={index}
+        name={item.name}
+        savedPhone={manualFull(item.name) ? manualEntry[item.name].phone : null}
+        editLabel={`${t('common.edit')} ${item.name}`}
+        textColor={colors.text}
+        secondaryColor={colors.textSecondary}
+        dividerColor={colors.divider}
+        primaryColor={colors.primary}
+        onEdit={openEditor}
+      />
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- manualFull reads manualEntry; listing it keeps saved phones fresh
+    [manualEntry, colors, openEditor, t]
+  );
+  const renderConflict = useCallback(
+    ({ item }: { item: MergePlan['phoneConflicts'][number] }) => (
+      <ConflictRow
+        memberId={item.member.id}
+        name={item.member.full_name}
+        pdfPhone={item.pdfPhone}
+        appPhone={item.appPhone}
+        value={useApp[item.member.id] !== false}
+        textColor={colors.text}
+        secondaryColor={colors.textSecondary}
+        primaryColor={colors.primary}
+        onToggle={toggleConflict}
+      />
+    ),
+    [useApp, colors, toggleConflict]
+  );
+  const renderRemoval = useCallback(
+    ({ item }: { item: MergePlan['absentInDb'][number] }) => (
+      <RemovalRow
+        memberId={item.id}
+        name={item.full_name}
+        value={!!toRemove[item.id]}
+        textColor={colors.text}
+        dividerColor={colors.divider}
+        errorColor={colors.error}
+        onToggle={toggleRemoval}
+      />
+    ),
+    [toRemove, colors, toggleRemoval]
+  );
 
   return (
     <View style={styles.container}>
@@ -206,67 +359,43 @@ export function PdfImportReview({
         </View>
       )}
 
-      {/* Scrollable name list (only this scrolls). */}
+      {/* Virtualized name list (only this scrolls). RAP-07: FlatList + memoized rows. */}
       <KeyboardAvoider testID="pdf-import-review-keyboard-avoider">
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {!current && (
+        {!current && (
+          <View style={styles.body}>
             <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('pdfImport.nothingToReview')}</Text>
-          )}
-
-          {current === 'blanks' &&
-            blanks.map((b, i) => (
-              <View key={`b-${i}`} style={[styles.row, { borderBottomColor: colors.divider }]}>
-                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{b.name}</Text>
-                {manualFull(b.name) && (
-                  <Text style={[styles.savedPhone, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {manualEntry[b.name].phone}
-                  </Text>
-                )}
-                <Pressable
-                  onPress={() => openEditor(b.name)}
-                  hitSlop={12}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${t('common.edit')} ${b.name}`}
-                  testID={`pdf-blank-edit-${i}`}
-                >
-                  <PencilIcon size={18} color={colors.primary} />
-                </Pressable>
-              </View>
-            ))}
-
-          {current === 'conflicts' &&
-            plan.phoneConflicts.map((c) => (
-              <View key={c.member.id} style={styles.conflict}>
-                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{c.member.full_name}</Text>
-                <View style={styles.conflictRow}>
-                  <Text style={[styles.phoneText, { color: colors.textSecondary }]} numberOfLines={1}>{c.pdfPhone}</Text>
-                  <AppSwitch
-                    testID={`pdf-conflict-toggle-${c.member.id}`}
-                    accessibilityLabel={c.member.full_name}
-                    value={useApp[c.member.id] !== false}
-                    onValueChange={(v) => setUseApp((s) => ({ ...s, [c.member.id]: v }))}
-                    trackColor={{ false: colors.primary, true: colors.primary }}
-                    ios_backgroundColor={colors.primary}
-                  />
-                  <Text style={[styles.phoneText, { color: colors.text, textAlign: 'right' }]} numberOfLines={1}>+{c.appPhone}</Text>
-                </View>
-              </View>
-            ))}
-
-          {current === 'removals' &&
-            plan.absentInDb.map((m) => (
-              <View key={m.id} style={[styles.row, { borderBottomColor: colors.divider }]}>
-                <Text style={[styles.name, { color: colors.text, flex: 1 }]} numberOfLines={1}>{m.full_name}</Text>
-                <AppSwitch
-                  testID={`pdf-remove-${m.id}`}
-                  accessibilityLabel={m.full_name}
-                  value={!!toRemove[m.id]}
-                  onValueChange={(v) => setToRemove((s) => ({ ...s, [m.id]: v }))}
-                  trackColor={{ true: colors.error }}
-                />
-              </View>
-            ))}
-        </ScrollView>
+          </View>
+        )}
+        {current === 'blanks' && (
+          <FlatList
+            style={styles.scroll}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+            data={blanks}
+            keyExtractor={(b, i) => `b-${i}`}
+            renderItem={renderBlank}
+          />
+        )}
+        {current === 'conflicts' && (
+          <FlatList
+            style={styles.scroll}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+            data={plan.phoneConflicts}
+            keyExtractor={(c) => c.member.id}
+            renderItem={renderConflict}
+          />
+        )}
+        {current === 'removals' && (
+          <FlatList
+            style={styles.scroll}
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+            data={plan.absentInDb}
+            keyExtractor={(m) => m.id}
+            renderItem={renderRemoval}
+          />
+        )}
       </KeyboardAvoider>
 
       {/* Bottom bar: Voltar (left, disabled on the first step) + Próximo/Concluir (right). */}

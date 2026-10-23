@@ -6,6 +6,8 @@
  *   - assets/favicon.png     192×192 (web favicon; was the 1.7 MB 1024px source)
  *   - assets/favicon-48.png   48×48
  * and recompresses (same pixels, same dimensions, max deflate):
+ *   - assets/icon.png (the source itself — it was skipping this step and
+ *     carried ~460 KB of slack the derivatives did not have),
  *   - assets/adaptive-icon.png, assets/splash-icon.png
  *
  * Store art is NOT derived here and does not belong in `assets/`:
@@ -58,7 +60,7 @@ console.log(`${SOURCE} (fonte única): ${source.width}x${source.height}`);
 writePng('assets/favicon.png', resizeBilinear(source, 192, 192));
 writePng('assets/favicon-48.png', resizeBilinear(source, 48, 48));
 
-for (const path of ['assets/adaptive-icon.png', 'assets/splash-icon.png']) {
+for (const path of ['assets/icon.png', 'assets/adaptive-icon.png', 'assets/splash-icon.png']) {
   const png = PNG.sync.read(readFileSync(path));
   writePng(path, png); // mesmos pixels, compressão melhor
 }

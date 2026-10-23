@@ -12,7 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHymns, useSacramentalHymns, formatHymnDisplay } from './useHymns';
 import { useMembers } from './useMembers';
-import { useWardName } from './useWard';
+import { useWardName, useWardInfo } from './useWard';
 import { buildPresentationCards } from './usePresentationMode';
 import { exportAgendaPdf } from '../lib/exportAgendaPdf';
 import { formatDateHumanReadable } from '../lib/dateUtils';
@@ -33,6 +33,7 @@ export function useAgendaPdfExport() {
   const { data: sacramentalHymns } = useSacramentalHymns(locale);
   const { data: members } = useMembers();
   const wardName = useWardName();
+  const { data: wardInfo } = useWardInfo();
   const [isExporting, setIsExporting] = useState(false);
 
   // buildPresentationCards takes a (key, fallback) function; i18next's own t has a wider,
@@ -61,7 +62,8 @@ export function useAgendaPdfExport() {
           exception,
           hymnLookup,
           tFn,
-          members ?? []
+          members ?? [],
+          wardInfo ? { name: wardInfo.name, stakeName: wardInfo.stake_name } : undefined
         );
         return await exportAgendaPdf({
           cards,
@@ -77,7 +79,7 @@ export function useAgendaPdfExport() {
         setIsExporting(false);
       }
     },
-    [hymnLookup, members, t, tFn, wardName, locale]
+    [hymnLookup, members, t, tFn, wardName, wardInfo, locale]
   );
 
   return { exportAgenda, isExporting };

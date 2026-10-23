@@ -333,3 +333,36 @@ describe('buildPresentationCards — recognized people callings (PR1)', () => {
     expect(value).toBe('Ricardo Almeida');
   });
 });
+
+describe('buildPresentationCards — fixed welcome section', () => {
+  const welcomeT = (key: string, fallback?: string) =>
+    key === 'presentation.welcomeText'
+      ? 'Gostaria de fazer todos bem-vindos à Reunião Sacramental da ala {{ward}} da estaca {{stake}}!'
+      : fallback ?? key;
+
+  it('puts the interpolated welcome script before Presiding when ward info is given', () => {
+    const cards = buildPresentationCards(makeAgenda(), [], null, mockHymnLookup, welcomeT, [], {
+      name: 'Jardim das Flores',
+      stakeName: 'Primavera',
+    });
+    const fields = cards[0].fields;
+    expect(fields[0].label).toBe('presentation.welcome');
+    expect(fields[0].value).toBe(
+      'Gostaria de fazer todos bem-vindos à Reunião Sacramental da ala Jardim das Flores da estaca Primavera!'
+    );
+    expect(fields[1].label).toBe('agenda.presiding');
+  });
+
+  it('omits the welcome section when ward info is missing', () => {
+    const cards = buildPresentationCards(makeAgenda(), [], null, mockHymnLookup, mockT);
+    expect(cards[0].fields[0].label).toBe('agenda.presiding');
+  });
+
+  it('omits the welcome section when a name is blank', () => {
+    const cards = buildPresentationCards(makeAgenda(), [], null, mockHymnLookup, mockT, [], {
+      name: 'Jardim das Flores',
+      stakeName: '',
+    });
+    expect(cards[0].fields[0].label).toBe('agenda.presiding');
+  });
+});

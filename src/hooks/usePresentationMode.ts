@@ -116,16 +116,29 @@ export function buildPresentationCards(
   exception: SundayException | null,
   hymnLookup: (id: string | null) => string,
   t: (key: string, fallback?: string) => string,
-  members: Member[] = []
+  members: Member[] = [],
+  wardInfo?: { name: string; stakeName: string }
 ): PresentationCard[] {
   const isSpecial = isSpecialMeeting(exception?.reason ?? null);
   const cards: PresentationCard[] = [];
 
   // Card 1: Welcome & Announcements
-  const welcomeFields: PresentationField[] = [
+  const welcomeFields: PresentationField[] = [];
+  // Fixed welcome script, read aloud before anything else. Only when the
+  // ward/stake names are known — never render a sentence with blanks.
+  if (wardInfo?.name && wardInfo?.stakeName) {
+    welcomeFields.push({
+      label: t('presentation.welcome'),
+      value: t('presentation.welcomeText')
+        .replace('{{ward}}', wardInfo.name)
+        .replace('{{stake}}', wardInfo.stakeName),
+      type: 'multiline',
+    });
+  }
+  welcomeFields.push(
     { label: t('agenda.presiding'), value: agenda?.presiding_name ?? '', type: 'text' },
     { label: t('agenda.conducting'), value: agenda?.conducting_name ?? '', type: 'text' },
-  ];
+  );
   if (agenda?.recognized_names) {
     welcomeFields.push({
       label: t('agenda.recognizing'),

@@ -40,6 +40,7 @@ jest.mock('expo-blur', () => ({
     require('react').createElement('BlurView', p, p.children),
 }));
 jest.mock('../hooks/useWard', () => ({
+  useWardInfo: () => ({ data: undefined }),
   useWardName: () => 'Jardim',
   useWardDesignationTemplates: () => ({ templates: mockState.templates, isLoaded: true }),
 }));

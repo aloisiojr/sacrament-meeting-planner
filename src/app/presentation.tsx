@@ -26,7 +26,7 @@ import { AccordionCard } from '../components/AccordionCard';
 import { SacramentPrayerModal } from '../components/SacramentPrayerModal';
 import { DesignationReadModal } from '../components/DesignationReadModal';
 import { QueryErrorView } from '../components/QueryErrorView';
-import { useWardName, useWardDesignationTemplates } from '../hooks/useWard';
+import { useWardName, useWardInfo, useWardDesignationTemplates } from '../hooks/useWard';
 import { formatFullDate } from '../lib/dateUtils';
 import { getCurrentLanguage } from '../i18n';
 import { PencilIcon, XIcon, ScrollTextIcon } from '../components/icons';
@@ -53,6 +53,7 @@ export default function PresentationScreen() {
   const openDesignationsModal = useCallback(() => setDesignationsModalVisible(true), []);
   const closeDesignationsModal = useCallback(() => setDesignationsModalVisible(false), []);
   const wardName = useWardName();
+  const { data: wardInfo } = useWardInfo();
   const { templates: designationTemplates } = useWardDesignationTemplates();
 
   const sundayDate = params.date ?? getTodaySundayDate();
@@ -78,8 +79,17 @@ export default function PresentationScreen() {
   );
 
   const cards = useMemo(
-    () => buildPresentationCards(agenda ?? null, speeches, exception, hymnLookup, tFn, members),
-    [agenda, speeches, exception, hymnLookup, tFn, members]
+    () =>
+      buildPresentationCards(
+        agenda ?? null,
+        speeches,
+        exception,
+        hymnLookup,
+        tFn,
+        members,
+        wardInfo ? { name: wardInfo.name, stakeName: wardInfo.stake_name } : undefined
+      ),
+    [agenda, speeches, exception, hymnLookup, tFn, members, wardInfo]
   );
 
   const accordionCards = useMemo(

@@ -36,6 +36,7 @@ jest.mock('expo-blur', () => ({
 }));
 
 jest.mock('../hooks/useWard', () => ({
+  useWardInfo: () => ({ data: undefined }),
   useWardName: () => 'Test Ward',
   useWardDesignationTemplates: () => ({ templates: {}, isLoaded: true }),
 }));

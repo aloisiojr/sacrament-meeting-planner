@@ -11,6 +11,13 @@
  * React 19 deprecated it, and @testing-library/react-native is the supported replacement.
  */
 
+// The suite asserts LOCAL-date behaviour (the app deliberately works with local
+// dates, not UTC — see EST-13). Pin the timezone so those assertions are
+// deterministic on any machine: on a UTC runner (GitHub Actions) the local
+// calendar day shifts and dateUtils/local-today fail. Jest workers are forked
+// after this config loads, so they inherit the pinned TZ.
+process.env.TZ = 'America/Sao_Paulo';
+
 /** Packages that ship untranspiled ESM/Flow and must be transformed. */
 const transformIgnorePatterns = [
   'node_modules/(?!((jest-)?react-native|@react-native(-community)?)' +

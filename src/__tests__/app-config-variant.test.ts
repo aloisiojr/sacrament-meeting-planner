@@ -101,9 +101,16 @@ describe('eas.json wires the variant to exactly the staging-facing profiles', ()
     return profile.env ?? (profile.extends ? envFor(profile.extends) : {});
   }
 
-  it('there are exactly two profiles', () => {
-    // One loop for development, one for release. Anything else was an app to keep in sync.
-    expect(Object.keys(eas.build).sort()).toEqual(['development-testflight', 'production']);
+  it('there are exactly three profiles', () => {
+    // One loop for development, one for release, one for store captures (a simulator build of
+    // the dev variant). Anything else was an app to keep in sync.
+    expect(Object.keys(eas.build).sort()).toEqual(['development-testflight', 'production', 'screenshots']);
+  });
+
+  it('screenshots builds the dev variant for the simulator', () => {
+    expect(envFor('screenshots').APP_VARIANT).toBe('development');
+    expect(eas.build.screenshots.ios.simulator).toBe(true);
+    expect(eas.build.screenshots.distribution).toBe('internal');
   });
 
   it('development-testflight builds the dev variant', () => {
